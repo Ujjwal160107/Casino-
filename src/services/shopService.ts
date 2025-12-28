@@ -93,7 +93,9 @@ export async function buyItem(guildId: string, userId: string, itemName: string,
       throw new Error(`You need ${item.price} coins to buy this.`);
     }
 
-    // CHECK: Limit "Chicken" to 1 per person
+    let metaData: any = {};
+
+    // CHECK: Limit "Chicken" to 1 per person & Generate Trait
     if (item.name.toLowerCase() === "chicken") {
       const existingInfo = await tx.inventory.findUnique({
         where: { userId_shopItemId: { userId: user.id, shopItemId: item.id } }
@@ -101,6 +103,20 @@ export async function buyItem(guildId: string, userId: string, itemName: string,
       if (existingInfo && existingInfo.amount >= 1) {
         throw new Error("You can only hold 1 Chicken at a time!");
       }
+
+      const TRAITS = ["Aggressive", "Tank", "Speedster", "Balanced", "Fierce"];
+      const trait = TRAITS[Math.floor(Math.random() * TRAITS.length)];
+
+      metaData = {
+        name: `${user.username}'s Chicken`,
+        level: 0,
+        xp: 0,
+        wins: 0,
+        strength: 0,
+        agility: 0,
+        defense: 0,
+        trait: trait
+      };
     }
 
     await tx.wallet.update({
@@ -118,7 +134,13 @@ export async function buyItem(guildId: string, userId: string, itemName: string,
     // Always add to inventory
     await tx.inventory.upsert({
       where: { userId_shopItemId: { userId: user.id, shopItemId: item.id } },
-      create: { guildId, userId: user.id, shopItemId: item.id, amount: 1 },
+      create: {
+        guildId,
+        userId: user.id,
+        shopItemId: item.id,
+        amount: 1,
+        meta: metaData
+      },
       update: { amount: { increment: 1 } }
     });
 

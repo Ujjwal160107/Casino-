@@ -2,6 +2,8 @@ import { Message, EmbedBuilder } from "discord.js";
 import prisma from "../../utils/prisma";
 import { errorEmbed } from "../../utils/embed";
 import { getGuildConfig } from "../../services/guildConfigService";
+import { getEquipmentSlot } from "../../utils/gameUtils";
+import { GameConfig, EquipmentSlot } from "../../config/gameConfig";
 
 export async function handleEquip(message: Message, args: string[]) {
     if (!message.guild || !message.member) return;
@@ -36,10 +38,12 @@ export async function handleEquip(message: Message, args: string[]) {
         return message.reply({ embeds: [errorEmbed(user, "Missing Item", `You do not own **${shopItem.name}**.`)] });
     }
 
-    // 3. Check if Equippable (Allow list for now)
-    const validEquips = ["spur", "armor", "armour", "shield", "helmet", "glove", "boot", "sword"];
-    if (!validEquips.some(e => shopItem.name.toLowerCase().includes(e))) {
-        return message.reply({ embeds: [errorEmbed(user, "Not Equippable", "This item cannot be equipped to a chicken.")] });
+    // 3. Determine Slot
+    const slot = getEquipmentSlot(shopItem.name);
+    if (!slot) {
+        return message.reply({
+            embeds: [errorEmbed(user, "Not Equippable", "This item cannot be equipped to a chicken.\nOnly weapons (spurs, swords), armor (shields, helmets), and accessories (gloves, boots) can be equipped.")]
+        });
     }
 
     // 4. Get Chicken
@@ -54,37 +58,42 @@ export async function handleEquip(message: Message, args: string[]) {
         return message.reply({ embeds: [errorEmbed(user, "No Chicken", "You need a chicken to equip items!")] });
     }
 
-    // 5. Equip
+    // 5. Equip Logic
     const meta = (chickenInv.meta as any) || {};
-    const oldEquip = meta.equipped ? meta.equipped : "None";
 
-    // Simple slot system: Just one "equipped" slot for simplicity as requested "equip items... Spurs"
-    // Or maybe specific slots? Let's just use "equipped" array or string.
-    // User asked "Equip items to boost effectiveness", "Spurs".
-    // I'll stick to a single slot "equippedItem" or a list "equipment".
-    // For simplicity: One main equipment slot for now OR logic to handle multiple.
-    // Let's use an array `equipment: []`.
+    // Initialize equipment object if missing
+    if (!meta.equipment) meta.equipment = {};
 
-    let equipment: string[] = meta.equipment || [];
+    // Get old item in this slot (if any)
+    const oldItem = meta.equipment[slot] ? meta.equipment[slot].name : "None";
 
-    // If it's the same type, replace? Hard to know type without config.
-    // Let's just add it, max 1.
-    // Actually, "Spurs" imply a weapon.
-    // Let's simplified: `equippedItem` = ID.
+    // Set new item
+    meta.equipment[slot] = {
+        id: shopItem.id,
+        name: shopItem.name
+    };
 
-    meta.equippedItem = shopItem.id;
-    meta.equippedItemName = shopItem.name;
+    // Remove legacy fields if they exist to avoid confusion
+    if (meta.equippedItem) delete meta.equippedItem;
+    if (meta.equippedItemName) delete meta.equippedItemName;
 
     await prisma.inventory.update({
         where: { id: chickenInv.id },
         data: { meta }
     });
 
+    const EMOJI_CHECK = GameConfig.Emojis.Tick || "✅";
+    const slotName = slot.charAt(0).toUpperCase() + slot.slice(1);
+
     const embed = new EmbedBuilder()
         .setColor("#00FF00")
-        .setTitle(`⚔️ Equipped ${shopItem.name}`)
-        .setDescription(`**${shopItem.name}** has been equipped to your chicken!`)
-        .addFields({ name: "Previous Equipment", value: oldEquip !== "None" ? (meta.equippedItemName || "Unknown") : "None" });
+        .setTitle(`${EMOJI_CHECK} Equipped ${shopItem.name}`)
+        .setDescription(`**${shopItem.name}** has been equipped to the **${slotName}** slot!`)
+        .addFields(
+            { name: "Slot", value: slotName, inline: true },
+            { name: "Replaced", value: oldItem, inline: true }
+        )
+        .setFooter({ text: `Check stats with ${config.prefix}chicken` });
 
     return message.reply({ embeds: [embed] });
 }

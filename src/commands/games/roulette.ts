@@ -13,7 +13,7 @@ import { placeBetWithTransaction, placeBetFallback } from "../../services/gameSe
 import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { successEmbed, errorEmbed } from "../../utils/embed";
-import { checkCooldown } from "../../utils/cooldown";
+import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
 import { formatDuration } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 
@@ -104,8 +104,10 @@ export async function handleBet(message: Message, args: string[]) {
     const key = `game:roulette:${message.guildId}:${message.author.id}`;
     const remaining = checkCooldown(key, cdSeconds);
     if (remaining > 0) {
+      const expire = getCooldownExpiry(key);
+      const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
       return message.reply({
-        embeds: [errorEmbed(message.author, "Cooldown Active", `⏳ Please wait **${formatDuration(remaining * 1000)}** before playing Roulette again.`)]
+        embeds: [errorEmbed(message.author, "Cooldown Active", `<:cooldown:1454025354631970826> Please wait <t:${ts}:R> before playing Roulette again.`)]
       });
     }
   }

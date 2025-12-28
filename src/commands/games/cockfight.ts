@@ -16,11 +16,19 @@ import prisma from "../../utils/prisma";
 import { errorEmbed } from "../../utils/embed";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { generateVsImage, generateWinnerImage } from "../../utils/imageUtils";
+import { checkCooldown, getCooldownExpiry, setCooldown } from "../../utils/cooldown";
+import { formatDuration } from "../../utils/format";
+import { calculateTotalStats, calculateCombatScore, getWinChance } from "../../utils/gameUtils";
+import { GameConfig } from "../../config/gameConfig";
 
-const EMOJI_CHICKEN = "<:cock:1451281426329768172>";
-const EMOJI_TICK = "<:n_check:1451281806279311435>";
-const EMOJI_WIN = "<:MoneyBag:1446970451606896781>";
-const EMOJI_RIP = "<:rip:1451287136132403303>";
+
+const EMOJI_CHICKEN = GameConfig.Emojis.Chicken;
+const EMOJI_TICK = GameConfig.Emojis.Tick;
+const EMOJI_WIN = GameConfig.Emojis.Win;
+const EMOJI_RIP = GameConfig.Emojis.Rip;
+
+
+
 
 export async function handleCockFight(message: Message, args: string[]) {
     if (!message.guild || !message.member) return;
@@ -50,6 +58,21 @@ export async function handleCockFight(message: Message, args: string[]) {
 
     if (betAmount < config.minBet) {
         return message.reply({ embeds: [errorEmbed(message.author, "Min Bet", `The minimum bet is **${config.minBet}**. `)] });
+    }
+
+    // Cooldown Check for Challenger
+    const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
+    const cdSeconds = cooldowns["cockfight"] || 0;
+    if (cdSeconds > 0) {
+        const key = `game:cockfight:${message.guild.id}:${message.author.id}`;
+        const remaining = checkCooldown(key, cdSeconds);
+        if (remaining > 0) {
+            const expire = getCooldownExpiry(key);
+            const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
+            return message.reply({
+                embeds: [errorEmbed(message.author, "Cooldown Active", `<:cooldown:1454025354631970826> You are on cooldown. Wait <t:${ts}:R>.`)]
+            });
+        }
     }
 
     const shopItem = await prisma.shopItem.findFirst({
@@ -138,6 +161,29 @@ export async function handleCockFight(message: Message, args: string[]) {
 
         if (i.customId === "cf_accept") {
             if (gameStarted) return;
+
+            // Cooldown Check for Acceptor
+            const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
+            const cdSeconds = cooldowns["cockfight"] || 0;
+            if (cdSeconds > 0) {
+                const key = `game:cockfight:${message.guild!.id}:${targetUser.id}`;
+                const remaining = checkCooldown(key, cdSeconds); // This resets/checks logic, but here we just want to read. 
+                // Wait, checkCooldown actually *sets* if not exists? No, checkCooldown(key, seconds) returns remaining time if exists, else 0. 
+                // But wait, checkCooldown *sets* it if it doesn't exist? 
+                // Looking at util: if (now < expiresAt) return remaining. else set(key, now + seconds). return 0.
+                // WE DO NOT WANT TO SET COOLDOWN ON CHECK HERE. 
+                // We should only check existence.
+                // Let's use getCooldownExpiry manually or checkCooldown with 0? No.
+                // We need to use `getCooldownExpiry` to check without setting.
+
+                const existingExpiry = getCooldownExpiry(key);
+                if (existingExpiry && existingExpiry > Date.now()) {
+                    const ts = Math.floor(existingExpiry / 1000);
+                    await i.reply({ content: `<:cooldown:1454025354631970826> You are on cooldown! Wait <t:${ts}:R>.`, ephemeral: true });
+                    return;
+                }
+            }
+
             gameStarted = true;
 
             try {
@@ -358,42 +404,30 @@ async function runCockFight(
         const p2Meta = (p2Inv?.meta as any) || {};
         const p2Level = p2Meta.level || 0;
 
-        // --- EQUIPMENT BONUSES ---
-        const getEquipBonus = (itemName: string | undefined): { str: number, agi: number, def: number } => {
-            if (!itemName) return { str: 0, agi: 0, def: 0 };
-            const name = itemName.toLowerCase();
-            let bonus = { str: 0, agi: 0, def: 0 };
-
-            if (name.includes("spur")) bonus.str += 2; // +Strength (Win Chance)
-            if (name.includes("sword")) bonus.str += 2;
-
-            if (name.includes("armor")) bonus.def += 2; // +Defense (Survival)
-            if (name.includes("shield")) bonus.def += 2;
-            if (name.includes("helmet")) bonus.def += 1;
-
-            if (name.includes("glove")) bonus.agi += 2; // +Agility (Dodge)
-            if (name.includes("boot")) bonus.agi += 2;
-
-            return bonus;
+        // Helper to get equipment list
+        const getEquipList = (meta: any) => {
+            const list: string[] = [];
+            if (meta.equipment) {
+                // New Format
+                Object.values(meta.equipment).forEach((e: any) => list.push(e.name));
+            } else if (meta.equippedItemName) {
+                // Legacy Format
+                list.push(meta.equippedItemName);
+            }
+            return list;
         };
 
-        const p1Equip = getEquipBonus(p1Meta.equippedItemName);
-        const p2Equip = getEquipBonus(p2Meta.equippedItemName);
+        const p1Equips = getEquipList(p1Meta);
+        const p2Equips = getEquipList(p2Meta);
 
-        // Apply Bonuses
-        const p1Str = (p1Meta.strength || 0) + p1Equip.str;
-        const p1Agi = (p1Meta.agility || 0) + p1Equip.agi;
-        const p1Def = (p1Meta.defense || 0) + p1Equip.def;
+        const p1Stats = calculateTotalStats({ str: p1Meta.strength || 0, agi: p1Meta.agility || 0, def: p1Meta.defense || 0 }, p1Meta.trait, p1Equips);
+        const p2Stats = calculateTotalStats({ str: p2Meta.strength || 0, agi: p2Meta.agility || 0, def: p2Meta.defense || 0 }, p2Meta.trait, p2Equips);
 
-        const p2Str = (p2Meta.strength || 0) + p2Equip.str;
-        const p2Agi = (p2Meta.agility || 0) + p2Equip.agi;
-        const p2Def = (p2Meta.defense || 0) + p2Equip.def;
+        const p1Score = calculateCombatScore(p1Level, p1Stats);
+        const p2Score = calculateCombatScore(p2Level, p2Stats);
 
-        const p1Score = (10 + (p1Level * 2)) * (1 + (p1Str * 0.1));
-        const p2Score = (10 + (p2Level * 2)) * (1 + (p2Str * 0.1));
-
-        const totalScore = p1Score + p2Score;
-        const p1Chance = p1Score / totalScore;
+        const winChancePercent = getWinChance(p1Score, p2Score);
+        const p1Chance = winChancePercent / 100;
 
         const rng = Math.random();
         const winnerIsP1 = rng < p1Chance;
@@ -403,7 +437,8 @@ async function runCockFight(
         const winnerKey = winnerIsP1 ? "p1" : "p2";
         const winnerLevel = winnerIsP1 ? p1Level : p2Level;
 
-        const winChancePercent = (winnerIsP1 ? p1Chance : (1 - p1Chance)) * 100;
+        // Use the calculated win chance for display (if P1 won, it's p1Chance, else it's 100 - p1Chance)
+        const displayWinChance = winnerIsP1 ? winChancePercent : (100 - winChancePercent);
 
         // --- SIMULATION START ---
         await gameMsg.edit({ components: [] }); // Remove bet buttons
@@ -425,8 +460,12 @@ async function runCockFight(
             const isP1Attacking = Math.random() > 0.5;
             const attacker = isP1Attacking ? p1.username : p2.username;
             const defender = isP1Attacking ? p2.username : p1.username;
-            const defenderDodgeChance = (isP1Attacking ? p2Agi : p1Agi) * 0.02; // 2% per agility
-            const attackerCritChance = (isP1Attacking ? p1Str : p2Str) * 0.01; // 1% per strength optional flavor
+
+            // Stats for flavor text logic
+            const attStats = isP1Attacking ? p1Stats : p2Stats;
+            const defStats = isP1Attacking ? p2Stats : p1Stats;
+
+            const defenderDodgeChance = defStats.agi * 0.02; // 2% per agility
 
             let moveText = "";
             const moveRoll = Math.random();
@@ -492,22 +531,16 @@ async function runCockFight(
             requiredXp = (newLevel + 1) * 100;
         }
 
-        // --- UPDATE WINNER (AND BREAK ITEM) ---
+        // --- UPDATE WINNER (FIXED: DO NOT BREAK EQUIPMENT) ---
         payoutOps.push(prisma.inventory.update({
             where: { userId_shopItemId: { userId: wId, shopItemId: chickenItemId } },
             data: {
                 meta: {
+                    ...((winnerIsP1 ? p1Meta : p2Meta) as any), // Keep existing meta (including equipment)
                     level: newLevel,
                     wins: newWins,
                     xp: newXp,
-                    strength: (winnerIsP1 ? p1Meta.strength : p2Meta.strength) || 0,
-                    agility: (winnerIsP1 ? p1Meta.agility : p2Meta.agility) || 0,
-                    defense: (winnerIsP1 ? p1Meta.defense : p2Meta.defense) || 0,
-                    name: (winnerIsP1 ? p1Meta.name : p2Meta.name),
-                    // BREAK ITEM: Remove equipped data
-                    equippedItem: null,
-                    equippedItemName: null,
-                    training: (winnerIsP1 ? p1Meta.training : p2Meta.training) // Should be null anyway
+                    training: (winnerIsP1 ? p1Meta.training : p2Meta.training) // Keep training status if any (though shouldn't fight if training)
                 }
             }
         }));
@@ -515,20 +548,28 @@ async function runCockFight(
         const lId = await getUserId(loserUser.id, guildId);
         // DEATH MECHANIC UPDATE:
         // 5% Chance of Permadeath. 95% Chance of Injury.
-        // Equipment is ALREADY broken in the "Saved" case calculation above? Wait, we need to redo that.
-        // We'll treat "Saved" as "Injured".
+        // Equipment is broken (Cleared) on Injury.
 
-        const DEATH_CHANCE = 0.05; // 5%
-        const isDead = Math.random() < DEATH_CHANCE;
+        const loserLevel = winnerIsP1 ? p2Level : p1Level;
+        const levelDiff = Math.max(0, winnerLevel - loserLevel);
+
+        let deathChance = 0.05; // Base 5%
+        if (levelDiff > 0) {
+            deathChance += (levelDiff * 0.02); // +2% per level difference
+        }
+        deathChance = Math.min(deathChance, 0.50); // Cap at 50%
+
+        const isDead = Math.random() < deathChance;
 
         if (!isDead) {
             // INJURED STATE (95%)
             const loserMeta = winnerIsP1 ? p2Meta : p1Meta;
             const newLoserMeta = JSON.parse(JSON.stringify(loserMeta));
 
-            // Break Item
+            // Break Item (Clear Equipment)
             delete newLoserMeta.equippedItem;
             delete newLoserMeta.equippedItemName;
+            delete newLoserMeta.equipment; // Clear new format too
 
             // Apply Injury (2 Hours)
             newLoserMeta.injured = {
@@ -572,7 +613,7 @@ async function runCockFight(
 **Battle Stats:**
 • Winner Level: ${winnerLevel} ${leveledUp ? `➔ **${newLevel}** (LEVEL UP!)` : `(XP: +${XP_PER_WIN})`}
 • Progress: ${progressBar}
-• Win Chance: ${winChancePercent.toFixed(1)}%
+• Win Chance: ${displayWinChance.toFixed(1)}%
 `)
             .setImage("attachment://winner.png")
             .addFields(
@@ -580,6 +621,14 @@ async function runCockFight(
                 { name: `${EMOJI_WIN} Side Winners`, value: sideWinnersText, inline: false },
                 { name: "Stats", value: `Total Pot: ${pot}\nSide ROI: ${sidePayoutRatio.toFixed(2)}x`, inline: false }
             );
+
+        // Set Cooldowns for NEXT fight
+        const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
+        const cdSeconds = cooldowns["cockfight"] || 0;
+        if (cdSeconds > 0) {
+            setCooldown(`game:cockfight:${guildId}:${p1.id}`, cdSeconds);
+            setCooldown(`game:cockfight:${guildId}:${p2.id}`, cdSeconds);
+        }
 
         await gameMsg.edit({ embeds: [resultEmbed], components: [], files: [winnerImage] });
     });

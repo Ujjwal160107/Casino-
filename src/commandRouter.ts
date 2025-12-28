@@ -201,6 +201,11 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "setcockfight":
       const { handleSetCockfight } = require("./commands/admin/setCockfight");
       return handleSetCockfight(message, args);
+    case "set-chicken":
+    case "manage-chicken":
+    case "setchicken":
+      const { handleManageChicken } = require("./commands/admin/manageChicken");
+      return handleManageChicken(message, args);
     case "add-money":
     case "admin-add":
       return handleAddMoney(message, args);
@@ -214,6 +219,14 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "set-income-cooldown":
     case "set-income-cd":
       return handleSetIncomeCooldown(message, args);
+    case "set-global-game-cooldown":
+    case "set-global-cd":
+      const { handleSetGlobalGameCooldown } = require("./commands/admin/setGlobalGameCooldown");
+      return handleSetGlobalGameCooldown(message, args);
+    case "set-game-cooldown":
+    case "set-game-cd":
+    case "game-cd":
+      return handleSetGameCooldown(message, args);
     case "reset-economy":
       return handleResetEconomy(message, args);
     case "set-currency":
@@ -350,6 +363,12 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "equip": {
       const { handleEquip } = require("./commands/economy/equip");
       return handleEquip(message, args);
+    }
+    case "cockstore":
+    case "cs":
+    case "cock-store": {
+      const { handleCockStore } = require("./commands/shop/cockStore");
+      return handleCockStore(message, args);
     }
     default:
       const VALID_COMMANDS = [

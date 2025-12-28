@@ -4,7 +4,7 @@ import { placeBetWithTransaction, placeBetFallback } from "../../services/gameSe
 import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { successEmbed, errorEmbed } from "../../utils/embed";
-import { checkCooldown } from "../../utils/cooldown";
+import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
 import { formatDuration } from "../../utils/format";
 
 const CHERRY = "<:cherri:1446428169786622053>";
@@ -44,13 +44,13 @@ export async function handleSlots(message: Message, args: string[]) {
   const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
   const cdSeconds = cooldowns["slots"] || 0;
   if (cdSeconds > 0) {
-    const { checkCooldown } = require("../../utils/cooldown");
-    const now = Date.now();
     const key = `game:slots:${message.guildId}:${message.author.id}`;
     const remaining = checkCooldown(key, cdSeconds);
     if (remaining > 0) {
+      const expire = getCooldownExpiry(key);
+      const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
       return message.reply({
-        embeds: [errorEmbed(message.author, "Cooldown Active", `⏳ Please wait **${formatDuration(remaining * 1000)}** before playing Slots again.`)]
+        embeds: [errorEmbed(message.author, "Cooldown Active", `<:cooldown:1454025354631970826> Please wait <t:${ts}:R> before playing Slots again.`)]
       });
     }
   }
