@@ -37,6 +37,7 @@ const setTheme_1 = require("./commands/general/setTheme");
 const casinoBan_1 = require("./commands/admin/casinoBan");
 const casinoUnban_1 = require("./commands/admin/casinoUnban");
 const casinoBanList_1 = require("./commands/admin/casinoBanList");
+const setGameCooldown_1 = require("./commands/admin/setGameCooldown");
 const roulette_1 = require("./commands/games/roulette");
 const blackjack_1 = require("./commands/games/blackjack");
 const coinflip_1 = require("./commands/games/coinflip");
@@ -50,6 +51,7 @@ const embed_1 = require("./utils/embed");
 const stringUtils_1 = require("./utils/stringUtils");
 const use_1 = require("./commands/economy/use");
 const iteminfo_1 = require("./commands/economy/iteminfo");
+const branding_1 = require("./config/branding");
 async function routeMessage(client, message, prefix) {
     const raw = message.content.slice(1).trim();
     const [cmd, ...args] = raw.split(/\s+/);
@@ -192,6 +194,15 @@ async function routeMessage(client, message, prefix) {
         case "feed":
             const { handleFeed } = require("./commands/games/feed");
             return handleFeed(message, args);
+        case "set-cockfight":
+        case "setcockfight":
+            const { handleSetCockfight } = require("./commands/admin/setCockfight");
+            return handleSetCockfight(message, args);
+        case "set-chicken":
+        case "manage-chicken":
+        case "setchicken":
+            const { handleManageChicken } = require("./commands/admin/manageChicken");
+            return handleManageChicken(message, args);
         case "add-money":
         case "admin-add":
             return (0, addMoney_1.handleAddMoney)(message, args);
@@ -205,6 +216,14 @@ async function routeMessage(client, message, prefix) {
         case "set-income-cooldown":
         case "set-income-cd":
             return (0, setIncomeCooldown_1.handleSetIncomeCooldown)(message, args);
+        case "set-global-game-cooldown":
+        case "set-global-cd":
+            const { handleSetGlobalGameCooldown } = require("./commands/admin/setGlobalGameCooldown");
+            return handleSetGlobalGameCooldown(message, args);
+        case "set-game-cooldown":
+        case "set-game-cd":
+        case "game-cd":
+            return (0, setGameCooldown_1.handleSetGameCooldown)(message, args);
         case "reset-economy":
             return (0, resetEconomy_1.handleResetEconomy)(message, args);
         case "set-currency":
@@ -244,6 +263,12 @@ async function routeMessage(client, message, prefix) {
             return (0, setEconomyConfig_1.handleSetEconomyConfig)(message, args, "bank-limit");
         case "set-wallet-limit":
             return (0, setEconomyConfig_1.handleSetEconomyConfig)(message, args, "wallet-limit");
+        case "uni":
+        case "university":
+            {
+                const { handleEducation } = require("./commands/life/education");
+                return handleEducation(message, args);
+            }
         case "set-fd-interest":
         case "set-fd":
             return (0, setEconomyConfig_1.handleSetEconomyConfig)(message, args, "fd");
@@ -338,6 +363,95 @@ async function routeMessage(client, message, prefix) {
         case "item": {
             return (0, iteminfo_1.handleItemInfo)(message, args);
         }
+        case "equip": {
+            const { handleEquip } = require("./commands/economy/equip");
+            return handleEquip(message, args);
+        }
+        case "cockstore":
+        case "cs": {
+            const { handleCockStore } = require("./commands/shop/cockStore");
+            return handleCockStore(message, args);
+        }
+        case "degrees":
+        case "mydegrees":
+        case "degree": {
+            const { handleListDegrees } = require("./commands/life/education");
+            return handleListDegrees(message);
+        }
+        case "jobs": {
+            const { handleJobs } = require("./commands/life/jobs");
+            return handleJobs(message, args);
+        }
+        case "apply": {
+            const { handleApply } = require("./commands/life/apply");
+            return handleApply(message, args);
+        }
+        case "freelance": {
+            const { handleFreelance } = require("./commands/life/freelance");
+            return handleFreelance(message, args);
+        }
+        case "resign": {
+            const { handleResign } = require("./commands/life/resign");
+            return handleResign(message, args);
+        }
+        // EDUCATION
+        case "education":
+        case "edu":
+        case "school": {
+            const { handleEducation } = require("./commands/life/education");
+            return handleEducation(message, args);
+        }
+        case "study": {
+            const { handleStudy } = require("./commands/life/study");
+            return handleStudy(message);
+        }
+        case "enroll": {
+            const { handleEnroll } = require("./commands/life/enroll");
+            return handleEnroll(message, args);
+        }
+        case "exam":
+        case "finals": {
+            const { handleExam } = require("./commands/life/enroll");
+            return handleExam(message);
+        }
+        case "dropout": {
+            const { handleDropout } = require("./commands/life/dropout");
+            return handleDropout(message);
+        }
+        // --- Education Admin ---
+        case "setgpa": {
+            const { handleSetGpa } = require("./commands/admin/educationAdmin");
+            return handleSetGpa(message, args);
+        }
+        case "setint":
+        case "setintelligence": {
+            const { handleSetInt } = require("./commands/admin/educationAdmin");
+            return handleSetInt(message, args);
+        }
+        case "setdis":
+        case "setdiscipline": {
+            const { handleSetDis } = require("./commands/admin/educationAdmin");
+            return handleSetDis(message, args);
+        }
+        case "resetedu": {
+            const { handleResetEdu } = require("./commands/admin/educationAdmin");
+            return handleResetEdu(message, args);
+        }
+        case "grantdegree": {
+            const { handleGrantDegree } = require("./commands/admin/educationAdmin");
+            return handleGrantDegree(message, args);
+        }
+        case "set-degree-cost":
+        case "setdegree":
+        case "settuition": {
+            const { handleSetDegreeCost } = require("./commands/admin/educationAdmin");
+            return handleSetDegreeCost(message, args);
+        }
+        case "set-study-cooldown":
+        case "setstudycd": {
+            const { handleSetStudyCooldown } = require("./commands/admin/educationAdmin");
+            return handleSetStudyCooldown(message, args);
+        }
         default:
             const VALID_COMMANDS = [
                 "balance", "bank", "deposit", "withdraw", "transfer", "collect",
@@ -354,13 +468,18 @@ async function routeMessage(client, message, prefix) {
                 "ask-money", "config-rob", "add-emoji", "set-income-cd", "set-prefix",
                 "set-currency-emoji", "adminpanel"
             ];
+            const thinkUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Think);
             const bestMatch = (0, stringUtils_1.findBestMatch)(command, VALID_COMMANDS);
             if (bestMatch) {
-                return message.reply({
-                    embeds: [(0, embed_1.errorEmbed)(message.author, "Unknown Command", `Did you mean \`${prefix}${bestMatch}\`?`)]
-                });
+                const embed = (0, embed_1.errorEmbed)(message.author, "Unknown Command", `Did you mean \`${prefix}${bestMatch}\`?`);
+                if (thinkUrl)
+                    embed.setThumbnail(thinkUrl);
+                return message.reply({ embeds: [embed] });
             }
-            return message.reply(`Unknown command. Try: \`${prefix}bal\`, \`${prefix}shop\`, \`${prefix}inv\`, \`${prefix}help\`.`);
+            const embed = (0, embed_1.errorEmbed)(message.author, "Unknown Command", `Command not found. Try: \`${prefix}bal\`, \`${prefix}shop\`, \`${prefix}inv\`, \`${prefix}help\`.`);
+            if (thinkUrl)
+                embed.setThumbnail(thinkUrl);
+            return message.reply({ embeds: [embed] });
     }
 }
 //# sourceMappingURL=commandRouter.js.map

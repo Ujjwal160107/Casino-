@@ -15,6 +15,7 @@ import {
 } from "discord.js";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { emojiInline } from "../../utils/emojiRegistry";
+import { Mascot } from "../../config/branding";
 
 interface AdminPageData {
   title: string;
@@ -173,9 +174,9 @@ export async function handleHelp(message: Message) {
   };
 
   const overview = new EmbedBuilder()
-    .setTitle(`${config.currencyEmoji} Casino Bot — Help Menu`)
+    .setTitle(`${Mascot.Emotes.Success} ${Mascot.Name} — Help Menu`)
     .setDescription(`Use the dropdown below to explore commands.\nServer Prefix: \`${prefix}\``)
-    .setColor(Colors.DarkPurple)
+    .setColor(Mascot.Colors.Base as any)
     .setThumbnail(message.client.user?.displayAvatarURL() ?? null);
 
   const row = createDropdownRow();
@@ -192,7 +193,7 @@ export async function handleHelp(message: Message) {
   collector.on("collect", async (i) => {
     if (i.isStringSelectMenu()) {
       const val = i.values[0];
-      let embed = new EmbedBuilder().setColor(Colors.Blurple);
+      let embed = new EmbedBuilder().setColor(Mascot.Colors.Base as any);
 
       if (val === "economy") {
         embed.setTitle(`${strEconomy} Economy & Shop`)
@@ -268,7 +269,7 @@ export async function handleHelp(message: Message) {
 
           const newPageData = adminPages[currentAdminPage - 1];
           const newEmbed = new EmbedBuilder()
-            .setColor(Colors.Blurple)
+            .setColor(Mascot.Colors.Base as any)
             .setTitle(newPageData.title)
             .addFields(newPageData.fields);
 

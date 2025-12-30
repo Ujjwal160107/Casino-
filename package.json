@@ -25,6 +25,7 @@
   },
   "homepage": "https://github.com/BEAST6869/Casino-#readme",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.22.0",
     "@types/node-cron": "^3.0.11",
     "canvas": "^3.2.0",

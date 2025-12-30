@@ -3,7 +3,7 @@ export const GameConfig = {
         Chicken: "<:cock:1451281426329768172>",
         Win: "<:MoneyBag:1446970451606896781>",
         Rip: "<:rip:1451287136132403303>",
-        Tick: "<:n_check:1451281806279311435>",
+        Tick: "<:tick:1455105986120515656>",
         Cooldown: "<:cooldown:1454025354631970826>",
         Clinic: "<:clinic:1453972244610154507>",
         Medicine: "<:medicine:1453973645675200727>",

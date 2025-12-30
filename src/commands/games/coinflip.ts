@@ -6,6 +6,7 @@ import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
 import { formatDuration } from "../../utils/format";
+import { Mascot, getEmoteUrl } from "../../config/branding";
 
 export async function handleCoinflip(message: Message, args: string[]) {
   const config = await getGuildConfig(message.guildId!);
@@ -59,7 +60,7 @@ export async function handleCoinflip(message: Message, args: string[]) {
       const expire = getCooldownExpiry(key);
       const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
       return message.reply({
-        embeds: [errorEmbed(message.author, "Cooldown Active", `<:cooldown:1454025354631970826> Please wait <t:${ts}:R> before flipping again.`)]
+        embeds: [errorEmbed(message.author, "Cooldown Active", `${Mascot.Emotes.Angry} Please wait <t:${ts}:R> before flipping again.`)]
       });
     }
   }
@@ -112,14 +113,10 @@ export async function handleCoinflip(message: Message, args: string[]) {
       footerIconURL = `https://cdn.discordapp.com/emojis/${match[0]}.gif?quality=lossless`;
     }
   }
+
   const embed = new EmbedBuilder()
-    .setTitle(didWin ? "🎉 You Won!" : "💀 You Lost")
+    .setTitle(didWin ? "You Won!" : "You Lost")
     .setColor(didWin ? Colors.Green : Colors.Red)
-    .setThumbnail(
-      didWin
-        ? "https://media.tenor.com/d6Jd-9w8eJkAAAAC/success-kid-hell-yeah.gif"
-        : null
-    )
     .setDescription(
       `**You Bet:** ${fmtCurrency(amount, emoji)} on \`${choice.toUpperCase()}\`\n` +
       `**The Coin Flipped:** 🪙 \`${result.toUpperCase()}\`\n\n` +
@@ -128,8 +125,20 @@ export async function handleCoinflip(message: Message, args: string[]) {
         : `**Lost:** ${fmtCurrency(amount, emoji)}`)
     )
     .setFooter({
-      text: `${message.author.username}'s Wallet: ${finalWalletBalanceIntl}`,
+      text: `${Mascot.Name} • ${message.author.username}'s Wallet: ${finalWalletBalanceIntl}`,
       iconURL: footerIconURL,
     });
+
+  if (didWin) {
+    embed.setThumbnail("https://media.tenor.com/d6Jd-9w8eJkAAAAC/success-kid-hell-yeah.gif");
+  } else {
+    const failUrl = getEmoteUrl(Mascot.Emotes.Fail);
+    // Only set fail thumbnail if not overriden or if specific logic applies (User said "where thumbnail... exist dont use it").
+    // Coinflip loss didn't have a thumbnail before. So adding one is "enhancement" or "keeping it normal"?
+    // "where thumbnail emojis already exist dont use it there keep it normal there"
+    // Coinflips normally don't have a LOSS thumbnail. Adding one might be good.
+    // Actually, let's Stick to the requested pattern: Use thumbnails for branding. 
+    if (failUrl) embed.setThumbnail(failUrl);
+  }
   return message.reply({ embeds: [embed] });
 }

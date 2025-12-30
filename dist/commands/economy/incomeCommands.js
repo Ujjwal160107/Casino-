@@ -1,12 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleIncome = handleIncome;
+const branding_1 = require("../../config/branding");
 const walletService_1 = require("../../services/walletService");
 const incomeService_1 = require("../../services/incomeService");
 const guildConfigService_1 = require("../../services/guildConfigService");
 const embed_1 = require("../../utils/embed");
 const format_1 = require("../../utils/format");
 const discordLogger_1 = require("../../utils/discordLogger");
+const branding_2 = require("../../config/branding");
 async function handleIncome(message) {
     const [cmd] = message.content.slice(1).split(/\s+/);
     const commandKey = cmd.toLowerCase();
@@ -32,9 +34,11 @@ async function handleIncome(message) {
                 description: `**User:** ${message.author.tag}\n**Amount:** ${(0, format_1.fmtCurrency)(res.amount, emoji)}`,
                 color: 0x00FF00
             });
-            return message.reply({
-                embeds: [(0, embed_1.successEmbed)(message.author, `${commandKey.toUpperCase()} SUCCESS`, `You earned **${(0, format_1.fmtCurrency)(res.amount, emoji)}**!`)]
-            });
+            const branded = (0, embed_1.successEmbed)(message.author, `${commandKey.toUpperCase()} SUCCESS`, `You earned **${(0, format_1.fmtCurrency)(res.amount, emoji)}**!`);
+            const moneyUrl = (0, branding_1.getEmoteUrl)(branding_2.Mascot.Emotes.Money);
+            if (moneyUrl)
+                branded.setThumbnail(moneyUrl);
+            return message.reply({ embeds: [branded] });
         }
         else {
             await (0, discordLogger_1.logToChannel)(message.client, {
@@ -50,7 +54,16 @@ async function handleIncome(message) {
         }
     }
     catch (err) {
-        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Cooldown", err.message)] });
+        // Cooldown or other errors
+        const isCooldown = err.message.toLowerCase().includes("wait");
+        if (isCooldown) {
+            const branded = (0, embed_1.errorEmbed)(message.author, "Cooldown Active", err.message);
+            const angryUrl = (0, branding_1.getEmoteUrl)(branding_2.Mascot.Emotes.Angry);
+            if (angryUrl)
+                branded.setThumbnail(angryUrl);
+            return message.reply({ embeds: [branded] });
+        }
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Error", err.message)] });
     }
 }
 //# sourceMappingURL=incomeCommands.js.map

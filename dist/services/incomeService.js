@@ -30,6 +30,22 @@ async function getIncomeConfigOrDefault(guildId, commandKey) {
     }
     return { minPay: 10, maxPay: 50, cooldown: 60, successPct: 100, failPenaltyPct: 50 };
 }
+const executeTx = async (fn, retries = 3) => {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await fn();
+        }
+        catch (error) {
+            const msg = error?.message?.toLowerCase() || "";
+            if (i < retries - 1 && (msg.includes("deadlock") || msg.includes("write conflict") || msg.includes("busy"))) {
+                await new Promise(r => setTimeout(r, Math.random() * 200 + 50));
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw new Error("Transaction failed max retries");
+};
 async function runIncomeCommand({ commandKey, discordId, guildId, userId, walletId }) {
     const cfg = await getIncomeConfigOrDefault(guildId, commandKey);
     const cooldownKey = `income:${guildId}:${discordId}:${commandKey}`;
@@ -45,20 +61,22 @@ async function runIncomeCommand({ commandKey, discordId, guildId, userId, wallet
     if (!success) {
         const penaltyPct = cfg.failPenaltyPct ?? 50;
         const penalty = Math.max(1, Math.floor((amount * penaltyPct) / 100));
-        await prisma_1.default.$transaction([
-            prisma_1.default.transaction.create({
-                data: {
-                    walletId,
-                    amount: -penalty,
-                    type: `${commandKey}_fail`,
-                    meta: { penalty, attempted: amount, penaltyPct }
-                }
-            }),
-            prisma_1.default.wallet.update({
-                where: { id: walletId },
-                data: { balance: { decrement: penalty } }
-            })
-        ]);
+        await executeTx(async () => {
+            await prisma_1.default.$transaction([
+                prisma_1.default.transaction.create({
+                    data: {
+                        walletId,
+                        amount: -penalty,
+                        type: `${commandKey}_fail`,
+                        meta: { penalty, attempted: amount, penaltyPct }
+                    }
+                }),
+                prisma_1.default.wallet.update({
+                    where: { id: walletId },
+                    data: { balance: { decrement: penalty } }
+                })
+            ]);
+        });
         return { success: false, amount: -penalty, penalty, attempted: amount };
     }
     if (guildId) {
@@ -70,21 +88,23 @@ async function runIncomeCommand({ commandKey, discordId, guildId, userId, wallet
             }
         }
     }
-    await prisma_1.default.$transaction([
-        prisma_1.default.transaction.create({
-            data: {
-                walletId,
-                amount,
-                type: `${commandKey}_income`,
-                meta: { commandKey },
-                isEarned: true
-            }
-        }),
-        prisma_1.default.wallet.update({
-            where: { id: walletId },
-            data: { balance: { increment: amount } }
-        })
-    ]);
+    await executeTx(async () => {
+        await prisma_1.default.$transaction([
+            prisma_1.default.transaction.create({
+                data: {
+                    walletId,
+                    amount,
+                    type: `${commandKey}_income`,
+                    meta: { commandKey },
+                    isEarned: true
+                }
+            }),
+            prisma_1.default.wallet.update({
+                where: { id: walletId },
+                data: { balance: { increment: amount } }
+            })
+        ]);
+    });
     return { success: true, amount };
 }
 //# sourceMappingURL=incomeService.js.map

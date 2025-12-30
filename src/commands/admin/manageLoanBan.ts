@@ -3,6 +3,7 @@ import prisma from "../../utils/prisma";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
 import { getGuildConfig } from "../../services/guildConfigService";
+import { Mascot } from "../../config/branding";
 
 export async function handleLoanBan(message: Message, args: string[]) {
     if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
@@ -83,7 +84,7 @@ export async function handleLoanUnban(message: Message, args: string[]) {
             color: 0x00FF00
         });
         return message.reply({
-            embeds: [successEmbed(message.author, "User Unbanned", `✅ **${targetUser.tag}** can now take loans again.`)]
+            embeds: [successEmbed(message.author, "User Unbanned", `${Mascot.Emotes.Accept} **${targetUser.tag}** can now take loans again.`)]
         });
     } catch (e) {
         console.error(e);

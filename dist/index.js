@@ -40,51 +40,34 @@ if (!token) {
     console.error("DISCORD_TOKEN is missing in your .env");
     process.exit(1);
 }
-const client = new discord_js_1.Client({
-    intents: [
-        discord_js_1.GatewayIntentBits.Guilds,
-        discord_js_1.GatewayIntentBits.GuildMessages,
-        discord_js_1.GatewayIntentBits.MessageContent,
-    ],
-    partials: [discord_js_1.Partials.Channel],
-});
-client.once("ready", async () => {
-    console.log(`✅ Logged in as ${client.user?.tag}`);
+const client = new discord_js_1.Client({ intents: [discord_js_1.GatewayIntentBits.Guilds, discord_js_1.GatewayIntentBits.GuildMessages, discord_js_1.GatewayIntentBits.MessageContent,], partials: [discord_js_1.Partials.Channel], });
+client.once("ready", async () => { console.log(`✅ Logged in as ${client.user?.tag}`); try {
+    await prisma_1.default.$connect();
+    console.log("📦 Prisma connected");
+}
+catch (err) {
+    console.error("Prisma connection failed:", err);
+    process.exit(1);
+} await (0, emojiRegistry_1.initEmojiRegistry)(client); console.log("Emoji registry keys:", (0, emojiRegistry_1.listEmojiKeys)().slice(0, 200)); (0, xpListener_1.setupXpListener)(client); (0, scheduler_1.initScheduler)(client); if (slashData.length > 0) {
+    const rest = new discord_js_1.REST({ version: "10" }).setToken(token);
     try {
-        await prisma_1.default.$connect();
-        console.log("📦 Prisma connected");
-    }
-    catch (err) {
-        console.error("Prisma connection failed:", err);
-        process.exit(1);
-    }
-    await (0, emojiRegistry_1.initEmojiRegistry)(client);
-    console.log("Emoji registry keys:", (0, emojiRegistry_1.listEmojiKeys)().slice(0, 200));
-    (0, xpListener_1.setupXpListener)(client);
-    (0, scheduler_1.initScheduler)(client);
-    if (slashData.length > 0) {
-        const rest = new discord_js_1.REST({ version: "10" }).setToken(token);
-        try {
-            for (const [guildId] of client.guilds.cache) {
-                try {
-                    await rest.put(discord_js_1.Routes.applicationGuildCommands(client.user.id, guildId), {
-                        body: slashData,
-                    });
-                    console.log(`Registered ${slashData.length} slash command(s) in guild ${guildId}`);
-                }
-                catch (gerr) {
-                    console.warn(`Failed to register slash commands in guild ${guildId}:`, gerr);
-                }
+        for (const [guildId] of client.guilds.cache) {
+            try {
+                await rest.put(discord_js_1.Routes.applicationGuildCommands(client.user.id, guildId), { body: slashData, });
+                console.log(`Registered ${slashData.length} slash command(s) in guild ${guildId}`);
+            }
+            catch (gerr) {
+                console.warn(`Failed to register slash commands in guild ${guildId}:`, gerr);
             }
         }
-        catch (err) {
-            console.error("Error while registering slash commands:", err);
-        }
     }
-    else {
-        console.log("No slash commands to register.");
+    catch (err) {
+        console.error("Error while registering slash commands:", err);
     }
-});
+}
+else {
+    console.log("No slash commands to register.");
+} });
 client.on("interactionCreate", async (interaction) => {
     try {
         if (interaction.isChatInputCommand()) {
@@ -104,6 +87,10 @@ client.on("interactionCreate", async (interaction) => {
         }
         if (id.startsWith("inv_")) {
             return await (0, inventoryInteractionHandler_1.handleInventoryInteraction)(interaction);
+        }
+        if (id.startsWith("enroll_confirm_") || id.startsWith("claim_scholarship_") || id.startsWith("stress_") || id.startsWith("confirm_stress_") || id === "cancel_stress") {
+            const { handleLifeInteraction } = require("./handlers/lifeInteractionHandler");
+            return await handleLifeInteraction(interaction);
         }
         if (id.startsWith("ask_")) {
             const { handleAskInteraction } = require("./handlers/askInteractionHandler");

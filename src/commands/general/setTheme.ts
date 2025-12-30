@@ -9,6 +9,7 @@ import {
 } from "discord.js";
 import prisma from "../../utils/prisma";
 import { getGuildConfig } from "../../services/guildConfigService";
+import { Mascot } from "../../config/branding";
 
 export async function handleSetTheme(message: Message, args: string[]) {
   const config = await getGuildConfig(message.guildId!);
@@ -77,7 +78,7 @@ export async function handleSetTheme(message: Message, args: string[]) {
       update: { profileTheme: theme }
     });
     await i.update({
-      content: `✅ Profile theme updated to **${theme}**! Check it with \`${config.prefix}profile\`.`,
+      content: `${Mascot.Emotes.Accept} Profile theme updated to **${theme}**! Check it with \`${config.prefix}profile\`.`,
       embeds: [],
       components: []
     });

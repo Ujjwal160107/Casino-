@@ -12,6 +12,7 @@ exports.formatTimeRemaining = formatTimeRemaining;
 const prisma_1 = __importDefault(require("../utils/prisma"));
 const discord_js_1 = require("discord.js");
 const discordLogger_1 = require("../utils/discordLogger");
+const branding_1 = require("../config/branding");
 async function applyItemEffects(userId, guildId, effects, member) {
     const results = [];
     for (const effect of effects) {
@@ -21,7 +22,7 @@ async function applyItemEffects(userId, guildId, effects, member) {
         }
         catch (err) {
             results.push({
-                message: `❌ Failed to apply ${effect.type}: ${err.message}`,
+                message: `${branding_1.Mascot.Emotes.Fail} Failed to apply ${effect.type}: ${err.message}`,
                 type: "ERROR"
             });
         }
@@ -39,7 +40,7 @@ async function applyEffect(userId, guildId, effect, member) {
                 await logEffectAction(client, guildId, "ROLE_PERMANENT", `Granted permanent role <@&${effect.roleId}> to <@${userId}>`);
             }
             return {
-                message: `✅ Granted permanent role <@&${effect.roleId}>`,
+                message: `${branding_1.Mascot.Emotes.Accept} Granted permanent role <@&${effect.roleId}>`,
                 type: "ROLE_PERMANENT"
             };
         case "ROLE_TEMPORARY":
@@ -62,7 +63,7 @@ async function applyEffect(userId, guildId, effect, member) {
                 await logEffectAction(client, guildId, "ROLE_TEMPORARY", `Granted temporary role <@&${effect.roleId}> to <@${userId}> for ${formatDuration(effect.duration)}`);
             }
             return {
-                message: `✅ Granted temporary role <@&${effect.roleId}> for ${formatDuration(effect.duration)}`,
+                message: `${branding_1.Mascot.Emotes.Accept} Granted temporary role <@&${effect.roleId}> for ${formatDuration(effect.duration)}`,
                 type: "ROLE_TEMPORARY"
             };
         case "XP_MULTIPLIER":
@@ -88,9 +89,6 @@ async function applyEffect(userId, guildId, effect, member) {
                 type: "XP_MULTIPLIER"
             };
         case "CUSTOM_MESSAGE":
-            // Custom messages are just returned, logging is optional or handled by the caller mostly, 
-            // but we can log that a custom message item was used if we had the item name here. 
-            // For now, no specific log for just the message part unless requested.
             return {
                 message: effect.message || "✨ Item used successfully!",
                 type: "CUSTOM_MESSAGE"
@@ -142,6 +140,48 @@ async function applyEffect(userId, guildId, effect, member) {
             return {
                 message: `📈 Level boost! +${effect.levels} levels!`,
                 type: "LEVEL_BOOST"
+            };
+        case "STAT_BOOST":
+            const statName = effect.stat;
+            const statAmount = effect.amount || 1;
+            if (!statName)
+                throw new Error("Missing stat name");
+            const shopItem = await prisma_1.default.shopItem.findFirst({ where: { name: { equals: "Chicken", mode: "insensitive" }, guildId } });
+            if (!shopItem)
+                throw new Error("Chicken item not configured");
+            const chickenInv = await prisma_1.default.inventory.findUnique({ where: { userId_shopItemId: { userId: (await getUser(userId, guildId)).id, shopItemId: shopItem.id } } });
+            if (!chickenInv || chickenInv.amount < 1)
+                throw new Error("You do not own a chicken to boost.");
+            const meta = chickenInv.meta || {};
+            meta[statName] = (meta[statName] || 0) + statAmount;
+            await prisma_1.default.inventory.update({
+                where: { id: chickenInv.id },
+                data: { meta }
+            });
+            if (client)
+                await logEffectAction(client, guildId, "STAT_BOOST", `Boosted ${statName} by ${statAmount} for <@${userId}>`);
+            return {
+                message: `💪 **${statName.toUpperCase()}** increased by ${statAmount}!`,
+                type: "STAT_BOOST"
+            };
+        case "DEATH_SAVE":
+            const dsUser = await getUser(userId, guildId);
+            const dsDuration = effect.duration || 86400;
+            const dsExpires = new Date(Date.now() + dsDuration * 1000);
+            await prisma_1.default.activeEffect.create({
+                data: {
+                    userId: dsUser.id,
+                    guildId,
+                    effectType: "DEATH_SAVE",
+                    value: 1,
+                    expiresAt: dsExpires
+                }
+            });
+            if (client)
+                await logEffectAction(client, guildId, "DEATH_SAVE", `Granted Death Save to <@${userId}>`);
+            return {
+                message: `🛡️ **Death Save** active! Your chicken will survive the next death (expires in ${formatDuration(dsDuration)}).`,
+                type: "DEATH_SAVE"
             };
         default:
             throw new Error(`Unknown effect type: ${effect.type}`);
@@ -199,7 +239,6 @@ async function getXPMultiplier(userId, guildId) {
         });
         if (xpEffects.length === 0)
             return 1;
-        // Stack multiplicatively: 2x * 1.5x = 3x total
         return xpEffects.reduce((total, effect) => total * effect.value, 1);
     }
     catch {
@@ -240,7 +279,6 @@ async function removeTemporaryRoles(client) {
         catch (err) {
             console.error(`Error processing expired role effect ${effect.id}:`, err);
         }
-        // Always delete the expired effect record so we don't process it again
         await prisma_1.default.activeEffect.delete({ where: { id: effect.id } });
     }
 }

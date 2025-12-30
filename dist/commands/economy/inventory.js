@@ -8,6 +8,7 @@ const walletService_1 = require("../../services/walletService");
 const format_1 = require("../../utils/format");
 const embed_1 = require("../../utils/embed");
 const emojiRegistry_1 = require("../../utils/emojiRegistry");
+const branding_1 = require("../../config/branding");
 async function handleInventory(message, args) {
     try {
         let targetUser = message.mentions.users.first() || message.author;
@@ -24,11 +25,14 @@ async function handleInventory(message, args) {
         const items = await (0, shopService_1.getUserInventory)(targetUser.id, message.guildId);
         const eInv = (0, emojiRegistry_1.emojiInline)("inventory", message.guild) || "🎒";
         if (items.length === 0) {
+            const url = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Think);
             const emptyEmbed = new discord_js_1.EmbedBuilder()
-                .setTitle(`${eInv} ${targetUser.username}'s Inventory`)
-                .setColor(discord_js_1.Colors.Blue)
+                .setTitle(`${targetUser.username}'s Inventory`)
+                .setColor(branding_1.Mascot.Colors.Base)
                 .setDescription(`Your inventory is empty.\nCheck out the store with \`${config.prefix}shop\`!`)
                 .setTimestamp();
+            if (url)
+                emptyEmbed.setThumbnail(url);
             return message.reply({ embeds: [emptyEmbed] });
         }
         const netWorth = items.reduce((sum, slot) => sum + (slot.shopItem.price * slot.amount), 0);
@@ -44,16 +48,21 @@ async function handleInventory(message, args) {
                 `Quantity: \`x${slot.amount}\` • Price: ${(0, format_1.fmtCurrency)(item.price, emoji)}`;
         }).join("\n\n");
         const embed = new discord_js_1.EmbedBuilder()
-            .setTitle(`${eInv} ${targetUser.username}'s Inventory`)
-            .setColor(discord_js_1.Colors.Blue)
+            .setTitle(`${targetUser.username}'s Inventory`)
+            .setColor(branding_1.Mascot.Colors.Base)
             .setDescription(description)
             .addFields({
-            name: "💰 Total Asset Value",
+            name: `Total Asset Value`,
             value: (0, format_1.fmtCurrency)(netWorth, emoji),
             inline: false
         })
-            .setFooter({ text: "Select an item below to Sell, Trade, or List." })
+            .setFooter({ text: `${branding_1.Mascot.Name} • Select an item below to Sell, Trade, or List.` })
             .setTimestamp();
+        // Use Money emote for populated inventory or keep eInv if it was significant? 
+        // The user wants "custom emojis as thumbnails". Money fits "Asset Value".
+        const moneyUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Money);
+        if (moneyUrl)
+            embed.setThumbnail(moneyUrl);
         const rows = [];
         if (targetUser.id === message.author.id) {
             const menu = new discord_js_1.StringSelectMenuBuilder()

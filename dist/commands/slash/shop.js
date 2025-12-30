@@ -5,6 +5,7 @@ exports.execute = execute;
 const discord_js_1 = require("discord.js");
 const shopService_1 = require("../../services/shopService");
 const guildConfigService_1 = require("../../services/guildConfigService");
+const branding_1 = require("../../config/branding");
 const walletService_1 = require("../../services/walletService");
 const format_1 = require("../../utils/format");
 const embed_1 = require("../../utils/embed");
@@ -153,12 +154,12 @@ async function execute(interaction) {
                             }
                         }
                         await btnInteraction.reply({
-                            content: `✅ Successfully purchased **${bought.name}** for **${(0, format_1.fmtCurrency)(bought.price, emoji)}**.`,
+                            content: `${branding_1.Mascot.Emotes.Accept} Successfully purchased **${bought.name}** for **${(0, format_1.fmtCurrency)(bought.price, emoji)}**.`,
                             ephemeral: true
                         });
                     }
                     catch (err) {
-                        await btnInteraction.reply({ content: `❌ Purchase failed: ${err.message}`, ephemeral: true });
+                        await btnInteraction.reply({ content: `${branding_1.Mascot.Emotes.Fail} Purchase failed: ${err.message}`, ephemeral: true });
                     }
                 }
             });

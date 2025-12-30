@@ -9,7 +9,7 @@ const guildConfigService_1 = require("../../services/guildConfigService");
 const format_1 = require("../../utils/format");
 const embed_1 = require("../../utils/embed");
 const cooldown_1 = require("../../utils/cooldown");
-const format_2 = require("../../utils/format");
+const branding_1 = require("../../config/branding");
 async function handleRouletteMenu(message) {
     const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
     const eCasino = "<a:casino:1445732641545654383>";
@@ -21,7 +21,7 @@ async function handleRouletteMenu(message) {
     const parseEmojiId = (str) => str.match(/:(\d+)>/)?.[1] ?? (str.match(/^\d+$/) ? str : str);
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle(`${eCasino} Roulette Table`)
-        .setDescription("Welcome to the Casino! Test your luck on the wheel.")
+        .setDescription(`Welcome to ${branding_1.Mascot.Name}'s Casino! Test your luck on the wheel.`)
         .setColor(discord_js_1.Colors.Red)
         .setImage("https://media.tenor.com/7gKkK6W85GgAAAAC/roulette-casino.gif")
         .setFooter({ text: "Click 'Guide' for rules or 'Play' to start." });
@@ -52,7 +52,8 @@ async function handleRouletteMenu(message) {
                 `35x Payout (Win chance ~2.7%)\n\n` +
                 `🔵 **Odd / 🟡 Even:**\n` +
                 `2x Payout\n\n` +
-                `**House Edge:** The green **0** belongs to the house!`);
+                `**House Edge:** The green **0** belongs to the house!`)
+                .setFooter({ text: `${branding_1.Mascot.Name} Tips` });
             await i.reply({ embeds: [guideEmbed], ephemeral: true });
         }
         if (i.customId === "roul_play") {
@@ -89,8 +90,10 @@ async function handleBet(message, args) {
         const key = `game:roulette:${message.guildId}:${message.author.id}`;
         const remaining = (0, cooldown_1.checkCooldown)(key, cdSeconds);
         if (remaining > 0) {
+            const expire = (0, cooldown_1.getCooldownExpiry)(key);
+            const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
             return message.reply({
-                embeds: [(0, embed_1.errorEmbed)(message.author, "Cooldown Active", `⏳ Please wait **${(0, format_2.formatDuration)(remaining * 1000)}** before playing Roulette again.`)]
+                embeds: [(0, embed_1.errorEmbed)(message.author, "Cooldown Active", `${branding_1.Mascot.Emotes.Angry} Please wait <t:${ts}:R> before playing Roulette again.`)]
             });
         }
     }
@@ -142,12 +145,12 @@ async function handleBet(message, args) {
     const eBlackCoin = "<:BlackCoin:1446217613632999565>";
     const displayColor = spin === 0 ? "🟢" : (isRed ? eRedCoin : eBlackCoin);
     const resultEmbed = new discord_js_1.EmbedBuilder()
-        .setTitle(didWin ? "🎉 Winner!" : "💀 You Lost")
+        .setTitle(didWin ? `${branding_1.Mascot.Emotes.Money} Winner!` : `${branding_1.Mascot.Emotes.Fail} You Lost`)
         .setColor(didWin ? discord_js_1.Colors.Green : discord_js_1.Colors.Red)
         .setDescription(`**Result:** ${displayColor} **${spin}**\n` +
         `**Your Bet:** ${choiceRaw}\n` +
         `**${didWin ? "Won" : "Lost"}:** ${(0, format_1.fmtCurrency)(didWin ? payout : amount, emoji)}`)
-        .setFooter({ text: `${message.author.username}'s Wallet: ${(user.wallet.balance - amount + payout).toLocaleString()}` });
+        .setFooter({ text: `${branding_1.Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet.balance - amount + payout).toLocaleString()}` });
     return message.reply({ embeds: [resultEmbed] });
 }
 //# sourceMappingURL=roulette.js.map

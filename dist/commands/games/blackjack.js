@@ -8,7 +8,7 @@ const guildConfigService_1 = require("../../services/guildConfigService");
 const format_1 = require("../../utils/format");
 const embed_1 = require("../../utils/embed");
 const cooldown_1 = require("../../utils/cooldown");
-const format_2 = require("../../utils/format");
+const branding_1 = require("../../config/branding");
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
 function createDeck() {
@@ -59,9 +59,7 @@ async function handleBlackjack(message, args) {
         currencyEmoji = "<a:money:1445732360204193824>";
     }
     if (amount < minBet) {
-        return message.reply({
-            embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too Low", `The minimum bet is **${(0, format_1.fmtCurrency)(minBet, currencyEmoji)}**.`)]
-        });
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too Low", `The minimum bet is **${(0, format_1.fmtCurrency)(minBet, currencyEmoji)}**.`)] });
     }
     const cooldowns = config.gameCooldowns || {};
     const cdSeconds = cooldowns["bj"] || 0;
@@ -69,9 +67,9 @@ async function handleBlackjack(message, args) {
         const key = `game:bj:${message.guildId}:${message.author.id}`;
         const remaining = (0, cooldown_1.checkCooldown)(key, cdSeconds);
         if (remaining > 0) {
-            return message.reply({
-                embeds: [(0, embed_1.errorEmbed)(message.author, "Cooldown Active", `⏳ Please wait **${(0, format_2.formatDuration)(remaining * 1000)}** before playing Blackjack again.`)]
-            });
+            const expire = (0, cooldown_1.getCooldownExpiry)(key);
+            const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
+            return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Cooldown Active", `${branding_1.Mascot.Emotes.Angry} Please wait <t:${ts}:R> before playing Blackjack again.`)] });
         }
     }
     if (user.wallet.balance < amount) {
@@ -100,27 +98,25 @@ async function handleBlackjack(message, args) {
     const getEmbed = (reveal) => {
         const pScore = calculateScore(playerHand);
         const dScore = reveal ? calculateScore(dealerHand) : "?";
-        const embed = new discord_js_1.EmbedBuilder()
-            .setTitle(`${eCasino} Blackjack Table`)
-            .setColor(gameOver ? (payout > currentBet ? discord_js_1.Colors.Green : (payout === currentBet ? discord_js_1.Colors.Yellow : discord_js_1.Colors.Red)) : discord_js_1.Colors.Blue)
-            .addFields({ name: `Your Hand (${pScore})`, value: formatHand(playerHand), inline: true }, { name: `Dealer's Hand (${dScore})`, value: formatHand(dealerHand, !reveal), inline: true });
+        const embed = new discord_js_1.EmbedBuilder().setTitle(`${eCasino} Blackjack Table`).setColor(gameOver ? (payout > currentBet ? discord_js_1.Colors.Green : (payout === currentBet ? discord_js_1.Colors.Yellow : discord_js_1.Colors.Red)) : discord_js_1.Colors.Blue).addFields({ name: `Your Hand (${pScore})`, value: formatHand(playerHand), inline: true }, { name: `Dealer's Hand (${dScore})`, value: formatHand(dealerHand, !reveal), inline: true });
         let statusText = `**Bet:** ${(0, format_1.fmtCurrency)(currentBet, currencyEmoji)}`;
         if (gameOver) {
             statusText += `\n\n**${result}**\n${payout > 0 ? `**Payout:** ${(0, format_1.fmtCurrency)(payout, currencyEmoji)}` : ""}`;
+            const winUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Money);
+            const failUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Fail);
+            if (payout > currentBet && winUrl)
+                embed.setThumbnail(winUrl);
+            else if (payout === 0 && failUrl)
+                embed.setThumbnail(failUrl);
         }
         else {
             statusText += `\n\nChoose an action below.`;
         }
         embed.setDescription(statusText);
-        embed.setFooter({ text: `${message.author.username}'s Game` });
+        embed.setFooter({ text: `${branding_1.Mascot.Name} • ${message.author.username}'s Game` });
         return embed;
     };
-    const getRows = (disabled) => {
-        return [
-            new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId("bj_hit").setLabel("Hit").setStyle(discord_js_1.ButtonStyle.Primary).setEmoji("👊").setDisabled(disabled), new discord_js_1.ButtonBuilder().setCustomId("bj_stand").setLabel("Stand").setStyle(discord_js_1.ButtonStyle.Secondary).setEmoji("🛑").setDisabled(disabled), new discord_js_1.ButtonBuilder().setCustomId("bj_double").setLabel("Double").setStyle(discord_js_1.ButtonStyle.Success).setEmoji("💰")
-                .setDisabled(disabled || playerHand.length > 2 || user.wallet.balance < currentBet * 2))
-        ];
-    };
+    const getRows = (disabled) => { return [new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId("bj_hit").setLabel("Hit").setStyle(discord_js_1.ButtonStyle.Primary).setEmoji("👊").setDisabled(disabled), new discord_js_1.ButtonBuilder().setCustomId("bj_stand").setLabel("Stand").setStyle(discord_js_1.ButtonStyle.Secondary).setEmoji("🛑").setDisabled(disabled), new discord_js_1.ButtonBuilder().setCustomId("bj_double").setLabel("Double").setStyle(discord_js_1.ButtonStyle.Success).setEmoji("💰").setDisabled(disabled || playerHand.length > 2 || user.wallet.balance < currentBet * 2))]; };
     if (gameOver) {
         try {
             const actualPayout = await (0, gameService_1.placeBetWithTransaction)(user.id, user.wallet.id, "blackjack", currentBet, "blackjack", payout > currentBet, payout, message.guildId);
@@ -132,84 +128,74 @@ async function handleBlackjack(message, args) {
         return message.reply({ embeds: [getEmbed(true)] });
     }
     const msg = await message.reply({ embeds: [getEmbed(false)], components: getRows(false) });
-    const collector = msg.createMessageComponentCollector({
-        componentType: discord_js_1.ComponentType.Button,
-        time: 60000,
-        filter: i => i.user.id === message.author.id
-    });
-    collector.on("collect", async (i) => {
-        const action = i.customId;
-        if (action === "bj_hit") {
-            playerHand.push(deck.pop());
-            playerScore = calculateScore(playerHand);
-            if (playerScore > 21) {
-                gameOver = true;
-                result = "Bust! You went over 21.";
-                payout = 0;
-                collector.stop();
-            }
-        }
-        else if (action === "bj_stand") {
+    const collector = msg.createMessageComponentCollector({ componentType: discord_js_1.ComponentType.Button, time: 60000, filter: i => i.user.id === message.author.id });
+    collector.on("collect", async (i) => { const action = i.customId; if (action === "bj_hit") {
+        playerHand.push(deck.pop());
+        playerScore = calculateScore(playerHand);
+        if (playerScore > 21) {
             gameOver = true;
+            result = "Bust! You went over 21.";
+            payout = 0;
             collector.stop();
         }
-        else if (action === "bj_double") {
-            if (user.wallet.balance < currentBet * 2) {
-                await i.reply({ content: "Insufficient funds to double.", ephemeral: true });
-                return;
+    }
+    else if (action === "bj_stand") {
+        gameOver = true;
+        collector.stop();
+    }
+    else if (action === "bj_double") {
+        if (user.wallet.balance < currentBet * 2) {
+            await i.reply({ content: "Insufficient funds to double.", ephemeral: true });
+            return;
+        }
+        currentBet *= 2;
+        playerHand.push(deck.pop());
+        playerScore = calculateScore(playerHand);
+        if (playerScore > 21) {
+            result = "Bust! You went over 21.";
+            payout = 0;
+        }
+        gameOver = true;
+        collector.stop();
+    } if (!gameOver) {
+        await i.update({ embeds: [getEmbed(false)], components: getRows(false) });
+    }
+    else {
+        if (playerScore <= 21) {
+            while (dealerScore < 17) {
+                dealerHand.push(deck.pop());
+                dealerScore = calculateScore(dealerHand);
             }
-            currentBet *= 2;
-            playerHand.push(deck.pop());
-            playerScore = calculateScore(playerHand);
-            if (playerScore > 21) {
-                result = "Bust! You went over 21.";
+            if (dealerScore > 21) {
+                result = "Dealer Busts! You Win!";
+                payout = currentBet * 2;
+            }
+            else if (dealerScore > playerScore) {
+                result = "Dealer Wins.";
                 payout = 0;
             }
-            gameOver = true;
-            collector.stop();
-        }
-        if (!gameOver) {
-            await i.update({ embeds: [getEmbed(false)], components: getRows(false) });
-        }
-        else {
-            if (playerScore <= 21) {
-                while (dealerScore < 17) {
-                    dealerHand.push(deck.pop());
-                    dealerScore = calculateScore(dealerHand);
-                }
-                if (dealerScore > 21) {
-                    result = "Dealer Busts! You Win!";
-                    payout = currentBet * 2;
-                }
-                else if (dealerScore > playerScore) {
-                    result = "Dealer Wins.";
-                    payout = 0;
-                }
-                else if (dealerScore < playerScore) {
-                    result = "You Win!";
-                    payout = currentBet * 2;
-                }
-                else {
-                    result = "Push.";
-                    payout = currentBet;
-                }
+            else if (dealerScore < playerScore) {
+                result = "You Win!";
+                payout = currentBet * 2;
             }
-            let actualPayout = payout;
-            try {
-                actualPayout = await (0, gameService_1.placeBetWithTransaction)(user.id, user.wallet.id, "blackjack", currentBet, "blackjack", payout > currentBet, payout, message.guildId);
+            else {
+                result = "Push.";
+                payout = currentBet;
             }
-            catch (e) {
-                await i.update({ content: `Transaction failed: ${e.message}`, components: [] });
-                return;
-            }
-            payout = actualPayout;
-            await i.update({ embeds: [getEmbed(true)], components: [] });
         }
-    });
-    collector.on("end", (_, reason) => {
-        if (reason === "time" && !gameOver) {
-            msg.edit({ content: "Game timed out. You surrendered.", components: [] });
+        let actualPayout = payout;
+        try {
+            actualPayout = await (0, gameService_1.placeBetWithTransaction)(user.id, user.wallet.id, "blackjack", currentBet, "blackjack", payout > currentBet, payout, message.guildId);
         }
-    });
+        catch (e) {
+            await i.update({ content: `Transaction failed: ${e.message}`, components: [] });
+            return;
+        }
+        payout = actualPayout;
+        await i.update({ embeds: [getEmbed(true)], components: [] });
+    } });
+    collector.on("end", (_, reason) => { if (reason === "time" && !gameOver) {
+        msg.edit({ content: "Game timed out. You surrendered.", components: [] });
+    } });
 }
 //# sourceMappingURL=blackjack.js.map

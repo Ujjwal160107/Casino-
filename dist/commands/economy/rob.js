@@ -10,6 +10,7 @@ const guildConfigService_1 = require("../../services/guildConfigService");
 const cooldown_1 = require("../../utils/cooldown");
 const embed_1 = require("../../utils/embed");
 const format_1 = require("../../utils/format");
+const branding_1 = require("../../config/branding");
 async function handleRob(message, args) {
     const targetUser = message.mentions.members?.first();
     if (!targetUser)
@@ -22,8 +23,17 @@ async function handleRob(message, args) {
     const emoji = config.currencyEmoji;
     const cdKey = `rob:${message.guildId}:${message.author.id}`;
     const remaining = (0, cooldown_1.checkCooldown)(cdKey, config.robCooldown);
-    if (remaining > 0)
-        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Cooldown", `Wait **${remaining}s**.`)] });
+    if (remaining > 0) {
+        const expire = (0, cooldown_1.getCooldownExpiry)(cdKey);
+        const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
+        // Custom cooldown embed with Angry thumbnail
+        const embed = (0, embed_1.errorEmbed)(message.author, "Cooldown", `Wait <t:${ts}:R>.`);
+        // errorEmbed sets Fail thumbnail by default. We want Angry.
+        const angryUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Angry);
+        if (angryUrl)
+            embed.setThumbnail(angryUrl);
+        return message.reply({ embeds: [embed] });
+    }
     const isImmune = targetUser.roles.cache.some(r => config.robImmuneRoles.includes(r.id));
     if (isImmune)
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Failed", `**${targetUser.displayName}** is immune!`)] });
@@ -36,25 +46,13 @@ async function handleRob(message, args) {
     if (roll < config.robSuccessPct) {
         const percent = Math.floor(Math.random() * 41) + 10;
         const robAmount = Math.floor((victim.wallet.balance * percent) / 100);
-        await prisma_1.default.$transaction([
-            prisma_1.default.wallet.update({ where: { id: victim.wallet.id }, data: { balance: { decrement: robAmount } } }),
-            prisma_1.default.transaction.create({ data: { walletId: victim.wallet.id, amount: -robAmount, type: "robbed_by", meta: { robber: robber.discordId } } }),
-            prisma_1.default.wallet.update({ where: { id: robber.wallet.id }, data: { balance: { increment: robAmount } } }),
-            prisma_1.default.transaction.create({ data: { walletId: robber.wallet.id, amount: robAmount, type: "rob_win", meta: { victim: victim.discordId }, isEarned: true } })
-        ]);
-        return message.reply({
-            embeds: [(0, embed_1.successEmbed)(message.author, "Robbery Successful! 🥷", `Stole **${(0, format_1.fmtCurrency)(robAmount, emoji)}** from **${targetUser.displayName}**!`)]
-        });
+        await prisma_1.default.$transaction([prisma_1.default.wallet.update({ where: { id: victim.wallet.id }, data: { balance: { decrement: robAmount } } }), prisma_1.default.transaction.create({ data: { walletId: victim.wallet.id, amount: -robAmount, type: "robbed_by", meta: { robber: robber.discordId } } }), prisma_1.default.wallet.update({ where: { id: robber.wallet.id }, data: { balance: { increment: robAmount } } }), prisma_1.default.transaction.create({ data: { walletId: robber.wallet.id, amount: robAmount, type: "rob_win", meta: { victim: victim.discordId }, isEarned: true } })]);
+        return message.reply({ embeds: [(0, embed_1.successEmbed)(message.author, "Robbery Successful! 🥷", `${branding_1.Mascot.Emotes.Money} Stole **${(0, format_1.fmtCurrency)(robAmount, emoji)}** from **${targetUser.displayName}**!`)] });
     }
     else {
         const fineAmount = Math.max(Math.floor((robber.wallet.balance * config.robFinePct) / 100), 50);
-        await prisma_1.default.$transaction([
-            prisma_1.default.wallet.update({ where: { id: robber.wallet.id }, data: { balance: { decrement: fineAmount } } }),
-            prisma_1.default.transaction.create({ data: { walletId: robber.wallet.id, amount: -fineAmount, type: "rob_fine", meta: { victim: victim.discordId } } })
-        ]);
-        return message.reply({
-            embeds: [(0, embed_1.errorEmbed)(message.author, "Caught! 🚔", `You paid a fine of **${(0, format_1.fmtCurrency)(fineAmount, emoji)}**.`)]
-        });
+        await prisma_1.default.$transaction([prisma_1.default.wallet.update({ where: { id: robber.wallet.id }, data: { balance: { decrement: fineAmount } } }), prisma_1.default.transaction.create({ data: { walletId: robber.wallet.id, amount: -fineAmount, type: "rob_fine", meta: { victim: victim.discordId } } })]);
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Caught! 🚔", `You paid a fine of **${(0, format_1.fmtCurrency)(fineAmount, emoji)}**.`)] });
     }
 }
 //# sourceMappingURL=rob.js.map

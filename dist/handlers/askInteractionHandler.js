@@ -4,6 +4,7 @@ exports.handleAskInteraction = handleAskInteraction;
 const discord_js_1 = require("discord.js");
 const walletService_1 = require("../services/walletService");
 const discordLogger_1 = require("../utils/discordLogger");
+const branding_1 = require("../config/branding");
 async function handleAskInteraction(interaction) {
     if (!interaction.isButton())
         return;
@@ -13,7 +14,7 @@ async function handleAskInteraction(interaction) {
     const mentionMatch = interaction.message.content.match(/<@!?(\d+)>/);
     const targetUserId = mentionMatch ? mentionMatch[1] : null;
     if (!targetUserId || interaction.user.id !== targetUserId) {
-        return interaction.reply({ content: "🚫 This request is not for you.", ephemeral: true });
+        return interaction.reply({ content: `${branding_1.Mascot.Emotes.Decline} This request is not for you.`, ephemeral: true });
     }
     try {
         await interaction.deferUpdate();
@@ -49,9 +50,9 @@ async function handleAskInteraction(interaction) {
             }
             catch (error) {
                 if (error.message === "Insufficient funds.") {
-                    return interaction.followUp({ content: "❌ You do not have enough funds in your **wallet** to fulfill this request.", ephemeral: true });
+                    return interaction.followUp({ content: `${branding_1.Mascot.Emotes.Fail} You do not have enough funds in your **wallet** to fulfill this request.`, ephemeral: true });
                 }
-                return interaction.followUp({ content: `❌ Transfer failed: ${error.message}`, ephemeral: true });
+                return interaction.followUp({ content: `${branding_1.Mascot.Emotes.Fail} Transfer failed: ${error.message}`, ephemeral: true });
             }
         }
     }

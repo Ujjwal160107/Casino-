@@ -1,6 +1,7 @@
 import prisma from "../utils/prisma";
 import { GuildMember, Client, Colors } from "discord.js";
 import { logToChannel } from "../utils/discordLogger";
+import { Mascot } from "../config/branding";
 
 export type EffectType =
     | "ROLE_PERMANENT"
@@ -41,7 +42,7 @@ export async function applyItemEffects(
             results.push(result);
         } catch (err: any) {
             results.push({
-                message: `❌ Failed to apply ${effect.type}: ${err.message}`,
+                message: `${Mascot.Emotes.Fail} Failed to apply ${effect.type}: ${err.message}`,
                 type: "ERROR"
             });
         }
@@ -68,7 +69,7 @@ async function applyEffect(
             }
 
             return {
-                message: `✅ Granted permanent role <@&${effect.roleId}>`,
+                message: `${Mascot.Emotes.Accept} Granted permanent role <@&${effect.roleId}>`,
                 type: "ROLE_PERMANENT"
             };
 
@@ -95,7 +96,7 @@ async function applyEffect(
             }
 
             return {
-                message: `✅ Granted temporary role <@&${effect.roleId}> for ${formatDuration(effect.duration)}`,
+                message: `${Mascot.Emotes.Accept} Granted temporary role <@&${effect.roleId}> for ${formatDuration(effect.duration)}`,
                 type: "ROLE_TEMPORARY"
             };
 

@@ -1,4 +1,5 @@
 import { Message, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ComponentType, GuildMember, AttachmentBuilder } from "discord.js";
+import { Mascot } from "../../config/branding";
 import prisma from "../../utils/prisma";
 import { errorEmbed } from "../../utils/embed";
 import { getGuildConfig } from "../../services/guildConfigService";
@@ -209,7 +210,7 @@ async function handleBuy(message: Message, args: string[]) {
         // -------------------------
 
         await buyItem(message.guildId!, message.author.id, preDef.name, message.member!);
-        return message.reply(`✅ You successfully bought **${preDef.name}**! Don't forget to \`!equip ${preDef.name}\`!`);
+        return message.reply(`${Mascot.Emotes.Accept} You successfully bought **${preDef.name}**! Don't forget to \`!equip ${preDef.name}\`!`);
     } catch (e: any) {
         return message.reply({ embeds: [errorEmbed(message.author, "Purchase Failed", e.message || "Unknown error")] });
     }

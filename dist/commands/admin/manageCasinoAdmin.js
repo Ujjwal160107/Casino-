@@ -10,6 +10,7 @@ const discord_js_1 = require("discord.js");
 const prisma_1 = __importDefault(require("../../utils/prisma"));
 const embed_1 = require("../../utils/embed");
 const guildConfigService_1 = require("../../services/guildConfigService");
+const branding_1 = require("../../config/branding");
 async function handleMakeCasinoAdmin(message, args) {
     const BOT_OWNER_ID = "1288340046449086567";
     if (message.author.id !== message.guild?.ownerId && message.author.id !== BOT_OWNER_ID) {
@@ -36,7 +37,7 @@ async function handleMakeCasinoAdmin(message, args) {
             color: 0x00FF00
         });
         return message.reply({
-            embeds: [(0, embed_1.successEmbed)(message.author, "Promoted", `✅ **${targetUser.tag}** is now a **Casino Admin**.`)]
+            embeds: [(0, embed_1.successEmbed)(message.author, "Promoted", `${branding_1.Mascot.Emotes.Accept} **${targetUser.tag}** is now a **Casino Admin**.`)]
         });
     }
     catch (e) {
@@ -69,7 +70,7 @@ async function handleRemoveCasinoAdmin(message, args) {
             color: 0xFF0000
         });
         return message.reply({
-            embeds: [(0, embed_1.successEmbed)(message.author, "Demoted", `✅ **${targetUser.tag}** is no longer a Casino Admin.`)]
+            embeds: [(0, embed_1.successEmbed)(message.author, "Demoted", `${branding_1.Mascot.Emotes.Accept} **${targetUser.tag}** is no longer a Casino Admin.`)]
         });
     }
     catch (e) {

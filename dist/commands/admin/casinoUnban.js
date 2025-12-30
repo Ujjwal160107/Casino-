@@ -8,6 +8,7 @@ const prisma_1 = __importDefault(require("../../utils/prisma"));
 const embed_1 = require("../../utils/embed");
 const permissionUtils_1 = require("../../utils/permissionUtils");
 const guildConfigService_1 = require("../../services/guildConfigService");
+const branding_1 = require("../../config/branding");
 async function handleCasinoUnban(message, args) {
     if (!message.member || !(await (0, permissionUtils_1.canExecuteAdminCommand)(message, message.member))) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "No Permission", "Administrator or Bot Commander required.")] });
@@ -32,7 +33,7 @@ async function handleCasinoUnban(message, args) {
             color: 0x00FF00
         });
         return message.reply({
-            embeds: [(0, embed_1.successEmbed)(message.author, "User Unbanned", `✅ **<@${discordId}>** has been unbanned from the casino.`)]
+            embeds: [(0, embed_1.successEmbed)(message.author, "User Unbanned", `${branding_1.Mascot.Emotes.Accept} **<@${discordId}>** has been unbanned from the casino.`)]
         });
     }
     catch (error) {

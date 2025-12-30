@@ -2,12 +2,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleSlots = handleSlots;
 const discord_js_1 = require("discord.js");
+const branding_1 = require("../../config/branding");
 const walletService_1 = require("../../services/walletService");
 const gameService_1 = require("../../services/gameService");
 const guildConfigService_1 = require("../../services/guildConfigService");
 const format_1 = require("../../utils/format");
 const embed_1 = require("../../utils/embed");
-const format_2 = require("../../utils/format");
+const cooldown_1 = require("../../utils/cooldown");
 const CHERRY = "<:cherri:1446428169786622053>";
 const BANANA = "<:banano:1446428190837968989>";
 const GRAPES = "<:graps:1446428294483542040>";
@@ -43,13 +44,13 @@ async function handleSlots(message, args) {
     const cooldowns = config.gameCooldowns || {};
     const cdSeconds = cooldowns["slots"] || 0;
     if (cdSeconds > 0) {
-        const { checkCooldown } = require("../../utils/cooldown");
-        const now = Date.now();
         const key = `game:slots:${message.guildId}:${message.author.id}`;
-        const remaining = checkCooldown(key, cdSeconds);
+        const remaining = (0, cooldown_1.checkCooldown)(key, cdSeconds);
         if (remaining > 0) {
+            const expire = (0, cooldown_1.getCooldownExpiry)(key);
+            const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
             return message.reply({
-                embeds: [(0, embed_1.errorEmbed)(message.author, "Cooldown Active", `⏳ Please wait **${(0, format_2.formatDuration)(remaining * 1000)}** before playing Slots again.`)]
+                embeds: [(0, embed_1.errorEmbed)(message.author, "Cooldown Active", `${branding_1.Mascot.Emotes.Angry} Please wait <t:${ts}:R> before playing Slots again.`)]
             });
         }
     }
@@ -83,7 +84,17 @@ async function handleSlots(message, args) {
         (win
             ? `**JACKPOT!** You won **${(0, format_1.fmtCurrency)(payout, emoji)}**! (x${multiplier})`
             : `Better luck next time... You lost **${(0, format_1.fmtCurrency)(amount, emoji)}**.`))
-        .setFooter({ text: `${message.author.username}'s Wallet: ${(user.wallet.balance - amount + payout).toLocaleString()}` });
+        .setFooter({ text: `${branding_1.Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet.balance - amount + payout).toLocaleString()}` });
+    if (win) {
+        const url = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Money);
+        if (url)
+            embed.setThumbnail(url);
+    }
+    else {
+        const url = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Fail);
+        if (url)
+            embed.setThumbnail(url);
+    }
     return message.reply({ embeds: [embed] });
 }
 //# sourceMappingURL=slots.js.map

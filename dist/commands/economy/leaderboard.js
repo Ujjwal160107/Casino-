@@ -9,6 +9,7 @@ const prisma_1 = __importDefault(require("../../utils/prisma"));
 const guildConfigService_1 = require("../../services/guildConfigService");
 const format_1 = require("../../utils/format");
 const emojiRegistry_1 = require("../../utils/emojiRegistry");
+const branding_1 = require("../../config/branding");
 async function handleLeaderboard(message, args) {
     const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
     const emoji = config.currencyEmoji;
@@ -63,21 +64,37 @@ async function handleLeaderboard(message, args) {
             return `${rankDisplay} **${u.username}** — ${valStr}`;
         }).join("\n");
         let title = "";
-        if (t === "net")
-            title = `${eGraphRaw} Net Worth Leaderboard`;
-        else if (t === "cash")
-            title = `${eWalletRaw} Cash Leaderboard`;
-        else
-            title = `⭐ Level Leaderboard`;
-        return { title, desc, topUsers: top10 };
+        let thumbUrl = null;
+        if (t === "net") {
+            title = `Net Worth Leaderboard`;
+            thumbUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Money); // Or Think as it was before? "Think" was inline. Money fits Net Worth better.
+            // Actually original was Think. Let's use Money for "Net Worth".
+            // Wait, "Think" was used for Net Worth in the file I viewed. 
+            // "Think" seems weird for LB. "Money" is better.
+            thumbUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Money);
+        }
+        else if (t === "cash") {
+            title = `Cash Leaderboard`;
+            thumbUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Money);
+        }
+        else {
+            title = `Level Leaderboard`;
+            thumbUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Success); // Sparkle for levels?
+        }
+        return { title, desc, topUsers: top10, thumbUrl };
     };
     const initialSorted = getSorted(currentType);
-    const { title, desc } = getEmbedData(currentType, initialSorted);
+    if (initialSorted.length === 0) {
+        // Just some safety, though usually empty array is fine
+    }
+    const { title, desc, thumbUrl } = getEmbedData(currentType, initialSorted);
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle(title)
-        .setColor(discord_js_1.Colors.Gold)
+        .setColor(branding_1.Mascot.Colors.Base)
         .setDescription(desc || "No users found.")
-        .setFooter({ text: "Top 10 Leaders" });
+        .setFooter({ text: `${branding_1.Mascot.Name} • Top 10 Leaders` });
+    if (thumbUrl)
+        embed.setThumbnail(thumbUrl);
     const getButtons = (activeType) => {
         const bNet = new discord_js_1.ButtonBuilder().setCustomId("lb_net").setLabel("Net Worth").setStyle(activeType === "net" ? discord_js_1.ButtonStyle.Primary : discord_js_1.ButtonStyle.Secondary);
         const bCash = new discord_js_1.ButtonBuilder().setCustomId("lb_cash").setLabel("Cash Only").setStyle(activeType === "cash" ? discord_js_1.ButtonStyle.Primary : discord_js_1.ButtonStyle.Secondary);
@@ -110,8 +127,12 @@ async function handleLeaderboard(message, args) {
         if (i.customId === "lb_level")
             currentType = "level";
         const newSorted = getSorted(currentType);
-        const { title: newTitle, desc: newDesc } = getEmbedData(currentType, newSorted);
-        embed.setTitle(newTitle).setDescription(newDesc);
+        const { title: newTitle, desc: newDesc, thumbUrl: newThumb } = getEmbedData(currentType, newSorted);
+        embed.setTitle(newTitle).setDescription(newDesc).setFooter({ text: `${branding_1.Mascot.Name} • Top 10 Leaders` });
+        if (newThumb)
+            embed.setThumbnail(newThumb);
+        else
+            embed.setThumbnail(null);
         await i.update({ embeds: [embed], components: [getButtons(currentType)] });
     });
     collector.on("end", () => {

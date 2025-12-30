@@ -7,6 +7,7 @@ exports.handleResetAdminSettings = handleResetAdminSettings;
 const discord_js_1 = require("discord.js");
 const prisma_1 = __importDefault(require("../../utils/prisma"));
 const embed_1 = require("../../utils/embed");
+const branding_1 = require("../../config/branding");
 async function handleResetAdminSettings(message) {
     if (!message.member?.permissions.has("Administrator") && message.author.id !== message.guild?.ownerId) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Access Denied", "Only Administrators/Owner can use this command.")] });
@@ -46,7 +47,7 @@ async function handleResetAdminSettings(message) {
                 where: { guildId }
             });
             await interaction.update({
-                embeds: [(0, embed_1.successEmbed)(message.author, "Settings Reset", "✅ All admin access settings, permissions, and restrictions have been reset to default.")],
+                embeds: [(0, embed_1.successEmbed)(message.author, "Settings Reset", `${branding_1.Mascot.Emotes.Accept} All admin access settings, permissions, and restrictions have been reset to default.`)],
                 components: []
             });
         }

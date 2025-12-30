@@ -1,6 +1,7 @@
 import { Message, EmbedBuilder } from "discord.js";
 import { getGuildConfig } from "../../services/guildConfigService";
 import prisma from "../../utils/prisma";
+import { Mascot } from "../../config/branding";
 
 export async function handleCommandStatus(message: Message, args: string[]) {
     const commandName = args[0]?.toLowerCase();
@@ -24,10 +25,10 @@ export async function handleCommandStatus(message: Message, args: string[]) {
     });
     const isCasinoAdmin = userDb?.isCasinoAdmin ?? false;
 
-    if (isBotOwner) trace.push("✅ Allowed: Bot Owner override");
-    else if (isOwner) trace.push("✅ Allowed: Server Owner override");
-    else if (isAdmin) trace.push("✅ Allowed: Administrator override");
-    else if (isCasinoAdmin) trace.push("✅ Allowed: Casino Admin override");
+    if (isBotOwner) trace.push(`${Mascot.Emotes.Accept} Allowed: Bot Owner override`);
+    else if (isOwner) trace.push(`${Mascot.Emotes.Accept} Allowed: Server Owner override`);
+    else if (isAdmin) trace.push(`${Mascot.Emotes.Accept} Allowed: Administrator override`);
+    else if (isCasinoAdmin) trace.push(`${Mascot.Emotes.Accept} Allowed: Casino Admin override`);
     else trace.push("ℹ️ Not Tier 1 admin");
 
     const permissions = await prisma.commandPermission.findMany({
@@ -43,22 +44,22 @@ export async function handleCommandStatus(message: Message, args: string[]) {
     });
 
     const userAllow = permissions.find(p => p.targetType === "USER" && p.targetId === userId && p.action === "ALLOW");
-    if (userAllow) trace.push("✅ Allowed: Explicit User Permission");
+    if (userAllow) trace.push(`${Mascot.Emotes.Accept} Allowed: Explicit User Permission`);
 
     const roleAllow = permissions.find(p => p.targetType === "ROLE" && member.roles.cache.has(p.targetId) && p.action === "ALLOW");
-    if (roleAllow) trace.push("✅ Allowed: Explicit Role Permission");
+    if (roleAllow) trace.push(`${Mascot.Emotes.Accept} Allowed: Explicit Role Permission`);
 
     const channelDeny = permissions.find(p => p.targetType === "CHANNEL" && p.targetId === channelId && p.action === "DENY");
-    if (channelDeny) trace.push("❌ Denied: Channel Override DENY");
+    if (channelDeny) trace.push(`${Mascot.Emotes.Decline} Denied: Channel Override DENY`);
 
-    if (config.disabledCommands.includes(commandName)) trace.push("❌ Denied: Global Disable");
+    if (config.disabledCommands.includes(commandName)) trace.push(`${Mascot.Emotes.Decline} Denied: Global Disable`);
     else trace.push("ℹ️ Not Globally Disabled");
 
     if (config.casinoChannels.length > 0) {
         if (!config.casinoChannels.includes(channelId)) {
             const channelAllow = permissions.some(p => p.targetType === "CHANNEL" && p.targetId === channelId && p.action === "ALLOW");
-            if (!channelAllow) trace.push("❌ Denied: Channel not in Whitelist (and no Override ALLOW)");
-            else trace.push("✅ Allowed: Channel Override ALLOW bypasses Whitelist");
+            if (!channelAllow) trace.push(`${Mascot.Emotes.Decline} Denied: Channel not in Whitelist (and no Override ALLOW)`);
+            else trace.push(`${Mascot.Emotes.Accept} Allowed: Channel Override ALLOW bypasses Whitelist`);
         } else {
             trace.push("ℹ️ Channel is in Whitelist");
         }
@@ -71,7 +72,7 @@ export async function handleCommandStatus(message: Message, args: string[]) {
 
     const embed = new EmbedBuilder()
         .setTitle(`Status for: ${commandName}`)
-        .setDescription(`**Final Result:** ${result.allowed ? "✅ ALLOWED" : "❌ DENIED"}\n${result.reason ? `**Reason:** ${result.reason}` : ""}\n\n**Logic Trace:**\n${trace.join("\n")}`)
+        .setDescription(`**Final Result:** ${result.allowed ? `${Mascot.Emotes.Accept} ALLOWED` : `${Mascot.Emotes.Decline} DENIED`}\n${result.reason ? `**Reason:** ${result.reason}` : ""}\n\n**Logic Trace:**\n${trace.join("\n")}`)
         .setColor(result.allowed ? "Green" : "Red");
 
     return message.reply({ embeds: [embed] });

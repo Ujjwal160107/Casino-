@@ -4,6 +4,7 @@ exports.handleHelp = handleHelp;
 const discord_js_1 = require("discord.js");
 const guildConfigService_1 = require("../../services/guildConfigService");
 const emojiRegistry_1 = require("../../utils/emojiRegistry");
+const branding_1 = require("../../config/branding");
 function createAdminPages(prefix, eSettings) {
     return [
         {
@@ -137,9 +138,9 @@ async function handleHelp(message) {
         return new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.StringSelectMenuBuilder().setCustomId("help_select").setPlaceholder("Select a category").addOptions(options));
     };
     const overview = new discord_js_1.EmbedBuilder()
-        .setTitle(`${config.currencyEmoji} Casino Bot — Help Menu`)
+        .setTitle(`${branding_1.Mascot.Emotes.Success} ${branding_1.Mascot.Name} — Help Menu`)
         .setDescription(`Use the dropdown below to explore commands.\nServer Prefix: \`${prefix}\``)
-        .setColor(discord_js_1.Colors.DarkPurple)
+        .setColor(branding_1.Mascot.Colors.Base)
         .setThumbnail(message.client.user?.displayAvatarURL() ?? null);
     const row = createDropdownRow();
     const sent = await message.reply({ embeds: [overview], components: [row] });
@@ -151,7 +152,7 @@ async function handleHelp(message) {
     collector.on("collect", async (i) => {
         if (i.isStringSelectMenu()) {
             const val = i.values[0];
-            let embed = new discord_js_1.EmbedBuilder().setColor(discord_js_1.Colors.Blurple);
+            let embed = new discord_js_1.EmbedBuilder().setColor(branding_1.Mascot.Colors.Base);
             if (val === "economy") {
                 embed.setTitle(`${strEconomy} Economy & Shop`)
                     .addFields({ name: `\`${prefix}profile\``, value: "View your stats, net worth & credit score." }, { name: `\`${prefix}credit\``, value: "💳 **Credit Profile** (Score, Loan Limits, Active Loan)." }, { name: `\`${prefix}bank\``, value: "🏦 **Financial Dashboard** (Loans, Investments, Net Worth)." }, { name: `\`${prefix}bm\``, value: "🏴‍☠️ **Black Market** (Buy/Sell/List Items Globaly)." }, { name: `\`${prefix}bal [user]\``, value: "Check wallet and bank balance." }, { name: `\`${prefix}lb\``, value: "View Server Leaderboard (Net Worth)." }, { name: `\`${prefix}lb-wallet\``, value: "View Cash-only Leaderboard." }, { name: `\`${prefix}shop\``, value: "View and buy items from the store." }, { name: `\`${prefix}inv\``, value: "View your purchased items." }, { name: `\`${prefix}dep <amount|all>\``, value: "Deposit money to bank." }, { name: `\`${prefix}with <amount|all>\``, value: "Withdraw money from bank." }, { name: `\`${prefix}rob <user>\``, value: "Attempt to steal from a user." }, { name: `\`${prefix}rank [user]\``, value: "Check your current level and XP." }, { name: `\`${prefix}set-theme <color>\``, value: "Customize your profile embed color." }, { name: `\`${prefix}transfer <amount> <user>\``, value: "Gift money to another user." });
@@ -194,7 +195,7 @@ async function handleHelp(message) {
                     }
                     const newPageData = adminPages[currentAdminPage - 1];
                     const newEmbed = new discord_js_1.EmbedBuilder()
-                        .setColor(discord_js_1.Colors.Blurple)
+                        .setColor(branding_1.Mascot.Colors.Base)
                         .setTitle(newPageData.title)
                         .addFields(newPageData.fields);
                     const newButtonRow = createPaginationButtons(currentAdminPage, newPageData.totalPages);

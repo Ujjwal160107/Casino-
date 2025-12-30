@@ -3,6 +3,7 @@ import prisma from "../../utils/prisma";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
 import { getGuildConfig } from "../../services/guildConfigService";
+import { Mascot } from "../../config/branding";
 
 export async function handleCasinoUnban(message: Message, args: string[]) {
     if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
@@ -33,7 +34,7 @@ export async function handleCasinoUnban(message: Message, args: string[]) {
         });
 
         return message.reply({
-            embeds: [successEmbed(message.author, "User Unbanned", `✅ **<@${discordId}>** has been unbanned from the casino.`)]
+            embeds: [successEmbed(message.author, "User Unbanned", `${Mascot.Emotes.Accept} **<@${discordId}>** has been unbanned from the casino.`)]
         });
 
     } catch (error) {

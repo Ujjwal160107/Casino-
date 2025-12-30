@@ -5,6 +5,7 @@ import { ensureUserAndWallet } from "../../services/walletService";
 import { fmtCurrency, fmtAmount } from "../../utils/format";
 import { errorEmbed } from "../../utils/embed";
 import { emojiInline } from "../../utils/emojiRegistry";
+import { Mascot, getEmoteUrl } from "../../config/branding";
 
 export async function handleInventory(message: Message, args: string[]) {
   try {
@@ -22,12 +23,16 @@ export async function handleInventory(message: Message, args: string[]) {
     const items = await getUserInventory(targetUser.id, message.guildId!);
     const eInv = emojiInline("inventory", message.guild) || "🎒";
 
+
+
     if (items.length === 0) {
+      const url = getEmoteUrl(Mascot.Emotes.Think);
       const emptyEmbed = new EmbedBuilder()
-        .setTitle(`${eInv} ${targetUser.username}'s Inventory`)
-        .setColor(Colors.Blue)
+        .setTitle(`${targetUser.username}'s Inventory`)
+        .setColor(Mascot.Colors.Base as any)
         .setDescription(`Your inventory is empty.\nCheck out the store with \`${config.prefix}shop\`!`)
         .setTimestamp();
+      if (url) emptyEmbed.setThumbnail(url);
       return message.reply({ embeds: [emptyEmbed] });
     }
 
@@ -46,16 +51,21 @@ export async function handleInventory(message: Message, args: string[]) {
     }).join("\n\n");
 
     const embed = new EmbedBuilder()
-      .setTitle(`${eInv} ${targetUser.username}'s Inventory`)
-      .setColor(Colors.Blue)
+      .setTitle(`${targetUser.username}'s Inventory`)
+      .setColor(Mascot.Colors.Base as any)
       .setDescription(description)
       .addFields({
-        name: "💰 Total Asset Value",
+        name: `Total Asset Value`,
         value: fmtCurrency(netWorth, emoji),
         inline: false
       })
-      .setFooter({ text: "Select an item below to Sell, Trade, or List." })
+      .setFooter({ text: `${Mascot.Name} • Select an item below to Sell, Trade, or List.` })
       .setTimestamp();
+
+    // Use Money emote for populated inventory or keep eInv if it was significant? 
+    // The user wants "custom emojis as thumbnails". Money fits "Asset Value".
+    const moneyUrl = getEmoteUrl(Mascot.Emotes.Money);
+    if (moneyUrl) embed.setThumbnail(moneyUrl);
 
     const rows = [];
     if (targetUser.id === message.author.id) {

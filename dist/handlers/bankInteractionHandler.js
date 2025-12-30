@@ -6,6 +6,7 @@ const bankingService_1 = require("../services/bankingService");
 const guildConfigService_1 = require("../services/guildConfigService");
 const discordLogger_1 = require("../utils/discordLogger");
 const format_1 = require("../utils/format");
+const branding_1 = require("../config/branding");
 async function handleBankInteraction(interaction) {
     if (interaction.isButton()) {
         await handleButton(interaction);
@@ -226,7 +227,7 @@ async function handleModal(interaction) {
                 description: `**User:** ${user.tag}\n**Amount:** ${(0, format_1.fmtCurrency)(amount, config.currencyEmoji)}\n**Repayment:** ${(0, format_1.fmtCurrency)(result.totalRepayment, config.currencyEmoji)}\n**Due:** ${result.dueDate.toLocaleDateString()}`,
                 color: 0x00FF00
             });
-            await interaction.editReply({ content: `✅ Loan approved! Received **${amount}**. You must repay **${result.totalRepayment}** by ${result.dueDate.toLocaleDateString()}.` });
+            await interaction.editReply({ content: `${branding_1.Mascot.Emotes.Accept} Loan approved! Received **${amount}**. You must repay **${result.totalRepayment}** by ${result.dueDate.toLocaleDateString()}.` });
         }
         else if (customId === "loan_repay_modal") {
             const amountStr = fields.getTextInputValue("repay_amount");
@@ -269,7 +270,7 @@ async function handleModal(interaction) {
                     description: `**User:** ${user.tag}\n**Amount:** ${(0, format_1.fmtCurrency)(amount, config.currencyEmoji)}\n**Duration:** ${days} days`,
                     color: 0xFFA500
                 });
-                await interaction.editReply({ content: `✅ Created Fixed Deposit of **${amount}** for **${days} days**.` });
+                await interaction.editReply({ content: `${branding_1.Mascot.Emotes.Accept} Created Fixed Deposit of **${amount}** for **${days} days**.` });
             }
             else {
                 await (0, bankingService_1.createInvestment)(user.id, guildId, "RD", amount, days);
@@ -280,12 +281,12 @@ async function handleModal(interaction) {
                     description: `**User:** ${user.tag}\n**Amount:** ${(0, format_1.fmtCurrency)(amount, config.currencyEmoji)}\n**Duration:** ${days} days`,
                     color: 0xFFA500
                 });
-                await interaction.editReply({ content: `✅ Created Recurring Deposit of **${amount}** for **${days} days**.` });
+                await interaction.editReply({ content: `${branding_1.Mascot.Emotes.Accept} Created Recurring Deposit of **${amount}** for **${days} days**.` });
             }
         }
     }
     catch (err) {
-        await interaction.editReply({ content: `❌ Error: ${err.message}` });
+        await interaction.editReply({ content: `${branding_1.Mascot.Emotes.Fail} Error: ${err.message}` });
     }
 }
 async function handleSelectMenu(interaction) {

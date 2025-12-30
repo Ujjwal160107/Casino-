@@ -1,4 +1,5 @@
 import { Message, EmbedBuilder, Colors } from "discord.js";
+import { Mascot, getEmoteUrl } from "../../config/branding";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { placeBetWithTransaction, placeBetFallback } from "../../services/gameService";
 import { getGuildConfig } from "../../services/guildConfigService";
@@ -50,7 +51,7 @@ export async function handleSlots(message: Message, args: string[]) {
       const expire = getCooldownExpiry(key);
       const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
       return message.reply({
-        embeds: [errorEmbed(message.author, "Cooldown Active", `<:cooldown:1454025354631970826> Please wait <t:${ts}:R> before playing Slots again.`)]
+        embeds: [errorEmbed(message.author, "Cooldown Active", `${Mascot.Emotes.Angry} Please wait <t:${ts}:R> before playing Slots again.`)]
       });
     }
   }
@@ -75,6 +76,8 @@ export async function handleSlots(message: Message, args: string[]) {
     actualPayout = await placeBetFallback(user.wallet!.id, user.id, "slots", amount, "spin", win, payout, message.guildId!);
   }
   payout = actualPayout;
+
+
   const eTitle = "<a:casino:1445732641545654383>";
   const embed = new EmbedBuilder()
     .setTitle(`${eTitle} Slots`)
@@ -85,6 +88,15 @@ export async function handleSlots(message: Message, args: string[]) {
         ? `**JACKPOT!** You won **${fmtCurrency(payout, emoji)}**! (x${multiplier})`
         : `Better luck next time... You lost **${fmtCurrency(amount, emoji)}**.`)
     )
-    .setFooter({ text: `${message.author.username}'s Wallet: ${(user.wallet!.balance - amount + payout).toLocaleString()}` });
+    .setFooter({ text: `${Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet!.balance - amount + payout).toLocaleString()}` });
+
+  if (win) {
+    const url = getEmoteUrl(Mascot.Emotes.Money);
+    if (url) embed.setThumbnail(url);
+  } else {
+    const url = getEmoteUrl(Mascot.Emotes.Fail);
+    if (url) embed.setThumbnail(url);
+  }
+
   return message.reply({ embeds: [embed] });
 }

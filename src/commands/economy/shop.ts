@@ -19,14 +19,21 @@ import { logToChannel } from "../../utils/discordLogger";
 
 const ITEMS_PER_PAGE = 5;
 
+import { Mascot, getEmoteUrl } from "../../config/branding";
+
 function renderShopPage(items: any[], page: number, totalPages: number, currencyEmoji: string) {
   const start = (page - 1) * ITEMS_PER_PAGE;
   const currentItems = items.slice(start, start + ITEMS_PER_PAGE);
 
+
+
   const embed = new EmbedBuilder()
-    .setTitle("🛒 Shop")
-    .setColor(Colors.DarkGrey)
-    .setFooter({ text: `Page ${page}/${totalPages} • Use buttons to buy` + "\u3000".repeat(25) });
+    .setTitle(`Shop`)
+    .setColor(Mascot.Colors.Base as any)
+    .setFooter({ text: `${Mascot.Name} • Page ${page}/${totalPages} • Use buttons to buy` + "\u3000".repeat(25) });
+
+  const url = getEmoteUrl(Mascot.Emotes.Money);
+  if (url) embed.setThumbnail(url);
 
   if (currentItems.length > 0) {
     currentItems.forEach((item, index) => {
@@ -156,12 +163,12 @@ export async function handleShop(message: Message, args: string[]) {
             color: 0x00FF00
           });
 
-          await interaction.editReply({ content: `✅ Purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**!` });
+          await interaction.editReply({ content: `${Mascot.Emotes.Accept} Purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**!` });
         } catch (err) {
           if (interaction.deferred || interaction.replied) {
-            await interaction.editReply({ content: `❌ Error: ${(err as Error).message}` });
+            await interaction.editReply({ content: `${Mascot.Emotes.Fail} Error: ${(err as Error).message}` });
           } else {
-            await interaction.reply({ content: `❌ Error: ${(err as Error).message}`, ephemeral: true });
+            await interaction.reply({ content: `${Mascot.Emotes.Fail} Error: ${(err as Error).message}`, ephemeral: true });
           }
         }
       }

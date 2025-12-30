@@ -50,6 +50,7 @@ import { errorEmbed } from "./utils/embed";
 import { findBestMatch } from "./utils/stringUtils";
 import { handleUse } from "./commands/economy/use";
 import { handleItemInfo } from "./commands/economy/iteminfo";
+import { Mascot, getEmoteUrl } from "./config/branding";
 
 export async function routeMessage(client: Client, message: Message, prefix: string) {
   const raw = message.content.slice(1).trim();
@@ -266,6 +267,12 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleSetEconomyConfig(message, args, "bank-limit");
     case "set-wallet-limit":
       return handleSetEconomyConfig(message, args, "wallet-limit");
+    case "uni":
+    case "university":
+      {
+        const { handleEducation } = require("./commands/life/education");
+        return handleEducation(message, args);
+      }
     case "set-fd-interest":
     case "set-fd":
       return handleSetEconomyConfig(message, args, "fd");
@@ -365,10 +372,87 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleEquip(message, args);
     }
     case "cockstore":
-    case "cs":
-    case "cock-store": {
+    case "cs": {
       const { handleCockStore } = require("./commands/shop/cockStore");
       return handleCockStore(message, args);
+    }
+
+    case "degrees":
+    case "mydegrees":
+    case "degree": {
+      const { handleListDegrees } = require("./commands/life/education");
+      return handleListDegrees(message);
+    }
+    case "jobs": {
+      const { handleJobs } = require("./commands/life/jobs");
+      return handleJobs(message, args);
+    }
+    case "apply": {
+      const { handleApply } = require("./commands/life/apply");
+      return handleApply(message, args);
+    }
+    case "freelance": {
+      const { handleFreelance } = require("./commands/life/freelance");
+      return handleFreelance(message, args);
+    }
+    case "resign": {
+      const { handleResign } = require("./commands/life/resign");
+      return handleResign(message, args);
+    }
+    // EDUCATION
+    case "education":
+    case "edu":
+    case "school": {
+      const { handleEducation } = require("./commands/life/education");
+      return handleEducation(message, args);
+    }
+    case "study": {
+      const { handleStudy } = require("./commands/life/study");
+      return handleStudy(message);
+    }
+    case "enroll": {
+      const { handleEnroll } = require("./commands/life/enroll");
+      return handleEnroll(message, args);
+    }
+    case "exam":
+    case "finals": {
+      const { handleExam } = require("./commands/life/enroll");
+      return handleExam(message);
+    }
+    case "dropout": {
+      const { handleDropout } = require("./commands/life/dropout");
+      return handleDropout(message);
+    }
+
+    // --- Education Admin ---
+    case "setint":
+    case "setintelligence": {
+      const { handleSetInt } = require("./commands/admin/educationAdmin");
+      return handleSetInt(message, args);
+    }
+    case "setdis":
+    case "setdiscipline": {
+      const { handleSetDis } = require("./commands/admin/educationAdmin");
+      return handleSetDis(message, args);
+    }
+    case "resetedu": {
+      const { handleResetEdu } = require("./commands/admin/educationAdmin");
+      return handleResetEdu(message, args);
+    }
+    case "grantdegree": {
+      const { handleGrantDegree } = require("./commands/admin/educationAdmin");
+      return handleGrantDegree(message, args);
+    }
+    case "set-degree-cost":
+    case "setdegree":
+    case "settuition": {
+      const { handleSetDegreeCost } = require("./commands/admin/educationAdmin");
+      return handleSetDegreeCost(message, args);
+    }
+    case "set-study-cooldown":
+    case "setstudycd": {
+      const { handleSetStudyCooldown } = require("./commands/admin/educationAdmin");
+      return handleSetStudyCooldown(message, args);
     }
     default:
       const VALID_COMMANDS = [
@@ -386,14 +470,17 @@ export async function routeMessage(client: Client, message: Message, prefix: str
         "ask-money", "config-rob", "add-emoji", "set-income-cd", "set-prefix",
         "set-currency-emoji", "adminpanel"
       ];
+      const thinkUrl = getEmoteUrl(Mascot.Emotes.Think);
       const bestMatch = findBestMatch(command, VALID_COMMANDS);
+
       if (bestMatch) {
-        return message.reply({
-          embeds: [errorEmbed(message.author, "Unknown Command", `Did you mean \`${prefix}${bestMatch}\`?`)]
-        });
+        const embed = errorEmbed(message.author, "Unknown Command", `Did you mean \`${prefix}${bestMatch}\`?`);
+        if (thinkUrl) embed.setThumbnail(thinkUrl);
+        return message.reply({ embeds: [embed] });
       }
-      return message.reply(
-        `Unknown command. Try: \`${prefix}bal\`, \`${prefix}shop\`, \`${prefix}inv\`, \`${prefix}help\`.`
-      );
+
+      const embed = errorEmbed(message.author, "Unknown Command", `Command not found. Try: \`${prefix}bal\`, \`${prefix}shop\`, \`${prefix}inv\`, \`${prefix}help\`.`);
+      if (thinkUrl) embed.setThumbnail(thinkUrl);
+      return message.reply({ embeds: [embed] });
   }
 }

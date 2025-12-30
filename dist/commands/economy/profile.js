@@ -10,6 +10,7 @@ const format_1 = require("../../utils/format");
 const embed_1 = require("../../utils/embed");
 const emojiRegistry_1 = require("../../utils/emojiRegistry");
 const imageService_1 = require("../../services/imageService");
+const branding_1 = require("../../config/branding");
 async function handleProfile(message, args) {
     try {
         const targetUser = message.mentions.users.first() || message.author;
@@ -66,18 +67,24 @@ async function handleProfile(message, args) {
                 else {
                     const itemsList = inventory.slice(0, 10).map(i => `• ${i.shopItem.name} (x${i.amount})`).join("\n");
                     const invEmbed = new discord_js_1.EmbedBuilder()
-                        .setTitle(`${eInv} Quick Inventory`)
-                        .setColor(discord_js_1.Colors.Blue)
+                        .setTitle(`Quick Inventory`)
+                        .setColor(branding_1.Mascot.Colors.Base)
                         .setDescription(itemsList + (inventory.length > 10 ? `\n...and ${inventory.length - 10} more` : ""));
+                    const thinkUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Think);
+                    if (thinkUrl)
+                        invEmbed.setThumbnail(thinkUrl);
                     await interaction.reply({ embeds: [invEmbed], ephemeral: true });
                 }
             }
             if (interaction.customId === "prof_bal") {
                 const balEmbed = new discord_js_1.EmbedBuilder()
-                    .setTitle(`${eGraph} Detailed Balance`)
+                    .setTitle(`Detailed Balance`)
                     .setColor(discord_js_1.Colors.Green)
                     .addFields({ name: "Wallet", value: (0, format_1.fmtCurrency)(walletBal, currencyEmoji), inline: true }, { name: "Bank", value: (0, format_1.fmtCurrency)(bankBal, currencyEmoji), inline: true }, { name: "Inventory", value: (0, format_1.fmtCurrency)(inventoryValue, currencyEmoji), inline: true }, { name: "Net Worth", value: (0, format_1.fmtCurrency)(netWorth, currencyEmoji), inline: true })
-                    .setFooter({ text: "Private View" });
+                    .setFooter({ text: `${branding_1.Mascot.Name} Private View` });
+                const moneyUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Money);
+                if (moneyUrl)
+                    balEmbed.setThumbnail(moneyUrl);
                 await interaction.reply({ embeds: [balEmbed], ephemeral: true });
             }
         });

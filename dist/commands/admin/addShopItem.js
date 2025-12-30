@@ -6,6 +6,7 @@ const embed_1 = require("../../utils/embed");
 const format_1 = require("../../utils/format");
 const permissionUtils_1 = require("../../utils/permissionUtils");
 const collectorHelper_1 = require("../../utils/collectorHelper");
+const branding_1 = require("../../config/branding");
 async function handleAddShopItem(message, args) {
     if (!message.member || !(await (0, permissionUtils_1.canExecuteAdminCommand)(message, message.member)))
         return;
@@ -45,7 +46,7 @@ async function handleAddShopItem(message, args) {
     await message.channel.send("📝 **Step 1/4:** Enter item description (or `skip`):");
     const desc = await awaitTextResponse(message);
     if (desc === "CANCEL")
-        return message.reply("❌ Cancelled.");
+        return message.reply(`${branding_1.Mascot.Emotes.Decline} Cancelled.`);
     if (desc && desc !== "SKIP")
         builder.description = desc;
     // Step 2: Item Type
@@ -57,7 +58,7 @@ async function handleAddShopItem(message, args) {
         "`4` - Buff Item");
     const typeChoice = await awaitTextResponse(message);
     if (typeChoice === "CANCEL")
-        return message.reply("❌ Cancelled.");
+        return message.reply(`${branding_1.Mascot.Emotes.Decline} Cancelled.`);
     if (typeChoice === "2") {
         builder.itemType = "CONSUMABLE";
         builder.consumable = true;
@@ -74,7 +75,7 @@ async function handleAddShopItem(message, args) {
         await message.channel.send("🔄 **Step 3/4:** Make this item consumable? (`yes`/`no` or `skip`):");
         const consumableChoice = await awaitTextResponse(message);
         if (consumableChoice === "CANCEL")
-            return message.reply("❌ Cancelled.");
+            return message.reply(`${branding_1.Mascot.Emotes.Decline} Cancelled.`);
         if (consumableChoice?.toLowerCase() === "yes")
             builder.consumable = true;
     }
@@ -88,7 +89,7 @@ async function handleAddShopItem(message, args) {
         "Effects include: XP multipliers, roles, money, level boosts, custom messages");
     const addEffects = await awaitTextResponse(message);
     if (addEffects === "CANCEL")
-        return message.reply("❌ Cancelled.");
+        return message.reply(`${branding_1.Mascot.Emotes.Decline} Cancelled.`);
     if (addEffects?.toLowerCase() === "yes") {
         await configureEffects(message, builder);
     }
@@ -99,7 +100,7 @@ async function handleAddShopItem(message, args) {
             ? "\n\n**Effects:**\n" + formatEffectList(builder.effects)
             : "";
         await message.reply({
-            embeds: [(0, embed_1.successEmbed)(message.author, "✅ Item Created!", `**${builder.name}** added to shop!\n\n` +
+            embeds: [(0, embed_1.successEmbed)(message.author, `${branding_1.Mascot.Emotes.Accept} Item Created!`, `**${builder.name}** added to shop!\n\n` +
                     `💰 Price: ${(0, format_1.fmtCurrency)(builder.price)}\n` +
                     `📦 Type: ${builder.itemType}\n` +
                     `🔄 Consumable: ${builder.consumable ? "Yes" : "No"}\n` +
@@ -133,7 +134,7 @@ async function configureEffects(message, builder) {
         if (effect) {
             builder.effects.push(effect);
             // @ts-ignore - guild text channels support send
-            await message.channel.send(`✅ Effect added! Total effects: ${builder.effects.length}`);
+            await message.channel.send(`${branding_1.Mascot.Emotes.Accept} Effect added! Total effects: ${builder.effects.length}`);
         }
         if (builder.effects.length >= 5) {
             // @ts-ignore - guild text channels support send
@@ -220,13 +221,13 @@ async function buildEffect(message, choice) {
                 return { type: "CUSTOM_MESSAGE", message: customMsg };
             default:
                 // @ts-ignore - guild text channels support send
-                await message.channel.send("❌ Invalid choice. Skipping effect.");
+                await message.channel.send(`${branding_1.Mascot.Emotes.Fail} Invalid choice. Skipping effect.`);
                 return null;
         }
     }
     catch (err) {
         // @ts-ignore - guild text channels support send
-        await message.channel.send(`❌ Error: ${err.message}. Skipping effect.`);
+        await message.channel.send(`${branding_1.Mascot.Emotes.Fail} Error: ${err.message}. Skipping effect.`);
         return null;
     }
 }

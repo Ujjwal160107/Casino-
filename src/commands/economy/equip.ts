@@ -4,6 +4,7 @@ import { errorEmbed } from "../../utils/embed";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { getEquipmentSlot } from "../../utils/gameUtils";
 import { GameConfig, EquipmentSlot } from "../../config/gameConfig";
+import { Mascot } from "../../config/branding";
 
 export async function handleEquip(message: Message, args: string[]) {
     if (!message.guild || !message.member) return;
@@ -82,7 +83,7 @@ export async function handleEquip(message: Message, args: string[]) {
         data: { meta }
     });
 
-    const EMOJI_CHECK = GameConfig.Emojis.Tick || "✅";
+    const EMOJI_CHECK = GameConfig.Emojis.Tick || Mascot.Emotes.Accept;
     const slotName = slot.charAt(0).toUpperCase() + slot.slice(1);
 
     const embed = new EmbedBuilder()

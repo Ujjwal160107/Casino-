@@ -45,6 +45,20 @@ model User {
   investments Investment[]
   listings    MarketListing[]
   activeEffects ActiveEffect[]
+  
+  // BitLife Stats (0-100)
+  intelligence Int      @default(50)
+  discipline   Int      @default(50)
+  
+  // Education Relations
+  currentEducation UserEducation?
+  degrees          UserDegree[]
+  
+  // Employment
+  jobId       String?   @db.ObjectId
+  job         Job?      @relation(fields: [jobId], references: [id])
+
+  // Life Sim Relations
 }
 
 model Wallet {
@@ -115,6 +129,12 @@ model Job {
   maxPay      Int
   successRate Float?
   cooldown    Int
+  
+  // Requirements
+  requiredDegreeId String? @db.ObjectId
+  requiredDegree   Degree? @relation(fields: [requiredDegreeId], references: [id])
+  
+  employees User[]
 }
 
 model ShopItem {
@@ -250,6 +270,8 @@ model GuildConfig {
   chickenTrainBaseCost Int @default(500)
   chickenTrainMultiplier Float @default(0.5)
   chickenHealCost Int      @default(500)
+  
+  studyCooldown   Int      @default(300) // Seconds
 
   // Banking System Configs
   loanInterestRate Int      @default(5)
@@ -326,3 +348,81 @@ model CommandPermission {
 
   @@unique([guildId, command, targetType, targetId]) // prevent duplicate rules
 }
+
+
+
+// --- ADVANCED EDUCATION SYSTEM ---
+
+model Degree {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId         String
+  name            String
+  type            String   // HS, ASSOCIATE, BACHELORS, MASTERS, PHD, TRADE, CERTIFICATE
+  
+  // Requirements
+  minIntelligence Int      @default(0) // 0-100
+  requiredDegreeId String? @db.ObjectId // Prerequisite
+  
+  // Structure
+  totalSemesters  Int      @default(8) // Standard 4-year degree (8 sem)
+  passGpa         Float    @default(2.0)
+  
+  // Financial
+  tuitionPerSem   Int      @default(1000)
+  
+  // Perks (Passive)
+  intelligenceBoost Int    @default(0) // Permanent stat boost on completion
+  incomeMulti     Float    @default(0.1) // Additive multiplier
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  requiredForJobs Job[]
+  prereqFor       Degree[] @relation("DegreePrereq")
+  
+  requiredDegree  Degree?  @relation("DegreePrereq", fields: [requiredDegreeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  
+  activeStudents  UserEducation[]
+  graduates       UserDegree[]
+}
+
+model UserEducation {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  user            User     @relation(fields: [userId], references: [id])
+  userId          String   @unique @db.ObjectId // Can only be enrolled in one at a time? Yes for now.
+  
+  degree          Degree   @relation(fields: [degreeId], references: [id])
+  degreeId        String   @db.ObjectId
+  
+  // Progress
+  currentSemester Int      @default(1)
+  currentGpa      Float    @default(3.0) // 0.0 - 4.0 scale
+  creditsEarned   Int      @default(0)
+  
+  // Sim Stats
+  stress          Int      @default(0) // 0-100. High stress = dropout risk.
+  attendance      Int      @default(100) // %
+  lastStudy       DateTime? 
+  
+  status          String   @default("ENROLLED") // ENROLLED, PROBATION, DROPPED, GRADUATED
+  scholarshipsClaimed Int[] @default([]) 
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model UserDegree {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  user            User     @relation(fields: [userId], references: [id])
+  userId          String   @db.ObjectId
+  
+  degree          Degree   @relation(fields: [degreeId], references: [id])
+  degreeId        String   @db.ObjectId
+  
+  finalGpa        Float
+  obtainedAt      DateTime @default(now())
+  
+  @@unique([userId, degreeId])
+}
+

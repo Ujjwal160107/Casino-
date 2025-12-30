@@ -8,10 +8,15 @@ const discord_js_1 = require("discord.js");
 const prisma_1 = __importDefault(require("../../utils/prisma"));
 const embed_1 = require("../../utils/embed");
 const guildConfigService_1 = require("../../services/guildConfigService");
-const EMOJI_CHICKEN = "<:cock:1451281426329768172>";
-const EMOJI_TICK = "<:n_check:1451281806279311435>";
-const EMOJI_WIN = "<:MoneyBag:1446970451606896781>";
-const EMOJI_RIP = "<:rip:1451287136132403303>";
+const imageUtils_1 = require("../../utils/imageUtils");
+const cooldown_1 = require("../../utils/cooldown");
+const gameUtils_1 = require("../../utils/gameUtils");
+const gameConfig_1 = require("../../config/gameConfig");
+const branding_1 = require("../../config/branding");
+const EMOJI_CHICKEN = gameConfig_1.GameConfig.Emojis.Chicken;
+const EMOJI_TICK = gameConfig_1.GameConfig.Emojis.Tick;
+const EMOJI_WIN = gameConfig_1.GameConfig.Emojis.Win;
+const EMOJI_RIP = gameConfig_1.GameConfig.Emojis.Rip;
 async function handleCockFight(message, args) {
     if (!message.guild || !message.member)
         return;
@@ -36,6 +41,20 @@ async function handleCockFight(message, args) {
     if (betAmount < config.minBet) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Min Bet", `The minimum bet is **${config.minBet}**. `)] });
     }
+    // Cooldown Check for Challenger
+    const cooldowns = config.gameCooldowns || {};
+    const cdSeconds = cooldowns["cockfight"] || 0;
+    if (cdSeconds > 0) {
+        const key = `game:cockfight:${message.guild.id}:${message.author.id}`;
+        const remaining = (0, cooldown_1.checkCooldown)(key, cdSeconds);
+        if (remaining > 0) {
+            const expire = (0, cooldown_1.getCooldownExpiry)(key);
+            const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
+            return message.reply({
+                embeds: [(0, embed_1.errorEmbed)(message.author, "Cooldown Active", `<:cooldown:1454025354631970826> You are on cooldown. Wait <t:${ts}:R>.`)]
+            });
+        }
+    }
     const shopItem = await prisma_1.default.shopItem.findFirst({
         where: {
             guildId: message.guild.id,
@@ -51,11 +70,31 @@ async function handleCockFight(message, args) {
     if (!invChallenger || invChallenger.amount < 1) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Missing Item", `You need a ${EMOJI_CHICKEN} **Chicken** to fight!`)] });
     }
+    const challengerMeta = invChallenger.meta || {};
+    if (challengerMeta.training) {
+        const endTime = Math.floor(challengerMeta.training.endTime / 1000);
+        return message.reply({
+            embeds: [(0, embed_1.errorEmbed)(message.author, "Busy", `Your chicken is training! Come back <t:${endTime}:R>.`)]
+        });
+    }
+    if (challengerMeta.injured) {
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Injured", "Your chicken is injured! Heal it via `!chicken`.")] });
+    }
     const invTarget = await prisma_1.default.inventory.findUnique({
         where: { userId_shopItemId: { userId: (await getUserId(targetUser.id, message.guild.id)), shopItemId: shopItem.id } }
     });
     if (!invTarget || invTarget.amount < 1) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Opponent Missing Item", `${targetUser.username} needs a ${EMOJI_CHICKEN} **Chicken** to fight!`)] });
+    }
+    const targetMeta = invTarget.meta || {};
+    if (targetMeta.training) {
+        const endTime = Math.floor(targetMeta.training.endTime / 1000);
+        return message.reply({
+            embeds: [(0, embed_1.errorEmbed)(message.author, "Busy", `**${targetUser.username}**'s chicken is training! Ends <t:${endTime}:R>.`)]
+        });
+    }
+    if (targetMeta.injured) {
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Injured", `**${targetUser.username}**'s chicken is injured!`)] });
     }
     const challengerWallet = await prisma_1.default.wallet.findUnique({ where: { userId: (await getUserId(message.author.id, message.guild.id)) } });
     const userBal = challengerWallet?.balance || 0;
@@ -84,6 +123,26 @@ async function handleCockFight(message, args) {
         if (i.customId === "cf_accept") {
             if (gameStarted)
                 return;
+            // Cooldown Check for Acceptor
+            const cooldowns = config.gameCooldowns || {};
+            const cdSeconds = cooldowns["cockfight"] || 0;
+            if (cdSeconds > 0) {
+                const key = `game:cockfight:${message.guild.id}:${targetUser.id}`;
+                const remaining = (0, cooldown_1.checkCooldown)(key, cdSeconds); // This resets/checks logic, but here we just want to read. 
+                // Wait, checkCooldown actually *sets* if not exists? No, checkCooldown(key, seconds) returns remaining time if exists, else 0. 
+                // But wait, checkCooldown *sets* it if it doesn't exist? 
+                // Looking at util: if (now < expiresAt) return remaining. else set(key, now + seconds). return 0.
+                // WE DO NOT WANT TO SET COOLDOWN ON CHECK HERE. 
+                // We should only check existence.
+                // Let's use getCooldownExpiry manually or checkCooldown with 0? No.
+                // We need to use `getCooldownExpiry` to check without setting.
+                const existingExpiry = (0, cooldown_1.getCooldownExpiry)(key);
+                if (existingExpiry && existingExpiry > Date.now()) {
+                    const ts = Math.floor(existingExpiry / 1000);
+                    await i.reply({ content: `<:cooldown:1454025354631970826> You are on cooldown! Wait <t:${ts}:R>.`, ephemeral: true });
+                    return;
+                }
+            }
             gameStarted = true;
             try {
                 await i.deferUpdate();
@@ -127,6 +186,26 @@ async function getUserId(discordId, guildId) {
     }
     return user.id;
 }
+const FIGHT_MOVES = [
+    "{attacker} pecks {defender} right in the eye!",
+    "{attacker} flutters wildly, confusing {defender}!",
+    "{attacker} lands a solid scratch on {defender}'s beak!",
+    "{attacker} summons ancient chicken energy against {defender}!",
+    "{attacker} attempts a flying kick at {defender}!",
+    "{attacker} clucks menacingly, lowering {defender}'s morale!",
+    "{defender} slips on a loose feather, taking damage!",
+    "{attacker} unleashes a flurry of pecks!",
+];
+const CRITICAL_MOVES = [
+    "CRITICAL HIT! {attacker} tears a hole in the fabric of space-time!",
+    "BOOM! {attacker} lands a devastating spur strike!",
+    "{attacker} moves so fast they disappear, reappearing behind {defender}!",
+];
+const MISS_MOVES = [
+    "{attacker} misses completely!",
+    "{defender} dodges the attack effortlessly!",
+    "{attacker} trips over their own feet!",
+];
 async function runCockFight(originalMsg, gameMsg, p1, p2, bet, chickenItemId) {
     const guildId = originalMsg.guild.id;
     const p1Id = await getUserId(p1.id, guildId);
@@ -137,6 +216,12 @@ async function runCockFight(originalMsg, gameMsg, p1, p2, bet, chickenItemId) {
     ]);
     let pot = bet * 2;
     const sideBets = [];
+    // --- CONFIG: Bet Timer ---
+    const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
+    const betTimeSeconds = config.cockfightBetTime || 60; // Default 60s
+    const betTimeMs = betTimeSeconds * 1000;
+    // --- GENERATE VS IMAGE ---
+    const vsImage = await (0, imageUtils_1.generateVsImage)(p1.displayAvatarURL({ extension: "png", size: 256 }), p2.displayAvatarURL({ extension: "png", size: 256 }));
     const bettingEmbed = new discord_js_1.EmbedBuilder()
         .setColor("#FFFF00")
         .setTitle(`${EMOJI_CHICKEN} Betting Phase!`)
@@ -145,14 +230,15 @@ async function runCockFight(originalMsg, gameMsg, p1, p2, bet, chickenItemId) {
     **Main Pot:** ${pot}
     
     Other players can place side bets now!
-    **Side Bets Open for 60 seconds.**
+    **Side Bets Open for ${betTimeSeconds} seconds.**
     
     <:alert_sign:1451625691664875610> **WARNING:** You can only bet **ONCE**. No switching allowed!
     Click the buttons below to bet on a winner.`)
+        .setImage("attachment://vs.png")
         .addFields({ name: `${p1.username}`, value: "No bets yet.", inline: true }, { name: `${p2.username}`, value: "No bets yet.", inline: true });
     const betRow = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId(`bet_p1`).setLabel(`Bet on ${p1.username}`).setStyle(discord_js_1.ButtonStyle.Primary), new discord_js_1.ButtonBuilder().setCustomId(`bet_p2`).setLabel(`Bet on ${p2.username}`).setStyle(discord_js_1.ButtonStyle.Primary));
-    await gameMsg.edit({ embeds: [bettingEmbed], components: [betRow] });
-    const betCollector = gameMsg.createMessageComponentCollector({ componentType: discord_js_1.ComponentType.Button, time: 60000 });
+    await gameMsg.edit({ embeds: [bettingEmbed], components: [betRow], files: [vsImage] });
+    const betCollector = gameMsg.createMessageComponentCollector({ componentType: discord_js_1.ComponentType.Button, time: betTimeMs });
     betCollector.on("collect", async (i) => {
         if (i.user.id === p1.id || i.user.id === p2.id) {
             await i.deferReply({ ephemeral: true });
@@ -182,7 +268,7 @@ async function runCockFight(originalMsg, gameMsg, p1, p2, bet, chickenItemId) {
             }
             const bettorDbId = await getUserId(submit.user.id, guildId);
             if (sideBets.some(b => b.userId === submit.user.id)) {
-                await submit.editReply({ content: "❌ You have already placed a bet! You cannot switch sides or add more." });
+                await submit.editReply({ content: `${branding_1.Mascot.Emotes.Decline} You have already placed a bet! You cannot switch sides or add more.` });
                 return;
             }
             const bettorWallet = await prisma_1.default.wallet.findUnique({ where: { userId: bettorDbId } });
@@ -218,17 +304,78 @@ async function runCockFight(originalMsg, gameMsg, p1, p2, bet, chickenItemId) {
         const p2Inv = await prisma_1.default.inventory.findUnique({ where: { userId_shopItemId: { userId: p2Id, shopItemId: chickenItemId } } });
         const p2Meta = p2Inv?.meta || {};
         const p2Level = p2Meta.level || 0;
-        const p1Score = 10 + (p1Level * 2);
-        const p2Score = 10 + (p2Level * 2);
-        const totalScore = p1Score + p2Score;
-        const p1Chance = p1Score / totalScore;
+        // Helper to get equipment list
+        const getEquipList = (meta) => {
+            const list = [];
+            if (meta.equipment) {
+                // New Format
+                Object.values(meta.equipment).forEach((e) => list.push(e.name));
+            }
+            else if (meta.equippedItemName) {
+                // Legacy Format
+                list.push(meta.equippedItemName);
+            }
+            return list;
+        };
+        const p1Equips = getEquipList(p1Meta);
+        const p2Equips = getEquipList(p2Meta);
+        const p1Stats = (0, gameUtils_1.calculateTotalStats)({ str: p1Meta.strength || 0, agi: p1Meta.agility || 0, def: p1Meta.defense || 0 }, p1Meta.trait, p1Equips);
+        const p2Stats = (0, gameUtils_1.calculateTotalStats)({ str: p2Meta.strength || 0, agi: p2Meta.agility || 0, def: p2Meta.defense || 0 }, p2Meta.trait, p2Equips);
+        const p1Score = (0, gameUtils_1.calculateCombatScore)(p1Level, p1Stats);
+        const p2Score = (0, gameUtils_1.calculateCombatScore)(p2Level, p2Stats);
+        const winChancePercent = (0, gameUtils_1.getWinChance)(p1Score, p2Score);
+        const p1Chance = winChancePercent / 100;
         const rng = Math.random();
         const winnerIsP1 = rng < p1Chance;
         const winnerUser = winnerIsP1 ? p1 : p2;
         const loserUser = winnerIsP1 ? p2 : p1;
         const winnerKey = winnerIsP1 ? "p1" : "p2";
         const winnerLevel = winnerIsP1 ? p1Level : p2Level;
-        const winChancePercent = (winnerIsP1 ? p1Chance : (1 - p1Chance)) * 100;
+        // Use the calculated win chance for display (if P1 won, it's p1Chance, else it's 100 - p1Chance)
+        const displayWinChance = winnerIsP1 ? winChancePercent : (100 - winChancePercent);
+        // --- SIMULATION START ---
+        await gameMsg.edit({ components: [] }); // Remove bet buttons
+        const totalRounds = 3 + Math.floor(Math.random() * 3); // 3 to 6 rounds
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        let logText = "";
+        await gameMsg.edit({
+            embeds: [
+                new discord_js_1.EmbedBuilder()
+                    .setColor("#FFA500")
+                    .setTitle(`${EMOJI_CHICKEN} FIGHT STARTED!`)
+                    .setDescription(`**${p1.username}** vs **${p2.username}**\n\nThe chickens enter the ring...`)
+            ]
+        });
+        await delay(2000);
+        for (let i = 1; i <= totalRounds; i++) {
+            const isP1Attacking = Math.random() > 0.5;
+            const attacker = isP1Attacking ? p1.username : p2.username;
+            const defender = isP1Attacking ? p2.username : p1.username;
+            // Stats for flavor text logic
+            const attStats = isP1Attacking ? p1Stats : p2Stats;
+            const defStats = isP1Attacking ? p2Stats : p1Stats;
+            const defenderDodgeChance = defStats.agi * 0.02; // 2% per agility
+            let moveText = "";
+            const moveRoll = Math.random();
+            // Miss chance = base 10% + dodge chance
+            if (moveRoll < (0.10 + defenderDodgeChance))
+                moveText = MISS_MOVES[Math.floor(Math.random() * MISS_MOVES.length)];
+            else if (moveRoll > 0.85)
+                moveText = CRITICAL_MOVES[Math.floor(Math.random() * CRITICAL_MOVES.length)];
+            else
+                moveText = FIGHT_MOVES[Math.floor(Math.random() * FIGHT_MOVES.length)];
+            moveText = moveText.replace(/{attacker}/g, `**${attacker}**`).replace(/{defender}/g, `**${defender}**`);
+            logText += `**Round ${i}:** ${moveText}\n`;
+            const roundEmbed = new discord_js_1.EmbedBuilder()
+                .setColor("#FFA500")
+                .setTitle(`${EMOJI_CHICKEN} Fight in Progress...`)
+                .setDescription(logText)
+                .setImage("attachment://vs.png") // Keep the VS image visible
+                .setFooter({ text: "Fighting..." });
+            await gameMsg.edit({ embeds: [roundEmbed] }); // Keep existing files by not specifying files: []
+            await delay(2500);
+        }
+        // --- SIMULATION END ---
         const winningSideBets = sideBets.filter(b => b.target === winnerKey);
         const sidePayoutRatio = 1.5;
         const payoutOps = [];
@@ -262,21 +409,58 @@ async function runCockFight(originalMsg, gameMsg, p1, p2, bet, chickenItemId) {
             leveledUp = true;
             requiredXp = (newLevel + 1) * 100;
         }
+        // --- UPDATE WINNER (FIXED: DO NOT BREAK EQUIPMENT) ---
         payoutOps.push(prisma_1.default.inventory.update({
             where: { userId_shopItemId: { userId: wId, shopItemId: chickenItemId } },
             data: {
                 meta: {
+                    ...(winnerIsP1 ? p1Meta : p2Meta), // Keep existing meta (including equipment)
                     level: newLevel,
                     wins: newWins,
-                    xp: newXp
+                    xp: newXp,
+                    training: (winnerIsP1 ? p1Meta.training : p2Meta.training) // Keep training status if any (though shouldn't fight if training)
                 }
             }
         }));
         const lId = await getUserId(loserUser.id, guildId);
-        payoutOps.push(prisma_1.default.inventory.delete({
-            where: { userId_shopItemId: { userId: lId, shopItemId: chickenItemId } }
-        }));
+        // DEATH MECHANIC UPDATE:
+        // 5% Chance of Permadeath. 95% Chance of Injury.
+        // Equipment is broken (Cleared) on Injury.
+        const loserLevel = winnerIsP1 ? p2Level : p1Level;
+        const levelDiff = Math.max(0, winnerLevel - loserLevel);
+        let deathChance = 0.05; // Base 5%
+        if (levelDiff > 0) {
+            deathChance += (levelDiff * 0.02); // +2% per level difference
+        }
+        deathChance = Math.min(deathChance, 0.50); // Cap at 50%
+        const isDead = Math.random() < deathChance;
+        if (!isDead) {
+            // INJURED STATE (95%)
+            const loserMeta = winnerIsP1 ? p2Meta : p1Meta;
+            const newLoserMeta = JSON.parse(JSON.stringify(loserMeta));
+            // Break Item (Clear Equipment)
+            delete newLoserMeta.equippedItem;
+            delete newLoserMeta.equippedItemName;
+            delete newLoserMeta.equipment; // Clear new format too
+            // Apply Injury (2 Hours)
+            newLoserMeta.injured = {
+                endTime: Date.now() + (2 * 60 * 60 * 1000)
+            };
+            payoutOps.push(prisma_1.default.inventory.update({
+                where: { userId_shopItemId: { userId: lId, shopItemId: chickenItemId } },
+                data: { meta: newLoserMeta }
+            }));
+        }
+        else {
+            // PERMADEATH (5%)
+            payoutOps.push(prisma_1.default.inventory.delete({
+                where: { userId_shopItemId: { userId: lId, shopItemId: chickenItemId } }
+            }));
+        }
         await prisma_1.default.$transaction(payoutOps);
+        const deathMessage = !isDead
+            ? `<:clinic:1453972244610154507> **INJURED!** ${loserUser.username}'s chicken survives but is hospitalized for 2 hours.\n<:alert_sign:1451625691664875610> **Equipment Broken!**`
+            : `${EMOJI_RIP} **CRITICAL FAILURE!** ${loserUser.username}'s chicken has died (Permadeath).`;
         const EMOJI_XP = "<:xpfull:1451636569982111765>";
         const EMOJI_XP_EMPTY = "<:xpempty:1451642829427314822>";
         const filledBars = Math.floor((newXp / requiredXp) * 10);
@@ -285,18 +469,28 @@ async function runCockFight(originalMsg, gameMsg, p1, p2, bet, chickenItemId) {
         let sideWinnersText = sideWinnersDetails.length > 0 ? sideWinnersDetails.join("\n") : "None";
         if (sideWinnersText.length > 1024)
             sideWinnersText = sideWinnersText.slice(0, 1020) + "...";
+        // Generate Winner Image
+        const winnerImage = await (0, imageUtils_1.generateWinnerImage)(winnerUser.displayAvatarURL({ extension: "png", size: 256 }), winnerUser.username);
         const resultEmbed = new discord_js_1.EmbedBuilder()
             .setColor(winnerIsP1 ? "#00FF00" : "#FF0000")
             .setTitle(`${EMOJI_CHICKEN} Cock Fight Result`)
-            .setDescription(`The dust settles...\n\n${EMOJI_WIN} ${winnerUser} is the winner!\n${EMOJI_RIP} ${loserUser}'s chicken has died.
+            .setDescription(`The dust settles...\n\n${winnerIsP1 ? branding_1.Mascot.Emotes.Money : branding_1.Mascot.Emotes.Fail} ${winnerUser} is the winner!\n${deathMessage}
             
 **Battle Stats:**
 • Winner Level: ${winnerLevel} ${leveledUp ? `➔ **${newLevel}** (LEVEL UP!)` : `(XP: +${XP_PER_WIN})`}
 • Progress: ${progressBar}
-• Win Chance: ${winChancePercent.toFixed(1)}%
-`)
-            .addFields({ name: `${EMOJI_WIN} Main Winner`, value: `${winnerUser} won **${mainWinnerPayout}**!`, inline: false }, { name: `${EMOJI_WIN} Side Winners`, value: sideWinnersText, inline: false }, { name: "Stats", value: `Total Pot: ${pot}\nSide ROI: ${sidePayoutRatio.toFixed(2)}x`, inline: false });
-        await gameMsg.edit({ embeds: [resultEmbed], components: [] });
+• Win Chance: ${displayWinChance.toFixed(1)}%`)
+            .setImage("attachment://winner.png")
+            .addFields({ name: `${branding_1.Mascot.Emotes.Money} Main Winner`, value: `${winnerUser} won ** ${mainWinnerPayout} ** !`, inline: false }, { name: `${branding_1.Mascot.Emotes.Money} Side Winners`, value: sideWinnersText, inline: false }, { name: "Stats", value: `Total Pot: ${pot}\nSide ROI: ${sidePayoutRatio.toFixed(2)}x`, inline: false })
+            .setFooter({ text: `${branding_1.Mascot.Name} • Arena` });
+        // Set Cooldowns for NEXT fight
+        const cooldowns = config.gameCooldowns || {};
+        const cdSeconds = cooldowns["cockfight"] || 0;
+        if (cdSeconds > 0) {
+            (0, cooldown_1.setCooldown)(`game: cockfight: ${guildId}: ${p1.id}`, cdSeconds);
+            (0, cooldown_1.setCooldown)(`game: cockfight: ${guildId}: ${p2.id}`, cdSeconds);
+        }
+        await gameMsg.edit({ embeds: [resultEmbed], components: [], files: [winnerImage] });
     });
 }
 //# sourceMappingURL=cockfight.js.map

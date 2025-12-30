@@ -7,6 +7,7 @@ exports.handleSetTheme = handleSetTheme;
 const discord_js_1 = require("discord.js");
 const prisma_1 = __importDefault(require("../../utils/prisma"));
 const guildConfigService_1 = require("../../services/guildConfigService");
+const branding_1 = require("../../config/branding");
 async function handleSetTheme(message, args) {
     const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
     const options = [
@@ -55,7 +56,7 @@ async function handleSetTheme(message, args) {
             update: { profileTheme: theme }
         });
         await i.update({
-            content: `✅ Profile theme updated to **${theme}**! Check it with \`${config.prefix}profile\`.`,
+            content: `${branding_1.Mascot.Emotes.Accept} Profile theme updated to **${theme}**! Check it with \`${config.prefix}profile\`.`,
             embeds: [],
             components: []
         });

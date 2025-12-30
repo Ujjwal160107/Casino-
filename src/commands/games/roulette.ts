@@ -16,6 +16,7 @@ import { successEmbed, errorEmbed } from "../../utils/embed";
 import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
 import { formatDuration } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
+import { Mascot } from "../../config/branding";
 
 export async function handleRouletteMenu(message: Message) {
   const config = await getGuildConfig(message.guildId!);
@@ -28,7 +29,7 @@ export async function handleRouletteMenu(message: Message) {
   const parseEmojiId = (str: string) => str.match(/:(\d+)>/)?.[1] ?? (str.match(/^\d+$/) ? str : str);
   const embed = new EmbedBuilder()
     .setTitle(`${eCasino} Roulette Table`)
-    .setDescription("Welcome to the Casino! Test your luck on the wheel.")
+    .setDescription(`Welcome to ${Mascot.Name}'s Casino! Test your luck on the wheel.`)
     .setColor(Colors.Red)
     .setImage("https://media.tenor.com/7gKkK6W85GgAAAAC/roulette-casino.gif")
     .setFooter({ text: "Click 'Guide' for rules or 'Play' to start." });
@@ -64,7 +65,8 @@ export async function handleRouletteMenu(message: Message) {
           `🔵 **Odd / 🟡 Even:**\n` +
           `2x Payout\n\n` +
           `**House Edge:** The green **0** belongs to the house!`
-        );
+        )
+        .setFooter({ text: `${Mascot.Name} Tips` });
       await i.reply({ embeds: [guideEmbed], ephemeral: true });
     }
     if (i.customId === "roul_play") {
@@ -107,7 +109,7 @@ export async function handleBet(message: Message, args: string[]) {
       const expire = getCooldownExpiry(key);
       const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
       return message.reply({
-        embeds: [errorEmbed(message.author, "Cooldown Active", `<:cooldown:1454025354631970826> Please wait <t:${ts}:R> before playing Roulette again.`)]
+        embeds: [errorEmbed(message.author, "Cooldown Active", `${Mascot.Emotes.Angry} Please wait <t:${ts}:R> before playing Roulette again.`)]
       });
     }
   }
@@ -153,13 +155,13 @@ export async function handleBet(message: Message, args: string[]) {
   const eBlackCoin = "<:BlackCoin:1446217613632999565>";
   const displayColor = spin === 0 ? "🟢" : (isRed ? eRedCoin : eBlackCoin);
   const resultEmbed = new EmbedBuilder()
-    .setTitle(didWin ? "🎉 Winner!" : "💀 You Lost")
+    .setTitle(didWin ? `${Mascot.Emotes.Money} Winner!` : `${Mascot.Emotes.Fail} You Lost`)
     .setColor(didWin ? Colors.Green : Colors.Red)
     .setDescription(
       `**Result:** ${displayColor} **${spin}**\n` +
       `**Your Bet:** ${choiceRaw}\n` +
       `**${didWin ? "Won" : "Lost"}:** ${fmtCurrency(didWin ? payout : amount, emoji)}`
     )
-    .setFooter({ text: `${message.author.username}'s Wallet: ${(user.wallet!.balance - amount + payout).toLocaleString()}` });
+    .setFooter({ text: `${Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet!.balance - amount + payout).toLocaleString()}` });
   return message.reply({ embeds: [resultEmbed] });
 }

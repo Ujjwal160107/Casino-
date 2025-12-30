@@ -10,17 +10,16 @@ const guildConfigService_1 = require("../services/guildConfigService");
 const prisma_1 = __importDefault(require("../utils/prisma"));
 const discordLogger_1 = require("../utils/discordLogger");
 const format_1 = require("../utils/format");
-async function handleMarketInteraction(interaction) {
-    if (interaction.isButton()) {
-        await handleButton(interaction);
-    }
-    else if (interaction.isModalSubmit()) {
-        await handleModal(interaction);
-    }
-    else if (interaction.isStringSelectMenu()) {
-        await handleSelectMenu(interaction);
-    }
+const branding_1 = require("../config/branding");
+async function handleMarketInteraction(interaction) { if (interaction.isButton()) {
+    await handleButton(interaction);
 }
+else if (interaction.isModalSubmit()) {
+    await handleModal(interaction);
+}
+else if (interaction.isStringSelectMenu()) {
+    await handleSelectMenu(interaction);
+} }
 async function handleButton(interaction) {
     const { customId, user, guildId } = interaction;
     if (!guildId)
@@ -29,22 +28,15 @@ async function handleButton(interaction) {
         if (customId === "market_home") {
             const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
             const { total } = await (0, marketService_1.getMarketListings)(guildId, 1, 1);
-            const embed = new discord_js_1.EmbedBuilder()
-                .setTitle("🏴‍☠️ Black Market")
-                .setDescription(`Welcome to the underground.\n\n**Market Tax:** ${config.marketTax}%\n**Active Listings:** ${total}`)
-                .setColor("#36393F")
-                .setThumbnail("https://media.tenor.com/azwT6M5tO3EAAAAC/black-market.gif");
-            const row = new discord_js_1.ActionRowBuilder()
-                .addComponents(new discord_js_1.ButtonBuilder().setCustomId("market_browse_1").setLabel("Browse Market").setStyle(discord_js_1.ButtonStyle.Primary).setEmoji("🛒"), new discord_js_1.ButtonBuilder().setCustomId("market_sell_flow").setLabel("Sell Item").setStyle(discord_js_1.ButtonStyle.Success).setEmoji("➕"), new discord_js_1.ButtonBuilder().setCustomId("market_buy_flow").setLabel("Buy by ID").setStyle(discord_js_1.ButtonStyle.Secondary).setEmoji("🔍"), new discord_js_1.ButtonBuilder().setCustomId("market_mine").setLabel("My Listings").setStyle(discord_js_1.ButtonStyle.Danger).setEmoji("📦"));
+            const embed = new discord_js_1.EmbedBuilder().setTitle("🏴‍☠️ Black Market").setDescription(`Welcome to the underground.\n\n**Market Tax:** ${config.marketTax}%\n**Active Listings:** ${total}`).setColor("#36393F").setThumbnail("https://media.tenor.com/azwT6M5tO3EAAAAC/black-market.gif");
+            const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId("market_browse_1").setLabel("Browse Market").setStyle(discord_js_1.ButtonStyle.Primary).setEmoji("🛒"), new discord_js_1.ButtonBuilder().setCustomId("market_sell_flow").setLabel("Sell Item").setStyle(discord_js_1.ButtonStyle.Success).setEmoji("➕"), new discord_js_1.ButtonBuilder().setCustomId("market_buy_flow").setLabel("Buy by ID").setStyle(discord_js_1.ButtonStyle.Secondary).setEmoji("🔍"), new discord_js_1.ButtonBuilder().setCustomId("market_mine").setLabel("My Listings").setStyle(discord_js_1.ButtonStyle.Danger).setEmoji("📦"));
             await interaction.update({ embeds: [embed], components: [row] });
         }
         else if (customId.startsWith("market_browse_")) {
             const page = parseInt(customId.split("_")[2]);
             const { listings, total, totalPages } = await (0, marketService_1.getMarketListings)(guildId, page);
             const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
-            const embed = new discord_js_1.EmbedBuilder()
-                .setTitle(`🛒 Market Listings (Page ${page}/${totalPages || 1})`)
-                .setColor("#2F3136");
+            const embed = new discord_js_1.EmbedBuilder().setTitle(`🛒 Market Listings (Page ${page}/${totalPages || 1})`).setColor("#2F3136");
             if (listings.length === 0) {
                 embed.setDescription("No items for sale right now.");
             }
@@ -66,43 +58,23 @@ async function handleButton(interaction) {
             const userDb = await prisma_1.default.user.findUnique({ where: { discordId_guildId: { discordId: user.id, guildId } } });
             if (!userDb)
                 return;
-            const inventory = await prisma_1.default.inventory.findMany({
-                where: { userId: userDb.id },
-                include: { shopItem: true },
-                take: 25
-            });
+            const inventory = await prisma_1.default.inventory.findMany({ where: { userId: userDb.id }, include: { shopItem: true }, take: 25 });
             if (inventory.length === 0) {
                 await interaction.reply({ content: "You have no items to sell.", ephemeral: true });
                 return;
             }
-            const row = new discord_js_1.ActionRowBuilder()
-                .addComponents(new discord_js_1.StringSelectMenuBuilder()
-                .setCustomId("market_sell_select")
-                .setPlaceholder("Select an item to sell")
-                .addOptions(inventory.map(inv => new discord_js_1.StringSelectMenuOptionBuilder()
-                .setLabel(`${inv.shopItem.name} (x${inv.amount})`)
-                .setValue(inv.shopItem.id)
-                .setDescription(`In Stock: ${inv.amount}`))));
+            const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.StringSelectMenuBuilder().setCustomId("market_sell_select").setPlaceholder("Select an item to sell").addOptions(inventory.map(inv => new discord_js_1.StringSelectMenuOptionBuilder().setLabel(`${inv.shopItem.name} (x${inv.amount})`).setValue(inv.shopItem.id).setDescription(`In Stock: ${inv.amount}`))));
             await interaction.reply({ content: "Select an item from your inventory to list:", components: [row], ephemeral: true });
         }
         else if (customId === "market_buy_flow") {
-            const modal = new discord_js_1.ModalBuilder()
-                .setCustomId("market_buy_modal")
-                .setTitle("Buy Item");
-            const idInput = new discord_js_1.TextInputBuilder()
-                .setCustomId("market_listing_id")
-                .setLabel("Listing ID")
-                .setStyle(discord_js_1.TextInputStyle.Short)
-                .setPlaceholder("Paste the ID from the browse list")
-                .setRequired(true);
+            const modal = new discord_js_1.ModalBuilder().setCustomId("market_buy_modal").setTitle("Buy Item");
+            const idInput = new discord_js_1.TextInputBuilder().setCustomId("market_listing_id").setLabel("Listing ID").setStyle(discord_js_1.TextInputStyle.Short).setPlaceholder("Paste the ID from the browse list").setRequired(true);
             modal.addComponents(new discord_js_1.ActionRowBuilder().addComponents(idInput));
             await interaction.showModal(modal);
         }
         else if (customId === "market_mine") {
             const myListings = await (0, marketService_1.getUserListings)(user.id, guildId);
-            const embed = new discord_js_1.EmbedBuilder()
-                .setTitle("📦 Your Active Listings")
-                .setColor("#FFAA00");
+            const embed = new discord_js_1.EmbedBuilder().setTitle("📦 Your Active Listings").setColor("#FFAA00");
             if (myListings.length === 0) {
                 embed.setDescription("You have no active listings.");
             }
@@ -110,104 +82,61 @@ async function handleButton(interaction) {
                 const desc = myListings.map(l => `**ID:** \`${l.id}\` | **${l.shopItem.name} (x${l.amount})** for ${l.totalPrice}`).join("\n");
                 embed.setDescription(desc);
             }
-            const row = new discord_js_1.ActionRowBuilder()
-                .addComponents(new discord_js_1.ButtonBuilder().setCustomId("market_cancel_flow").setLabel("Cancel Listing").setStyle(discord_js_1.ButtonStyle.Danger), new discord_js_1.ButtonBuilder().setCustomId("market_home").setLabel("Back").setStyle(discord_js_1.ButtonStyle.Secondary));
+            const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId("market_cancel_flow").setLabel("Cancel Listing").setStyle(discord_js_1.ButtonStyle.Danger), new discord_js_1.ButtonBuilder().setCustomId("market_home").setLabel("Back").setStyle(discord_js_1.ButtonStyle.Secondary));
             await interaction.update({ embeds: [embed], components: [row] });
         }
         else if (customId === "market_cancel_flow") {
-            const modal = new discord_js_1.ModalBuilder()
-                .setCustomId("market_cancel_modal")
-                .setTitle("Cancel Listing");
-            const idInput = new discord_js_1.TextInputBuilder()
-                .setCustomId("market_listing_id")
-                .setLabel("Listing ID")
-                .setStyle(discord_js_1.TextInputStyle.Short)
-                .setRequired(true);
+            const modal = new discord_js_1.ModalBuilder().setCustomId("market_cancel_modal").setTitle("Cancel Listing");
+            const idInput = new discord_js_1.TextInputBuilder().setCustomId("market_listing_id").setLabel("Listing ID").setStyle(discord_js_1.TextInputStyle.Short).setRequired(true);
             modal.addComponents(new discord_js_1.ActionRowBuilder().addComponents(idInput));
             await interaction.showModal(modal);
         }
     }
     catch (err) {
         if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: `❌ Error: ${err.message}`, ephemeral: true });
+            await interaction.reply({ content: `${branding_1.Mascot.Emotes.Fail} Error: ${err.message}`, ephemeral: true });
         }
         else {
-            await interaction.followUp({ content: `❌ Error: ${err.message}`, ephemeral: true });
+            await interaction.followUp({ content: `${branding_1.Mascot.Emotes.Fail} Error: ${err.message}`, ephemeral: true });
         }
     }
 }
-async function handleSelectMenu(interaction) {
-    if (interaction.customId === "market_sell_select") {
-        const shopItemId = interaction.values[0];
-        const modal = new discord_js_1.ModalBuilder()
-            .setCustomId(`market_sell_modal_${shopItemId}`)
-            .setTitle("List Item for Sale");
-        const qtyInput = new discord_js_1.TextInputBuilder()
-            .setCustomId("sell_amount")
-            .setLabel("Quantity")
-            .setStyle(discord_js_1.TextInputStyle.Short)
-            .setPlaceholder("1")
-            .setRequired(true);
-        const priceInput = new discord_js_1.TextInputBuilder()
-            .setCustomId("sell_price")
-            .setLabel("Total Price")
-            .setStyle(discord_js_1.TextInputStyle.Short)
-            .setPlaceholder("e.g. 500")
-            .setRequired(true);
-        modal.addComponents(new discord_js_1.ActionRowBuilder().addComponents(qtyInput), new discord_js_1.ActionRowBuilder().addComponents(priceInput));
-        await interaction.showModal(modal);
+async function handleSelectMenu(interaction) { if (interaction.customId === "market_sell_select") {
+    const shopItemId = interaction.values[0];
+    const modal = new discord_js_1.ModalBuilder().setCustomId(`market_sell_modal_${shopItemId}`).setTitle("List Item for Sale");
+    const qtyInput = new discord_js_1.TextInputBuilder().setCustomId("sell_amount").setLabel("Quantity").setStyle(discord_js_1.TextInputStyle.Short).setPlaceholder("1").setRequired(true);
+    const priceInput = new discord_js_1.TextInputBuilder().setCustomId("sell_price").setLabel("Total Price").setStyle(discord_js_1.TextInputStyle.Short).setPlaceholder("e.g. 500").setRequired(true);
+    modal.addComponents(new discord_js_1.ActionRowBuilder().addComponents(qtyInput), new discord_js_1.ActionRowBuilder().addComponents(priceInput));
+    await interaction.showModal(modal);
+} }
+async function handleModal(interaction) { const { customId, fields, user, guildId } = interaction; if (!guildId)
+    return; try {
+    if (customId.startsWith("market_sell_modal_")) {
+        const shopItemId = customId.split("_")[3];
+        const amount = (0, format_1.parseSmartAmount)(fields.getTextInputValue("sell_amount"));
+        const price = (0, format_1.parseSmartAmount)(fields.getTextInputValue("sell_price"));
+        if (isNaN(amount) || isNaN(price))
+            throw new Error("Invalid numbers.");
+        await (0, marketService_1.listItemOnMarket)(user.id, guildId, shopItemId, amount, price);
+        const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
+        await (0, discordLogger_1.logToChannel)(interaction.client, { guild: interaction.guild, type: "MARKET", title: "Item Listed", description: `**Seller:** ${user.tag}\n**Item:** ${shopItemId} (x${amount})\n**Price:** ${(0, format_1.fmtCurrency)(price, config.currencyEmoji)}`, color: 0xFFA500 });
+        await interaction.reply({ content: `${branding_1.Mascot.Emotes.Accept} Listed item for sale!`, ephemeral: true });
+    }
+    else if (customId === "market_buy_modal") {
+        const listingId = fields.getTextInputValue("market_listing_id").trim();
+        const res = await (0, marketService_1.buyItemFromMarket)(user.id, listingId);
+        const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
+        await (0, discordLogger_1.logToChannel)(interaction.client, { guild: interaction.guild, type: "MARKET", title: "Item Bought", description: `**Buyer:** ${user.tag}\n**Listing ID:** \`${listingId}\`\n**Item:** ${res.item} (x${res.amount})\n**Price:** ${(0, format_1.fmtCurrency)(Math.abs(res.price), config.currencyEmoji)}`, color: 0x00FF00 });
+        await interaction.reply({ content: `${branding_1.Mascot.Emotes.Accept} Successfully bought **${res.amount}x ${res.item}** for **${res.price}**! (Tax: ${res.tax})`, ephemeral: true });
+    }
+    else if (customId === "market_cancel_modal") {
+        const listingId = fields.getTextInputValue("market_listing_id").trim();
+        await (0, marketService_1.cancelListing)(user.id, listingId);
+        await (0, discordLogger_1.logToChannel)(interaction.client, { guild: interaction.guild, type: "MARKET", title: "Listing Cancelled", description: `**Seller:** ${user.tag}\n**Listing ID:** \`${listingId}\``, color: 0xFF0000 });
+        await interaction.reply({ content: `${branding_1.Mascot.Emotes.Accept} Listing cancelled and items returned.`, ephemeral: true });
     }
 }
-async function handleModal(interaction) {
-    const { customId, fields, user, guildId } = interaction;
-    if (!guildId)
-        return;
-    try {
-        if (customId.startsWith("market_sell_modal_")) {
-            const shopItemId = customId.split("_")[3];
-            const amount = (0, format_1.parseSmartAmount)(fields.getTextInputValue("sell_amount"));
-            const price = (0, format_1.parseSmartAmount)(fields.getTextInputValue("sell_price"));
-            if (isNaN(amount) || isNaN(price))
-                throw new Error("Invalid numbers.");
-            await (0, marketService_1.listItemOnMarket)(user.id, guildId, shopItemId, amount, price);
-            const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
-            await (0, discordLogger_1.logToChannel)(interaction.client, {
-                guild: interaction.guild,
-                type: "MARKET",
-                title: "Item Listed",
-                description: `**Seller:** ${user.tag}\n**Item:** ${shopItemId} (x${amount})\n**Price:** ${(0, format_1.fmtCurrency)(price, config.currencyEmoji)}`,
-                color: 0xFFA500
-            });
-            await interaction.reply({ content: `✅ Listed item for sale!`, ephemeral: true });
-        }
-        else if (customId === "market_buy_modal") {
-            const listingId = fields.getTextInputValue("market_listing_id").trim();
-            const res = await (0, marketService_1.buyItemFromMarket)(user.id, listingId);
-            const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
-            await (0, discordLogger_1.logToChannel)(interaction.client, {
-                guild: interaction.guild,
-                type: "MARKET",
-                title: "Item Bought",
-                description: `**Buyer:** ${user.tag}\n**Listing ID:** \`${listingId}\`\n**Item:** ${res.item} (x${res.amount})\n**Price:** ${(0, format_1.fmtCurrency)(Math.abs(res.price), config.currencyEmoji)}`,
-                color: 0x00FF00
-            });
-            await interaction.reply({ content: `✅ Successfully bought **${res.amount}x ${res.item}** for **${res.price}**! (Tax: ${res.tax})`, ephemeral: true });
-        }
-        else if (customId === "market_cancel_modal") {
-            const listingId = fields.getTextInputValue("market_listing_id").trim();
-            await (0, marketService_1.cancelListing)(user.id, listingId);
-            await (0, discordLogger_1.logToChannel)(interaction.client, {
-                guild: interaction.guild,
-                type: "MARKET",
-                title: "Listing Cancelled",
-                description: `**Seller:** ${user.tag}\n**Listing ID:** \`${listingId}\``,
-                color: 0xFF0000
-            });
-            await interaction.reply({ content: `✅ Listing cancelled and items returned.`, ephemeral: true });
-        }
-    }
-    catch (err) {
-        await interaction.reply({ content: `❌ Error: ${err.message}`, ephemeral: true });
-    }
-}
+catch (err) {
+    await interaction.reply({ content: `${branding_1.Mascot.Emotes.Fail} Error: ${err.message}`, ephemeral: true });
+} }
 //# sourceMappingURL=marketInteractionHandler.js.map

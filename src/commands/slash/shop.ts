@@ -12,6 +12,7 @@ import {
 } from "discord.js";
 import { getShopItems, buyItem, getUserInventory } from "../../services/shopService";
 import { getGuildConfig } from "../../services/guildConfigService";
+import { Mascot } from "../../config/branding";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { fmtCurrency } from "../../utils/format";
 import { successEmbed, errorEmbed } from "../../utils/embed";
@@ -195,11 +196,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             }
 
             await btnInteraction.reply({
-              content: `✅ Successfully purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**.`,
+              content: `${Mascot.Emotes.Accept} Successfully purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**.`,
               ephemeral: true
             });
           } catch (err) {
-            await btnInteraction.reply({ content: `❌ Purchase failed: ${(err as Error).message}`, ephemeral: true });
+            await btnInteraction.reply({ content: `${Mascot.Emotes.Fail} Purchase failed: ${(err as Error).message}`, ephemeral: true });
           }
         }
       });

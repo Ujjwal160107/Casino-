@@ -5,6 +5,7 @@ import { errorEmbed } from "../../utils/embed";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { calculateTotalStats, calculateCombatScore, getWinChance } from "../../utils/gameUtils";
 import { GameConfig } from "../../config/gameConfig";
+import { Mascot } from "../../config/branding";
 
 const EMOJI_CHICKEN = GameConfig.Emojis.Chicken;
 const EMOJI_XP = GameConfig.Emojis.XpFull;
@@ -431,7 +432,7 @@ async function handleView(message: Message, args: string[]) {
                                 });
                             });
 
-                            await i.update({ content: "✅ Your chicken has been healed!", embeds: [], components: [] });
+                            await i.update({ content: `${Mascot.Emotes.Accept} Your chicken has been healed!`, embeds: [], components: [] });
                         } catch (e) {
                             await i.reply({ content: `Heal failed. You might lack funds (${healCost}) or an error occurred.`, ephemeral: true });
                         }

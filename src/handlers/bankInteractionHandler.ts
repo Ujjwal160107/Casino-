@@ -18,6 +18,7 @@ import { safeInteractionReply } from "../utils/interactionHelpers";
 import { ensureBankForUser } from "../services/bankService";
 import { logToChannel } from "../utils/discordLogger";
 import { fmtCurrency, formatDuration } from "../utils/format";
+import { Mascot } from "../config/branding";
 
 export async function handleBankInteraction(interaction: Interaction) {
     if (interaction.isButton()) {
@@ -282,7 +283,7 @@ async function handleModal(interaction: ModalSubmitInteraction) {
                 color: 0x00FF00
             });
 
-            await interaction.editReply({ content: `✅ Loan approved! Received **${amount}**. You must repay **${result.totalRepayment}** by ${result.dueDate.toLocaleDateString()}.` });
+            await interaction.editReply({ content: `${Mascot.Emotes.Accept} Loan approved! Received **${amount}**. You must repay **${result.totalRepayment}** by ${result.dueDate.toLocaleDateString()}.` });
 
         } else if (customId === "loan_repay_modal") {
             const amountStr = fields.getTextInputValue("repay_amount");
@@ -327,7 +328,7 @@ async function handleModal(interaction: ModalSubmitInteraction) {
                     description: `**User:** ${user.tag}\n**Amount:** ${fmtCurrency(amount, config.currencyEmoji)}\n**Duration:** ${days} days`,
                     color: 0xFFA500
                 });
-                await interaction.editReply({ content: `✅ Created Fixed Deposit of **${amount}** for **${days} days**.` });
+                await interaction.editReply({ content: `${Mascot.Emotes.Accept} Created Fixed Deposit of **${amount}** for **${days} days**.` });
             } else {
                 await createInvestment(user.id, guildId, "RD", amount, days);
                 await logToChannel(interaction.client, {
@@ -337,11 +338,11 @@ async function handleModal(interaction: ModalSubmitInteraction) {
                     description: `**User:** ${user.tag}\n**Amount:** ${fmtCurrency(amount, config.currencyEmoji)}\n**Duration:** ${days} days`,
                     color: 0xFFA500
                 });
-                await interaction.editReply({ content: `✅ Created Recurring Deposit of **${amount}** for **${days} days**.` });
+                await interaction.editReply({ content: `${Mascot.Emotes.Accept} Created Recurring Deposit of **${amount}** for **${days} days**.` });
             }
         }
     } catch (err: any) {
-        await interaction.editReply({ content: `❌ Error: ${err.message}` });
+        await interaction.editReply({ content: `${Mascot.Emotes.Fail} Error: ${err.message}` });
     }
 }
 

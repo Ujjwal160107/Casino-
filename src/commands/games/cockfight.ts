@@ -20,6 +20,7 @@ import { checkCooldown, getCooldownExpiry, setCooldown } from "../../utils/coold
 import { formatDuration } from "../../utils/format";
 import { calculateTotalStats, calculateCombatScore, getWinChance } from "../../utils/gameUtils";
 import { GameConfig } from "../../config/gameConfig";
+import { Mascot } from "../../config/branding";
 
 
 const EMOJI_CHICKEN = GameConfig.Emojis.Chicken;
@@ -354,7 +355,7 @@ async function runCockFight(
             const bettorDbId = await getUserId(submit.user.id, guildId);
 
             if (sideBets.some(b => b.userId === submit.user.id)) {
-                await submit.editReply({ content: "❌ You have already placed a bet! You cannot switch sides or add more." });
+                await submit.editReply({ content: `${Mascot.Emotes.Decline} You have already placed a bet! You cannot switch sides or add more.` });
                 return;
             }
 
@@ -608,26 +609,26 @@ async function runCockFight(
         const resultEmbed = new EmbedBuilder()
             .setColor(winnerIsP1 ? "#00FF00" : "#FF0000")
             .setTitle(`${EMOJI_CHICKEN} Cock Fight Result`)
-            .setDescription(`The dust settles...\n\n${EMOJI_WIN} ${winnerUser} is the winner!\n${deathMessage}
+            .setDescription(`The dust settles...\n\n${winnerIsP1 ? Mascot.Emotes.Money : Mascot.Emotes.Fail} ${winnerUser} is the winner!\n${deathMessage}
             
 **Battle Stats:**
 • Winner Level: ${winnerLevel} ${leveledUp ? `➔ **${newLevel}** (LEVEL UP!)` : `(XP: +${XP_PER_WIN})`}
 • Progress: ${progressBar}
-• Win Chance: ${displayWinChance.toFixed(1)}%
-`)
+• Win Chance: ${displayWinChance.toFixed(1)}%`)
             .setImage("attachment://winner.png")
             .addFields(
-                { name: `${EMOJI_WIN} Main Winner`, value: `${winnerUser} won **${mainWinnerPayout}**!`, inline: false },
-                { name: `${EMOJI_WIN} Side Winners`, value: sideWinnersText, inline: false },
+                { name: `${Mascot.Emotes.Money} Main Winner`, value: `${winnerUser} won ** ${mainWinnerPayout} ** !`, inline: false },
+                { name: `${Mascot.Emotes.Money} Side Winners`, value: sideWinnersText, inline: false },
                 { name: "Stats", value: `Total Pot: ${pot}\nSide ROI: ${sidePayoutRatio.toFixed(2)}x`, inline: false }
-            );
+            )
+            .setFooter({ text: `${Mascot.Name} • Arena` });
 
         // Set Cooldowns for NEXT fight
         const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
         const cdSeconds = cooldowns["cockfight"] || 0;
         if (cdSeconds > 0) {
-            setCooldown(`game:cockfight:${guildId}:${p1.id}`, cdSeconds);
-            setCooldown(`game:cockfight:${guildId}:${p2.id}`, cdSeconds);
+            setCooldown(`game: cockfight: ${guildId}: ${p1.id}`, cdSeconds);
+            setCooldown(`game: cockfight: ${guildId}: ${p2.id}`, cdSeconds);
         }
 
         await gameMsg.edit({ embeds: [resultEmbed], components: [], files: [winnerImage] });

@@ -14,12 +14,13 @@ async function handleSetGameCooldown(message, args) {
     const timeInput = args.slice(1).join(" ");
     if (!game || !timeInput) {
         return message.reply({
-            embeds: [(0, embed_1.errorEmbed)(message.author, "Usage", `\`${config.prefix}set-game-cooldown <game> <time>\`\nExample: \`${config.prefix}game-cd slots 30s\` or \`${config.prefix}game-cd bj 1h 30m\``)]
+            embeds: [(0, embed_1.errorEmbed)(message.author, "Usage", `\`${config.prefix}set-game-cooldown <game> <time|off>\`\nExample: \`${config.prefix}game-cd slots 30s\` or \`${config.prefix}game-cd slots off\``)]
         });
     }
-    const seconds = (0, format_1.parseDuration)(timeInput);
+    const isOff = timeInput.toLowerCase() === "off" || timeInput === "0";
+    const seconds = isOff ? 0 : (0, format_1.parseDuration)(timeInput);
     if (seconds === null || seconds < 0) {
-        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Time", "Please provide a valid duration (e.g. `30s`, `1m`, `1h`).")] });
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Time", "Please provide a valid duration (e.g. `30s`, `1m`, `1h`) or `off`.")] });
     }
     let cooldowns = config.gameCooldowns || {};
     if (typeof cooldowns !== "object")
@@ -28,8 +29,9 @@ async function handleSetGameCooldown(message, args) {
     await (0, guildConfigService_1.updateGuildConfig)(message.guildId, {
         gameCooldowns: cooldowns
     });
+    const status = seconds === 0 ? "disabled" : `set to **${(0, format_1.formatDuration)(seconds * 1000)}**`;
     return message.reply({
-        embeds: [(0, embed_1.successEmbed)(message.author, "Configuration Updated", `🕐 **${game.toUpperCase()}** cooldown set to **${(0, format_1.formatDuration)(seconds * 1000)}**.`)]
+        embeds: [(0, embed_1.successEmbed)(message.author, "Configuration Updated", `🕐 **${game.toUpperCase()}** cooldown ${status}.`)]
     });
 }
 //# sourceMappingURL=setGameCooldown.js.map

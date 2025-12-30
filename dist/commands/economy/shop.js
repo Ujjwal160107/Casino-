@@ -9,13 +9,17 @@ const format_1 = require("../../utils/format");
 const embed_1 = require("../../utils/embed");
 const discordLogger_1 = require("../../utils/discordLogger");
 const ITEMS_PER_PAGE = 5;
+const branding_1 = require("../../config/branding");
 function renderShopPage(items, page, totalPages, currencyEmoji) {
     const start = (page - 1) * ITEMS_PER_PAGE;
     const currentItems = items.slice(start, start + ITEMS_PER_PAGE);
     const embed = new discord_js_1.EmbedBuilder()
-        .setTitle("🛒 Shop")
-        .setColor(discord_js_1.Colors.DarkGrey)
-        .setFooter({ text: `Page ${page}/${totalPages} • Use buttons to buy` + "\u3000".repeat(25) });
+        .setTitle(`Shop`)
+        .setColor(branding_1.Mascot.Colors.Base)
+        .setFooter({ text: `${branding_1.Mascot.Name} • Page ${page}/${totalPages} • Use buttons to buy` + "\u3000".repeat(25) });
+    const url = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Money);
+    if (url)
+        embed.setThumbnail(url);
     if (currentItems.length > 0) {
         currentItems.forEach((item, index) => {
             const itemNumber = (page - 1) * ITEMS_PER_PAGE + index + 1;
@@ -132,14 +136,14 @@ async function handleShop(message, args) {
                         description: `**User:** ${interaction.user.tag}\n**Item:** ${bought.name}\n**Price:** ${(0, format_1.fmtCurrency)(bought.price, emoji)}`,
                         color: 0x00FF00
                     });
-                    await interaction.editReply({ content: `✅ Purchased **${bought.name}** for **${(0, format_1.fmtCurrency)(bought.price, emoji)}**!` });
+                    await interaction.editReply({ content: `${branding_1.Mascot.Emotes.Accept} Purchased **${bought.name}** for **${(0, format_1.fmtCurrency)(bought.price, emoji)}**!` });
                 }
                 catch (err) {
                     if (interaction.deferred || interaction.replied) {
-                        await interaction.editReply({ content: `❌ Error: ${err.message}` });
+                        await interaction.editReply({ content: `${branding_1.Mascot.Emotes.Fail} Error: ${err.message}` });
                     }
                     else {
-                        await interaction.reply({ content: `❌ Error: ${err.message}`, ephemeral: true });
+                        await interaction.reply({ content: `${branding_1.Mascot.Emotes.Fail} Error: ${err.message}`, ephemeral: true });
                     }
                 }
             }

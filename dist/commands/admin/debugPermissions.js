@@ -7,6 +7,7 @@ exports.handleCommandStatus = handleCommandStatus;
 const discord_js_1 = require("discord.js");
 const guildConfigService_1 = require("../../services/guildConfigService");
 const prisma_1 = __importDefault(require("../../utils/prisma"));
+const branding_1 = require("../../config/branding");
 async function handleCommandStatus(message, args) {
     const commandName = args[0]?.toLowerCase();
     const guildId = message.guildId;
@@ -26,13 +27,13 @@ async function handleCommandStatus(message, args) {
     });
     const isCasinoAdmin = userDb?.isCasinoAdmin ?? false;
     if (isBotOwner)
-        trace.push("✅ Allowed: Bot Owner override");
+        trace.push(`${branding_1.Mascot.Emotes.Accept} Allowed: Bot Owner override`);
     else if (isOwner)
-        trace.push("✅ Allowed: Server Owner override");
+        trace.push(`${branding_1.Mascot.Emotes.Accept} Allowed: Server Owner override`);
     else if (isAdmin)
-        trace.push("✅ Allowed: Administrator override");
+        trace.push(`${branding_1.Mascot.Emotes.Accept} Allowed: Administrator override`);
     else if (isCasinoAdmin)
-        trace.push("✅ Allowed: Casino Admin override");
+        trace.push(`${branding_1.Mascot.Emotes.Accept} Allowed: Casino Admin override`);
     else
         trace.push("ℹ️ Not Tier 1 admin");
     const permissions = await prisma_1.default.commandPermission.findMany({
@@ -48,24 +49,24 @@ async function handleCommandStatus(message, args) {
     });
     const userAllow = permissions.find(p => p.targetType === "USER" && p.targetId === userId && p.action === "ALLOW");
     if (userAllow)
-        trace.push("✅ Allowed: Explicit User Permission");
+        trace.push(`${branding_1.Mascot.Emotes.Accept} Allowed: Explicit User Permission`);
     const roleAllow = permissions.find(p => p.targetType === "ROLE" && member.roles.cache.has(p.targetId) && p.action === "ALLOW");
     if (roleAllow)
-        trace.push("✅ Allowed: Explicit Role Permission");
+        trace.push(`${branding_1.Mascot.Emotes.Accept} Allowed: Explicit Role Permission`);
     const channelDeny = permissions.find(p => p.targetType === "CHANNEL" && p.targetId === channelId && p.action === "DENY");
     if (channelDeny)
-        trace.push("❌ Denied: Channel Override DENY");
+        trace.push(`${branding_1.Mascot.Emotes.Decline} Denied: Channel Override DENY`);
     if (config.disabledCommands.includes(commandName))
-        trace.push("❌ Denied: Global Disable");
+        trace.push(`${branding_1.Mascot.Emotes.Decline} Denied: Global Disable`);
     else
         trace.push("ℹ️ Not Globally Disabled");
     if (config.casinoChannels.length > 0) {
         if (!config.casinoChannels.includes(channelId)) {
             const channelAllow = permissions.some(p => p.targetType === "CHANNEL" && p.targetId === channelId && p.action === "ALLOW");
             if (!channelAllow)
-                trace.push("❌ Denied: Channel not in Whitelist (and no Override ALLOW)");
+                trace.push(`${branding_1.Mascot.Emotes.Decline} Denied: Channel not in Whitelist (and no Override ALLOW)`);
             else
-                trace.push("✅ Allowed: Channel Override ALLOW bypasses Whitelist");
+                trace.push(`${branding_1.Mascot.Emotes.Accept} Allowed: Channel Override ALLOW bypasses Whitelist`);
         }
         else {
             trace.push("ℹ️ Channel is in Whitelist");
@@ -78,7 +79,7 @@ async function handleCommandStatus(message, args) {
     const result = await checkCommandPermission(message, commandName);
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle(`Status for: ${commandName}`)
-        .setDescription(`**Final Result:** ${result.allowed ? "✅ ALLOWED" : "❌ DENIED"}\n${result.reason ? `**Reason:** ${result.reason}` : ""}\n\n**Logic Trace:**\n${trace.join("\n")}`)
+        .setDescription(`**Final Result:** ${result.allowed ? `${branding_1.Mascot.Emotes.Accept} ALLOWED` : `${branding_1.Mascot.Emotes.Decline} DENIED`}\n${result.reason ? `**Reason:** ${result.reason}` : ""}\n\n**Logic Trace:**\n${trace.join("\n")}`)
         .setColor(result.allowed ? "Green" : "Red");
     return message.reply({ embeds: [embed] });
 }

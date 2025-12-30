@@ -2,6 +2,7 @@ import { Message, EmbedBuilder } from "discord.js";
 import prisma from "../../utils/prisma";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { getGuildConfig } from "../../services/guildConfigService";
+import { Mascot } from "../../config/branding";
 
 export async function handleMakeCasinoAdmin(message: Message, args: string[]) {
     const BOT_OWNER_ID = "1288340046449086567";
@@ -30,7 +31,7 @@ export async function handleMakeCasinoAdmin(message: Message, args: string[]) {
             color: 0x00FF00
         });
         return message.reply({
-            embeds: [successEmbed(message.author, "Promoted", `✅ **${targetUser.tag}** is now a **Casino Admin**.`)]
+            embeds: [successEmbed(message.author, "Promoted", `${Mascot.Emotes.Accept} **${targetUser.tag}** is now a **Casino Admin**.`)]
         });
     } catch (e) {
         return message.reply({ embeds: [errorEmbed(message.author, "Error", "Ensure the user is registered in the bot.")] });
@@ -64,7 +65,7 @@ export async function handleRemoveCasinoAdmin(message: Message, args: string[]) 
             color: 0xFF0000
         });
         return message.reply({
-            embeds: [successEmbed(message.author, "Demoted", `✅ **${targetUser.tag}** is no longer a Casino Admin.`)]
+            embeds: [successEmbed(message.author, "Demoted", `${Mascot.Emotes.Accept} **${targetUser.tag}** is no longer a Casino Admin.`)]
         });
     } catch (e) {
         return message.reply({ embeds: [errorEmbed(message.author, "Error", "Ensure the user is registered in the bot.")] });

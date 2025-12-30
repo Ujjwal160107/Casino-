@@ -1,6 +1,7 @@
 import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from "discord.js";
 import prisma from "../../utils/prisma";
 import { errorEmbed, successEmbed } from "../../utils/embed";
+import { Mascot } from "../../config/branding";
 
 export async function handleResetAdminSettings(message: Message) {
     if (!message.member?.permissions.has("Administrator") && message.author.id !== message.guild?.ownerId) {
@@ -52,7 +53,7 @@ export async function handleResetAdminSettings(message: Message) {
             });
 
             await interaction.update({
-                embeds: [successEmbed(message.author, "Settings Reset", "✅ All admin access settings, permissions, and restrictions have been reset to default.")],
+                embeds: [successEmbed(message.author, "Settings Reset", `${Mascot.Emotes.Accept} All admin access settings, permissions, and restrictions have been reset to default.`)],
                 components: []
             });
         }
