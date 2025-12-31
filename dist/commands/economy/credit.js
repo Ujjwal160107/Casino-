@@ -5,6 +5,7 @@ const discord_js_1 = require("discord.js");
 const bankingService_1 = require("../../services/bankingService");
 const guildConfigService_1 = require("../../services/guildConfigService");
 const format_1 = require("../../utils/format");
+const branding_1 = require("../../config/branding");
 async function handleCredit(message, args) {
     const targetUser = message.mentions.users.first() || message.author;
     const userSummary = await (0, bankingService_1.getFinancialSummary)(targetUser.id, message.guildId);
@@ -27,7 +28,7 @@ async function handleCredit(message, args) {
         userSummary.activeLoans.forEach((loan, i) => {
             const isOverdue = new Date() > new Date(loan.dueDate);
             const dueTimestamp = Math.floor(loan.dueDate.getTime() / 1000);
-            embed.addFields({ name: `Loan #${i + 1}`, value: `**Principal:** ${(0, format_1.fmtCurrency)(loan.amount, emoji)}\n**Due:** ${(0, format_1.fmtCurrency)(loan.totalRepayment, emoji)}\n**When:** <t:${dueTimestamp}:R> ${isOverdue ? "⚠️ **OVERDUE**" : ""}`, inline: true });
+            embed.addFields({ name: `Loan #${i + 1}`, value: `**Principal:** ${(0, format_1.fmtCurrency)(loan.amount, emoji)}\n**Due:** ${(0, format_1.fmtCurrency)(loan.totalRepayment, emoji)}\n**When:** <t:${dueTimestamp}:R> ${isOverdue ? `${branding_1.Mascot.Emotes.Alert} **OVERDUE**` : ""}`, inline: true });
         });
     }
     else {

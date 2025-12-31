@@ -45,6 +45,7 @@ import { handleCockFight } from "./commands/games/cockfight";
 import { handleSetMinBet } from "./commands/admin/setMinBet";
 import { handleAdminDashboard } from "./commands/admin/adminDashboard";
 import { handleResetAdminSettings } from "./commands/admin/resetAdminConfig";
+import { handleSetBetLimit } from "./commands/admin/betLimit";
 import prisma from "./utils/prisma";
 import { errorEmbed } from "./utils/embed";
 import { findBestMatch } from "./utils/stringUtils";
@@ -154,17 +155,31 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleTransfer(message, args);
     case "collect":
       return handleCollectRoleIncome(message, args);
-    case "work":
     case "crime":
     case "beg":
     case "slut":
       return handleIncome(message);
+
+    // ...
+
+    case "apply": {
+      const { handleApply } = require("./commands/life/apply");
+      return handleApply(message, args);
+    }
+    case "work":
+    case "job":
+    case "myjob": {
+      const { handleWork } = require("./commands/life/work");
+      return handleWork(message);
+    }
     case "rob":
     case "steal":
       return handleRob(message, args);
     case "shop":
     case "store":
       return handleShop(message, args);
+    case "buy":
+      return handleShop(message, ["buy", ...args]);
     case "inventory":
       return handleInventory(message, args);
     case "profile":
@@ -234,6 +249,11 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleSetCurrency(message, args);
     case "min-bet":
       return handleSetMinBet(message, args);
+    case "set-bet-limit":
+    case "setbetlimit":
+    case "betlimit":
+    case "bet-limit":
+      return handleSetBetLimit(message, args);
     case "admin-view-config":
     case "view-config":
       return handleAdminViewConfig(message, args);
@@ -246,6 +266,13 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "edit-shop":
     case "delete-shop":
       return handleManageShop(message, args);
+    case "remove-item":
+    case "del-item":
+    case "delete-item":
+    case "remove-inv":
+    case "clear-inv":
+      const { handleRemoveItem } = require("./commands/admin/removeItem");
+      return handleRemoveItem(message, args);
     case "set-theme":
       return handleSetTheme(message, args);
     case "casino-ban":
@@ -383,22 +410,26 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const { handleListDegrees } = require("./commands/life/education");
       return handleListDegrees(message);
     }
-    case "jobs": {
+    case "jobs":
+    case "careers":
+    case "jobs":
+    case "careers":
+    case "joblist": {
       const { handleJobs } = require("./commands/life/jobs");
-      return handleJobs(message, args);
+      return handleJobs(message);
     }
     case "apply": {
       const { handleApply } = require("./commands/life/apply");
       return handleApply(message, args);
     }
-    case "freelance": {
-      const { handleFreelance } = require("./commands/life/freelance");
-      return handleFreelance(message, args);
+    case "work":
+    case "job":
+    case "myjob": {
+      const { handleWork } = require("./commands/life/work");
+      return handleWork(message);
     }
-    case "resign": {
-      const { handleResign } = require("./commands/life/resign");
-      return handleResign(message, args);
-    }
+
+
     // EDUCATION
     case "education":
     case "edu":
@@ -422,6 +453,16 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "dropout": {
       const { handleDropout } = require("./commands/life/dropout");
       return handleDropout(message);
+    }
+    case "unistore":
+    case "bookstore": {
+      const { handleUniStore } = require("./commands/life/uniStore");
+      return handleUniStore(message);
+    }
+    case "manage-uni":
+    case "uni-admin": {
+      const { handleManageUniStore } = require("./commands/admin/manageUniStore");
+      return handleManageUniStore(message, args);
     }
 
     // --- Education Admin ---

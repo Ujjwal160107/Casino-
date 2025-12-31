@@ -26,7 +26,8 @@ exports.Mascot = {
         Sports: "<:fortuna_sports:1455103427473440768>",
         Gym: "<:fortuna_gym:1455103411866566716>",
         Accept: "<:tick:1455105986120515656>",
-        Decline: "<a:decline:1455106146120761492>"
+        Decline: "<a:decline:1455106146120761492>",
+        Alert: "<:alert_sign:1455458789934235738>"
     },
     Images: {
         Main: path_1.default.join(process.cwd(), "src", "assets", "fortuna.jpg")

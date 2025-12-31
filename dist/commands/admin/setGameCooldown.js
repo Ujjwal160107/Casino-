@@ -10,7 +10,16 @@ async function handleSetGameCooldown(message, args) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Access Denied", "You need Administrator or Bot Commander permissions.")] });
     }
     const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
-    const game = args[0]?.toLowerCase();
+    const gameRaw = args[0]?.toLowerCase();
+    const aliases = {
+        "bj": "blackjack",
+        "cf": "coinflip",
+        "cool": "roulette", // common alias if exists?
+        "slot": "slots",
+        "cock": "cockfight",
+        "chicken": "cockfight"
+    };
+    const game = aliases[gameRaw] || gameRaw;
     const timeInput = args.slice(1).join(" ");
     if (!game || !timeInput) {
         return message.reply({

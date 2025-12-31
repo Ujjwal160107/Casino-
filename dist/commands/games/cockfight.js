@@ -38,8 +38,12 @@ async function handleCockFight(message, args) {
     if (isNaN(betAmount) || betAmount <= 0) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Amount", "Please enter a valid positive integer.")] });
     }
-    if (betAmount < config.minBet) {
-        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Min Bet", `The minimum bet is **${config.minBet}**. `)] });
+    const { min, max } = (0, gameUtils_1.getGameBetLimits)(config, "cockfight");
+    if (betAmount < min) {
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too Low", `The minimum bet for Cockfight is **${min}**. `)] });
+    }
+    if (betAmount > max) {
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too High", `The maximum bet for Cockfight is **${max}**. `)] });
     }
     // Cooldown Check for Challenger
     const cooldowns = config.gameCooldowns || {};

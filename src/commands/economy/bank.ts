@@ -43,9 +43,9 @@ export async function execute(message: Message | any, args: string[]) {
         .setDescription(`Welcome to the ${config.currencyName} Bank. Manage your assets and liabilities here.`)
         .addFields(
             { name: `${Mascot.Emotes.Money} Net Worth`, value: `${config.currencyEmoji} ${summary.netWorth.toLocaleString()}`, inline: true },
-            { name: "💳 Credit Score", value: `${summary.creditScore}`, inline: true },
+            { name: "<a:credits:1445689337172721716> Credit Score", value: `${summary.creditScore}`, inline: true },
             {
-                name: "💸 Active Loans", value: summary.activeLoans.length > 0
+                name: `${config.currencyEmoji} Active Loans`, value: summary.activeLoans.length > 0
                     ? `**${summary.activeLoans.length} Active**\n(Use \`${config.prefix}credit\` for details)`
                     : "None", inline: true
             },
@@ -59,17 +59,17 @@ export async function execute(message: Message | any, args: string[]) {
                 .setCustomId("bank_deposit_withdraw")
                 .setLabel("Deposit/Withdraw")
                 .setStyle(ButtonStyle.Secondary)
-                .setEmoji("💸"),
+                .setEmoji(config.currencyEmoji),
             new ButtonBuilder()
                 .setCustomId("bank_loans")
                 .setLabel("Loans")
                 .setStyle(ButtonStyle.Primary)
-                .setEmoji("💳"),
+                .setEmoji("<a:credits:1445689337172721716>"),
             new ButtonBuilder()
                 .setCustomId("bank_invest")
                 .setLabel("Investments")
                 .setStyle(ButtonStyle.Success)
-                .setEmoji("📈"),
+                .setEmoji("<:graph:1445689267861979197>"),
             new ButtonBuilder()
                 .setCustomId("bank_refresh")
                 .setLabel("Refresh")

@@ -1,4 +1,5 @@
 import { GameConfig, EquipmentSlot } from "../config/gameConfig";
+import { GuildConfig } from "@prisma/client";
 
 export interface StatBonus {
     str: number;
@@ -117,4 +118,17 @@ export function getWinChance(myScore: number, enemyScore: number): number {
     const total = myScore + enemyScore;
     if (total === 0) return 50;
     return (myScore / total) * 100;
+}
+
+export function getGameBetLimits(config: GuildConfig, gameKey: string): { min: number, max: number } {
+    const limits = (config.gameBetLimits as any) || {};
+    const gameLimits = limits[gameKey] || {};
+
+    const globalMin = config.minBet || 100;
+    const globalMax = config.maxBet || 100000;
+
+    return {
+        min: typeof gameLimits.min === "number" ? gameLimits.min : globalMin,
+        max: typeof gameLimits.max === "number" ? gameLimits.max : globalMax
+    };
 }

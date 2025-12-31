@@ -55,8 +55,11 @@ model User {
   degrees          UserDegree[]
   
   // Employment
-  jobId       String?   @db.ObjectId
-  job         Job?      @relation(fields: [jobId], references: [id])
+  // Employment
+  jobId       String?   // Static ID from jobService (e.g., "tech_intern")
+  jobXp       Int       @default(0)
+  shiftsWorked Int      @default(0)
+  lastShift   DateTime?
 
   // Life Sim Relations
 }
@@ -129,12 +132,13 @@ model Job {
   maxPay      Int
   successRate Float?
   cooldown    Int
+  minIntelligence Int @default(0) // Requirement
   
   // Requirements
   requiredDegreeId String? @db.ObjectId
   requiredDegree   Degree? @relation(fields: [requiredDegreeId], references: [id])
   
-  employees User[]
+
 }
 
 model ShopItem {
@@ -266,6 +270,8 @@ model GuildConfig {
   robImmuneRoles String[] @default([])
   
   minBet         Int      @default(100)
+  maxBet         Int?     @default(100000)
+  gameBetLimits  Json?    @default("{}") // { "blackjack": { "min": 100, "max": 5000 }, ... }
   cockfightBetTime Int    @default(60)
   chickenTrainBaseCost Int @default(500)
   chickenTrainMultiplier Float @default(0.5)

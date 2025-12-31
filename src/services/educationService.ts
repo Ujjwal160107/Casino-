@@ -1,4 +1,5 @@
 import prisma from "../utils/prisma";
+import { Mascot } from "../config/branding";
 
 export async function checkAndSeedDegrees(guildId: string) {
     // 1. High School (Foundation)
@@ -80,6 +81,32 @@ export async function checkAndSeedDegrees(guildId: string) {
             data: { guildId, name: "Doctor of Medicine (MD)", type: "MD", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 15000, intelligenceBoost: 5, incomeMulti: 2.5, minIntelligence: 8, requiredDegreeId: mbbs.id }
         });
     }
+
+    // 7. Law (LLB)
+    let llb = await prisma.degree.findFirst({ where: { guildId, name: "Bachelor of Laws (LLB)" } });
+    if (llb) {
+        llb = await prisma.degree.update({
+            where: { id: llb.id },
+            data: { passGpa: 6.0, intelligenceBoost: 3, minIntelligence: 6, incomeMulti: 1.5, totalSemesters: 1 }
+        });
+    } else {
+        llb = await prisma.degree.create({
+            data: { guildId, name: "Bachelor of Laws (LLB)", type: "LLB", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 8000, intelligenceBoost: 3, incomeMulti: 1.5, minIntelligence: 6, requiredDegreeId: hs!.id }
+        });
+    }
+
+    // 8. Law (LLM)
+    const llm = await prisma.degree.findFirst({ where: { guildId, name: "Master of Laws (LLM)" } });
+    if (llm) {
+        await prisma.degree.update({
+            where: { id: llm.id },
+            data: { passGpa: 6.0, intelligenceBoost: 5, minIntelligence: 8, requiredDegreeId: llb.id, totalSemesters: 1 }
+        });
+    } else {
+        await prisma.degree.create({
+            data: { guildId, name: "Master of Laws (LLM)", type: "LLM", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 15000, intelligenceBoost: 5, incomeMulti: 2.5, minIntelligence: 8, requiredDegreeId: llb.id }
+        });
+    }
 }
 
 export async function getDegrees(guildId: string) {
@@ -139,7 +166,7 @@ export async function enroll(userId: string, guildId: string, degreeId: string) 
     });
 }
 
-export async function study(userId: string, guildId: string) {
+export async function study(userId: string, guildId: string, bonusGpa: number = 0) {
     const user = await prisma.user.findUnique({
         where: { discordId_guildId: { discordId: userId, guildId } },
         include: { currentEducation: { include: { degree: true } } }
@@ -153,20 +180,81 @@ export async function study(userId: string, guildId: string) {
     // Intelligence makes studying more effective.
     // Discipline reduces stress accumulation.
 
+    // Check for Textbooks in Inventory
+    const inventory = await prisma.inventory.findMany({
+        where: { userId: user.id, guildId, shopItem: { itemType: "UNI_BOOK" } },
+        include: { shopItem: true }
+    });
+
+    let extraGpa = 0;
+    let bookUsedMsg = "";
+
+    // Prioritize best book? Or just first found. Let's use best.
+    const bestBook = inventory.sort((a, b) => (b.shopItem.price - a.shopItem.price))[0];
+
+    if (bestBook) {
+        // Apply effect
+        const effect = (bestBook.shopItem.effects as any[])?.find(e => e.type === "STUDY_BOOST");
+        if (effect) {
+            extraGpa = effect.value || 0.2;
+            bookUsedMsg = `\n📚 Used **${bestBook.shopItem.name}** (+${extraGpa} Int).`;
+
+            // Decrement Uses
+            if (bestBook.shopItem.maxUses) {
+                const meta = (bestBook.meta as any) || {};
+                let usesLeft = meta.usesLeft !== undefined ? meta.usesLeft : bestBook.shopItem.maxUses;
+                usesLeft -= 1;
+
+                if (usesLeft <= 0) {
+                    // Break the book
+                    await prisma.inventory.delete({ where: { id: bestBook.id } });
+                    bookUsedMsg += ` (Broken!)`;
+                } else {
+                    await prisma.inventory.update({
+                        where: { id: bestBook.id },
+                        data: { meta: { ...meta, usesLeft } }
+                    });
+                    bookUsedMsg += ` (${usesLeft} uses left)`;
+                }
+            }
+        }
+    }
+
     // 2 Studies = 1 Bar (1 Point). So 1 Study = 0.5 Points.
-    const gpaGain = 0.5;
+    const gpaGain = 0.5 + extraGpa + bonusGpa;
     const stressGain = Math.max(5, 20 - (user.discipline * 0.2));
 
     let newGpa = Math.min(10.0, edu.currentGpa + gpaGain);
     let newStress = Math.min(100, edu.stress + stressGain);
 
     let msg = `You studied hard! Intelligence: ${edu.currentGpa.toFixed(1)} -> **${newGpa.toFixed(1)}**. Stress +${stressGain}.`;
+    if (bonusGpa > 0) msg += ` (Includes +${bonusGpa} from interactive bonus!)`;
+    msg += bookUsedMsg;
 
-    // Random Events
-    if (newStress > 90 && Math.random() < 0.2) {
-        // Burnout!
+    // Random Events (15% chance)
+    if (Math.random() < 0.15) {
+        const events = [
+            { type: "good", msg: "💡 You found a fantastic video tutorial on the topic!", gpaMod: 0.3, stressMod: -5 },
+            { type: "good", msg: "🧘 You felt incredibly focused today.", gpaMod: 0.2, stressMod: -10 },
+            { type: "bad", msg: "📉 The professor assigned a surprise 10-page essay.", gpaMod: 0, stressMod: 15 },
+            { type: "bad", msg: "🔊 Your roommates were partying while you studied.", gpaMod: -0.1, stressMod: 10 },
+            { type: "horrible", msg: "💻 Your laptop crashed and you lost your notes!", gpaMod: -0.5, stressMod: 20 }
+        ];
+
+        const event = events[Math.floor(Math.random() * events.length)];
+
+        // Apply mods
+        newGpa = Math.max(0, Math.min(10, newGpa + event.gpaMod));
+        newStress = Math.max(0, Math.min(100, newStress + event.stressMod));
+
+        let icon = event.type === "good" ? Mascot.Emotes.Success : (event.type === "horrible" ? Mascot.Emotes.Alert : Mascot.Emotes.Fail);
+        msg += `\n\n${icon} **Event:** ${event.msg} (${event.gpaMod > 0 ? '+' : ''}${event.gpaMod} Int, ${event.stressMod > 0 ? '+' : ''}${event.stressMod} Stress)`;
+    }
+
+    // Burnout Check (Separate overriding event)
+    if (newStress > 90 && Math.random() < 0.25) {
         newGpa = Math.max(0, newGpa - 1.0);
-        msg = `⚠️ BURNOUT! You overstudied and panicked. Intelligence dropped to **${newGpa.toFixed(1)}**. Chill out!`;
+        msg += `\n\n${Mascot.Emotes.Alert} **BURNOUT!** You pushed yourself too hard. Intelligence dropped by **1.0**. Take a break!`;
     }
 
     await prisma.userEducation.update({
@@ -192,6 +280,65 @@ export async function study(userId: string, guildId: string) {
     }
 
     return { msg, newGpa, newStress, scholarship };
+}
+
+export async function takeExam(userId: string, guildId: string): Promise<{ success: boolean; msg: string; finalGpa?: number }> {
+    const user = await prisma.user.findUnique({
+        where: { discordId_guildId: { discordId: userId, guildId } },
+        include: { currentEducation: { include: { degree: true } } }
+    });
+
+    if (!user || !user.currentEducation) throw new Error("Not enrolled.");
+
+    const edu = user.currentEducation;
+    const deg = edu.degree;
+    const PASS_REQ = 6.0;
+
+    // Check for Cheat Sheet / Exam Boost
+    // Clean expired first
+    await prisma.activeEffect.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+
+    const boostEffect = await prisma.activeEffect.findFirst({
+        where: { userId: user.id, guildId, effectType: "EXAM_BOOST" }
+    });
+
+    const boost = boostEffect ? boostEffect.value : 0;
+    const effectiveGpa = edu.currentGpa + boost;
+
+    if (effectiveGpa < PASS_REQ) {
+        // Failed
+        let failMsg = `Your intelligence (**${edu.currentGpa.toFixed(1)}**) is too low. You need **${PASS_REQ.toFixed(1)}** to pass.`;
+        if (boost > 0) failMsg += ` (Even with +${boost} form Cheat Sheet, you failed!)`;
+        return { success: false, msg: failMsg };
+    }
+
+    // Success - Graduate logic
+    // Expulsion risk from cheat sheet?
+    if (boost > 0 && Math.random() < 0.05) {
+        // CAUGHT!
+        await prisma.userEducation.delete({ where: { id: edu.id } });
+        return { success: false, msg: `${Mascot.Emotes.Alert} **CAUGHT CHEATING!** You were caught using a cheat sheet. You have been **EXPELLED**! Degree failed.` };
+    }
+
+    await prisma.$transaction([
+        prisma.userEducation.delete({ where: { id: edu.id } }),
+        prisma.userDegree.upsert({
+            where: { userId_degreeId: { userId: user.id, degreeId: deg.id } },
+            create: {
+                userId: user.id,
+                degreeId: deg.id,
+                finalGpa: edu.currentGpa
+            },
+            update: {
+                finalGpa: edu.currentGpa,
+                obtainedAt: new Date() // Update graduation date if re-taking
+            }
+        }),
+        // Remove the boost effect as it is used
+        ...(boostEffect ? [prisma.activeEffect.delete({ where: { id: boostEffect.id } })] : [])
+    ]);
+
+    return { success: true, msg: `You have completed your **${deg.name}** with Final Intelligence Score: **${edu.currentGpa.toFixed(1)}**!`, finalGpa: edu.currentGpa };
 }
 
 export async function claimScholarship(userId: string, guildId: string, milestone: number) {
@@ -252,7 +399,12 @@ export async function reduceStress(userId: string, guildId: string, activity: "s
     if (!user || !user.currentEducation) throw new Error("You are not enrolled.");
 
     const edu = user.currentEducation;
-    const cost = Math.floor(edu.degree.tuitionPerSem * 0.5);
+    let multiplier = 0.5;
+    if (activity === "sports") multiplier = 0.75;
+    if (activity === "gym") multiplier = 0.5;
+    if (activity === "meditation") multiplier = 0.25;
+
+    const cost = Math.floor(edu.degree.tuitionPerSem * multiplier);
 
     if (user.wallet!.balance < cost) {
         throw new Error(`You need **${cost}** coins to go to the ${activity}.`);
@@ -287,12 +439,18 @@ export async function reduceStress(userId: string, guildId: string, activity: "s
     };
 }
 
-export async function getStressCost(userId: string, guildId: string) {
+export async function getStressCost(userId: string, guildId: string, activity: "sports" | "gym" | "meditation" = "gym") {
     const user = await prisma.user.findUnique({
         where: { discordId_guildId: { discordId: userId, guildId } },
         include: { currentEducation: { include: { degree: true } } }
     });
 
     if (!user || !user.currentEducation) return 0;
-    return Math.floor(user.currentEducation.degree.tuitionPerSem * 0.5);
+
+    let multiplier = 0.5;
+    if (activity === "sports") multiplier = 0.75;
+    if (activity === "gym") multiplier = 0.5;
+    if (activity === "meditation") multiplier = 0.25;
+
+    return Math.floor(user.currentEducation.degree.tuitionPerSem * multiplier);
 }

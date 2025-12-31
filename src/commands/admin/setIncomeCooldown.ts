@@ -16,11 +16,17 @@ export async function handleSetIncomeCooldown(message: Message, args: string[]) 
     const config = await getGuildConfig(message.guildId!);
     const cmd = (args[0] ?? "").toLowerCase();
     const timeStr = args.slice(1).join(" ");
-    const seconds = parseDuration(timeStr);
+
+    let seconds: number | null = 0;
+    if (timeStr.toLowerCase() === "off") {
+      seconds = 0;
+    } else {
+      seconds = parseDuration(timeStr);
+    }
 
     if (!SUPPORTED.includes(cmd) || seconds === null || seconds < 0) {
       return message.reply({
-        embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}setincomecooldown <work|beg|crime|slut> <duration>\`\nExample: \`${config.prefix}setincomecooldown work 1h 30m\``)]
+        embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}setincomecooldown <work|beg|crime|slut> <duration|off>\`\nExample: \`${config.prefix}setincomecooldown work 1h 30m\` or \`... work off\``)]
       });
     }
 

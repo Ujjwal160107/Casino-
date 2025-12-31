@@ -11,7 +11,9 @@ export type EffectType =
     | "MONEY"
     | "LEVEL_BOOST"
     | "STAT_BOOST"
-    | "DEATH_SAVE";
+    | "DEATH_SAVE"
+    | "STRESS_REDUCE"
+    | "EXAM_BOOST";
 
 export interface ItemEffect {
     type: EffectType;
@@ -21,6 +23,7 @@ export interface ItemEffect {
     message?: string;
     amount?: number;
     levels?: number;
+    value?: number;
 }
 
 export interface ItemEffectResult {
@@ -237,6 +240,56 @@ async function applyEffect(
             return {
                 message: `🛡️ **Death Save** active! Your chicken will survive the next death (expires in ${formatDuration(dsDuration)}).`,
                 type: "DEATH_SAVE"
+            };
+
+        case "STRESS_REDUCE":
+            const stressAmount = effect.amount || effect.value || 10;
+            const stressUser = await prisma.user.findUnique({
+                where: { discordId_guildId: { discordId: userId, guildId } },
+                include: { currentEducation: true }
+            });
+
+            if (!stressUser || !stressUser.currentEducation) {
+                // If not enrolled, maybe it just relaxes them? But stress is on Education model.
+                throw new Error("You need to be a student to have stress!");
+            }
+
+            const oldStress = stressUser.currentEducation.stress;
+            const newStress = Math.max(0, oldStress - stressAmount);
+
+            await prisma.userEducation.update({
+                where: { id: stressUser.currentEducation.id },
+                data: { stress: newStress }
+            });
+
+            if (client) await logEffectAction(client, guildId, "STRESS_REDUCE", `Reduced stress for <@${userId}> by ${stressAmount}`);
+
+            return {
+                message: `😌 **Relief!** Your stress went down by ${stressAmount}. (Stress: ${newStress}%)`,
+                type: "STRESS_REDUCE"
+            };
+
+        case "EXAM_BOOST":
+            const examBoostDuration = effect.duration || 3600; // 1 hour default
+            const examBoostValue = effect.value || 1;
+
+            const ebUser = await getUser(userId, guildId);
+
+            await prisma.activeEffect.create({
+                data: {
+                    userId: ebUser.id,
+                    guildId,
+                    effectType: "EXAM_BOOST",
+                    value: examBoostValue,
+                    expiresAt: new Date(Date.now() + examBoostDuration * 1000)
+                }
+            });
+
+            if (client) await logEffectAction(client, guildId, "EXAM_BOOST", `Granted Exam Boost (+${examBoostValue}) to <@${userId}>`);
+
+            return {
+                message: `🤓 **Cheat Sheet Active!** You have +${examBoostValue} effective Intelligence for the next ${formatDuration(examBoostDuration)} (or until exam).`,
+                type: "EXAM_BOOST"
             };
 
         default:

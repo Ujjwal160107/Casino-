@@ -9,6 +9,7 @@ const format_1 = require("../../utils/format");
 const embed_1 = require("../../utils/embed");
 const cooldown_1 = require("../../utils/cooldown");
 const branding_1 = require("../../config/branding");
+const gameUtils_1 = require("../../utils/gameUtils");
 async function handleCoinflip(message, args) {
     const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
     const amountStr = args[0];
@@ -43,9 +44,9 @@ async function handleCoinflip(message, args) {
         });
     }
     const cooldowns = config.gameCooldowns || {};
-    const cdSeconds = cooldowns["cf"] || 0;
+    const cdSeconds = cooldowns["coinflip"] || 0;
     if (cdSeconds > 0) {
-        const key = `game:cf:${message.guildId}:${message.author.id}`;
+        const key = `game:coinflip:${message.guildId}:${message.author.id}`;
         const remaining = (0, cooldown_1.checkCooldown)(key, cdSeconds);
         if (remaining > 0) {
             const expire = (0, cooldown_1.getCooldownExpiry)(key);
@@ -54,6 +55,13 @@ async function handleCoinflip(message, args) {
                 embeds: [(0, embed_1.errorEmbed)(message.author, "Cooldown Active", `${branding_1.Mascot.Emotes.Angry} Please wait <t:${ts}:R> before flipping again.`)]
             });
         }
+    }
+    const { min, max } = (0, gameUtils_1.getGameBetLimits)(config, "coinflip");
+    if (amount < min) {
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too Low", `The minimum bet for Coinflip is **${(0, format_1.fmtCurrency)(min, emoji)}**.`)] });
+    }
+    if (amount > max) {
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too High", `The maximum bet for Coinflip is **${(0, format_1.fmtCurrency)(max, emoji)}**.`)] });
     }
     if (!user.wallet || user.wallet.balance < amount) {
         return message.reply({

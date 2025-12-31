@@ -7,6 +7,7 @@ import { successEmbed, errorEmbed } from "../../utils/embed";
 import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
 import { formatDuration } from "../../utils/format";
 import { Mascot, getEmoteUrl } from "../../config/branding";
+import { getGameBetLimits } from "../../utils/gameUtils";
 
 export async function handleCoinflip(message: Message, args: string[]) {
   const config = await getGuildConfig(message.guildId!);
@@ -52,9 +53,9 @@ export async function handleCoinflip(message: Message, args: string[]) {
     });
   }
   const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
-  const cdSeconds = cooldowns["cf"] || 0;
+  const cdSeconds = cooldowns["coinflip"] || 0;
   if (cdSeconds > 0) {
-    const key = `game:cf:${message.guildId}:${message.author.id}`;
+    const key = `game:coinflip:${message.guildId}:${message.author.id}`;
     const remaining = checkCooldown(key, cdSeconds);
     if (remaining > 0) {
       const expire = getCooldownExpiry(key);
@@ -63,6 +64,15 @@ export async function handleCoinflip(message: Message, args: string[]) {
         embeds: [errorEmbed(message.author, "Cooldown Active", `${Mascot.Emotes.Angry} Please wait <t:${ts}:R> before flipping again.`)]
       });
     }
+  }
+
+
+  const { min, max } = getGameBetLimits(config, "coinflip");
+  if (amount < min) {
+    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Coinflip is **${fmtCurrency(min, emoji)}**.`)] });
+  }
+  if (amount > max) {
+    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Coinflip is **${fmtCurrency(max, emoji)}**.`)] });
   }
   if (!user.wallet || user.wallet.balance < amount) {
     return message.reply({

@@ -9,6 +9,7 @@ const format_1 = require("../../utils/format");
 const embed_1 = require("../../utils/embed");
 const cooldown_1 = require("../../utils/cooldown");
 const branding_1 = require("../../config/branding");
+const gameUtils_1 = require("../../utils/gameUtils");
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
 function createDeck() {
@@ -48,7 +49,7 @@ async function handleBlackjack(message, args) {
     }
     const amount = bet;
     const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
-    const minBet = config.minBet;
+    const { min, max } = (0, gameUtils_1.getGameBetLimits)(config, "blackjack");
     const eCasino = "<:casino:1445732641545654383>";
     let currencyEmoji = config.currencyEmoji;
     if (/^\d+$/.test(currencyEmoji)) {
@@ -58,13 +59,16 @@ async function handleBlackjack(message, args) {
     if (currencyEmoji === "1445732360204193824") {
         currencyEmoji = "<a:money:1445732360204193824>";
     }
-    if (amount < minBet) {
-        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too Low", `The minimum bet is **${(0, format_1.fmtCurrency)(minBet, currencyEmoji)}**.`)] });
+    if (amount < min) {
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too Low", `The minimum bet for Blackjack is **${(0, format_1.fmtCurrency)(min, currencyEmoji)}**.`)] });
+    }
+    if (amount > max) {
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too High", `The maximum bet for Blackjack is **${(0, format_1.fmtCurrency)(max, currencyEmoji)}**.`)] });
     }
     const cooldowns = config.gameCooldowns || {};
-    const cdSeconds = cooldowns["bj"] || 0;
+    const cdSeconds = cooldowns["blackjack"] || 0;
     if (cdSeconds > 0) {
-        const key = `game:bj:${message.guildId}:${message.author.id}`;
+        const key = `game:blackjack:${message.guildId}:${message.author.id}`;
         const remaining = (0, cooldown_1.checkCooldown)(key, cdSeconds);
         if (remaining > 0) {
             const expire = (0, cooldown_1.getCooldownExpiry)(key);

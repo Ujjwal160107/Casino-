@@ -10,7 +10,18 @@ export async function handleSetGameCooldown(message: Message, args: string[]) {
   }
 
   const config = await getGuildConfig(message.guildId!);
-  const game = args[0]?.toLowerCase();
+  const gameRaw = args[0]?.toLowerCase();
+
+  const aliases: Record<string, string> = {
+    "bj": "blackjack",
+    "cf": "coinflip",
+    "cool": "roulette", // common alias if exists?
+    "slot": "slots",
+    "cock": "cockfight",
+    "chicken": "cockfight"
+  };
+  const game = aliases[gameRaw] || gameRaw;
+
   const timeInput = args.slice(1).join(" ");
 
   if (!game || !timeInput) {

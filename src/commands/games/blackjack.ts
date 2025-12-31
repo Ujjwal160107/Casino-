@@ -8,6 +8,7 @@ import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
 import { formatDuration } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import { Mascot, getEmoteUrl } from "../../config/branding";
+import { getGameBetLimits } from "../../utils/gameUtils";
 
 type Card = { suit: string; rank: string; value: number };
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
@@ -51,7 +52,8 @@ export async function handleBlackjack(message: Message, args: string[]) {
     }
     const amount = bet;
     const config = await getGuildConfig(message.guildId!);
-    const minBet = config.minBet;
+    const { min, max } = getGameBetLimits(config, "blackjack");
+
     const eCasino = "<:casino:1445732641545654383>";
     let currencyEmoji = config.currencyEmoji;
     if (/^\d+$/.test(currencyEmoji)) {
@@ -61,13 +63,17 @@ export async function handleBlackjack(message: Message, args: string[]) {
     if (currencyEmoji === "1445732360204193824") {
         currencyEmoji = "<a:money:1445732360204193824>";
     }
-    if (amount < minBet) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet is **${fmtCurrency(minBet, currencyEmoji)}**.`)] });
+
+    if (amount < min) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Blackjack is **${fmtCurrency(min, currencyEmoji)}**.`)] });
+    }
+    if (amount > max) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Blackjack is **${fmtCurrency(max, currencyEmoji)}**.`)] });
     }
     const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
-    const cdSeconds = cooldowns["bj"] || 0;
+    const cdSeconds = cooldowns["blackjack"] || 0;
     if (cdSeconds > 0) {
-        const key = `game:bj:${message.guildId}:${message.author.id}`;
+        const key = `game:blackjack:${message.guildId}:${message.author.id}`;
         const remaining = checkCooldown(key, cdSeconds);
         if (remaining > 0) {
             const expire = getCooldownExpiry(key);

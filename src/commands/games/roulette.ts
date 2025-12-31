@@ -17,6 +17,7 @@ import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
 import { formatDuration } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import { Mascot } from "../../config/branding";
+import { getGameBetLimits } from "../../utils/gameUtils";
 
 export async function handleRouletteMenu(message: Message) {
   const config = await getGuildConfig(message.guildId!);
@@ -94,10 +95,15 @@ export async function handleBet(message: Message, args: string[]) {
   }
   const config = await getGuildConfig(message.guildId!);
   const emoji = config.currencyEmoji;
-  const minBet = config.minBet;
-  if (amount < minBet) {
+  const { min, max } = getGameBetLimits(config, "roulette");
+  if (amount < min) {
     return message.reply({
-      embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet is **${fmtCurrency(minBet, emoji)}**.`)]
+      embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Roulette is **${fmtCurrency(min, emoji)}**.`)]
+    });
+  }
+  if (amount > max) {
+    return message.reply({
+      embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Roulette is **${fmtCurrency(max, emoji)}**.`)]
     });
   }
   const cooldowns = (config.gameCooldowns as Record<string, number>) || {};

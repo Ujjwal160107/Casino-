@@ -62,42 +62,29 @@ async function handleEnroll(message, args) {
         message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Error", err.message)] });
     }
 }
+const educationService_1 = require("../../services/educationService");
+// successEmbed, errorEmbed already imported abov
+// ... (handleEnroll stays same)
 async function handleExam(message) {
     if (!message.guild)
         return;
     const userId = message.author.id;
     const guildId = message.guild.id;
-    const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
-    const prefix = config?.prefix || "!";
-    // Logic: Pass if Intelligence >= 6. Graduate.
-    const user = await prisma_1.default.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
-        include: { currentEducation: { include: { degree: true } }, wallet: true }
-    });
-    if (!user || !user.currentEducation) {
-        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Not Enrolled", "You are not currently enrolled/studying anywhere.")] });
+    try {
+        const res = await (0, educationService_1.takeExam)(userId, guildId);
+        if (res.success) {
+            return message.reply({ embeds: [(0, embed_1.successEmbed)(message.author, "🎓 GRADUATED!", res.msg)] });
+        }
+        else {
+            const embed = (0, embed_1.errorEmbed)(message.author, "Exam Failed", res.msg);
+            const sadUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.TeacherSad);
+            if (sadUrl)
+                embed.setThumbnail(sadUrl);
+            return message.reply({ embeds: [embed] });
+        }
     }
-    const edu = user.currentEducation;
-    const deg = edu.degree;
-    const PASS_REQ = 6.0;
-    if (edu.currentGpa < PASS_REQ) {
-        const embed = (0, embed_1.errorEmbed)(message.author, "Exam Failed", `Your intelligence (**${edu.currentGpa.toFixed(1)}**) is too low. You need **${PASS_REQ.toFixed(1)}** to pass.\nGo \`${prefix}study\` to increase it!`);
-        const sadUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.TeacherSad);
-        if (sadUrl)
-            embed.setThumbnail(sadUrl);
-        return message.reply({ embeds: [embed] });
+    catch (err) {
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Error", err.message)] });
     }
-    // Passed - GRADUATE!
-    await prisma_1.default.$transaction([
-        prisma_1.default.userEducation.delete({ where: { id: edu.id } }),
-        prisma_1.default.userDegree.create({
-            data: {
-                userId: user.id,
-                degreeId: deg.id,
-                finalGpa: edu.currentGpa
-            }
-        })
-    ]);
-    return message.reply({ embeds: [(0, embed_1.successEmbed)(message.author, "🎓 GRADUATED!", `You have completed your **${deg.name}** with Final Intelligence Score: **${edu.currentGpa.toFixed(1)}**!`)] });
 }
 //# sourceMappingURL=enroll.js.map

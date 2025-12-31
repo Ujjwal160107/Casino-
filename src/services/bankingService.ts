@@ -3,6 +3,7 @@ import prisma from "../utils/prisma";
 import { Loan, Investment, User, GuildConfig } from "@prisma/client";
 import { ensureBankForUser } from "./bankService";
 import { getGuildConfig } from "./guildConfigService";
+import { Mascot } from "../config/branding";
 
 export function calculateCreditLimits(creditScore: number, config: any) {
     const defaultTiers = [
@@ -30,6 +31,7 @@ export async function applyForLoan(discordId: string, guildId: string, amount: n
     const user = await prisma.user.findUnique({ where: { discordId_guildId: { discordId, guildId } } });
     if (!user) throw new Error("User not found.");
     const userId = user.id;
+    await ensureBankForUser(userId);
 
     // Check Max Active Loans
     const activeLoansCount = await prisma.loan.count({
@@ -290,7 +292,7 @@ export async function processOverdueLoans(client: Client) {
         try {
             user = await prisma.user.findUnique({ where: { id: loan.userId }, include: { bank: true, wallet: true } });
         } catch (e) {
-            console.warn(`⚠️ Corrupt user data for loan ${loan.id}. Deleting loan to prevent loop crash.`);
+            console.warn(`${Mascot.Emotes.Alert} Corrupt user data for loan ${loan.id}. Deleting loan to prevent loop crash.`);
             await prisma.loan.delete({ where: { id: loan.id } }).catch(() => { });
             continue;
         }

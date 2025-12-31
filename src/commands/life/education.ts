@@ -49,7 +49,7 @@ export async function handleEducation(message: Message, args: string[]) {
             const isClaimed = edu.scholarshipsClaimed.includes(m.level);
             const isEligible = edu.currentGpa >= m.level;
 
-            let status = "🔒";
+            let status = "<:lockk:1455461260635144387> ";
             if (isClaimed) status = `${Mascot.Emotes.Accept} Claimed`;
             else if (isEligible) status = `${Mascot.Emotes.MoneyBag} Available`;
 
@@ -64,14 +64,14 @@ export async function handleEducation(message: Message, args: string[]) {
             .addFields(
                 { name: "Intelligence", value: `${intProgress} **${edu.currentGpa.toFixed(1)} / 10**\nRequired: 6.0`, inline: true },
                 { name: "Stress", value: `${edu.stress}%`, inline: true },
-                { name: "Actions", value: `\`${prefix}study\` - Gain Intelligence (+0.5)\n\`${prefix}exam\` - Take Final Exam (Req: 6 Intelligence)` },                { name: `${Mascot.Emotes.MoneyBag} Scholarship Guide`, value: scholarshipGuide }
+                { name: "Actions", value: `\`${prefix}study\` - Gain Intelligence (+0.5)\n\`${prefix}exam\` - Take Final Exam (Req: 6 Intelligence)` }, { name: `${Mascot.Emotes.MoneyBag} Scholarship Guide`, value: scholarshipGuide }
             );
 
         const thumbUrl = getEmoteUrl(Mascot.Emotes.Teacher);
         if (thumbUrl) embed.setThumbnail(thumbUrl);
 
         if (edu.stress > 70) {
-            embed.setDescription(embed.data.description + `\n\n⚠️ **High Stress!** You should visit the Gym, meditate, or play sports to relax!`);
+            embed.setDescription(embed.data.description + `\n\n${Mascot.Emotes.Alert} **High Stress!** You should visit the Gym, meditate, or play sports to relax!`);
         }
 
         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

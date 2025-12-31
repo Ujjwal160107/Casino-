@@ -9,6 +9,7 @@ const guildConfigService_1 = require("../../services/guildConfigService");
 const format_1 = require("../../utils/format");
 const embed_1 = require("../../utils/embed");
 const cooldown_1 = require("../../utils/cooldown");
+const gameUtils_1 = require("../../utils/gameUtils");
 const CHERRY = "<:cherri:1446428169786622053>";
 const BANANA = "<:banano:1446428190837968989>";
 const GRAPES = "<:graps:1446428294483542040>";
@@ -35,10 +36,15 @@ async function handleSlots(message, args) {
     }
     const amount = bet;
     const emoji = config.currencyEmoji;
-    const minBet = config.minBet;
-    if (amount < minBet) {
+    const { min, max } = (0, gameUtils_1.getGameBetLimits)(config, "slots");
+    if (amount < min) {
         return message.reply({
-            embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too Low", `The minimum bet is **${(0, format_1.fmtCurrency)(minBet, emoji)}**.`)]
+            embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too Low", `The minimum bet for Slots is **${(0, format_1.fmtCurrency)(min, emoji)}**.`)]
+        });
+    }
+    if (amount > max) {
+        return message.reply({
+            embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too High", `The maximum bet for Slots is **${(0, format_1.fmtCurrency)(max, emoji)}**.`)]
         });
     }
     const cooldowns = config.gameCooldowns || {};

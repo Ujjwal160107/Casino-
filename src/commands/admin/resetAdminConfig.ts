@@ -13,7 +13,7 @@ export async function handleResetAdminSettings(message: Message) {
             .setCustomId("confirm_reset_admin")
             .setLabel("CONFIRM RESET")
             .setStyle(ButtonStyle.Danger)
-            .setEmoji("⚠️"),
+            .setEmoji(Mascot.Emotes.Alert),
         new ButtonBuilder()
             .setCustomId("cancel_reset_admin")
             .setLabel("Cancel")
@@ -21,7 +21,7 @@ export async function handleResetAdminSettings(message: Message) {
     );
 
     const reply = await message.reply({
-        content: `**⚠️ DANGER ZONE**\nAre you sure you want to reset **ALL Admin Access Settings**?\n\n**This will:**\n- Enable all disabled commands.\n- Remove all Granular Permission overrides.\n- Clear Casino Channel whitelist.\n\n**This will NOT affect:**\n- Currency, Economy Configs, Taxes, or Cooldowns.`,
+        content: `**${Mascot.Emotes.Alert} DANGER ZONE**\nAre you sure you want to reset **ALL Admin Access Settings**?\n\n**This will:**\n- Enable all disabled commands.\n- Remove all Granular Permission overrides.\n- Clear Casino Channel whitelist.\n\n**This will NOT affect:**\n- Currency, Economy Configs, Taxes, or Cooldowns.`,
         components: [row]
     });
 

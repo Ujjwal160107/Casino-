@@ -46,6 +46,7 @@ const cockfight_1 = require("./commands/games/cockfight");
 const setMinBet_1 = require("./commands/admin/setMinBet");
 const adminDashboard_1 = require("./commands/admin/adminDashboard");
 const resetAdminConfig_1 = require("./commands/admin/resetAdminConfig");
+const betLimit_1 = require("./commands/admin/betLimit");
 const prisma_1 = __importDefault(require("./utils/prisma"));
 const embed_1 = require("./utils/embed");
 const stringUtils_1 = require("./utils/stringUtils");
@@ -163,6 +164,8 @@ async function routeMessage(client, message, prefix) {
         case "shop":
         case "store":
             return (0, shop_1.handleShop)(message, args);
+        case "buy":
+            return (0, shop_1.handleShop)(message, ["buy", ...args]);
         case "inventory":
             return (0, inventory_1.handleInventory)(message, args);
         case "profile":
@@ -230,6 +233,11 @@ async function routeMessage(client, message, prefix) {
             return (0, setCurrency_1.handleSetCurrency)(message, args);
         case "min-bet":
             return (0, setMinBet_1.handleSetMinBet)(message, args);
+        case "set-bet-limit":
+        case "setbetlimit":
+        case "betlimit":
+        case "bet-limit":
+            return (0, betLimit_1.handleSetBetLimit)(message, args);
         case "admin-view-config":
         case "view-config":
             return (0, viewConfig_1.handleAdminViewConfig)(message, args);
@@ -378,22 +386,12 @@ async function routeMessage(client, message, prefix) {
             const { handleListDegrees } = require("./commands/life/education");
             return handleListDegrees(message);
         }
+        // JOBS REMOVED AS PER REQUEST
+        /*
         case "jobs": {
-            const { handleJobs } = require("./commands/life/jobs");
-            return handleJobs(message, args);
+           // ...
         }
-        case "apply": {
-            const { handleApply } = require("./commands/life/apply");
-            return handleApply(message, args);
-        }
-        case "freelance": {
-            const { handleFreelance } = require("./commands/life/freelance");
-            return handleFreelance(message, args);
-        }
-        case "resign": {
-            const { handleResign } = require("./commands/life/resign");
-            return handleResign(message, args);
-        }
+        */
         // EDUCATION
         case "education":
         case "edu":
@@ -418,11 +416,17 @@ async function routeMessage(client, message, prefix) {
             const { handleDropout } = require("./commands/life/dropout");
             return handleDropout(message);
         }
-        // --- Education Admin ---
-        case "setgpa": {
-            const { handleSetGpa } = require("./commands/admin/educationAdmin");
-            return handleSetGpa(message, args);
+        case "unistore":
+        case "bookstore": {
+            const { handleUniStore } = require("./commands/life/uniStore");
+            return handleUniStore(message);
         }
+        case "manage-uni":
+        case "uni-admin": {
+            const { handleManageUniStore } = require("./commands/admin/manageUniStore");
+            return handleManageUniStore(message, args);
+        }
+        // --- Education Admin ---
         case "setint":
         case "setintelligence": {
             const { handleSetInt } = require("./commands/admin/educationAdmin");

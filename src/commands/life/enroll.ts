@@ -68,46 +68,29 @@ export async function handleEnroll(message: Message, args: string[]) {
     }
 }
 
+import { enroll, takeExam } from "../../services/educationService";
+// successEmbed, errorEmbed already imported abov
+
+// ... (handleEnroll stays same)
+
 export async function handleExam(message: Message) {
     if (!message.guild) return;
     const userId = message.author.id;
     const guildId = message.guild.id;
-    const config = await getGuildConfig(guildId);
-    const prefix = config?.prefix || "!";
 
-    // Logic: Pass if Intelligence >= 6. Graduate.
+    try {
+        const res = await takeExam(userId, guildId);
 
-    const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
-        include: { currentEducation: { include: { degree: true } }, wallet: true }
-    });
+        if (res.success) {
+            return message.reply({ embeds: [successEmbed(message.author, "🎓 GRADUATED!", res.msg)] });
+        } else {
+            const embed = errorEmbed(message.author, "Exam Failed", res.msg);
+            const sadUrl = getEmoteUrl(Mascot.Emotes.TeacherSad);
+            if (sadUrl) embed.setThumbnail(sadUrl);
+            return message.reply({ embeds: [embed] });
+        }
 
-    if (!user || !user.currentEducation) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Not Enrolled", "You are not currently enrolled/studying anywhere.")] });
+    } catch (err: any) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Error", err.message)] });
     }
-
-    const edu = user.currentEducation;
-    const deg = edu.degree;
-    const PASS_REQ = 6.0;
-
-    if (edu.currentGpa < PASS_REQ) {
-        const embed = errorEmbed(message.author, "Exam Failed", `Your intelligence (**${edu.currentGpa.toFixed(1)}**) is too low. You need **${PASS_REQ.toFixed(1)}** to pass.\nGo \`${prefix}study\` to increase it!`);
-        const sadUrl = getEmoteUrl(Mascot.Emotes.TeacherSad);
-        if (sadUrl) embed.setThumbnail(sadUrl);
-        return message.reply({ embeds: [embed] });
-    }
-
-    // Passed - GRADUATE!
-    await prisma.$transaction([
-        prisma.userEducation.delete({ where: { id: edu.id } }),
-        prisma.userDegree.create({
-            data: {
-                userId: user.id,
-                degreeId: deg.id,
-                finalGpa: edu.currentGpa
-            }
-        })
-    ]);
-
-    return message.reply({ embeds: [successEmbed(message.author, "🎓 GRADUATED!", `You have completed your **${deg.name}** with Final Intelligence Score: **${edu.currentGpa.toFixed(1)}**!`)] });
 }

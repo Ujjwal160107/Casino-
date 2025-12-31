@@ -18,7 +18,7 @@ import { getGuildConfig } from "../../services/guildConfigService";
 import { generateVsImage, generateWinnerImage } from "../../utils/imageUtils";
 import { checkCooldown, getCooldownExpiry, setCooldown } from "../../utils/cooldown";
 import { formatDuration } from "../../utils/format";
-import { calculateTotalStats, calculateCombatScore, getWinChance } from "../../utils/gameUtils";
+import { calculateTotalStats, calculateCombatScore, getWinChance, getGameBetLimits } from "../../utils/gameUtils";
 import { GameConfig } from "../../config/gameConfig";
 import { Mascot } from "../../config/branding";
 
@@ -57,8 +57,12 @@ export async function handleCockFight(message: Message, args: string[]) {
         return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please enter a valid positive integer.")] });
     }
 
-    if (betAmount < config.minBet) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Min Bet", `The minimum bet is **${config.minBet}**. `)] });
+    const { min, max } = getGameBetLimits(config, "cockfight");
+    if (betAmount < min) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Cockfight is **${min}**. `)] });
+    }
+    if (betAmount > max) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Cockfight is **${max}**. `)] });
     }
 
     // Cooldown Check for Challenger

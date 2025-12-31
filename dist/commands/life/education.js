@@ -40,18 +40,49 @@ async function handleEducation(message, args) {
         const filledBars = Math.min(10, Math.floor(edu.currentGpa));
         const emptyBars = 10 - filledBars;
         const intProgress = `${EMOJI_XP.repeat(filledBars)}${EMOJI_XP_EMPTY.repeat(Math.max(0, emptyBars))}`;
+        // Scholarship Status
+        const scholarshipMilestones = [
+            { level: 9, multi: 1.5, desc: "1.5x Refund" },
+            { level: 10, multi: 2, desc: "2x Refund" }
+        ];
+        const scholarshipLines = scholarshipMilestones.map(m => {
+            const isClaimed = edu.scholarshipsClaimed.includes(m.level);
+            const isEligible = edu.currentGpa >= m.level;
+            let status = "<:lockk:1455461260635144387> ";
+            if (isClaimed)
+                status = `${branding_1.Mascot.Emotes.Accept} Claimed`;
+            else if (isEligible)
+                status = `${branding_1.Mascot.Emotes.MoneyBag} Available`;
+            return `${status} **${m.level}.0 Int** (${m.desc})`;
+        });
+        const scholarshipGuide = scholarshipLines.join("\n");
         const embed = new discord_js_1.EmbedBuilder()
             .setTitle(`Student Dashboard: ${deg.name}`)
             .setDescription(`**Degree Fee Paid**: ${(0, format_1.fmtCurrency)(deg.tuitionPerSem, config.currencyEmoji)}\n${progressBar} ${progress}% to Graduation`)
             .setColor(edu.stress > 80 ? "#FF0000" : "#3498DB")
-            .addFields({ name: "Intelligence", value: `${intProgress} **${edu.currentGpa.toFixed(1)} / 10**\nRequired: 6.0`, inline: true }, { name: "Stress", value: `${edu.stress}%`, inline: true }, { name: "Actions", value: `\`${prefix}study\` - Gain Intelligence (+0.5)\n\`${prefix}exam\` - Take Final Exam (Req: 6 Intelligence)` }, { name: "🎓 Scholarship Guide", value: "Reach **8.0 Intelligence** for 2x Refund\nReach **9.0 Intelligence** for 5x Refund\nReach **10.0 Intelligence** for 10x Refund!" });
+            .addFields({ name: "Intelligence", value: `${intProgress} **${edu.currentGpa.toFixed(1)} / 10**\nRequired: 6.0`, inline: true }, { name: "Stress", value: `${edu.stress}%`, inline: true }, { name: "Actions", value: `\`${prefix}study\` - Gain Intelligence (+0.5)\n\`${prefix}exam\` - Take Final Exam (Req: 6 Intelligence)` }, { name: `${branding_1.Mascot.Emotes.MoneyBag} Scholarship Guide`, value: scholarshipGuide });
         const thumbUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Teacher);
         if (thumbUrl)
             embed.setThumbnail(thumbUrl);
         if (edu.stress > 70) {
-            embed.setDescription(embed.data.description + `\n\n⚠️ **High Stress!** You should visit the Gym, meditate, or play sports to relax!`);
+            embed.setDescription(embed.data.description + `\n\n${branding_1.Mascot.Emotes.Alert} **High Stress!** You should visit the Gym, meditate, or play sports to relax!`);
         }
         const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId("stress_sports").setLabel("Sports").setStyle(discord_js_1.ButtonStyle.Success).setEmoji(branding_1.Mascot.Emotes.Sports), new discord_js_1.ButtonBuilder().setCustomId("stress_gym").setLabel("Gym").setStyle(discord_js_1.ButtonStyle.Primary).setEmoji(branding_1.Mascot.Emotes.Gym), new discord_js_1.ButtonBuilder().setCustomId("stress_meditation").setLabel("Meditation").setStyle(discord_js_1.ButtonStyle.Secondary).setEmoji(branding_1.Mascot.Emotes.Meditation));
+        // Check for Scholarships
+        const milestones = [9, 10];
+        const currentInt = Math.floor(edu.currentGpa);
+        const claimed = edu.scholarshipsClaimed;
+        for (const m of milestones) {
+            if (currentInt >= m && !claimed.includes(m)) {
+                row.addComponents(new discord_js_1.ButtonBuilder()
+                    .setCustomId(`claim_scholarship_${m}`)
+                    .setLabel(`Claim ${m}.0 Int Scholarship`)
+                    .setStyle(discord_js_1.ButtonStyle.Success)
+                    .setEmoji(branding_1.Mascot.Emotes.MoneyBag));
+                // Only show one claim button at a time to avoid clutter/spam
+                break;
+            }
+        }
         return message.reply({ embeds: [embed], components: [row] });
     }
     // 2. Not Enrolled View (List Schools)

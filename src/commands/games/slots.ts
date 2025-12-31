@@ -7,6 +7,7 @@ import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
 import { formatDuration } from "../../utils/format";
+import { getGameBetLimits } from "../../utils/gameUtils";
 
 const CHERRY = "<:cherri:1446428169786622053>";
 const BANANA = "<:banano:1446428190837968989>";
@@ -36,10 +37,15 @@ export async function handleSlots(message: Message, args: string[]) {
   }
   const amount = bet;
   const emoji = config.currencyEmoji;
-  const minBet = config.minBet;
-  if (amount < minBet) {
+  const { min, max } = getGameBetLimits(config, "slots");
+  if (amount < min) {
     return message.reply({
-      embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet is **${fmtCurrency(minBet, emoji)}**.`)]
+      embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Slots is **${fmtCurrency(min, emoji)}**.`)]
+    });
+  }
+  if (amount > max) {
+    return message.reply({
+      embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Slots is **${fmtCurrency(max, emoji)}**.`)]
     });
   }
   const cooldowns = (config.gameCooldowns as Record<string, number>) || {};

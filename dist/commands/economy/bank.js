@@ -42,8 +42,8 @@ async function execute(message, args) {
         .setColor(branding_1.Mascot.Colors.Base)
         .setThumbnail(user.displayAvatarURL())
         .setDescription(`Welcome to the ${config.currencyName} Bank. Manage your assets and liabilities here.`)
-        .addFields({ name: `${branding_1.Mascot.Emotes.Money} Net Worth`, value: `${config.currencyEmoji} ${summary.netWorth.toLocaleString()}`, inline: true }, { name: "💳 Credit Score", value: `${summary.creditScore}`, inline: true }, {
-        name: "💸 Active Loans", value: summary.activeLoans.length > 0
+        .addFields({ name: `${branding_1.Mascot.Emotes.Money} Net Worth`, value: `${config.currencyEmoji} ${summary.netWorth.toLocaleString()}`, inline: true }, { name: "<a:credits:1445689337172721716> Credit Score", value: `${summary.creditScore}`, inline: true }, {
+        name: `${config.currencyEmoji} Active Loans`, value: summary.activeLoans.length > 0
             ? `**${summary.activeLoans.length} Active**\n(Use \`${config.prefix}credit\` for details)`
             : "None", inline: true
     }, { name: `${branding_1.Mascot.Emotes.Think} Investments`, value: `${summary.investments.length} Active`, inline: true })
@@ -53,15 +53,15 @@ async function execute(message, args) {
         .setCustomId("bank_deposit_withdraw")
         .setLabel("Deposit/Withdraw")
         .setStyle(discord_js_1.ButtonStyle.Secondary)
-        .setEmoji("💸"), new discord_js_1.ButtonBuilder()
+        .setEmoji(config.currencyEmoji), new discord_js_1.ButtonBuilder()
         .setCustomId("bank_loans")
         .setLabel("Loans")
         .setStyle(discord_js_1.ButtonStyle.Primary)
-        .setEmoji("💳"), new discord_js_1.ButtonBuilder()
+        .setEmoji("<a:credits:1445689337172721716>"), new discord_js_1.ButtonBuilder()
         .setCustomId("bank_invest")
         .setLabel("Investments")
         .setStyle(discord_js_1.ButtonStyle.Success)
-        .setEmoji("📈"), new discord_js_1.ButtonBuilder()
+        .setEmoji("<:graph:1445689267861979197>"), new discord_js_1.ButtonBuilder()
         .setCustomId("bank_refresh")
         .setLabel("Refresh")
         .setStyle(discord_js_1.ButtonStyle.Secondary)

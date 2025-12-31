@@ -10,6 +10,7 @@ const format_1 = require("../../utils/format");
 const embed_1 = require("../../utils/embed");
 const cooldown_1 = require("../../utils/cooldown");
 const branding_1 = require("../../config/branding");
+const gameUtils_1 = require("../../utils/gameUtils");
 async function handleRouletteMenu(message) {
     const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
     const eCasino = "<a:casino:1445732641545654383>";
@@ -78,10 +79,15 @@ async function handleBet(message, args) {
     }
     const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
     const emoji = config.currencyEmoji;
-    const minBet = config.minBet;
-    if (amount < minBet) {
+    const { min, max } = (0, gameUtils_1.getGameBetLimits)(config, "roulette");
+    if (amount < min) {
         return message.reply({
-            embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too Low", `The minimum bet is **${(0, format_1.fmtCurrency)(minBet, emoji)}**.`)]
+            embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too Low", `The minimum bet for Roulette is **${(0, format_1.fmtCurrency)(min, emoji)}**.`)]
+        });
+    }
+    if (amount > max) {
+        return message.reply({
+            embeds: [(0, embed_1.errorEmbed)(message.author, "Bet Too High", `The maximum bet for Roulette is **${(0, format_1.fmtCurrency)(max, emoji)}**.`)]
         });
     }
     const cooldowns = config.gameCooldowns || {};

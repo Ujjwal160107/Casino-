@@ -6,6 +6,7 @@ exports.getTraitBonus = getTraitBonus;
 exports.calculateTotalStats = calculateTotalStats;
 exports.calculateCombatScore = calculateCombatScore;
 exports.getWinChance = getWinChance;
+exports.getGameBetLimits = getGameBetLimits;
 const gameConfig_1 = require("../config/gameConfig");
 function getEquipmentSlot(itemName) {
     const name = itemName.toLowerCase();
@@ -132,5 +133,15 @@ function getWinChance(myScore, enemyScore) {
     if (total === 0)
         return 50;
     return (myScore / total) * 100;
+}
+function getGameBetLimits(config, gameKey) {
+    const limits = config.gameBetLimits || {};
+    const gameLimits = limits[gameKey] || {};
+    const globalMin = config.minBet || 100;
+    const globalMax = config.maxBet || 100000;
+    return {
+        min: typeof gameLimits.min === "number" ? gameLimits.min : globalMin,
+        max: typeof gameLimits.max === "number" ? gameLimits.max : globalMax
+    };
 }
 //# sourceMappingURL=gameUtils.js.map

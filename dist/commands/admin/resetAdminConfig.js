@@ -16,12 +16,12 @@ async function handleResetAdminSettings(message) {
         .setCustomId("confirm_reset_admin")
         .setLabel("CONFIRM RESET")
         .setStyle(discord_js_1.ButtonStyle.Danger)
-        .setEmoji("⚠️"), new discord_js_1.ButtonBuilder()
+        .setEmoji(branding_1.Mascot.Emotes.Alert), new discord_js_1.ButtonBuilder()
         .setCustomId("cancel_reset_admin")
         .setLabel("Cancel")
         .setStyle(discord_js_1.ButtonStyle.Secondary));
     const reply = await message.reply({
-        content: `**⚠️ DANGER ZONE**\nAre you sure you want to reset **ALL Admin Access Settings**?\n\n**This will:**\n- Enable all disabled commands.\n- Remove all Granular Permission overrides.\n- Clear Casino Channel whitelist.\n\n**This will NOT affect:**\n- Currency, Economy Configs, Taxes, or Cooldowns.`,
+        content: `**${branding_1.Mascot.Emotes.Alert} DANGER ZONE**\nAre you sure you want to reset **ALL Admin Access Settings**?\n\n**This will:**\n- Enable all disabled commands.\n- Remove all Granular Permission overrides.\n- Clear Casino Channel whitelist.\n\n**This will NOT affect:**\n- Currency, Economy Configs, Taxes, or Cooldowns.`,
         components: [row]
     });
     const collector = reply.createMessageComponentCollector({

@@ -14,6 +14,7 @@ exports.processOverdueLoans = processOverdueLoans;
 const prisma_1 = __importDefault(require("../utils/prisma"));
 const bankService_1 = require("./bankService");
 const guildConfigService_1 = require("./guildConfigService");
+const branding_1 = require("../config/branding");
 function calculateCreditLimits(creditScore, config) {
     const defaultTiers = [
         { minScore: 0, maxLoan: 5000, maxDays: 3 },
@@ -269,7 +270,7 @@ async function processOverdueLoans(client) {
             user = await prisma_1.default.user.findUnique({ where: { id: loan.userId }, include: { bank: true, wallet: true } });
         }
         catch (e) {
-            console.warn(`⚠️ Corrupt user data for loan ${loan.id}. Deleting loan to prevent loop crash.`);
+            console.warn(`${branding_1.Mascot.Emotes.Alert} Corrupt user data for loan ${loan.id}. Deleting loan to prevent loop crash.`);
             await prisma_1.default.loan.delete({ where: { id: loan.id } }).catch(() => { });
             continue;
         }

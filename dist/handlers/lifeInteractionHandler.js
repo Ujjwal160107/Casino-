@@ -43,8 +43,8 @@ async function handleButton(interaction) {
             const amount = await (0, educationService_1.claimScholarship)(user.id, guild.id, milestone);
             const config = await (0, guildConfigService_1.getGuildConfig)(guild.id);
             const embed = new discord_js_1.EmbedBuilder()
-                .setTitle("💰 Scholarship Claimed!")
-                .setDescription(`You have successfully claimed your scholarship of **${(0, format_1.fmtCurrency)(amount, config.currencyEmoji)}** for reaching GPA **${milestone}.0**!`)
+                .setTitle(`${branding_1.Mascot.Emotes.MoneyBag} Scholarship Claimed!`)
+                .setDescription(`You have successfully claimed your scholarship of **${(0, format_1.fmtCurrency)(amount, config.currencyEmoji)}** for reaching Meritfull Performance **${milestone}.0**!`)
                 .setColor("#F1C40F");
             await interaction.editReply({ embeds: [embed] });
         }
@@ -71,7 +71,7 @@ async function handleButton(interaction) {
         }
         await interaction.deferReply({ ephemeral: true });
         try {
-            const cost = await (0, educationService_1.getStressCost)(user.id, guild.id);
+            const cost = await (0, educationService_1.getStressCost)(user.id, guild.id, activity);
             const config = await (0, guildConfigService_1.getGuildConfig)(guild.id);
             const embed = new discord_js_1.EmbedBuilder()
                 .setTitle(`Confirm ${activity.charAt(0).toUpperCase() + activity.slice(1)}`)
@@ -117,6 +117,24 @@ async function handleButton(interaction) {
     }
     else if (customId === "cancel_stress") {
         await interaction.update({ content: `${branding_1.Mascot.Emotes.Decline} Activity cancelled.`, embeds: [], components: [] });
+    }
+    else if (customId === "dropout_confirm") {
+        await interaction.deferUpdate();
+        try {
+            const res = await (0, educationService_1.dropout)(user.id, guild.id);
+            const embed = new discord_js_1.EmbedBuilder()
+                .setTitle(`${branding_1.Mascot.Emotes.Shocked} Dropped Out`)
+                .setDescription(`You have dropped out of **${res.degreeName}**.\n\nYour tuition fees are non-refundable. You are now free to enroll in another program.`)
+                .setColor("#E74C3C")
+                .setThumbnail((0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Shocked));
+            await interaction.editReply({ embeds: [embed], components: [] });
+        }
+        catch (err) {
+            await interaction.editReply({ content: `${branding_1.Mascot.Emotes.Fail} **Dropout Failed**: ${err.message}`, components: [] });
+        }
+    }
+    else if (customId === "dropout_cancel") {
+        await interaction.update({ content: `${branding_1.Mascot.Emotes.Decline} Dropout cancelled. Phew!`, embeds: [], components: [] });
     }
 }
 //# sourceMappingURL=lifeInteractionHandler.js.map
