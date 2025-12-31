@@ -1,4 +1,4 @@
-import { Message, TextChannel } from "discord.js";
+import { Message, TextChannel, EmbedBuilder } from "discord.js";
 import { useItem } from "../../services/shopService";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { getGuildConfig } from "../../services/guildConfigService";
@@ -31,6 +31,16 @@ export async function handleUse(message: Message, args: string[]) {
             .filter(r => r.type !== "CUSTOM_MESSAGE")
             .map(r => r.message);
 
+        // If only custom messages (passive items), show them in a clean embed and return
+        if (customMessages.length > 0 && otherEffects.length === 0) {
+            const embed = new EmbedBuilder()
+                .setColor("#3498DB") // Blue for info
+                .setDescription(customMessages.join("\n"));
+
+            return message.reply({ embeds: [embed] });
+        }
+
+        // If mixed or just effects
         if (customMessages.length > 0) {
             await (message.channel as TextChannel).send(customMessages.join("\n"));
         }

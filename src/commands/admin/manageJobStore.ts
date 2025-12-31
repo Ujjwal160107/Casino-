@@ -14,15 +14,14 @@ import {
     StringSelectMenuInteraction,
     CacheType
 } from "discord.js";
-import { updateShopItem, deleteShopItem } from "../../services/shopService";
+import { updateShopItem } from "../../services/shopService";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency } from "../../utils/format";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
-import { ItemEffect } from "../../services/effectService";
 import prisma from "../../utils/prisma";
 
-export async function handleManageUniStore(message: Message, args: string[]) {
+export async function handleManageJobStore(message: Message, args: string[]) {
     if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
         return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "Admins or Bot Commanders only.")] });
     }
@@ -37,28 +36,25 @@ export async function handleManageUniStore(message: Message, args: string[]) {
             where: {
                 guildId: message.guildId!,
                 name: { contains: searchName, mode: "insensitive" },
-                // Ensure it's a uni item if strict, but maybe allow generic search too? 
-                // Let's stick to strict to avoid confusion.
-                itemType: { in: ["UNI_BOOK", "CONSUMABLE"] }
+                itemType: { in: ["JOB_CONSUMABLE", "JOB_GEAR"] }
             }
         });
-        if (!targetItem) return message.reply("Uni Store item not found.");
+        if (!targetItem) return message.reply("Job Store item not found.");
     } else {
-        // Filter for Uni Items
+        // Filter for Job Items
         const items = await prisma.shopItem.findMany({
             where: {
                 guildId: message.guildId!,
-                itemType: { in: ["UNI_BOOK", "CONSUMABLE"] },
-                name: { in: ["Standard Textbook", "Advanced Guide", "Energy Drink", "Cheat Sheet"] }
+                itemType: { in: ["JOB_CONSUMABLE", "JOB_GEAR"] }
             }
         });
 
-        if (items.length === 0) return message.reply("Uni Shop is empty. Run `!unistore` first to seed items.");
+        if (items.length === 0) return message.reply("Job Shop is empty. Run `!jobstore` first to seed items.");
 
         // Select item
         const select = new StringSelectMenuBuilder()
-            .setCustomId("manage_uni_select")
-            .setPlaceholder("Select a Uni Store item...")
+            .setCustomId("manage_job_select")
+            .setPlaceholder("Select a Job Store item...")
             .addOptions(items.map(i =>
                 new StringSelectMenuOptionBuilder()
                     .setLabel(i.name)
@@ -85,13 +81,10 @@ export async function handleManageUniStore(message: Message, args: string[]) {
 
     if (!targetItem) return message.reply("Error finding item.");
 
-    // For Uni Store, we mainly care about Price and Stock (though stock is usually infinite).
-    // Simplified view compared to full ManageShop.
-
     const renderPanel = (item: any) => {
         const embed = new EmbedBuilder()
-            .setTitle(`🎓 Managing: ${item.name}`)
-            .setColor(Colors.Blue)
+            .setTitle(`💼 Managing: ${item.name}`)
+            .setColor(Colors.Orange)
             .addFields(
                 { name: "Name", value: item.name, inline: true },
                 { name: "Price", value: fmtCurrency(item.price, emoji), inline: true },
@@ -132,8 +125,8 @@ export async function handleManageUniStore(message: Message, args: string[]) {
         let currentVal = String(btnId === "edit_price" ? targetItem.price : targetItem.description);
         let style = TextInputStyle.Short;
 
-        if (btnId === "edit_price") { modalId = "modal_uni_price"; fieldId = "val_price"; label = "New Price"; }
-        else if (btnId === "edit_desc") { modalId = "modal_uni_desc"; fieldId = "val_desc"; label = "New Description"; style = TextInputStyle.Paragraph; }
+        if (btnId === "edit_price") { modalId = "modal_job_price"; fieldId = "val_price"; label = "New Price"; }
+        else if (btnId === "edit_desc") { modalId = "modal_job_desc"; fieldId = "val_desc"; label = "New Description"; style = TextInputStyle.Paragraph; }
 
         const modal = new ModalBuilder().setCustomId(modalId).setTitle(`Edit ${targetItem.name}`);
         const input = new TextInputBuilder().setCustomId(fieldId).setLabel(label).setStyle(style).setValue(currentVal).setRequired(true);
@@ -150,7 +143,7 @@ export async function handleManageUniStore(message: Message, args: string[]) {
             const val = submit.fields.getTextInputValue(fieldId);
             const updates: any = {};
 
-            if (modalId === "modal_uni_price") {
+            if (modalId === "modal_job_price") {
                 const p = parseInt(val);
                 if (isNaN(p) || p < 0) { await submit.reply({ content: "Invalid price", ephemeral: true }); return; }
                 updates.price = p;

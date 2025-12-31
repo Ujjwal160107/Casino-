@@ -58,10 +58,27 @@ model User {
   // Employment
   jobId       String?   // Static ID from jobService (e.g., "tech_intern")
   jobXp       Int       @default(0)
+  jobStress   Int       @default(0)
+  jobStreak   Int       @default(0)
+  lastJobShift      DateTime?
+  lastJobPromotion  DateTime?
   shiftsWorked Int      @default(0)
   lastShift   DateTime?
 
   // Life Sim Relations
+  workLogs    WorkLog[]
+}
+
+model WorkLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId   String
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  jobId     String
+  shiftType String   // e.g., "button", "typing"
+  success   Boolean
+  earnings  Int
+  createdAt DateTime @default(now())
 }
 
 model Wallet {
@@ -302,6 +319,10 @@ model GuildConfig {
   // Advanced Permissions
   casinoChannels    String[] @default([]) // Whitelisted channels
 
+
+  // Job System Configs
+  jobSectorBasePay    Json?    @default("{}") // { "tech": 1000 }
+  jobLevelMultipliers Json?    @default("{}") // { "Intern": 1.0 }
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

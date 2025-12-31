@@ -1,5 +1,5 @@
 import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from "discord.js";
-import { JOBS, JobDefinition, getJobsBySector } from "../../services/jobService";
+import { JOBS, JobDefinition, getJobsBySector, getJobPaySync } from "../../services/jobService";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 import { fmtCurrency } from "../../utils/format";
 import { getGuildConfig } from "../../services/guildConfigService";
@@ -60,7 +60,7 @@ export async function handleJobs(message: Message) {
 
             embed.addFields({
                 name: `${job.title} (${job.id})`,
-                value: `**${fmtCurrency(job.pay, config?.currencyEmoji)}** / shift\n${reqText}`,
+                value: `**${fmtCurrency(getJobPaySync(job, config), config?.currencyEmoji)}** / shift\n${reqText}`,
                 inline: true
             });
         }

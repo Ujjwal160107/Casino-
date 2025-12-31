@@ -4,6 +4,7 @@ import { getInterview, Question } from "../../services/interviewService";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 import prisma from "../../utils/prisma";
 import { errorEmbed } from "../../utils/embed";
+import { logToChannel } from "../../utils/discordLogger";
 
 export async function handleApply(message: Message, args: string[]) {
     const jobId = args[0];
@@ -115,6 +116,25 @@ export async function handleApply(message: Message, args: string[]) {
             : `${Mascot.Emotes.Fail} Unfortunately, you failed the interview (${score}/5). You need at least 4/5 correct.`
         )
         .setColor(passed ? "#2ECC71" : "#E74C3C");
+
+    // Log the result
+    if (message.guild) {
+        logToChannel(message.client, {
+            guild: message.guild,
+            type: "ECONOMY",
+            title: passed ? "Job Application: Hired" : "Job Application: Rejected",
+            description: passed
+                ? `**${message.author.globalName}** has been hired as a **${job.title}**.`
+                : `**${message.author.globalName}** failed the interview for **${job.title}**.`,
+            fields: [
+                { name: "User", value: `<@${message.author.id}>`, inline: true },
+                { name: "Score", value: `${score}/5`, inline: true },
+                { name: "Job", value: job.title, inline: true }
+            ],
+            color: passed ? 0x2ECC71 : 0xE74C3C,
+            thumbnail: message.author.displayAvatarURL()
+        });
+    }
 
     if (passed) {
         await prisma.user.update({

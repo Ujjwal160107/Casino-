@@ -1,5 +1,5 @@
 import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from "discord.js";
-import { JOBS, getJob } from "../../services/jobService";
+import { JOBS, getJob, getJobPaySync } from "../../services/jobService";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 import prisma from "../../utils/prisma";
 import { fmtCurrency } from "../../utils/format";
@@ -45,13 +45,15 @@ export async function handleWork(message: Message) {
     }
 
     const embed = new EmbedBuilder()
-        .setTitle(`${job.emoji} Job Dashboard`)
+        .setAuthor({ name: `${message.author.username}'s Job Dashboard`, iconURL: message.author.displayAvatarURL() })
+        .setTitle(`${job.emoji} ${job.title}`)
         .setDescription(`**Position:** ${job.title}\n**Sector:** ${capitalize(job.sector)}`)
         .setColor(Mascot.Colors.Base as any)
         .addFields(
-            { name: "Salary", value: fmtCurrency(job.pay, config?.currencyEmoji), inline: true },
+            { name: "Salary", value: fmtCurrency(getJobPaySync(job, config), config?.currencyEmoji), inline: true },
             { name: "Shifts Worked", value: user.shiftsWorked.toString(), inline: true },
             { name: "XP", value: user.jobXp.toString(), inline: true },
+            { name: `${getStressColor(user.jobStress)} Stress`, value: `${user.jobStress}%`, inline: true },
             { name: "Career Progress", value: promoText }
         )
         .setFooter({ text: "Use the buttons below to work or manage employment." });
@@ -75,4 +77,10 @@ function makeProgressBar(pct: number) {
 
 function capitalize(s: string) {
     return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function getStressColor(stress: number) {
+    if (stress < 30) return "<:n_check:1451281806279311435>";
+    if (stress < 70) return "<:alert_sign:1451625691664875610>";
+    return "<:rip:1451287136132403303>";
 }

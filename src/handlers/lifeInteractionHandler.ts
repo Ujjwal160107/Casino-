@@ -4,6 +4,7 @@ import { getGuildConfig } from "../services/guildConfigService";
 import { fmtCurrency, formatDuration } from "../utils/format";
 import { Mascot, getEmoteUrl } from "../config/branding";
 import prisma from "../utils/prisma";
+import { logToChannel } from "../utils/discordLogger";
 
 export async function handleLifeInteraction(interaction: Interaction) {
     if (interaction.isButton()) {
@@ -183,6 +184,19 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setColor("#95A5A6");
 
             await interaction.editReply({ embeds: [embed], components: [] });
+
+            // Log resignation
+            logToChannel(interaction.client, {
+                guild: guild,
+                type: "ECONOMY",
+                title: "Job Resignation",
+                description: `**${user.username}** has resigned from their job.`,
+                fields: [
+                    { name: "User", value: `<@${user.id}>`, inline: true }
+                ],
+                thumbnail: user.displayAvatarURL(),
+                color: 0xE74C3C
+            });
         } catch (e: any) {
             await interaction.editReply({ content: `Error: ${e.message}`, components: [] });
         }
@@ -192,7 +206,7 @@ async function handleButton(interaction: ButtonInteraction) {
     }
     else if (customId === "work_shift") {
         // Import here to avoid circular dependencies if any
-        const { getJob } = require("../services/jobService");
+        const { getJob, getJobPay, checkPromotion, checkDemotion } = require("../services/jobService");
         const { getWorkGame } = require("../services/minigameService");
 
         const userData = await prisma.user.findUnique({ where: { discordId_guildId: { discordId: user.id, guildId: guild.id } } });
@@ -208,9 +222,33 @@ async function handleButton(interaction: ButtonInteraction) {
             where: { guildId_commandKey: { guildId: guild.id, commandKey: "work" } }
         });
 
+        // Check Active Effects (Permanent Buffs)
+        const activeEffects = await prisma.activeEffect.findMany({
+            where: {
+                userId: userData.id,
+                guildId: guild.id,
+                effectType: { in: ["COOLDOWN_REDUCTION", "PAY_MULTIPLIER"] },
+                OR: [
+                    { expiresAt: { gt: new Date() } },
+                    { expiresAt: null }
+                ]
+            }
+        });
+
+        let cooldownRed = 0;
+        let payMult = 0;
+
+        for (const eff of activeEffects) {
+            if (eff.effectType === "COOLDOWN_REDUCTION") cooldownRed += (eff.value || 0);
+            if (eff.effectType === "PAY_MULTIPLIER") payMult += (eff.value || 0);
+        }
+
         const lastShift = userData.lastShift ? new Date(userData.lastShift).getTime() : 0;
         const now = Date.now();
-        const cooldownSeconds = incomeConfig ? incomeConfig.cooldown : 0; // Default 0 if not set
+        let cooldownSeconds = incomeConfig ? incomeConfig.cooldown : 0; // Default 0 if not set
+
+        // Apply Reductions
+        cooldownSeconds = Math.max(0, cooldownSeconds - cooldownRed);
         const cooldownMs = cooldownSeconds * 1000;
 
         if (now - lastShift < cooldownMs) {
@@ -218,11 +256,35 @@ async function handleButton(interaction: ButtonInteraction) {
             return interaction.reply({ content: `${Mascot.Emotes.Angry} You are tired! You can work again in **${remaining} minutes**.`, ephemeral: true });
         }
 
+        // --- STRESS CHECK ---
+        if (userData.jobStress > 80) {
+            // High stress! Risk of burnout.
+            if (Math.random() < 0.5) {
+                // BURNOUT!
+                await prisma.user.update({
+                    where: { id: userData.id },
+                    data: {
+                        lastShift: new Date(),
+                        jobStress: { increment: 5 } // Even more stress
+                    }
+                });
+
+                const burnoutEmbed = new EmbedBuilder()
+                    .setTitle(`${Mascot.Emotes.Alert} BURNOUT!`)
+                    .setDescription(`You are too stressed to work well! You collapsed from exhaustion.\n\n**Stress Level:** ${userData.jobStress}/100\n\nUse \`!relax\` to recover before working again.`)
+                    .setColor("#E74C3C")
+                    .setThumbnail(getEmoteUrl(Mascot.Emotes.Fail));
+
+                return interaction.reply({ embeds: [burnoutEmbed], ephemeral: true });
+            }
+        }
+
         const game = getWorkGame();
 
         // --- PREVIEW LOGIC ---
         let reply: any;
         let isWin = false;
+        let userMessage: Message | null = null;
 
         const embed = new EmbedBuilder()
             .setTitle(game.title)
@@ -297,6 +359,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
                     const msg = collected.first();
                     if (msg) {
+                        userMessage = msg;
                         isWin = msg.content.trim() === game.answer;
                     }
                 } catch (e) {
@@ -307,43 +370,164 @@ async function handleButton(interaction: ButtonInteraction) {
 
         // --- RESULT ---
         if (isWin) {
-            // Pay Salary
-            const amount = job.pay;
+            // Streak Logic
+            const ONE_DAY = 24 * 60 * 60 * 1000;
+            const TWO_DAYS = 48 * 60 * 60 * 1000; // 48h buffer to keep streak
+            const timeSinceLast = now - lastShift;
+
+            let newStreak = userData.jobStreak;
+            if (timeSinceLast > TWO_DAYS) {
+                newStreak = 1; // Reset
+            } else if (timeSinceLast > ONE_DAY || newStreak === 0) {
+                // First shift ever or > 24h since last
+                newStreak += 1;
+            }
+            // else: same day, streak maintained but not increased
+
+            // Payout Calculation
+            let amount = await getJobPay(job, guild.id);
+
+            // Apply Gear Bonus
+            const gearBonus = Math.floor(amount * payMult);
+            amount += gearBonus;
+
+            // Apply Streak Bonus (max 50%)
+            const streakBonusPct = Math.min(50, (newStreak - 1) * 5); // 5% per day
+            const streakBonus = Math.floor(amount * (streakBonusPct / 100));
+            amount += streakBonus;
+
+            // Update User
             await prisma.user.update({
                 where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
                 data: {
                     wallet: { update: { balance: { increment: amount } } },
                     shiftsWorked: { increment: 1 },
                     jobXp: { increment: 10 },
+                    jobStress: { increment: 5 }, // +5 Stress on success
+                    jobStreak: newStreak,
                     lastShift: new Date()
                 }
             });
 
+            // Check Promotion
+            // We use the UPDATED jobXp (add 10 to current)
+            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + 10 });
+
             const config = await getGuildConfig(guild.id);
             const winEmbed = new EmbedBuilder()
+                .setAuthor({ name: `${user.username}`, iconURL: user.displayAvatarURL() })
                 .setTitle(`${Mascot.Emotes.JobWorking} Shift Complete`)
-                .setDescription(`Great work! You finished your shift as a **${job.title}**.\n\n**Earnings:** ${fmtCurrency(amount, config?.currencyEmoji)}\n**XP Gained:** 10 XP`)
+                .setDescription(`Great work! You finished your shift as a **${job.title}**.\n\n**Earnings:** ${fmtCurrency(amount, config?.currencyEmoji)}\n(Base Pay + ${streakBonusPct}% Streak Bonus)\n\n**XP Gained:** +10\n**Stress:** +5`)
                 .setColor("#2ECC71");
 
-            await interaction.editReply({ embeds: [winEmbed], components: [] });
+            if (newStreak > 1) {
+                winEmbed.addFields({ name: "🔥 Job Streak", value: `${newStreak} Days`, inline: true });
+            }
+
+            if (promoCheck.eligible && promoCheck.nextJob) {
+                winEmbed.addFields({ name: "🎉 Promotion Available!", value: `You are eligible for **${promoCheck.nextJob.title}**!\nAsk an admin or apply!` });
+            } else if (promoCheck.nextJob) {
+                winEmbed.setFooter({ text: `Next Job: ${promoCheck.nextJob.title} (Need ${promoCheck.missingXp} more XP)` });
+            }
+
+            // Disable buttons on the original game embed
+            await interaction.editReply({ components: [] });
+
+            // Create Work Log
+            await prisma.workLog.create({
+                data: {
+                    guildId: guild.id,
+                    userId: userData.id, // Use internal DB ID
+                    jobId: userData.jobId!,
+                    shiftType: game.type,
+                    success: true,
+                    earnings: amount
+                }
+            });
+
+            // Log Success
+            logToChannel(interaction.client, {
+                guild: guild,
+                type: "ECONOMY",
+                title: "Work Shift: Complete",
+                description: `**${user.username}** finished a shift as **${job.title}**.`,
+                fields: [
+                    { name: "User", value: `<@${user.id}>`, inline: true },
+                    { name: "Earnings", value: fmtCurrency(amount, config?.currencyEmoji), inline: true },
+                    { name: "Job", value: job.title, inline: true },
+                    { name: "Streak", value: `${newStreak}`, inline: true }
+                ],
+                thumbnail: user.displayAvatarURL(),
+                color: 0x2ECC71
+            });
+
+            if (userMessage) {
+                await (userMessage as Message).reply({ embeds: [winEmbed] });
+            } else {
+                await interaction.followUp({ embeds: [winEmbed] });
+            }
 
         } else {
             // FAILED
-            // Should we record lastShift? If we don't, they can spam retry until win.
-            // If we do, they lose an hour of work. "Dank Memer" usually penalizes or sets cooldown.
-            // Let's set the cooldown to be safe.
-
             await prisma.user.update({
                 where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
-                data: { lastShift: new Date() } // Trigger cooldown
+                data: {
+                    lastShift: new Date(), // Trigger cooldown
+                    jobXp: { decrement: 5 }, // -5 XP
+                    jobStress: { increment: 10 } // +10 Stress
+                }
             });
 
+            // Check Demotion (using updated XP estimate)
+            const demoCheck = await checkDemotion({ ...userData, jobXp: Math.max(0, userData.jobXp - 5) });
+
+            let desc = `You messed up the task!\n\n**Correct Answer:** ${game.answer}\n\n**Penalty:**\n- No Pay\n- **-5 Job XP**\n- **+10 Stress**\n\nCome back in **${cooldownSeconds > 0 ? formatDuration(cooldownMs) : "a moment"}**.`;
+
+            if (demoCheck.demoted) {
+                desc += `\n\n${Mascot.Emotes.Alert} **DEMOTED!**\n${demoCheck.msg}`;
+            }
+
             const failEmbed = new EmbedBuilder()
+                .setAuthor({ name: `${user.username}`, iconURL: user.displayAvatarURL() })
                 .setTitle(`${Mascot.Emotes.Fail} Shift Failed`)
-                .setDescription(`You messed up the task!\n\n**Correct Answer:** ${game.answer}\n\nYour boss is unhappy. No pay this shift. Come back in **${cooldownSeconds > 0 ? formatDuration(cooldownMs) : "a moment"}**.`)
+                .setDescription(desc)
                 .setColor("#E74C3C");
 
-            await interaction.editReply({ embeds: [failEmbed], components: [] });
+            // Disable buttons on the original game embed
+            await interaction.editReply({ components: [] });
+
+            // Create Work Log
+            await prisma.workLog.create({
+                data: {
+                    guildId: guild.id,
+                    userId: userData.id,
+                    jobId: userData.jobId!,
+                    shiftType: game.type,
+                    success: false,
+                    earnings: 0
+                }
+            });
+
+            // Log Failure
+            logToChannel(interaction.client, {
+                guild: guild,
+                type: "ECONOMY",
+                title: "Work Shift: Failed",
+                description: `**${user.username}** failed their shift as **${job.title}**.`,
+                fields: [
+                    { name: "User", value: `<@${user.id}>`, inline: true },
+                    { name: "Penalty", value: "No Pay", inline: true },
+                    { name: "Job", value: job.title, inline: true }
+                ],
+                thumbnail: user.displayAvatarURL(),
+                color: 0xE74C3C
+            });
+
+            if (userMessage) {
+                await (userMessage as Message).reply({ embeds: [failEmbed] });
+            } else {
+                await interaction.followUp({ embeds: [failEmbed] });
+            }
         }
     }
 }
