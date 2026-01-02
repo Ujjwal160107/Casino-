@@ -194,6 +194,21 @@ export class PropertyService {
             return { success: false, message: "No rent due yet.", totalCollected: 0 };
         }
 
+        // Check for marriage (Rent Sharing/Duplication)
+        const marriage = await prisma.marriage.findFirst({
+            where: {
+                OR: [
+                    { spouse1Id: user.id },
+                    { spouse2Id: user.id }
+                ]
+            }
+        });
+
+        let spouseId: string | null = null;
+        if (marriage) {
+            spouseId = marriage.spouse1Id === user.id ? marriage.spouse2Id : marriage.spouse1Id;
+        }
+
         // Process collection
         await prisma.$transaction(async (tx) => {
             for (const p of collectable) {
@@ -205,14 +220,28 @@ export class PropertyService {
             }
 
             if (totalParams > 0) {
+                // Credit User
                 await tx.wallet.update({
                     where: { userId: user.id },
                     data: { balance: { increment: totalParams } }
                 });
+
+                // Credit Spouse if exists (Duplicate Rent)
+                if (spouseId) {
+                    await tx.wallet.update({
+                        where: { userId: spouseId },
+                        data: { balance: { increment: totalParams } }
+                    });
+                }
             }
         });
 
-        return { success: true, message: `Collected **${totalParams}** coins from ${collectable.length} properties.`, totalCollected: totalParams };
+        let msg = `Collected **${totalParams}** coins from ${collectable.length} properties.`;
+        if (spouseId && totalParams > 0) {
+            msg += `\n❤️ Your spouse also received **${totalParams}** coins!`;
+        }
+
+        return { success: true, message: msg, totalCollected: totalParams };
     }
 
     // Admin: Create Property

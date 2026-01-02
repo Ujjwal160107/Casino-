@@ -26,15 +26,19 @@ export async function handleStudy(message: Message) {
         return message.reply({ embeds: [errorEmbed(message.author, "Not Enrolled", `You are not enrolled in any degree. Use \`${prefix}enroll\` to start your education!`)] });
     }
 
-    // Cooldown
-    const cooldownTime = config?.studyCooldown ?? 300;
-    const cooldownKey = `study:${message.author.id}`;
-    const cd = checkCooldown(cooldownKey, cooldownTime);
-    if (cd > 0) {
-        const expiresAt = getCooldownExpiry(cooldownKey);
+    // DB-Based Cooldown (Dynamic)
+    const cooldownSeconds = config?.studyCooldown ?? 300;
+    const cooldownMs = cooldownSeconds * 1000;
+    const lastStudyTime = user.currentEducation.lastStudy ? new Date(user.currentEducation.lastStudy).getTime() : 0;
+    const now = Date.now();
+
+    if (now - lastStudyTime < cooldownMs) {
+        const remainingMs = cooldownMs - (now - lastStudyTime);
+        const expiresAt = Math.floor((now + remainingMs) / 1000);
+
         const embed = new EmbedBuilder()
             .setTitle(`Cooldown`)
-            .setDescription(`You are tired of studying! Try again <t:${Math.floor(expiresAt! / 1000)}:R>.`)
+            .setDescription(`You are tired of studying! Try again <t:${expiresAt}:R>.`)
             .setColor("#E74C3C"); // Red
         const angryUrl = getEmoteUrl(Mascot.Emotes.TeacherAngry);
         if (angryUrl) embed.setThumbnail(angryUrl);
@@ -130,6 +134,9 @@ export async function handleStudy(message: Message) {
         }
     }
 
+    // Disable buttons on game message
+    if (reply) await reply.edit({ components: [] }).catch(() => { });
+
     // Result Handling
     if (!isWin) {
         const failEmbed = new EmbedBuilder()
@@ -137,7 +144,8 @@ export async function handleStudy(message: Message) {
             .setDescription(`${Mascot.Emotes.Confused} You failed the test!\n\n**Correct Answer:** ${game.answer}`)
             .setColor("#E74C3C"); // Red
 
-        if (reply) await reply.edit({ embeds: [failEmbed], components: [] });
+        // NEW: Reply to USER MESSAGE with result
+        await message.reply({ embeds: [failEmbed] });
         return;
     }
 
@@ -171,9 +179,10 @@ export async function handleStudy(message: Message) {
         const thumb = getEmoteUrl(Mascot.Emotes.Teacher);
         if (thumb) resultEmbed.setThumbnail(thumb);
 
-        if (reply) await reply.edit({ embeds: [resultEmbed], components: comps });
+        // NEW: Reply to USER MESSAGE with result
+        await message.reply({ embeds: [resultEmbed], components: comps });
 
     } catch (err: any) {
-        if (reply) await reply.edit({ embeds: [errorEmbed(message.author, "Study Error", err.message)], components: [] });
+        await message.reply({ embeds: [errorEmbed(message.author, "Study Error", err.message)] });
     }
 }

@@ -1,7 +1,7 @@
 import { Message, EmbedBuilder } from "discord.js";
 import prisma from "../../utils/prisma";
-import { getGuildConfig } from "../../services/guildConfigService";
-import { fmtCurrency } from "../../utils/format";
+import { getGuildConfig, updateGuildConfig } from "../../services/guildConfigService";
+import { fmtCurrency, parseDuration, formatDuration } from "../../utils/format";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 
 const ADMIN_EMOJI = "<:admin:1451280807535968256>"; // Keep admin specific? Or make generic? User said remove default emojis. This looks custom.
@@ -199,16 +199,20 @@ export async function handleSetDegreeCost(message: Message, args: string[]) {
 
 export async function handleSetStudyCooldown(message: Message, args: string[]) {
     if (!(await checkAdmin(message))) return;
-    const cdStr = args[0];
-    const cd = parseInt(cdStr);
+    const cdStr = args[0]?.toLowerCase();
 
-    if (isNaN(cd) || cd < 0) return message.reply(`${Mascot.Emotes.Fail} Usage: \`!setstudycd <seconds>\``);
+    let cd = 0;
+    if (cdStr === "off") {
+        cd = 0;
+    } else {
+        const parsed = parseDuration(cdStr);
+        if (parsed === null || parsed < 0) return message.reply(`${Mascot.Emotes.Fail} Usage: \`!setstudycd <30s/5m/1h>\` or \`!setstudycd off\``);
+        cd = parsed;
+    }
 
     const guildId = message.guild!.id;
-    await prisma.guildConfig.update({
-        where: { guildId },
-        data: { studyCooldown: cd }
-    });
+    await updateGuildConfig(guildId, { studyCooldown: cd });
 
-    message.reply(`${Mascot.Emotes.Success} Study cooldown set to **${cd}** seconds.`);
+    const valStr = cd === 0 ? "OFF" : `**${formatDuration(cd * 1000)}**`;
+    message.reply(`${Mascot.Emotes.Success} Study cooldown set to ${valStr}.`);
 }

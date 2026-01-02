@@ -30,7 +30,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setTitle("🏴‍☠️ Black Market")
                 .setDescription(`Welcome to the underground.\n\n**Market Tax:** ${config.marketTax}%\n**Active Listings:** ${total}`)
                 .setColor("#36393F")
-                .setThumbnail("https://media.tenor.com/azwT6M5tO3EAAAAC/black-market.gif");
+                .setImage("attachment://black_market.png");
 
             const row = new ActionRowBuilder<ButtonBuilder>()
                 .addComponents(
@@ -41,7 +41,7 @@ async function handleButton(interaction: ButtonInteraction) {
                     new ButtonBuilder().setCustomId("market_mine").setLabel("My Listings").setStyle(ButtonStyle.Danger).setEmoji("📦")
                 );
 
-            await interaction.update({ embeds: [embed], components: [row] });
+            await interaction.update({ embeds: [embed], components: [row], files: ["./assets/black_market.png"] });
         }
         else if (customId.startsWith("market_browse_")) {
             const page = parseInt(customId.split("_")[2]);

@@ -128,3 +128,62 @@ export async function consumeRing(discordId: string, guildId: string) {
     }
     return true;
 }
+
+export async function depositToJoint(discordId: string, guildId: string, amount: number) {
+    const user = await resolveUser(discordId, guildId);
+    if (!user) throw new Error("User not found.");
+
+    const marriage = await getMarriage(discordId, guildId);
+    if (!marriage) throw new Error("You are not married!");
+
+    const wallet = await prisma.wallet.findUnique({ where: { userId: user.id } });
+    if (!wallet || wallet.balance < amount) throw new Error("Insufficient funds in your wallet.");
+
+    return await prisma.$transaction(async (tx) => {
+        // Deduct from wallet
+        await tx.wallet.update({
+            where: { userId: user.id },
+            data: { balance: { decrement: amount } }
+        });
+
+        // Add to joint account
+        const updatedMarriage = await tx.marriage.update({
+            where: { id: marriage.id },
+            data: { jointBalance: { increment: amount } }
+        });
+
+        return updatedMarriage.jointBalance;
+    }, {
+        maxWait: 5000, // default: 2000
+        timeout: 10000 // default: 5000
+    });
+}
+
+export async function withdrawFromJoint(discordId: string, guildId: string, amount: number) {
+    const user = await resolveUser(discordId, guildId);
+    if (!user) throw new Error("User not found.");
+
+    const marriage = await getMarriage(discordId, guildId);
+    if (!marriage) throw new Error("You are not married!");
+
+    if (marriage.jointBalance < amount) throw new Error("Insufficient funds in joint account.");
+
+    return await prisma.$transaction(async (tx) => {
+        // Deduct from joint account
+        await tx.marriage.update({
+            where: { id: marriage.id },
+            data: { jointBalance: { decrement: amount } }
+        });
+
+        // Add to wallet
+        await tx.wallet.update({
+            where: { userId: user.id },
+            data: { balance: { increment: amount } }
+        });
+
+        return marriage.jointBalance - amount;
+    }, {
+        maxWait: 5000, // default: 2000
+        timeout: 10000 // default: 5000
+    });
+}

@@ -39,9 +39,10 @@ import { handleCasinoUnban } from "./commands/admin/casinoUnban";
 import { handleCasinoBanList } from "./commands/admin/casinoBanList";
 import { handleSetGameCooldown } from "./commands/admin/setGameCooldown";
 import { handleSetLogChannel } from "./commands/admin/setLogChannel";
-import { handleBet } from "./commands/games/roulette";
+import { handleBet, handleRouletteMenu } from "./commands/games/roulette";
 import { handleBlackjack } from "./commands/games/blackjack";
 import { handleCoinflip } from "./commands/games/coinflip";
+import { handleRussianRoulette } from "./commands/games/russianRoulette";
 import { handleSlots } from "./commands/games/slots";
 import { handleCockFight } from "./commands/games/cockfight";
 import { handleSetMinBet } from "./commands/admin/setMinBet";
@@ -210,10 +211,16 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return rank(client, message, args);
     case "lb-wallet":
       return handleLeaderboard(message, ["cash"]);
+    case "roulette-guide":
+    case "roul-guide":
+      return handleRouletteMenu(message);
     case "bet":
       return handleBet(message, args);
     case "blackjack":
       return handleBlackjack(message, args);
+    case "rr":
+    case "russianroulette":
+      return handleRussianRoulette(message, args);
     case "coinflip":
       return handleCoinflip(message, args);
 
@@ -299,6 +306,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "ban-list":
       return handleCasinoBanList(message, args);
     case "bm":
+    case "market":
     case "black-market":
       return handleMarket(message, args);
     case "set-loan-interest":
@@ -317,6 +325,15 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "set-fd-interest":
     case "set-fd":
       return handleSetEconomyConfig(message, args, "fd");
+    case "set-log-channel":
+    case "set-logs":
+    case "log-channel":
+      const { handleSetLogChannel } = require("./commands/admin/setLogChannel");
+      return handleSetLogChannel(message, args);
+    case "set-casino-channel":
+    case "casino-channel":
+      const { handleSetCasinoChannel } = require("./commands/admin/setCasinoChannel");
+      return handleSetCasinoChannel(message, args);
     case "set-rd-interest":
     case "set-rd":
       return handleSetEconomyConfig(message, args, "rd");
@@ -515,7 +532,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "spouse":
     case "marriage": {
       const { handleFamily } = require("./commands/life/marriage");
-      return handleFamily(message);
+      return handleFamily(message, args);
     }
 
     // PROPERTY COMMANDS
@@ -576,7 +593,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleSetDegreeCost(message, args);
     }
     case "set-study-cooldown":
-    case "setstudycd": {
+    case "set-study-cd": {
       const { handleSetStudyCooldown } = require("./commands/admin/educationAdmin");
       return handleSetStudyCooldown(message, args);
     }

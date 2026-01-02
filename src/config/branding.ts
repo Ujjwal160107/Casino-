@@ -35,6 +35,7 @@ export const Mascot = {
         JobPromotion: "<:fortuna_mod:1455572710632587368>",
         Monitor: "<:fortuna_engineer:1455563457112969331>",
         Trash: "🗑️",
+        Gun: "<:gun:1456729243399753752>",
 
         // Auto-generated Emojis
         FortunaAngry: "<:fortuna_angry:1454885720316575916>",

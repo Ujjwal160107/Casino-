@@ -3,7 +3,7 @@ import { Message, User, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentT
 import prisma from "../../utils/prisma";
 import { errorEmbed, successEmbed } from "../../utils/embed";
 import { Mascot, getEmoteUrl } from "../../config/branding";
-import { marry, divorce, getMarriage, isMarried, checkHasRing, consumeRing } from "../../services/life/marriageService";
+import { marry, divorce, getMarriage, isMarried, checkHasRing, consumeRing, depositToJoint, withdrawFromJoint } from "../../services/life/marriageService";
 
 export async function handleMarry(message: Message, args: string[]) {
     if (message.mentions.users.size === 0) {
@@ -184,7 +184,83 @@ export async function handleDivorce(message: Message) {
     });
 }
 
-export async function handleFamily(message: Message) {
+
+async function handleJointBalance(message: Message) {
+    const marriage = await getMarriage(message.author.id, message.guildId!);
+    if (!marriage) return message.reply({ embeds: [errorEmbed(message.author, "Not Married", "You don't have a joint account nearby.")] });
+
+    const embed = new EmbedBuilder()
+        .setColor("#FFD700")
+        .setTitle(`🏦 Joint Bank Account`)
+        .setDescription(`**Balance**: ${marriage.jointBalance.toLocaleString()} coins`)
+        .setFooter({ text: "Secure from robberies!" });
+
+    return message.reply({ embeds: [embed] });
+}
+
+async function handleJointDeposit(message: Message, args: string[]) {
+    // args[1] is amount
+    if (!args[1]) return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", "Usage: `!marriage deposit <amount|all>`")] });
+
+    let amount = 0;
+
+    if (args[1].toLowerCase() === 'all') {
+        const user = await prisma.user.findUnique({
+            where: { discordId_guildId: { discordId: message.author.id, guildId: message.guildId! } },
+            include: { wallet: true }
+        });
+        if (!user || !user.wallet || user.wallet.balance <= 0) {
+            return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You have no money to deposit!")] });
+        }
+        amount = user.wallet.balance;
+    } else {
+        amount = parseInt(args[1]);
+        if (isNaN(amount) || amount <= 0) return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please specify a valid amount.")] });
+    }
+
+    try {
+        const newBal = await depositToJoint(message.author.id, message.guildId!, amount);
+        const embed = successEmbed(message.author, "Deposit Successful", `Deposited **${amount.toLocaleString()}** coins to your joint account.\nNew Balance: **${newBal.toLocaleString()}**`);
+        return message.reply({ embeds: [embed] });
+    } catch (e: any) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Transaction Failed", e.message)] });
+    }
+}
+
+async function handleJointWithdraw(message: Message, args: string[]) {
+    if (!args[1]) return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", "Usage: `!marriage withdraw <amount|all>`")] });
+
+    let amount = 0;
+
+    if (args[1].toLowerCase() === 'all') {
+        const marriage = await getMarriage(message.author.id, message.guildId!);
+        if (!marriage) return message.reply({ embeds: [errorEmbed(message.author, "Not Married", "You are not married!")] });
+        if (marriage.jointBalance <= 0) {
+            return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "Your joint account is empty!")] });
+        }
+        amount = marriage.jointBalance;
+    } else {
+        amount = parseInt(args[1]);
+        if (isNaN(amount) || amount <= 0) return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please specify a valid amount.")] });
+    }
+
+    try {
+        const newBal = await withdrawFromJoint(message.author.id, message.guildId!, amount);
+        const embed = successEmbed(message.author, "Withdrawal Successful", `Withdrew **${amount.toLocaleString()}** coins from your joint account.\nNew Balance: **${newBal.toLocaleString()}**`);
+        return message.reply({ embeds: [embed] });
+    } catch (e: any) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Transaction Failed", e.message)] });
+    }
+}
+
+export async function handleFamily(message: Message, args: string[] = []) {
+    if (args.length > 0) {
+        const sub = args[0].toLowerCase();
+        if (sub === 'bank' || sub === 'account' || sub === 'bal') return handleJointBalance(message);
+        if (sub === 'deposit' || sub === 'dep') return handleJointDeposit(message, args);
+        if (sub === 'withdraw' || sub === 'with') return handleJointWithdraw(message, args);
+    }
+
     const marriage = await getMarriage(message.author.id, message.guildId!);
     if (!marriage) {
         return message.reply({ embeds: [errorEmbed(message.author, "Not Married", "You are single!")] });
@@ -207,9 +283,10 @@ export async function handleFamily(message: Message) {
         .setColor("#ff69b4")
         .setTitle(`Family of ${message.author.username}`)
         .addFields(
-            { name: "💍Partner", value: spouseName, inline: true },
-            { name: "❤️Affection", value: `${marriage.affection}`, inline: true },
-            { name: "📅Married Since", value: `<t:${Math.floor(new Date(marriage.marriedAt).getTime() / 1000)}:R>`, inline: true }
+            { name: "💍 Partner", value: spouseName, inline: true },
+            { name: "❤️ Affection", value: `${marriage.affection}`, inline: true },
+            { name: "🏦 Joint Savings", value: `${marriage.jointBalance.toLocaleString()}`, inline: true },
+            { name: "📅 Married Since", value: `<t:${Math.floor(new Date(marriage.marriedAt).getTime() / 1000)}:R>`, inline: true }
         );
 
     if (spouseUser) {

@@ -282,7 +282,7 @@ model GuildConfig {
   transferTax   Int      @default(0)
   incomeTax     Int      @default(0)
   bankLimit     Int?     @default(1000000)
-  walletLimit   Int?     @default(1000000)
+  walletLimit   Int?
   interestRate  Int      @default(0) // Logic for savings account interest
   prefix        String   @default("!")
   
@@ -319,6 +319,7 @@ model GuildConfig {
   minCreditScore    Int      @default(0)    // Minimum credit score floor
 
   gameCooldowns    Json?    @default("{}") // e.g. {"slots": 30, "bj": 10}
+  rouletteSpinTime Int      @default(3)
 
   logChannelId     String?  // Channel ID for audit logs
   disabledCommands String[] @default([])
@@ -568,6 +569,7 @@ model Marriage {
   marriedAt DateTime @default(now())
   
   affection Int      @default(0)
+  jointBalance Int   @default(0)
   
   @@unique([spouse1Id]) // User can only be spouse1 once
   @@unique([spouse2Id]) // User can only be spouse2 once

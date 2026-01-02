@@ -51,7 +51,7 @@ export async function handleEnroll(message: Message, args: string[]) {
 
         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder()
-                .setCustomId(`enroll_confirm_${degree.id}`)
+                .setCustomId(`enroll_confirm_${degree.id}_${message.author.id}`)
                 .setLabel("Confirm Payment")
                 .setStyle(ButtonStyle.Success)
                 .setEmoji(Mascot.Emotes.Success)

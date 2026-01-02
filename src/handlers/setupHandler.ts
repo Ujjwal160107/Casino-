@@ -36,7 +36,13 @@ export async function handleSetupInteraction(interaction: Interaction) {
             modal.addComponents(
                 new ActionRowBuilder<TextInputBuilder>().addComponents(currencyName),
                 new ActionRowBuilder<TextInputBuilder>().addComponents(currencyEmoji),
-                new ActionRowBuilder<TextInputBuilder>().addComponents(startMoney)
+                new ActionRowBuilder<TextInputBuilder>().addComponents(startMoney),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(
+                    new TextInputBuilder().setCustomId("log_channel").setLabel("Log Channel ID (Optional)").setValue(config.logChannelId || "").setStyle(TextInputStyle.Short).setRequired(false)
+                ),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(
+                    new TextInputBuilder().setCustomId("casino_channels").setLabel("Casino Channel IDs (comma separated)").setValue(config.casinoChannels.join(", ")).setStyle(TextInputStyle.Short).setRequired(false)
+                )
             );
 
             await interaction.showModal(modal);
@@ -131,7 +137,10 @@ export async function handleSetupInteraction(interaction: Interaction) {
 
             modal.addComponents(
                 new ActionRowBuilder<TextInputBuilder>().addComponents(minBet),
-                new ActionRowBuilder<TextInputBuilder>().addComponents(maxBet)
+                new ActionRowBuilder<TextInputBuilder>().addComponents(maxBet),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(
+                    new TextInputBuilder().setCustomId("roulette_spin_time").setLabel("Roulette Spin Time (seconds)").setValue(config.rouletteSpinTime?.toString() || "3").setStyle(TextInputStyle.Short)
+                )
             );
 
             await interaction.showModal(modal);
@@ -220,12 +229,45 @@ export async function handleSetupInteraction(interaction: Interaction) {
 
             if (isNaN(startMoney)) return interaction.editReply("Invalid start money amount.");
 
+            const logChannelId = interaction.fields.getTextInputValue("log_channel");
+            const casinoChannelsRaw = interaction.fields.getTextInputValue("casino_channels");
+
+            // Check if Start Money Changed
+            const currentConfig = await getGuildConfig(interaction.guildId!);
+            const oldStart = currentConfig.startMoney;
+            let updatedCount = 0;
+
             await updateGuildConfig(interaction.guildId!, {
                 currencyName,
                 currencyEmoji,
-                startMoney
+                startMoney,
+                logChannelId: logChannelId || null,
+                casinoChannels: casinoChannelsRaw ? casinoChannelsRaw.split(",").map(id => id.trim()) : []
             });
-            await interaction.editReply(`✅ Configuration updated! Currency: ${currencyEmoji} ${currencyName}, Start: ${startMoney}`);
+
+            if (startMoney !== oldStart) {
+                // Retroactively update inactive users who still have the old start money
+                // Logic: Users with balance === oldStart AND no transactions (fresh users)
+                // Note: Checking 'no transactions' prevents resetting active players who happened to reach exactly start money.
+                const targets = await prisma.wallet.findMany({
+                    where: {
+                        user: { guildId: interaction.guildId! },
+                        balance: oldStart,
+                        transactions: { none: {} }
+                    },
+                    select: { id: true }
+                });
+
+                if (targets.length > 0) {
+                    await prisma.wallet.updateMany({
+                        where: { id: { in: targets.map(t => t.id) } },
+                        data: { balance: startMoney }
+                    });
+                    updatedCount = targets.length;
+                }
+            }
+
+            await interaction.editReply(`✅ Configuration updated! Currency: ${currencyEmoji} ${currencyName}, Start: ${startMoney}, Logs: ${logChannelId || "None"}, Casino Channels: ${casinoChannelsRaw || "All"}${updatedCount > 0 ? `\n🔄 Updated **${updatedCount}** inactive users to new start money.` : ""}`);
         }
         else if (id === "modal_setup_banking") {
             const bankLimit = parseSmartAmount(interaction.fields.getTextInputValue("bank_limit"));
@@ -256,14 +298,16 @@ export async function handleSetupInteraction(interaction: Interaction) {
         else if (id === "modal_setup_gambling") {
             const minBet = parseSmartAmount(interaction.fields.getTextInputValue("min_bet"));
             const maxBet = parseSmartAmount(interaction.fields.getTextInputValue("max_bet"));
+            const spinTime = parseInt(interaction.fields.getTextInputValue("roulette_spin_time"));
 
-            if (isNaN(minBet) || isNaN(maxBet)) return interaction.editReply("Invalid bet amounts.");
+            if (isNaN(minBet) || isNaN(maxBet) || isNaN(spinTime)) return interaction.editReply("Invalid numbers.");
 
             await updateGuildConfig(interaction.guildId!, {
                 minBet,
-                maxBet: maxBet === 0 ? null : maxBet
+                maxBet: maxBet === 0 ? null : maxBet,
+                rouletteSpinTime: spinTime
             });
-            await interaction.editReply(`✅ Gambling limits updated!`);
+            await interaction.editReply(`✅ Gambling limits updated! Spin Time: ${spinTime}s`);
         }
         else if (id === "modal_setup_cooldowns") {
             const robCd = parseSmartAmount(interaction.fields.getTextInputValue("rob_cd"));

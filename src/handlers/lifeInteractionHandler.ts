@@ -17,15 +17,26 @@ async function handleButton(interaction: ButtonInteraction) {
     if (!guild) return;
 
     if (customId.startsWith("enroll_confirm_")) {
-        const degreeId = customId.replace("enroll_confirm_", "");
+        const parts = customId.split("_");
+        // format: enroll_confirm_degreeId_userId
+        // parts: ['enroll', 'confirm', degreeId, userId]
 
-        await interaction.deferReply({ ephemeral: true });
+        // Backwards compatibility handling or robust parsing
+        const degreeId = parts[2];
+        const targetUserId = parts[3];
+
+        if (targetUserId && targetUserId !== user.id) {
+            return interaction.reply({ content: `${Mascot.Emotes.Fail} This interaction is not for you.`, ephemeral: true });
+        }
+
+        await interaction.deferReply({ ephemeral: false });
 
         try {
             const result = await enroll(user.id, guild.id, degreeId);
             const config = await getGuildConfig(guild.id);
 
             const embed = new EmbedBuilder()
+                .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
                 .setTitle(`${Mascot.Emotes.Accept} Enrollment Successful`)
                 .setDescription(`You have successfully enrolled in **${result.degree.name}**!`)
                 .addFields({ name: "Tuition Paid", value: fmtCurrency(result.degree.tuitionPerSem, config.currencyEmoji) })
