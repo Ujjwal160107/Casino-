@@ -25,9 +25,22 @@ exports.Mascot = {
         Meditation: "<:fortuna_medidate:1455103880982565008>",
         Sports: "<:fortuna_sports:1455103427473440768>",
         Gym: "<:fortuna_gym:1455103411866566716>",
-        Accept: "<:tick:1455105986120515656>",
+        Accept: "<:n_check:1451281806279311435>",
         Decline: "<a:decline:1455106146120761492>",
-        Alert: "<:alert_sign:1455458789934235738>"
+        Alert: "<:alert_sign:1451625691664875610>",
+        Graph: "<:graph:1445689267861979197>",
+        GraphDown: "<:graphdown:1456301332351815823>",
+        // Job Emojis
+        JobTech: "<:fortuna_engineer:1455563457112969331>",
+        JobMedical: "<:fortuna_doctor:1455563555930636331>",
+        JobBusiness: "<:fortuna_business:1455564125534031883>",
+        JobLegal: "<:fortuna_lawyer:1455564518217351251>",
+        JobService: "<:fortuna_coffee:1455565452670664736>", // Chef/Service
+        JobTrade: "<:fortuna_mechanic:1455568751343960064>", // Mechanic/Blue Collar
+        JobWorking: "<:fortuna_working:1455570584455872553>",
+        JobPromotion: "<:fortuna_mod:1455572710632587368>",
+        Monitor: "<:fortuna_engineer:1455563457112969331>",
+        Trash: "🗑️" // Fallback standard emoji
     },
     Images: {
         Main: path_1.default.join(process.cwd(), "src", "assets", "fortuna.jpg")
@@ -37,6 +50,8 @@ exports.Mascot = {
     }
 };
 function getEmoteUrl(emote) {
+    if (!emote)
+        return null;
     const match = emote.match(/:(\d+)>/);
     if (match && match[1]) {
         return `https://cdn.discordapp.com/emojis/${match[1]}.png`;

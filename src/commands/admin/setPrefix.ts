@@ -5,13 +5,14 @@ import { canExecuteAdminCommand } from "../../utils/permissionUtils";
 
 export async function handleSetPrefix(message: Message, args: string[]) {
   try {
+    if (!message.guild) return;
     if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
       return message.reply({
         embeds: [errorEmbed(message.author, "No Permission", "Admins or Bot Commanders only.")]
       });
     }
 
-    const config = await getGuildConfig(message.guildId!);
+    const config = await getGuildConfig(message.guild.id);
     const currentPrefix = config.prefix || "!";
     const newPrefix = args[0];
 

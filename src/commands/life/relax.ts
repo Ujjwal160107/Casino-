@@ -23,18 +23,26 @@ export async function handleRelax(message: Message) {
     }
 
     const config = await getGuildConfig(message.guild.id);
+    // Calculate Dynamic Prices
+    const { getJob, getJobPay } = require("../../services/jobService"); // Dynamic import
+    let basePay = 1000;
+    if (user.jobId) {
+        const job = getJob(user.jobId);
+        if (job) basePay = await getJobPay(job, message.guild.id);
+    }
+
     const costs = {
-        gym: 500,
-        sports: 800,
-        meditation: 300
+        gym: Math.floor(basePay * 0.75),
+        sports: Math.floor(basePay * 0.50),
+        meditation: Math.floor(basePay * 0.25)
     };
 
     const embed = new EmbedBuilder()
-        .setTitle(`🧘 Relax & Recover`)
+        .setTitle(`Relax & Recover`)
         .setDescription(`Your current stress level is **${user.jobStress}/100**.\nHigh stress increases the chance of **Burnout** during work shifts!\n\nChoose an activity to reduce stress:`)
         .addFields(
-            { name: `${Mascot.Emotes.Gym} Gym`, value: `**${fmtCurrency(costs.gym, config.currencyEmoji)}**\n-20 Stress`, inline: true },
-            { name: `${Mascot.Emotes.Sports} Sports`, value: `**${fmtCurrency(costs.sports, config.currencyEmoji)}**\n-30 Stress`, inline: true },
+            { name: `${Mascot.Emotes.Gym} Gym`, value: `**${fmtCurrency(costs.gym, config.currencyEmoji)}**\n-30 Stress`, inline: true },
+            { name: `${Mascot.Emotes.Sports} Sports`, value: `**${fmtCurrency(costs.sports, config.currencyEmoji)}**\n-20 Stress`, inline: true },
             { name: `${Mascot.Emotes.Meditation} Meditate`, value: `**${fmtCurrency(costs.meditation, config.currencyEmoji)}**\n-15 Stress`, inline: true }
         )
         .setColor(Mascot.Colors.Base as any)

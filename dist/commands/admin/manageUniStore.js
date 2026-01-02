@@ -75,7 +75,7 @@ async function handleManageUniStore(message, args) {
             .setTitle(`🎓 Managing: ${item.name}`)
             .setColor(discord_js_1.Colors.Blue)
             .addFields({ name: "Name", value: item.name, inline: true }, { name: "Price", value: (0, format_1.fmtCurrency)(item.price, emoji), inline: true }, { name: "Stock", value: item.stock === -1 ? "Infinite" : String(item.stock), inline: true }, { name: "Description", value: item.description || "None", inline: false });
-        const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId("edit_price").setLabel("Edit Price").setStyle(discord_js_1.ButtonStyle.Primary).setEmoji("💰"), new discord_js_1.ButtonBuilder().setCustomId("edit_desc").setLabel("Edit Desc").setStyle(discord_js_1.ButtonStyle.Secondary).setEmoji("📝"), new discord_js_1.ButtonBuilder().setCustomId("btn_done").setLabel("Done").setStyle(discord_js_1.ButtonStyle.Success));
+        const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId("edit_price").setLabel("Edit Price").setStyle(discord_js_1.ButtonStyle.Primary), new discord_js_1.ButtonBuilder().setCustomId("edit_desc").setLabel("Edit Desc").setStyle(discord_js_1.ButtonStyle.Secondary), new discord_js_1.ButtonBuilder().setCustomId("btn_done").setLabel("Done").setStyle(discord_js_1.ButtonStyle.Success));
         return { embeds: [embed], components: [row] };
     };
     const panelMsg = await message.reply(renderPanel(targetItem));

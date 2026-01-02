@@ -4,7 +4,24 @@ import { checkMaturedInvestments, processAllInvestments, processOverdueLoans } f
 import { removeTemporaryRoles } from "./services/effectService";
 import { Client } from "discord.js";
 
+import { updateMarket } from "./services/stockService";
+
 export function initScheduler(client: Client) {
+    // ... existing
+
+    // Update Stock Market Loop (Checks each guild's refresh rate independently)
+    setInterval(async () => {
+        try {
+            await updateMarket();
+        } catch (err) {
+            console.error("Failed to update stock market:", err);
+        }
+    }, 60 * 1000);
+
+    // Initial update to ensure prices exist
+    updateMarket().catch(e => console.error("Initial market update failed:", e));
+    // Initial update to ensure prices exist
+    updateMarket().catch(e => console.error("Initial market update failed:", e));
     cron.schedule("* * * * *", async () => {
         console.log("🕒 Running daily banking jobs...");
         try {

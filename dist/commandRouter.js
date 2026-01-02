@@ -153,11 +153,27 @@ async function routeMessage(client, message, prefix) {
             return (0, transfer_1.handleTransfer)(message, args);
         case "collect":
             return (0, collect_1.handleCollectRoleIncome)(message, args);
-        case "work":
         case "crime":
         case "beg":
         case "slut":
             return (0, incomeCommands_1.handleIncome)(message);
+        case "stock":
+        case "stocks":
+        case "stock-market": {
+            const { handleStock } = require("./commands/economy/stock");
+            return handleStock(message, args);
+        }
+        // ...
+        case "apply": {
+            const { handleApply } = require("./commands/life/apply");
+            return handleApply(message, args);
+        }
+        case "work":
+        case "job":
+        case "myjob": {
+            const { handleWork } = require("./commands/life/work");
+            return handleWork(message);
+        }
         case "rob":
         case "steal":
             return (0, rob_1.handleRob)(message, args);
@@ -250,6 +266,13 @@ async function routeMessage(client, message, prefix) {
         case "edit-shop":
         case "delete-shop":
             return (0, manageShop_1.handleManageShop)(message, args);
+        case "remove-item":
+        case "del-item":
+        case "delete-item":
+        case "remove-inv":
+        case "clear-inv":
+            const { handleRemoveItem } = require("./commands/admin/removeItem");
+            return handleRemoveItem(message, args);
         case "set-theme":
             return (0, setTheme_1.handleSetTheme)(message, args);
         case "casino-ban":
@@ -337,6 +360,11 @@ async function routeMessage(client, message, prefix) {
         case "edit-credit-tier":
             const { handleConfigCreditTier } = require("./commands/admin/configCreditTier");
             return handleConfigCreditTier(message, args);
+        case "config-jobs":
+        case "config-job":
+        case "set-job-salary":
+            const { handleConfigJobs } = require("./commands/admin/configJobs");
+            return handleConfigJobs(message, args);
         case "view-credit-tiers":
         case "view-credit-config":
             const { handleViewCreditTiers } = require("./commands/admin/manageCreditConfig");
@@ -386,12 +414,40 @@ async function routeMessage(client, message, prefix) {
             const { handleListDegrees } = require("./commands/life/education");
             return handleListDegrees(message);
         }
-        // JOBS REMOVED AS PER REQUEST
-        /*
-        case "jobs": {
-           // ...
+        case "jobs":
+        case "careers":
+        case "jobs":
+        case "careers":
+        case "joblist": {
+            const { handleJobs } = require("./commands/life/jobs");
+            return handleJobs(message);
         }
-        */
+        case "apply": {
+            const { handleApply } = require("./commands/life/apply");
+            return handleApply(message, args);
+        }
+        case "relax":
+        case "chill": {
+            const { handleRelax } = require("./commands/life/relax");
+            return handleRelax(message);
+        }
+        case "jobstore":
+        case "workstore":
+        case "jobshop": {
+            const { handleJobStore } = require("./commands/life/jobStore");
+            return handleJobStore(message, args);
+        }
+        case "work":
+        case "job":
+        case "myjob": {
+            const { handleWork } = require("./commands/life/work");
+            return handleWork(message);
+        }
+        case "career":
+        case "mycareer": {
+            const { handleCareer } = require("./commands/life/career");
+            return handleCareer(message);
+        }
         // EDUCATION
         case "education":
         case "edu":
@@ -425,6 +481,11 @@ async function routeMessage(client, message, prefix) {
         case "uni-admin": {
             const { handleManageUniStore } = require("./commands/admin/manageUniStore");
             return handleManageUniStore(message, args);
+        }
+        case "manage-jobstore":
+        case "job-admin": {
+            const { handleManageJobStore } = require("./commands/admin/manageJobStore");
+            return handleManageJobStore(message, args);
         }
         // --- Education Admin ---
         case "setint":

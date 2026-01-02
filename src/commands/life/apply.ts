@@ -7,11 +7,16 @@ import { errorEmbed } from "../../utils/embed";
 import { logToChannel } from "../../utils/discordLogger";
 
 export async function handleApply(message: Message, args: string[]) {
+    if (!message.guild) return;
+    const { getGuildConfig } = require("../../services/guildConfigService");
+    const config = await getGuildConfig(message.guild.id);
+    const prefix = config?.prefix || "!";
+
     const jobId = args[0];
-    if (!jobId) return message.reply("Usage: `!apply <job_id>`");
+    if (!jobId) return message.reply(`Usage: \`${prefix}apply <job_id>\``);
 
     const job = getJob(jobId);
-    if (!job) return message.reply("Invalid Job ID. Check `!jobs`.");
+    if (!job) return message.reply(`Invalid Job ID. Check \`${prefix}jobs\`.`);
 
     // 1. Checks
     const user = await prisma.user.findUnique({
@@ -48,6 +53,12 @@ export async function handleApply(message: Message, args: string[]) {
         if (user.jobId !== job.reqJobId) {
             const reqJob = getJob(job.reqJobId);
             return message.reply({ embeds: [errorEmbed(message.author, "Experience Missing", `You cannot just skip the ladder!\nThis position requires you to be currently working as a **${reqJob?.title || job.reqJobId}**.`)] });
+        }
+
+        // Check XP Requirement
+        const requiredXp = job.reqXp || 0;
+        if (requiredXp > 0 && user.jobXp < requiredXp) {
+            return message.reply({ embeds: [errorEmbed(message.author, "Experience Missing", `You do not have enough specific experience for this promotion.\n\n**Required:** ${requiredXp} XP\n**Current:** ${user.jobXp} XP`)] });
         }
     }
 

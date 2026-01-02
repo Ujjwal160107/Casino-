@@ -17,6 +17,7 @@ export async function execute(message: Message, args: string[]) {
         .addComponents(
             new ButtonBuilder().setCustomId("market_browse_1").setLabel("Browse Market").setStyle(ButtonStyle.Primary).setEmoji("🛒"),
             new ButtonBuilder().setCustomId("market_sell_flow").setLabel("Sell Item").setStyle(ButtonStyle.Success).setEmoji("➕"),
+            new ButtonBuilder().setCustomId("market_sell_prop_flow").setLabel("Sell Property").setStyle(ButtonStyle.Success).setEmoji("🏠"),
             new ButtonBuilder().setCustomId("market_buy_flow").setLabel("Buy by ID").setStyle(ButtonStyle.Secondary).setEmoji("🔍"),
             new ButtonBuilder().setCustomId("market_mine").setLabel("My Listings").setStyle(ButtonStyle.Danger).setEmoji("📦")
         );

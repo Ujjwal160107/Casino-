@@ -14,6 +14,85 @@ export interface JobDefinition {
     level: "Intern" | "Junior" | "Senior" | "Lead" | "Executive" | "Freelance";
 }
 
+export interface WorkEvent {
+    id: string;
+    sector: JobDefinition['sector'] | "all";
+    title: string;
+    description: string;
+    choices: {
+        label: string;
+        style: "success" | "danger" | "primary" | "secondary";
+        successChance: number; // 0-100
+        successMsg: string;
+        failMsg: string;
+        outcome: {
+            xp?: number;
+            money?: number; // Multiplier of base pay
+            stress: number;
+        };
+    }[];
+}
+
+export interface JobAction {
+    id: string;
+    sector: JobDefinition['sector'];
+    label: string;
+    description: string;
+    emoji: string;
+    cooldown: number; // Seconds
+}
+
+export const WORK_EVENTS: WorkEvent[] = [
+    // TECH
+    {
+        id: "tech_crash", sector: "tech", title: "Server Crash!", description: "Production database is down! What do you do?",
+        choices: [
+            { label: "Hotfix in Prod", style: "danger", successChance: 40, successMsg: "You saved the day! Bonus!", failMsg: "You made it worse. Much worse.", outcome: { xp: 50, money: 2.0, stress: 20 } },
+            { label: "Follow Protocol", style: "primary", successChance: 90, successMsg: "Service restored safely.", failMsg: "It took too long.", outcome: { xp: 10, money: 1.0, stress: 5 } }
+        ]
+    },
+    {
+        id: "tech_bug", sector: "tech", title: "Critical Bug", description: "A user found a critical bug in your code.",
+        choices: [
+            { label: "Blame the User", style: "secondary", successChance: 10, successMsg: "They believed you!", failMsg: "HR wants a word.", outcome: { xp: 0, money: 0.5, stress: 30 } },
+            { label: "Fix it now", style: "success", successChance: 80, successMsg: "Bug squashed.", failMsg: "You introduced 3 new bugs.", outcome: { xp: 20, money: 1.1, stress: 10 } }
+        ]
+    },
+    // MEDICAL
+    {
+        id: "med_emergency", sector: "medical", title: "Emergency!", description: "A patient is crashing in the ER!",
+        choices: [
+            { label: "CPR", style: "danger", successChance: 60, successMsg: "Patient stabilized!", failMsg: "It was too late...", outcome: { xp: 100, money: 1.5, stress: 25 } },
+            { label: "Call Attending", style: "primary", successChance: 100, successMsg: "The senior doctor took over.", failMsg: "N/A", outcome: { xp: 5, money: 0.8, stress: 0 } }
+        ]
+    },
+    // BUSINESS
+    {
+        id: "biz_deal", sector: "business", title: "The Big Deal", description: "A client wants to close a risky deal.",
+        choices: [
+            { label: "Sign it!", style: "success", successChance: 50, successMsg: "Huge commission!", failMsg: "The company lost millions.", outcome: { xp: 50, money: 3.0, stress: 40 } },
+            { label: "Review first", style: "secondary", successChance: 90, successMsg: "Smart move. Safe deal.", failMsg: "Client walked away.", outcome: { xp: 15, money: 1.0, stress: 5 } }
+        ]
+    }
+];
+
+export const JOB_ACTIONS: JobAction[] = [
+    { id: "tech_hack", sector: "tech", label: "Hack Server", description: "Attempt to steal small crypto.", emoji: "💻", cooldown: 86400 },
+    { id: "med_heal", sector: "medical", label: "Self Heal", description: "Treat your own stress.", emoji: "🩺", cooldown: 43200 },
+    { id: "biz_invest", sector: "business", label: "Insider Trade", description: "Boost next shift pay.", emoji: "📈", cooldown: 86400 },
+    { id: "law_consult", sector: "legal", label: "Legal Consult", description: "Quick cash job.", emoji: "⚖️", cooldown: 21600 }
+];
+
+export function getWorkEvent(sector: string): WorkEvent | null {
+    const events = WORK_EVENTS.filter(e => e.sector === sector || e.sector === "all");
+    if (events.length === 0) return null;
+    return events[Math.floor(Math.random() * events.length)];
+}
+
+export function getJobAction(sector: string): JobAction | null {
+    return JOB_ACTIONS.find(a => a.sector === sector) || null;
+}
+
 // Grouped by Sector for easiest display
 export const JOBS: JobDefinition[] = [
     // --- TECH (Computer Science) ---
@@ -170,11 +249,30 @@ export async function reduceJobStress(userId: string, guildId: string, activity:
 
     if (!user) throw new Error("User not found.");
 
-    let cost = 500;
+    // Calculate Dynamic Cost
+    let basePay = 1000; // Default if unemployed
+    if (user.jobId) {
+        const job = getJob(user.jobId);
+        if (job) {
+            basePay = await getJobPay(job, guildId);
+        }
+    }
+
+    let multiplier = 0.5;
     let reduction = 20;
 
-    if (activity === "sports") { cost = 800; reduction = 30; }
-    if (activity === "meditation") { cost = 300; reduction = 15; }
+    if (activity === "gym") {
+        multiplier = 0.75;
+        reduction = 30;
+    } else if (activity === "sports") {
+        multiplier = 0.5;
+        reduction = 20;
+    } else if (activity === "meditation") {
+        multiplier = 0.25;
+        reduction = 15;
+    }
+
+    const cost = Math.floor(basePay * multiplier);
 
     if (user.wallet!.balance < cost) {
         throw new Error(`You need **${cost}** coins to go to the ${activity}.`);

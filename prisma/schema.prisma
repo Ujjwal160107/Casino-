@@ -23,7 +23,7 @@ model User {
   creditScore Int @default(500)
   
   // User preferences
-  profileTheme String @default("cyberpunk") 
+  // Removed profileTheme 
 
   bets        Bet[]
   inventory   Inventory[] // Relation to Inventory items
@@ -67,6 +67,12 @@ model User {
 
   // Life Sim Relations
   workLogs    WorkLog[]
+  portfolio   Portfolio?
+  properties  OwnedProperty[]
+
+  // Marriage Relations
+  marriagesAsSpouse1 Marriage[] @relation("Spouse1")
+  marriagesAsSpouse2 Marriage[] @relation("Spouse2")
 }
 
 model WorkLog {
@@ -300,6 +306,7 @@ model GuildConfig {
   loanInterestRate Int      @default(5)
   fdInterestRate   Int      @default(10)
   rdInterestRate   Int      @default(8)
+  stockRefreshRate Int      @default(600) // Default 10 minutes (in seconds)
   loanMaxAmount    Int?     // If null, dynamic based on credit score
 
   marketTax        Int      @default(5) // % tax on black market sales
@@ -337,8 +344,11 @@ model MarketListing {
   // Snapshotted item details (in case ShopItem changes or deleted)
   // But ideally we link to ShopItem to show image/details dynamically.
   // Converting inventory item to listing.
-  shopItem    ShopItem @relation(fields: [shopItemId], references: [id])
-  shopItemId  String   @db.ObjectId
+  shopItem    ShopItem? @relation(fields: [shopItemId], references: [id])
+  shopItemId  String?   @db.ObjectId
+
+  property    Property? @relation(fields: [propertyId], references: [id])
+  propertyId  String?   @db.ObjectId
   
   amount      Int
   totalPrice  Int      // Price for the whole batch
@@ -453,3 +463,113 @@ model UserDegree {
   @@unique([userId, degreeId])
 }
 
+
+// --- STOCK MARKET ---
+
+
+// --- PROPERTY MODULE ---
+
+model Property {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId     String
+  key         String
+  name        String
+  description String
+  
+  // Pricing mechanics
+  basePrice   Int
+  price       Int      // Current system price (fluctuates)
+  totalSold   Int      @default(0) // Impacts price fluctuation
+  
+  incomePerCycle Int
+  incomeCycleHours Int @default(24)
+  imageUrl    String? // Can be overridden, otherwise uses banner
+  
+  maxPerUser  Int      @default(1)
+  isPublic    Boolean  @default(true) // For admin toggling
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owners      OwnedProperty[]
+  listings    MarketListing[] // Relations
+  
+  @@unique([guildId, key])
+}
+
+model OwnedProperty {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String   @db.ObjectId
+  
+  property    Property @relation(fields: [propertyId], references: [id])
+  propertyId  String   @db.ObjectId
+  
+  purchasedPrice Int     // To track ROI
+  purchasedAt DateTime @default(now())
+  lastCollected DateTime @default(now())
+  
+  @@unique([userId, propertyId])
+}
+
+model Stock {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId      String
+  symbol       String
+  name         String
+  currentPrice Int
+  volatility   Int      @default(5) // Max percentage change per update
+  basePrice    Int      @default(100) // Reference for resets/crashes
+  lastUpdate   DateTime @default(now())
+  
+  updatedAt    DateTime @updatedAt
+  
+  holdings     StockHolding[]
+
+  @@unique([guildId, symbol])
+}
+
+model Portfolio {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String   @unique @db.ObjectId
+  
+  holdings     StockHolding[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model StockHolding {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  portfolio    Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  portfolioId  String    @db.ObjectId
+  
+  stock        Stock     @relation(fields: [stockId], references: [id])
+  stockId      String    @db.ObjectId
+  
+  quantity     Int
+  avgBuyPrice  Int       // Average price paid per share (for profit calc)
+  
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([portfolioId, stockId])
+}
+
+model Marriage {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  
+  spouse1   User     @relation("Spouse1", fields: [spouse1Id], references: [id])
+  spouse1Id String   @db.ObjectId
+  
+  spouse2   User     @relation("Spouse2", fields: [spouse2Id], references: [id])
+  spouse2Id String   @db.ObjectId
+  
+  marriedAt DateTime @default(now())
+  
+  affection Int      @default(0)
+  
+  @@unique([spouse1Id]) // User can only be spouse1 once
+  @@unique([spouse2Id]) // User can only be spouse2 once
+  // Application logic must enforce that a user is not BOTH spouse1 and spouse2 in different records
+}

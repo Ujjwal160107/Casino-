@@ -3,11 +3,15 @@ import "dotenv/config"; import fs from "fs"; import path from "path"; import { C
     if (interaction.isChatInputCommand()) { const ci = interaction as ChatInputCommandInteraction; const module = slashCommands.get(ci.commandName); if (!module) { return ci.reply({ content: "Unknown command.", ephemeral: true }); } return await module.execute(ci); } const id = (interaction as any).customId || ""; if (id.startsWith("bank_") || id.startsWith("loan_") || id.startsWith("invest_") || id.startsWith("repay_")) { return await handleBankInteraction(interaction); } if (id.startsWith("market_") || id.startsWith("sell_")) { return await handleMarketInteraction(interaction); } if (id.startsWith("inv_")) {
       return await handleInventoryInteraction(interaction as any);
     }
-    if (id.startsWith("enroll_confirm_") || id.startsWith("claim_scholarship_") || id.startsWith("stress_") || id.startsWith("confirm_stress_") || id === "cancel_stress" || id.startsWith("dropout_") || id.startsWith("work_")) {
+    if (id.startsWith("enroll_confirm_") || id.startsWith("claim_scholarship_") || id.startsWith("stress_") || id.startsWith("confirm_stress_") || id === "cancel_stress" || id.startsWith("dropout_") || id.startsWith("work_") || id.startsWith("promote_confirm_")) {
       const { handleLifeInteraction } = require("./handlers/lifeInteractionHandler");
       return await handleLifeInteraction(interaction);
     }
     if (id.startsWith("ask_")) { const { handleAskInteraction } = require("./handlers/askInteractionHandler"); return await handleAskInteraction(interaction); }
+    if (id.startsWith("setup_") || id.startsWith("modal_setup_") || id.startsWith("select_setup_")) {
+      const { handleSetupInteraction } = require("./handlers/setupHandler");
+      return await handleSetupInteraction(interaction);
+    }
   } catch (err) { console.error("Interaction error:", err); await safeInteractionReply(interaction, { content: "Internal error while processing interaction.", ephemeral: true }); }
 }); client.on("messageCreate", async (message) => {
   try { if (message.author.bot) return; if (!message.guild) return; const cfg = await getGuildConfig(message.guild.id); const prefix = cfg?.prefix ?? "!"; if (!message.content.startsWith(prefix)) return; const contentWithoutPrefix = message.content.slice(prefix.length).trim(); if (!contentWithoutPrefix) return; const originalContent = message.content; try { (message as any).content = "!" + contentWithoutPrefix; await routeMessage(client, message, prefix); } finally { (message as any).content = originalContent; } } catch (err) {

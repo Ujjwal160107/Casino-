@@ -12,6 +12,8 @@ import { handleIncome } from "./commands/economy/incomeCommands";
 import { handleRob } from "./commands/economy/rob";
 import { handleShop } from "./commands/economy/shop";
 import { handleInventory } from "./commands/economy/inventory";
+import { propertiesHandler, buyPropertyHandler, sellPropertyHandler, myPropertiesHandler, collectRentHandler } from "./commands/economy/properties";
+import { managePropertyHandler } from "./commands/admin/adminProperty";
 import { handleProfile } from "./commands/economy/profile";
 import { handleLeaderboard } from "./commands/economy/leaderboard";
 import { execute as handleBank } from "./commands/economy/bank";
@@ -31,7 +33,7 @@ import { handleSetCurrencyEmoji } from "./commands/admin/setCurrencyEmoji";
 import { handleAdminViewConfig } from "./commands/admin/viewConfig";
 import { handleAddShopItem } from "./commands/admin/addShopItem";
 import { handleManageShop } from "./commands/admin/manageShop";
-import { handleSetTheme } from "./commands/general/setTheme";
+// Removed handleSetTheme import
 import { handleCasinoBan } from "./commands/admin/casinoBan";
 import { handleCasinoUnban } from "./commands/admin/casinoUnban";
 import { handleCasinoBanList } from "./commands/admin/casinoBanList";
@@ -46,6 +48,7 @@ import { handleSetMinBet } from "./commands/admin/setMinBet";
 import { handleAdminDashboard } from "./commands/admin/adminDashboard";
 import { handleResetAdminSettings } from "./commands/admin/resetAdminConfig";
 import { handleSetBetLimit } from "./commands/admin/betLimit";
+import { handleSetup } from "./commands/admin/setup";
 import prisma from "./utils/prisma";
 import { errorEmbed } from "./utils/embed";
 import { findBestMatch } from "./utils/stringUtils";
@@ -60,6 +63,10 @@ export async function routeMessage(client: Client, message: Message, prefix: str
   if (command === "set" && args[0]?.toLowerCase() === "casino" && args[1]?.toLowerCase() === "channel") {
     command = "set-casino-channel";
     args.splice(0, 2);
+  }
+  if (command === "set" && args[0]?.toLowerCase() === "prefix") {
+    command = "setprefix";
+    args.shift();
   }
   if (command === "channel" && args[0]?.toLowerCase() === "override") {
     command = "channel-override";
@@ -134,6 +141,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "setincome":
       return handleSetIncome(message, args);
     case "setprefix":
+    case "set-prefix":
       return handleSetPrefix(message, args);
     case "setrob":
     case "set-rob":
@@ -159,6 +167,13 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "beg":
     case "slut":
       return handleIncome(message);
+
+    case "stock":
+    case "stocks":
+    case "stock-market": {
+      const { handleStock } = require("./commands/economy/stock");
+      return handleStock(message, args);
+    }
 
     // ...
 
@@ -273,8 +288,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "clear-inv":
       const { handleRemoveItem } = require("./commands/admin/removeItem");
       return handleRemoveItem(message, args);
-    case "set-theme":
-      return handleSetTheme(message, args);
+    // Removed set-theme case
     case "casino-ban":
     case "ban-user":
       return handleCasinoBan(message, args);
@@ -376,6 +390,12 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "ask-money":
       const { handleAsk } = require("./commands/economy/ask");
       return handleAsk(message, args);
+
+    case "setup":
+    case "config": // Alias config to setup as it's the new master config
+    case "admin-setup":
+      return handleSetup(message, args);
+
     case "test": {
       const { handleCommandStatus } = require("./commands/admin/debugPermissions");
       return handleCommandStatus(message, args);
@@ -444,6 +464,11 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const { handleWork } = require("./commands/life/work");
       return handleWork(message);
     }
+    case "career":
+    case "mycareer": {
+      const { handleCareer } = require("./commands/life/career");
+      return handleCareer(message);
+    }
 
 
     // EDUCATION
@@ -475,6 +500,45 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const { handleUniStore } = require("./commands/life/uniStore");
       return handleUniStore(message);
     }
+
+    // MARRIAGE COMMANDS
+    case "marry":
+    case "propose": {
+      const { handleMarry } = require("./commands/life/marriage");
+      return handleMarry(message, args);
+    }
+    case "divorce": {
+      const { handleDivorce } = require("./commands/life/marriage");
+      return handleDivorce(message);
+    }
+    case "family":
+    case "spouse":
+    case "marriage": {
+      const { handleFamily } = require("./commands/life/marriage");
+      return handleFamily(message);
+    }
+
+    // PROPERTY COMMANDS
+    case "properties":
+    case "realestate":
+    case "estate":
+      return propertiesHandler(message, args);
+    case "buy-property":
+    case "buyprop":
+      return buyPropertyHandler(message, args);
+    case "sell-property": // System sell
+    case "sellprop":
+      return sellPropertyHandler(message, args);
+    case "my-properties":
+    case "myprops":
+    case "portfolio": // Overlap with stock portfolio? Maybe check args or context, for now alias is fine if stock uses "stock-portfolio"
+      return myPropertiesHandler(message);
+    case "collect-rent":
+    case "rent":
+      return collectRentHandler(message);
+    case "manage-property":
+    case "property-admin":
+      return managePropertyHandler(message, args);
     case "manage-uni":
     case "uni-admin": {
       const { handleManageUniStore } = require("./commands/admin/manageUniStore");
@@ -522,7 +586,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
         "work", "crime", "beg", "slut", "rob", "shop", "inventory", "profile",
         "leaderboard", "rank", "bet", "blackjack", "coinflip", "slots",
         "add-money", "remove-money", "set-start-money", "reset-economy", "set-currency",
-        "min-bet", "viewconfig", "shop-add", "manage-item", "set-theme",
+        "min-bet", "viewconfig", "shop-add", "manage-item",
         "casino-ban", "casino-unban", "banlist", "black-market",
         "set-loan-interest", "set-fd-interest", "set-rd-interest", "set-tax",
         "set-credit-reward", "set-credit-penalty", "set-credit-cap",

@@ -12,7 +12,7 @@ const branding_1 = require("../../config/branding");
 const guildConfigService_1 = require("../../services/guildConfigService");
 const format_1 = require("../../utils/format");
 const prisma_1 = __importDefault(require("../../utils/prisma")); // Added prisma import
-const studyMinigames_1 = require("./studyMinigames");
+const minigameService_1 = require("../../services/minigameService");
 async function handleStudy(message) {
     if (!message.guild)
         return;
@@ -41,10 +41,10 @@ async function handleStudy(message) {
         return message.reply({ embeds: [embed] });
     }
     // 2. Pick Game
-    const game = (0, studyMinigames_1.getStudyGame)();
+    const game = (0, minigameService_1.getStudyGame)();
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle("🧠 Quick Study Session")
-        .setDescription(game.question)
+        .setDescription(game.description)
         .setColor(branding_1.Mascot.Colors.Base)
         .setFooter({ text: `You have ${game.time} seconds!` });
     const thinkUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Think);
@@ -52,13 +52,34 @@ async function handleStudy(message) {
         embed.setThumbnail(thinkUrl);
     let isWin = false;
     let reply = null;
-    // Handle Button Game
+    // --- PREVIEW PHASE ---
+    if (game.previewTime) {
+        const previewEmbed = new discord_js_1.EmbedBuilder()
+            .setTitle(game.title)
+            .setDescription(game.previewText || "Get ready...")
+            .setColor(branding_1.Mascot.Colors.Base)
+            .setFooter({ text: `Memorize for ${game.previewTime}s...` });
+        reply = await message.reply({ embeds: [previewEmbed] });
+        await new Promise(r => setTimeout(r, game.previewTime * 1000));
+        // Show Real Question
+        embed.setDescription(`${game.description}\n\nYou have **${game.time}** seconds!`);
+        await reply.edit({ embeds: [embed] });
+    }
+    else {
+        embed.setDescription(`${game.description}\n\nYou have **${game.time}** seconds!`);
+    }
+    // --- BUTTON GAME ---
     if (game.type === "button") {
         const row = new discord_js_1.ActionRowBuilder().addComponents(game.options.map((opt, i) => new discord_js_1.ButtonBuilder()
             .setCustomId(`study_${i}_${opt}`)
             .setLabel(opt)
             .setStyle(discord_js_1.ButtonStyle.Secondary)));
-        reply = await message.reply({ embeds: [embed], components: [row] });
+        if (!reply) {
+            reply = await message.reply({ embeds: [embed], components: [row] });
+        }
+        else {
+            await reply.edit({ components: [row] });
+        }
         try {
             const i = await reply.awaitMessageComponent({
                 componentType: discord_js_1.ComponentType.Button,
@@ -73,9 +94,11 @@ async function handleStudy(message) {
             isWin = false; // Timeout
         }
     }
-    // Handle Typing Game
+    // --- TYPING GAME ---
     else {
-        reply = await message.reply({ embeds: [embed] });
+        if (!reply) {
+            reply = await message.reply({ embeds: [embed] });
+        }
         try {
             const channel = message.channel;
             const collected = await channel.awaitMessages({
@@ -87,7 +110,6 @@ async function handleStudy(message) {
             const userMsg = collected.first();
             if (userMsg) {
                 isWin = userMsg.content.trim() === game.answer;
-                // Optional: Delete user message to keep chat clean? maybe not.
             }
         }
         catch (e) {

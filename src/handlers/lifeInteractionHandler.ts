@@ -105,7 +105,9 @@ async function handleButton(interaction: ButtonInteraction) {
         await interaction.deferUpdate();
 
         try {
-            const res = await reduceStress(user.id, guild.id, activity);
+            const { reduceJobStress } = require("../services/jobService");
+            const config = await getGuildConfig(guild.id); // Fetch config for currency
+            const res = await reduceJobStress(user.id, guild.id, activity);
 
             let thumb = "";
             switch (activity) {
@@ -116,7 +118,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
             const embed = new EmbedBuilder()
                 .setTitle("Stress Relieved")
-                .setDescription(res.msg)
+                .setDescription(`**${activity.charAt(0).toUpperCase() + activity.slice(1)}** relieved your stress!\nStress: **${res.newStress}/100** (-${res.reduction})\nPaid: **${fmtCurrency(res.cost, config.currencyEmoji)}**`)
                 .setColor("#2ECC71");
 
             const thumbUrl = getEmoteUrl(thumb);
@@ -204,9 +206,222 @@ async function handleButton(interaction: ButtonInteraction) {
     else if (customId === "work_resign_cancel") {
         await interaction.update({ content: `${Mascot.Emotes.Success} Cancelled resignation. Get back to work!`, embeds: [], components: [] });
     }
+    else if (customId.startsWith("work_event_choice_")) {
+        const parts = customId.split("_"); // work_event_choice_eventId_choiceIdx
+        const eventId = parts[3] + "_" + parts[4]; // e.g., tech_crash. WAIT, split limit?
+        // ID might contain underscores. Let's start from index 3.
+        // Actually event IDs like "tech_crash" have underscores.
+        // CustomID: work_event_choice_tech_crash_0
+        // Split: ["work", "event", "choice", "tech", "crash", "0"]
+        // The last part is index. The middle parts are ID.
+
+        const choiceIdx = parseInt(parts[parts.length - 1]);
+        const eventIdParts = parts.slice(3, parts.length - 1);
+        const targetEventId = eventIdParts.join("_");
+
+        const { WORK_EVENTS } = require("../services/jobService");
+        const event = WORK_EVENTS.find((e: any) => e.id === targetEventId);
+
+        if (!event) {
+            return interaction.update({ content: "Event expired or invalid.", embeds: [], components: [] });
+        }
+
+        const choice = event.choices[choiceIdx];
+        const success = Math.random() * 100 < choice.successChance;
+
+        await interaction.deferUpdate();
+
+        const config = await getGuildConfig(guild.id);
+        const userData = await prisma.user.findUnique({ where: { discordId_guildId: { discordId: user.id, guildId: guild.id } } });
+
+        if (!userData || !userData.jobId) return;
+
+        // Import job here
+        const { getJob, getJobPay, checkPromotion, checkDemotion } = require("../services/jobService");
+        const job = getJob(userData.jobId);
+        const basePay = await getJobPay(job, guild.id);
+
+        let msg = success ? choice.successMsg : choice.failMsg;
+        let color = success ? "#2ECC71" : "#E74C3C";
+
+        // Outcome
+        const { xp = 0, money = 0, stress = 0 } = choice.outcome;
+
+        // Apply Outcome
+        let earnings = 0;
+        let xpGain = 0;
+        let stressGain = 0;
+
+        if (success) {
+            earnings = Math.floor(basePay * (money || 0));
+            xpGain = xp || 0;
+            stressGain = stress || 0;
+        } else {
+            // Fail usually gives stress, maybe small money? Check definitions.
+            // My definitions only have one outcome object. I should maybe have successOutcome and failOutcome?
+            // For now, let's assume the defined outcome is for SUCCESS, and FAIL applies penalties.
+            // OR the defined outcome is applied differently?
+            // "outcome: { xp: 50, money: 2.0, stress: 20 }" logic:
+            // "Success chance 40%". If success -> Get outcome. If allow fail?
+
+            // Let's refine the logic:
+            // IF SUCCESS: Apply outcome as positive benefit (XP+, Money+, Stress+ (if high stress event)).
+            // IF FAIL: Apply outcome as PENALTY?
+
+            // Checking the definitions:
+            // { label: "Hotfix", successChance: 40, outcome: { xp: 50, money: 2.0, stress: 20 } }
+            // Logic: Success = You get +50 XP, 2.0x Pay, +20 Stress.
+            // Fail = You fail. What happens? Standard fail penalty?
+
+            // Let's standardize:
+            // SUCCESS: Gain `money` * JobPay, Gain `xp`, Gain `stress`.
+            // FAIL: Gain 0 Money, Lose `xp` (or 0), Gain `stress` * 2?
+
+            if (success) {
+                earnings = Math.floor(basePay * (money || 0));
+                xpGain = xp || 10;
+                stressGain = stress || 5;
+            } else {
+                earnings = 0;
+                xpGain = -5;
+                stressGain = (stress || 10) + 15; // Extra stress (Total 25+)
+                msg += `\n(Penalty: No Pay, -5 XP, +${stressGain} Stress)`;
+            }
+        }
+
+        // Apply to DB
+        await prisma.user.update({
+            where: { id: userData.id },
+            data: {
+                wallet: { update: { balance: { increment: earnings } } },
+                jobXp: { increment: xpGain },
+                jobStress: Math.min(100, (userData.jobStress || 0) + stressGain), // Cap at 100
+                shiftsWorked: { increment: 1 },
+                lastShift: new Date()
+            }
+        });
+
+        // XP/Stress Checks
+        let footerText = "";
+
+        // Promotion
+        if (xpGain > 0) {
+            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain });
+            if (promoCheck.eligible && promoCheck.nextJob) {
+                // Determine if we show celebration or just footer
+                // Let's just note it for now, implementation plan says Celebration later
+                footerText = `🎉 Promotion Available: ${promoCheck.nextJob.title}`;
+            } else if (promoCheck.nextJob) {
+                footerText = `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingXp} XP to go)`;
+            }
+        }
+
+        // Demotion
+        if (xpGain < 0) {
+            const demoCheck = await checkDemotion({ ...userData, jobXp: userData.jobXp + xpGain });
+            if (demoCheck.demoted) {
+                msg += `\n\n🚨 **DEMOTED** to ${demoCheck.prevJob?.title}`;
+            }
+        }
+
+        const resEmbed = new EmbedBuilder()
+            .setTitle(success ? `${Mascot.Emotes.Success} Event Resolved` : `${Mascot.Emotes.Fail} Event Failed`)
+            .setDescription(`**${choice.label}**\n${msg}\n\n**Result:**\n${Mascot.Emotes.MoneyBag} ${fmtCurrency(earnings, config.currencyEmoji)}\nXP: ${xpGain > 0 ? '+' : ''}${xpGain}\n${Mascot.Emotes.Alert} +${stressGain} Stress`)
+            .setColor(color as any);
+
+        const eventRows: ActionRowBuilder<ButtonBuilder>[] = [];
+
+        if (xpGain > 0) {
+            // Re-check promotion to get the object
+            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain });
+            if (promoCheck.eligible && promoCheck.nextJob) {
+                resEmbed.addFields({ name: `${Mascot.Emotes.JobPromotion} Promotion Available!`, value: `You have qualified for **${promoCheck.nextJob.title}**!` });
+                resEmbed.setColor("#F1C40F");
+
+                eventRows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`promote_confirm_${promoCheck.nextJob.id}`)
+                        .setLabel(`Check Eligibility: ${promoCheck.nextJob.title}`)
+                        .setStyle(ButtonStyle.Success)
+                        .setEmoji(Mascot.Emotes.JobPromotion) // Use custom emoji for button too? Or keeps arrow? Button was "⬆️" before. User said NO DEFAULT EMOJIS.
+                ));
+            } else if (promoCheck.nextJob) {
+                resEmbed.setFooter({ text: `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingXp} XP to go)` });
+            }
+        } else if (footerText) {
+            resEmbed.setFooter({ text: footerText });
+        }
+
+        await interaction.editReply({ embeds: [resEmbed], components: eventRows });
+
+        // Log it
+        logToChannel(interaction.client, {
+            guild: guild,
+            type: "ECONOMY",
+            title: success ? "Work Event: Success" : "Work Event: Failed",
+            description: `**${user.username}** encountered: ${event.title}`,
+            fields: [
+                { name: "Choice", value: choice.label, inline: true },
+                { name: "Earnings", value: fmtCurrency(earnings, config.currencyEmoji), inline: true }
+            ],
+            thumbnail: user.displayAvatarURL(),
+            color: success ? 0x2ECC71 : 0xE74C3C
+        });
+
+    }
+
+
+    // Removed Job Actions as per user request
+
+
+    else if (customId.startsWith("promote_confirm_")) {
+        try {
+            await interaction.deferReply({ ephemeral: true });
+
+            const nextJobId = customId.replace("promote_confirm_", "");
+            // Import Job Service Safely
+            let jobService;
+            try {
+                jobService = require("../services/jobService");
+            } catch (err) {
+                console.error("Failed to require jobService:", err);
+                return interaction.editReply({ content: "System Error: Job Service unavailable." });
+            }
+
+            const { getJob, getJobAction } = jobService;
+            const nextJob = getJob(nextJobId);
+
+            if (!nextJob) {
+                return interaction.editReply({ content: `Error: Job definition for '${nextJobId}' not found.` });
+            }
+
+            // Fetch config if not already available in this scope
+            const { getGuildConfig } = require("../services/guildConfigService");
+            const config = await getGuildConfig(guild.id);
+            const prefix = config?.prefix || "!";
+
+            // DO NOT AUTO PROMOTE. Tell user to apply.
+            const embed = new EmbedBuilder()
+                .setTitle(`🎉 Promotion Eligibility Confirmed!`)
+                .setDescription(`You have met the requirements for **${nextJob.title}**!`)
+                .addFields(
+                    { name: "Next Step", value: `To officially secure this position, you must pass the application process.\n\nType the following command:` },
+                    { name: "Command", value: `\`${prefix}apply ${nextJob.id}\`` }
+                )
+                .setColor("#F1C40F") // Gold
+                .setThumbnail(getEmoteUrl(Mascot.Emotes.Success));
+
+            await interaction.editReply({ embeds: [embed] });
+
+        } catch (err: any) {
+            console.error("Promotion Error:", err);
+            // If already deferred, use editReply
+            try { await interaction.editReply({ content: `Error: ${err.message}` }); } catch (e) { }
+        }
+    }
     else if (customId === "work_shift") {
         // Import here to avoid circular dependencies if any
-        const { getJob, getJobPay, checkPromotion, checkDemotion } = require("../services/jobService");
+        const { getJob, getJobPay, checkPromotion, checkDemotion, getWorkEvent } = require("../services/jobService");
         const { getWorkGame } = require("../services/minigameService");
 
         const userData = await prisma.user.findUnique({ where: { discordId_guildId: { discordId: user.id, guildId: guild.id } } });
@@ -257,7 +472,8 @@ async function handleButton(interaction: ButtonInteraction) {
         }
 
         // --- STRESS CHECK ---
-        if (userData.jobStress > 80) {
+        const isBurnoutImmune = userData.jobId === "med_chief";
+        if (userData.jobStress > 80 && !isBurnoutImmune) {
             // High stress! Risk of burnout.
             if (Math.random() < 0.5) {
                 // BURNOUT!
@@ -276,6 +492,35 @@ async function handleButton(interaction: ButtonInteraction) {
                     .setThumbnail(getEmoteUrl(Mascot.Emotes.Fail));
 
                 return interaction.reply({ embeds: [burnoutEmbed], ephemeral: true });
+            }
+        }
+
+        // --- WORK EVENT CHECK ---
+        // getWorkEvent imported at block start
+
+
+        // 20% Chance for Event (if not high stress burnout)
+        if (Math.random() < 0.20) {
+            const event = getWorkEvent(job.sector);
+            if (event) {
+                const evEmbed = new EmbedBuilder()
+                    .setTitle(event.title)
+                    .setDescription(event.description)
+                    .setColor("#E67E22") // Orange
+                    .setThumbnail(getEmoteUrl(Mascot.Emotes.Think))
+                    .setFooter({ text: "Choose wisely..." });
+
+                const rows = event.choices.map((c: any, idx: number) =>
+                    new ButtonBuilder().setCustomId(`work_event_choice_${event.id}_${idx}`).setLabel(c.label).setStyle(
+                        c.style === 'success' ? ButtonStyle.Success :
+                            c.style === 'danger' ? ButtonStyle.Danger :
+                                c.style === 'primary' ? ButtonStyle.Primary : ButtonStyle.Secondary
+                    )
+                );
+
+                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(rows);
+
+                return interaction.reply({ embeds: [evEmbed], components: [row] });
             }
         }
 
@@ -421,11 +666,22 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setColor("#2ECC71");
 
             if (newStreak > 1) {
-                winEmbed.addFields({ name: "🔥 Job Streak", value: `${newStreak} Days`, inline: true });
+                winEmbed.addFields({ name: "Job Streak", value: `${newStreak} Days`, inline: true });
             }
 
+            const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+
             if (promoCheck.eligible && promoCheck.nextJob) {
-                winEmbed.addFields({ name: "🎉 Promotion Available!", value: `You are eligible for **${promoCheck.nextJob.title}**!\nAsk an admin or apply!` });
+                winEmbed.addFields({ name: `${Mascot.Emotes.JobPromotion} Promotion Available!`, value: `You have qualified for **${promoCheck.nextJob.title}**!` });
+                winEmbed.setColor("#F1C40F"); // Gold
+
+                rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`promote_confirm_${promoCheck.nextJob.id}`)
+                        .setLabel(`Check Eligibility: ${promoCheck.nextJob.title}`)
+                        .setStyle(ButtonStyle.Success)
+                        .setEmoji(Mascot.Emotes.JobPromotion)
+                ));
             } else if (promoCheck.nextJob) {
                 winEmbed.setFooter({ text: `Next Job: ${promoCheck.nextJob.title} (Need ${promoCheck.missingXp} more XP)` });
             }
@@ -462,9 +718,9 @@ async function handleButton(interaction: ButtonInteraction) {
             });
 
             if (userMessage) {
-                await (userMessage as Message).reply({ embeds: [winEmbed] });
+                await (userMessage as Message).reply({ embeds: [winEmbed], components: rows });
             } else {
-                await interaction.followUp({ embeds: [winEmbed] });
+                await interaction.followUp({ embeds: [winEmbed], components: rows });
             }
 
         } else {
@@ -474,7 +730,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 data: {
                     lastShift: new Date(), // Trigger cooldown
                     jobXp: { decrement: 5 }, // -5 XP
-                    jobStress: { increment: 10 } // +10 Stress
+                    jobStress: Math.min(100, (userData.jobStress || 0) + 10) // +10 Stress, capped at 100
                 }
             });
 

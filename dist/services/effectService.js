@@ -183,26 +183,49 @@ async function applyEffect(userId, guildId, effect, member) {
                 message: `🛡️ **Death Save** active! Your chicken will survive the next death (expires in ${formatDuration(dsDuration)}).`,
                 type: "DEATH_SAVE"
             };
+        case "PAY_MULTIPLIER":
+        case "COOLDOWN_REDUCTION": {
+            const effectUser = await getUser(userId, guildId);
+            const duration = effect.duration || 86400; // Default 24h
+            const exp = new Date(Date.now() + duration * 1000);
+            await prisma_1.default.activeEffect.create({
+                data: {
+                    userId: effectUser.id,
+                    guildId,
+                    effectType: effect.type,
+                    value: effect.value || 0,
+                    expiresAt: exp
+                }
+            });
+            if (client)
+                await logEffectAction(client, guildId, effect.type, `Activated ${effect.type} (${effect.value}) for <@${userId}> for ${formatDuration(duration)}`);
+            return {
+                message: `${branding_1.Mascot.Emotes.Success} **Boost Activated!**\n\n**Effect:** ${effect.type === "PAY_MULTIPLIER" ? "+" + ((effect.value || 0) * 100).toFixed(0) + "% Pay" : "-" + ((effect.value || 0) / 60).toFixed(1) + "m Cooldown"}\n**Duration:** ${formatDuration(duration)}`,
+                type: "CUSTOM_MESSAGE"
+            };
+        }
+        case "STRESS_REDUCTION":
         case "STRESS_REDUCE":
             const stressAmount = effect.amount || effect.value || 10;
             const stressUser = await prisma_1.default.user.findUnique({
-                where: { discordId_guildId: { discordId: userId, guildId } },
-                include: { currentEducation: true }
+                where: { discordId_guildId: { discordId: userId, guildId } }
             });
-            if (!stressUser || !stressUser.currentEducation) {
-                // If not enrolled, maybe it just relaxes them? But stress is on Education model.
-                throw new Error("You need to be a student to have stress!");
+            if (!stressUser || stressUser.jobStress <= 0) {
+                return {
+                    message: `${branding_1.Mascot.Emotes.Think} You are already chill! usage canceled.`,
+                    type: "ERROR"
+                };
             }
-            const oldStress = stressUser.currentEducation.stress;
+            const oldStress = stressUser.jobStress;
             const newStress = Math.max(0, oldStress - stressAmount);
-            await prisma_1.default.userEducation.update({
-                where: { id: stressUser.currentEducation.id },
-                data: { stress: newStress }
+            await prisma_1.default.user.update({
+                where: { id: stressUser.id },
+                data: { jobStress: newStress }
             });
             if (client)
-                await logEffectAction(client, guildId, "STRESS_REDUCE", `Reduced stress for <@${userId}> by ${stressAmount}`);
+                await logEffectAction(client, guildId, "STRESS_REDUCTION", `Reduced stress for <@${userId}> by ${stressAmount}`);
             return {
-                message: `😌 **Relief!** Your stress went down by ${stressAmount}. (Stress: ${newStress}%)`,
+                message: `😌 **Relief!** Your job stress went down by ${stressAmount}. (Stress: ${newStress}%)`,
                 type: "STRESS_REDUCE"
             };
         case "EXAM_BOOST":

@@ -19,6 +19,7 @@ export async function handleLeaderboard(message: Message, args: string[]) {
   let initialType = "net";
   if (args[0]?.toLowerCase() === "cash") initialType = "cash";
   if (args[0]?.toLowerCase() === "level" || args[0]?.toLowerCase() === "xp") initialType = "level";
+  if (args[0]?.toLowerCase() === "work" || args[0]?.toLowerCase() === "shift" || args[0]?.toLowerCase() === "employee") initialType = "employees";
   let currentType = initialType;
   const users = await prisma.user.findMany({
     where: { guildId: message.guildId! },
@@ -29,6 +30,9 @@ export async function handleLeaderboard(message: Message, args: string[]) {
       if (t === "level") {
         if (b.level !== a.level) return b.level - a.level;
         return b.xp - a.xp;
+      }
+      if (t === "employees") {
+        return (b.shiftsWorked || 0) - (a.shiftsWorked || 0);
       }
       const netA = (a.wallet?.balance ?? 0) + (t === "net" ? (a.bank?.balance ?? 0) : 0);
       const netB = (b.wallet?.balance ?? 0) + (t === "net" ? (b.bank?.balance ?? 0) : 0);
@@ -43,6 +47,8 @@ export async function handleLeaderboard(message: Message, args: string[]) {
       let valStr = "";
       if (t === "level") {
         valStr = `Level ${u.level} (${fmtAmount(u.xp)} XP)`;
+      } else if (t === "employees") {
+        valStr = `${u.shiftsWorked || 0} Shifts`;
       } else {
         const val = (u.wallet?.balance ?? 0) + (t === "net" ? (u.bank?.balance ?? 0) : 0);
         valStr = fmtCurrency(val, emoji);
@@ -67,6 +73,10 @@ export async function handleLeaderboard(message: Message, args: string[]) {
       title = `Cash Leaderboard`;
       thumbUrl = getEmoteUrl(Mascot.Emotes.Money);
     }
+    else if (t === "employees") {
+      title = `Hardest Workers`;
+      thumbUrl = getEmoteUrl(Mascot.Emotes.JobWorking);
+    }
     else {
       title = `Level Leaderboard`;
       thumbUrl = getEmoteUrl(Mascot.Emotes.Success); // Sparkle for levels?
@@ -90,10 +100,12 @@ export async function handleLeaderboard(message: Message, args: string[]) {
     const bNet = new ButtonBuilder().setCustomId("lb_net").setLabel("Net Worth").setStyle(activeType === "net" ? ButtonStyle.Primary : ButtonStyle.Secondary);
     const bCash = new ButtonBuilder().setCustomId("lb_cash").setLabel("Cash Only").setStyle(activeType === "cash" ? ButtonStyle.Primary : ButtonStyle.Secondary);
     const bLevel = new ButtonBuilder().setCustomId("lb_level").setLabel("Levels").setStyle(activeType === "level" ? ButtonStyle.Primary : ButtonStyle.Secondary);
+    const bWork = new ButtonBuilder().setCustomId("lb_employees").setLabel("Top Employees").setStyle(activeType === "employees" ? ButtonStyle.Primary : ButtonStyle.Secondary);
     try { bNet.setEmoji(btnGraph); } catch { bNet.setEmoji("📈"); }
     try { bCash.setEmoji(btnWallet); } catch { bCash.setEmoji("👛"); }
     try { bLevel.setEmoji("⭐"); } catch { }
-    return new ActionRowBuilder<ButtonBuilder>().addComponents(bNet, bCash, bLevel);
+    try { bWork.setEmoji(Mascot.Emotes.JobWorking); } catch { }
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(bNet, bCash, bLevel, bWork);
   };
   const sent = await message.reply({ embeds: [embed], components: [getButtons(currentType)] });
   const collector = sent.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
@@ -101,6 +113,7 @@ export async function handleLeaderboard(message: Message, args: string[]) {
     if (i.customId === "lb_net") currentType = "net";
     if (i.customId === "lb_cash") currentType = "cash";
     if (i.customId === "lb_level") currentType = "level";
+    if (i.customId === "lb_employees") currentType = "employees";
     const newSorted = getSorted(currentType);
     const { title: newTitle, desc: newDesc, thumbUrl: newThumb } = getEmbedData(currentType, newSorted);
     embed.setTitle(newTitle).setDescription(newDesc).setFooter({ text: `${Mascot.Name} • Top 10 Leaders` });

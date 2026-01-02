@@ -26,6 +26,8 @@ async function handleLeaderboard(message, args) {
         initialType = "cash";
     if (args[0]?.toLowerCase() === "level" || args[0]?.toLowerCase() === "xp")
         initialType = "level";
+    if (args[0]?.toLowerCase() === "work" || args[0]?.toLowerCase() === "shift" || args[0]?.toLowerCase() === "employee")
+        initialType = "employees";
     let currentType = initialType;
     const users = await prisma_1.default.user.findMany({
         where: { guildId: message.guildId },
@@ -38,6 +40,9 @@ async function handleLeaderboard(message, args) {
                     return b.level - a.level;
                 return b.xp - a.xp;
             }
+            if (t === "employees") {
+                return (b.shiftsWorked || 0) - (a.shiftsWorked || 0);
+            }
             const netA = (a.wallet?.balance ?? 0) + (t === "net" ? (a.bank?.balance ?? 0) : 0);
             const netB = (b.wallet?.balance ?? 0) + (t === "net" ? (b.bank?.balance ?? 0) : 0);
             return netB - netA;
@@ -49,6 +54,9 @@ async function handleLeaderboard(message, args) {
             let valStr = "";
             if (t === "level") {
                 valStr = `Level ${u.level} (${(0, format_1.fmtAmount)(u.xp)} XP)`;
+            }
+            else if (t === "employees") {
+                valStr = `${u.shiftsWorked || 0} Shifts`;
             }
             else {
                 const val = (u.wallet?.balance ?? 0) + (t === "net" ? (u.bank?.balance ?? 0) : 0);
@@ -77,6 +85,10 @@ async function handleLeaderboard(message, args) {
             title = `Cash Leaderboard`;
             thumbUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Money);
         }
+        else if (t === "employees") {
+            title = `Hardest Workers`;
+            thumbUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.JobWorking);
+        }
         else {
             title = `Level Leaderboard`;
             thumbUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Success); // Sparkle for levels?
@@ -99,6 +111,7 @@ async function handleLeaderboard(message, args) {
         const bNet = new discord_js_1.ButtonBuilder().setCustomId("lb_net").setLabel("Net Worth").setStyle(activeType === "net" ? discord_js_1.ButtonStyle.Primary : discord_js_1.ButtonStyle.Secondary);
         const bCash = new discord_js_1.ButtonBuilder().setCustomId("lb_cash").setLabel("Cash Only").setStyle(activeType === "cash" ? discord_js_1.ButtonStyle.Primary : discord_js_1.ButtonStyle.Secondary);
         const bLevel = new discord_js_1.ButtonBuilder().setCustomId("lb_level").setLabel("Levels").setStyle(activeType === "level" ? discord_js_1.ButtonStyle.Primary : discord_js_1.ButtonStyle.Secondary);
+        const bWork = new discord_js_1.ButtonBuilder().setCustomId("lb_employees").setLabel("Top Employees").setStyle(activeType === "employees" ? discord_js_1.ButtonStyle.Primary : discord_js_1.ButtonStyle.Secondary);
         try {
             bNet.setEmoji(btnGraph);
         }
@@ -115,7 +128,11 @@ async function handleLeaderboard(message, args) {
             bLevel.setEmoji("⭐");
         }
         catch { }
-        return new discord_js_1.ActionRowBuilder().addComponents(bNet, bCash, bLevel);
+        try {
+            bWork.setEmoji(branding_1.Mascot.Emotes.JobWorking);
+        }
+        catch { }
+        return new discord_js_1.ActionRowBuilder().addComponents(bNet, bCash, bLevel, bWork);
     };
     const sent = await message.reply({ embeds: [embed], components: [getButtons(currentType)] });
     const collector = sent.createMessageComponentCollector({ componentType: discord_js_1.ComponentType.Button, time: 60000 });
@@ -126,6 +143,8 @@ async function handleLeaderboard(message, args) {
             currentType = "cash";
         if (i.customId === "lb_level")
             currentType = "level";
+        if (i.customId === "lb_employees")
+            currentType = "employees";
         const newSorted = getSorted(currentType);
         const { title: newTitle, desc: newDesc, thumbUrl: newThumb } = getEmbedData(currentType, newSorted);
         embed.setTitle(newTitle).setDescription(newDesc).setFooter({ text: `${branding_1.Mascot.Name} • Top 10 Leaders` });

@@ -18,10 +18,16 @@ async function handleSetIncomeCooldown(message, args) {
         const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
         const cmd = (args[0] ?? "").toLowerCase();
         const timeStr = args.slice(1).join(" ");
-        const seconds = (0, format_1.parseDuration)(timeStr);
+        let seconds = 0;
+        if (timeStr.toLowerCase() === "off") {
+            seconds = 0;
+        }
+        else {
+            seconds = (0, format_1.parseDuration)(timeStr);
+        }
         if (!SUPPORTED.includes(cmd) || seconds === null || seconds < 0) {
             return message.reply({
-                embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Usage", `Usage: \`${config.prefix}setincomecooldown <work|beg|crime|slut> <duration>\`\nExample: \`${config.prefix}setincomecooldown work 1h 30m\``)]
+                embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Usage", `Usage: \`${config.prefix}setincomecooldown <work|beg|crime|slut> <duration|off>\`\nExample: \`${config.prefix}setincomecooldown work 1h 30m\` or \`... work off\``)]
             });
         }
         await prisma_1.default.incomeConfig.upsert({

@@ -13,17 +13,20 @@ export async function handleStudy(message: Message) {
     if (!message.guild) return;
 
     // Check Enrollment First
+    // Check Enrollment First
+    const config = await getGuildConfig(message.guild.id);
+    const prefix = config.prefix || "!";
+
     const user = await prisma.user.findUnique({
         where: { discordId_guildId: { discordId: message.author.id, guildId: message.guild.id } },
         include: { currentEducation: true }
     });
 
     if (!user || !user.currentEducation) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Not Enrolled", "You are not enrolled in any degree. Use `!enroll` to start your education!")] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Not Enrolled", `You are not enrolled in any degree. Use \`${prefix}enroll\` to start your education!`)] });
     }
 
     // Cooldown
-    const config = await getGuildConfig(message.guild.id);
     const cooldownTime = config?.studyCooldown ?? 300;
     const cooldownKey = `study:${message.author.id}`;
     const cd = checkCooldown(cooldownKey, cooldownTime);

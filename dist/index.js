@@ -88,7 +88,7 @@ client.on("interactionCreate", async (interaction) => {
         if (id.startsWith("inv_")) {
             return await (0, inventoryInteractionHandler_1.handleInventoryInteraction)(interaction);
         }
-        if (id.startsWith("enroll_confirm_") || id.startsWith("claim_scholarship_") || id.startsWith("stress_") || id.startsWith("confirm_stress_") || id === "cancel_stress" || id.startsWith("dropout_")) {
+        if (id.startsWith("enroll_confirm_") || id.startsWith("claim_scholarship_") || id.startsWith("stress_") || id.startsWith("confirm_stress_") || id === "cancel_stress" || id.startsWith("dropout_") || id.startsWith("work_") || id.startsWith("promote_confirm_")) {
             const { handleLifeInteraction } = require("./handlers/lifeInteractionHandler");
             return await handleLifeInteraction(interaction);
         }

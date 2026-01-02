@@ -38,6 +38,7 @@ async function applyForLoan(discordId, guildId, amount) {
     if (!user)
         throw new Error("User not found.");
     const userId = user.id;
+    await (0, bankService_1.ensureBankForUser)(userId);
     // Check Max Active Loans
     const activeLoansCount = await prisma_1.default.loan.count({
         where: { userId, status: "ACTIVE" }

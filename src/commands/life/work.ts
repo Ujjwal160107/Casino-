@@ -19,7 +19,7 @@ export async function handleWork(message: Message) {
     if (!user.jobId) {
         const embed = new EmbedBuilder()
             .setTitle("Employment Status: Unemployed")
-            .setDescription(`You currently do not have a job.\nUse \`!jobs\` to browse available careers and apply!`)
+            .setDescription(`You currently do not have a job.\nUse \`${config?.prefix || "!"}jobs\` to browse available careers and apply!`)
             .setColor("#95A5A6") // Grey
             .setThumbnail("https://media.discordapp.net/attachments/1093496077363421256/1149712711102713886/interview.png"); // Generic placeholder or none
 
@@ -53,7 +53,7 @@ export async function handleWork(message: Message) {
             { name: "Salary", value: fmtCurrency(getJobPaySync(job, config), config?.currencyEmoji), inline: true },
             { name: "Shifts Worked", value: user.shiftsWorked.toString(), inline: true },
             { name: "XP", value: user.jobXp.toString(), inline: true },
-            { name: `${getStressColor(user.jobStress)} Stress`, value: `${user.jobStress}%`, inline: true },
+            { name: `${getStressColor(user.jobStress ?? 0)} Stress`, value: `${user.jobStress ?? 0}/100`, inline: true },
             { name: "Career Progress", value: promoText }
         )
         .setFooter({ text: "Use the buttons below to work or manage employment." });
@@ -80,7 +80,7 @@ function capitalize(s: string) {
 }
 
 function getStressColor(stress: number) {
-    if (stress < 30) return "<:n_check:1451281806279311435>";
-    if (stress < 70) return "<:alert_sign:1451625691664875610>";
-    return "<:rip:1451287136132403303>";
+    if (stress < 30) return "<:n_check:1451281806279311435>"; // Low
+    if (stress < 70) return "<:alert_sign:1451625691664875610>"; // Medium
+    return "<:rip:1451287136132403303>"; // High
 }

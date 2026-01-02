@@ -43,8 +43,17 @@ export async function handleRob(message: Message, args: string[]) {
         await prisma.$transaction([prisma.wallet.update({ where: { id: victim.wallet.id }, data: { balance: { decrement: robAmount } } }), prisma.transaction.create({ data: { walletId: victim.wallet.id, amount: -robAmount, type: "robbed_by", meta: { robber: robber.discordId } } }), prisma.wallet.update({ where: { id: robber.wallet!.id }, data: { balance: { increment: robAmount } } }), prisma.transaction.create({ data: { walletId: robber.wallet!.id, amount: robAmount, type: "rob_win", meta: { victim: victim.discordId }, isEarned: true } })]);
         return message.reply({ embeds: [successEmbed(message.author, "Robbery Successful! 🥷", `${Mascot.Emotes.Money} Stole **${fmtCurrency(robAmount, emoji)}** from **${targetUser.displayName}**!`)] });
     } else {
-        const fineAmount = Math.max(Math.floor((robber.wallet!.balance * config.robFinePct) / 100), 50);
+        let fineAmount = Math.max(Math.floor((robber.wallet!.balance * config.robFinePct) / 100), 50);
+        let msg = `You paid a fine of **${fmtCurrency(fineAmount, emoji)}**.`;
+
+        // PERK: Legal Partner (10% Discount)
+        if (robber.jobId === "law_partner") {
+            const discount = Math.floor(fineAmount * 0.10);
+            fineAmount -= discount;
+            msg = `You paid a fine of **${fmtCurrency(fineAmount, emoji)}**.\n(⚖️ **Legal Partner Discount**: -${fmtCurrency(discount, emoji)})`;
+        }
+
         await prisma.$transaction([prisma.wallet.update({ where: { id: robber.wallet!.id }, data: { balance: { decrement: fineAmount } } }), prisma.transaction.create({ data: { walletId: robber.wallet!.id, amount: -fineAmount, type: "rob_fine", meta: { victim: victim.discordId } } })]);
-        return message.reply({ embeds: [errorEmbed(message.author, "Caught! 🚔", `You paid a fine of **${fmtCurrency(fineAmount, emoji)}**.`)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Caught! 🚔", msg)] });
     }
 }

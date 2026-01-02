@@ -94,6 +94,32 @@ async function checkAndSeedDegrees(guildId) {
             data: { guildId, name: "Doctor of Medicine (MD)", type: "MD", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 15000, intelligenceBoost: 5, incomeMulti: 2.5, minIntelligence: 8, requiredDegreeId: mbbs.id }
         });
     }
+    // 7. Law (LLB)
+    let llb = await prisma_1.default.degree.findFirst({ where: { guildId, name: "Bachelor of Laws (LLB)" } });
+    if (llb) {
+        llb = await prisma_1.default.degree.update({
+            where: { id: llb.id },
+            data: { passGpa: 6.0, intelligenceBoost: 3, minIntelligence: 6, incomeMulti: 1.5, totalSemesters: 1 }
+        });
+    }
+    else {
+        llb = await prisma_1.default.degree.create({
+            data: { guildId, name: "Bachelor of Laws (LLB)", type: "LLB", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 8000, intelligenceBoost: 3, incomeMulti: 1.5, minIntelligence: 6, requiredDegreeId: hs.id }
+        });
+    }
+    // 8. Law (LLM)
+    const llm = await prisma_1.default.degree.findFirst({ where: { guildId, name: "Master of Laws (LLM)" } });
+    if (llm) {
+        await prisma_1.default.degree.update({
+            where: { id: llm.id },
+            data: { passGpa: 6.0, intelligenceBoost: 5, minIntelligence: 8, requiredDegreeId: llb.id, totalSemesters: 1 }
+        });
+    }
+    else {
+        await prisma_1.default.degree.create({
+            data: { guildId, name: "Master of Laws (LLM)", type: "LLM", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 15000, intelligenceBoost: 5, incomeMulti: 2.5, minIntelligence: 8, requiredDegreeId: llb.id }
+        });
+    }
 }
 async function getDegrees(guildId) {
     await checkAndSeedDegrees(guildId);
