@@ -8,6 +8,7 @@ import { successEmbed, errorEmbed } from "../../utils/embed";
 import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
 import { formatDuration } from "../../utils/format";
 import { getGameBetLimits } from "../../utils/gameUtils";
+import { updateQuestProgress } from "../../services/questService";
 
 const CHERRY = "<:cherri:1446428169786622053>";
 const BANANA = "<:banano:1446428190837968989>";
@@ -82,6 +83,8 @@ export async function handleSlots(message: Message, args: string[]) {
     actualPayout = await placeBetFallback(user.wallet!.id, user.id, "slots", amount, "spin", win, payout, message.guildId!);
   }
   payout = actualPayout;
+  await updateQuestProgress(user.id, "GAMBLE").catch(console.error);
+  if (win) await updateQuestProgress(user.id, "WIN_SLOTS").catch(console.error);
 
 
   const eTitle = "<a:casino:1445732641545654383>";

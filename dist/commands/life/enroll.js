@@ -48,7 +48,7 @@ async function handleEnroll(message, args) {
         if (thumbUrl)
             embed.setThumbnail(thumbUrl);
         const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
-            .setCustomId(`enroll_confirm_${degree.id}`)
+            .setCustomId(`enroll_confirm_${degree.id}_${message.author.id}`)
             .setLabel("Confirm Payment")
             .setStyle(discord_js_1.ButtonStyle.Success)
             .setEmoji(branding_1.Mascot.Emotes.Success));

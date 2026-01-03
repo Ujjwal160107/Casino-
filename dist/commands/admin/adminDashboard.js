@@ -9,10 +9,12 @@ const prisma_1 = __importDefault(require("../../utils/prisma"));
 const guildConfigService_1 = require("../../services/guildConfigService");
 const permissionUtils_1 = require("../../utils/permissionUtils");
 const embed_1 = require("../../utils/embed");
+const stockService_1 = require("../../services/stockService");
 const MODULE_HOME = "module_home";
 const MODULE_DISABLES = "module_disabled";
 const MODULE_PERMS = "module_perms";
 const MODULE_CHANNELS = "module_channels";
+const MODULE_STOCKS = "module_stocks";
 function getMainMenuRow() {
     const menu = new discord_js_1.StringSelectMenuBuilder()
         .setCustomId("dashboard_menu")
@@ -20,7 +22,8 @@ function getMainMenuRow() {
         .addOptions([
         { label: "Global Disables", value: MODULE_DISABLES, emoji: "1448573227151396978" },
         { label: "Granular Permissions", value: MODULE_PERMS, emoji: "1448573334320185440" },
-        { label: "Casino Channels", value: MODULE_CHANNELS, emoji: "1448573411084210238" }
+        { label: "Casino Channels", value: MODULE_CHANNELS, emoji: "1448573411084210238" },
+        { label: "Stock Market", value: MODULE_STOCKS, emoji: "📈" }
     ]);
     return new discord_js_1.ActionRowBuilder().addComponents(menu);
 }
@@ -38,7 +41,7 @@ async function handleAdminDashboard(message) {
         .setTitle("<a:shieldd:1448576304151793665> Casino Admin Dashboard")
         .setDescription("Select a module below to manage permissions and configurations.")
         .setColor("Gold")
-        .addFields({ name: "<a:No_Entry_signnn:1448573227151396978> Global Disables", value: "Disable/Enable commands server-wide.", inline: true }, { name: "<:lockk:1448573334320185440> Granular Permissions", value: "Allow specific users/roles to use commands.", inline: true }, { name: "<:channel:1448573411084210238> Casino Channels", value: "Restrict bot usage to specific channels.", inline: true })
+        .addFields({ name: "<a:No_Entry_signnn:1448573227151396978> Global Disables", value: "Disable/Enable commands server-wide.", inline: true }, { name: "<:lockk:1448573334320185440> Granular Permissions", value: "Allow specific users/roles to use commands.", inline: true }, { name: "<:channel:1448573411084210238> Casino Channels", value: "Restrict bot usage to specific channels.", inline: true }, { name: "📈 Stock Market", value: "Manage stocks, prices, and refresh rates.", inline: true })
         .setFooter({ text: "Session expires in 10 minutes." });
     const row = getMainMenuRow();
     const reply = await message.reply({ embeds: [dashboardEmbed], components: [row] });
@@ -66,6 +69,9 @@ async function handleAdminDashboard(message) {
             case MODULE_CHANNELS:
                 await renderChannelsModule(interaction, message.guildId);
                 break;
+            case MODULE_STOCKS:
+                await renderStockModule(interaction, message.guildId);
+                break;
         }
     });
     subCollector.on("collect", async (interaction) => {
@@ -73,6 +79,23 @@ async function handleAdminDashboard(message) {
             await renderHome(interaction);
             return;
         }
+        // Stocks
+        if (interaction.customId === "btn_stock_add")
+            await handleStockAddBtn(interaction);
+        if (interaction.customId === "btn_stock_config")
+            await handleStockConfigBtn(interaction);
+        if (interaction.customId === "select_stock_manage" && interaction.isStringSelectMenu())
+            await handleStockManageSelect(interaction);
+        if (interaction.customId.startsWith("btn_stock_delete_")) {
+            const stockId = interaction.customId.replace("btn_stock_delete_", "");
+            await (0, stockService_1.deleteStock)(stockId);
+            await interaction.reply({ content: "Stock deleted.", ephemeral: true });
+            await renderStockModule(interaction, message.guildId);
+        }
+        if (interaction.customId.startsWith("btn_stock_edit_"))
+            await handleStockEditBtn(interaction);
+        if (interaction.customId === "btn_stock_home")
+            await renderStockModule(interaction, message.guildId);
         if (interaction.customId.startsWith("btn_disable_cmd"))
             await handleDisableBtn(interaction);
         if (interaction.customId === "select_enable_cmd" && interaction.isStringSelectMenu())
@@ -354,11 +377,112 @@ async function renderHome(interaction) {
         .setTitle("<a:shieldd:1448576304151793665> Casino Admin Dashboard")
         .setDescription("Select a module below to manage permissions and configurations.")
         .setColor("Gold")
-        .addFields({ name: "<a:No_Entry_signnn:1448573227151396978> Global Disables", value: "Disable/Enable commands server-wide.", inline: true }, { name: "<:lockk:1448573334320185440> Granular Permissions", value: "Allow specific users/roles/channels to use commands.", inline: true }, { name: "<:channel:1448573411084210238> Casino Channels", value: "Restrict bot usage to specific channels.", inline: true })
+        .addFields({ name: "<a:No_Entry_signnn:1448573227151396978> Global Disables", value: "Disable/Enable commands server-wide.", inline: true }, { name: "<:lockk:1448573334320185440> Granular Permissions", value: "Allow specific users/roles/channels to use commands.", inline: true }, { name: "<:channel:1448573411084210238> Casino Channels", value: "Restrict bot usage to specific channels.", inline: true }, { name: "📈 Stock Market", value: "Manage stocks, prices, and refresh rates.", inline: true })
         .setFooter({ text: "Session expires in 10 minutes." });
     const row = getMainMenuRow();
     if (interaction.isMessageComponent()) {
         await interaction.update({ embeds: [dashboardEmbed], components: [row] });
     }
+}
+// --- STOCK MARKET MODULE ---
+async function renderStockModule(interaction, guildId) {
+    const stocks = await (0, stockService_1.getAllStocks)(guildId);
+    const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
+    const refreshRate = config.stockRefreshRate || 600;
+    const list = stocks.length > 0
+        ? stocks.map(s => `• **${s.symbol}** (${s.name}) - $${s.currentPrice} (Vol: ${s.volatility}%)`).join("\n")
+        : "No stocks found. Defaults will initialize on first command use, or add one below.";
+    const embed = new discord_js_1.EmbedBuilder()
+        .setTitle("📈 Stock Market Administration")
+        .setDescription(`**Refresh Rate:** Every ${refreshRate / 60} minutes\n\n**Current Stocks:**\n${list}`)
+        .setColor("Green");
+    const rowBtns = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId("btn_stock_add").setLabel("Add Custom Stock").setStyle(discord_js_1.ButtonStyle.Success), new discord_js_1.ButtonBuilder().setCustomId("btn_stock_config").setLabel("Set Refresh Rate").setStyle(discord_js_1.ButtonStyle.Secondary));
+    const components = [rowBtns];
+    if (stocks.length > 0) {
+        const stockOptions = stocks.map(s => ({
+            label: `${s.symbol} ($${s.currentPrice})`,
+            value: s.id,
+            description: `Vol: ${s.volatility}%`
+        })).slice(0, 25); // Max 25
+        components.push(new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.StringSelectMenuBuilder().setCustomId("select_stock_manage").setPlaceholder("Select Stock to Edit/Delete").addOptions(stockOptions)));
+    }
+    components.push(getHomeButton());
+    components.push(getMainMenuRow());
+    if (interaction.isMessageComponent()) {
+        try {
+            await interaction.update({ embeds: [embed], components });
+        }
+        catch (e) {
+            // fallback if already replied
+            await interaction.editReply({ embeds: [embed], components });
+        }
+    }
+}
+async function handleStockAddBtn(interaction) {
+    const modal = new discord_js_1.ModalBuilder().setCustomId("modal_stock_add").setTitle("Add New Stock");
+    modal.addComponents(new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.TextInputBuilder().setCustomId("s_symbol").setLabel("Symbol (e.g. BTC)").setStyle(discord_js_1.TextInputStyle.Short).setMaxLength(5).setRequired(true)), new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.TextInputBuilder().setCustomId("s_name").setLabel("Company Name").setStyle(discord_js_1.TextInputStyle.Short).setRequired(true)), new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.TextInputBuilder().setCustomId("s_price").setLabel("Starting Price").setStyle(discord_js_1.TextInputStyle.Short).setPlaceholder("100").setRequired(true)), new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.TextInputBuilder().setCustomId("s_vol").setLabel("Volatility % (1-50)").setStyle(discord_js_1.TextInputStyle.Short).setPlaceholder("5").setRequired(true)));
+    await interaction.showModal(modal);
+    const submitted = await interaction.awaitModalSubmit({ time: 60000, filter: i => i.user.id === interaction.user.id }).catch(() => null);
+    if (!submitted)
+        return;
+    try {
+        const symbol = submitted.fields.getTextInputValue("s_symbol");
+        const name = submitted.fields.getTextInputValue("s_name");
+        const price = parseInt(submitted.fields.getTextInputValue("s_price"));
+        const vol = parseInt(submitted.fields.getTextInputValue("s_vol"));
+        if (isNaN(price) || isNaN(vol))
+            return submitted.reply({ content: "Price and Volatility must be numbers.", ephemeral: true });
+        await (0, stockService_1.createStock)(submitted.guildId, symbol, name, price, vol);
+        await submitted.deferUpdate();
+        await renderStockModule(interaction, submitted.guildId);
+    }
+    catch (e) {
+        await submitted.reply({ content: `Error: ${e.message}`, ephemeral: true });
+    }
+}
+async function handleStockConfigBtn(interaction) {
+    const modal = new discord_js_1.ModalBuilder().setCustomId("modal_stock_config").setTitle("Configure Stock Market");
+    modal.addComponents(new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.TextInputBuilder().setCustomId("s_rate").setLabel("Refresh Rate (Minutes)").setStyle(discord_js_1.TextInputStyle.Short).setPlaceholder("10").setRequired(true)));
+    await interaction.showModal(modal);
+    const submitted = await interaction.awaitModalSubmit({ time: 60000, filter: i => i.user.id === interaction.user.id }).catch(() => null);
+    if (!submitted)
+        return;
+    const mins = parseInt(submitted.fields.getTextInputValue("s_rate"));
+    if (isNaN(mins) || mins < 1)
+        return submitted.reply({ content: "Invalid rate. Minimum 1 minute.", ephemeral: true });
+    await (0, guildConfigService_1.updateGuildConfig)(submitted.guildId, { stockRefreshRate: mins * 60 });
+    await submitted.deferUpdate();
+    await renderStockModule(interaction, submitted.guildId);
+}
+async function handleStockManageSelect(interaction) {
+    const stockId = interaction.values[0];
+    const stock = await (0, stockService_1.getStockById)(stockId);
+    if (!stock)
+        return interaction.reply({ content: "Stock not found.", ephemeral: true });
+    const embed = new discord_js_1.EmbedBuilder()
+        .setTitle(`Manage Stock: ${stock.symbol}`)
+        .setDescription(`**Name:** ${stock.name}\n**Price:** $${stock.currentPrice}\n**Volatility:** ${stock.volatility}%\n**Base Price:** $${stock.basePrice}`)
+        .setColor("Blue");
+    const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId(`btn_stock_edit_${stock.id}`).setLabel("Edit Price/Vol").setStyle(discord_js_1.ButtonStyle.Primary), new discord_js_1.ButtonBuilder().setCustomId(`btn_stock_delete_${stock.id}`).setLabel("Delete Stock").setStyle(discord_js_1.ButtonStyle.Danger));
+    await interaction.update({ embeds: [embed], components: [row, new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId("btn_stock_home").setLabel("Back").setStyle(discord_js_1.ButtonStyle.Secondary))] });
+}
+async function handleStockEditBtn(interaction) {
+    const stockId = interaction.customId.replace("btn_stock_edit_", "");
+    const stock = await (0, stockService_1.getStockById)(stockId);
+    if (!stock)
+        return interaction.reply({ content: "Stock not found.", ephemeral: true });
+    const modal = new discord_js_1.ModalBuilder().setCustomId(`modal_stock_edit_${stockId}`).setTitle(`Edit ${stock.symbol}`);
+    modal.addComponents(new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.TextInputBuilder().setCustomId("e_price").setLabel("New Price").setStyle(discord_js_1.TextInputStyle.Short).setValue(stock.currentPrice.toString()).setRequired(true)), new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.TextInputBuilder().setCustomId("e_vol").setLabel("New Volatility").setStyle(discord_js_1.TextInputStyle.Short).setValue(stock.volatility.toString()).setRequired(true)));
+    await interaction.showModal(modal);
+    const submitted = await interaction.awaitModalSubmit({ time: 60000, filter: i => i.user.id === interaction.user.id }).catch(() => null);
+    if (!submitted)
+        return;
+    const price = parseInt(submitted.fields.getTextInputValue("e_price"));
+    const vol = parseInt(submitted.fields.getTextInputValue("e_vol"));
+    if (isNaN(price) || isNaN(vol))
+        return submitted.reply({ content: "Invalid numbers.", ephemeral: true });
+    await (0, stockService_1.editStock)(stockId, { currentPrice: price, volatility: vol });
+    await submitted.deferUpdate();
+    await renderStockModule(interaction, submitted.guildId);
 }
 //# sourceMappingURL=adminDashboard.js.map

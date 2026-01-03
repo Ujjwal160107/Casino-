@@ -106,7 +106,8 @@ function createAdminPages(prefix: string, eSettings: string): AdminPageData[] {
           value:
             `\`${prefix}setincome <cmd> <min|max> <amount>\`\n` +
             `\`${prefix}setincomecooldown <cmd> <seconds>\`\n` +
-            `\`${prefix}set-role-income @Role <amt> <time>\``
+            `\`${prefix}set-role-income @Role <amt> <time>\`\n` +
+            `\`${prefix}set-[daily/weekly/monthly] <amount>\``
         }
       ]
     }
@@ -223,7 +224,10 @@ export async function handleHelp(message: Message) {
             { name: `\`${prefix}beg\``, value: "Small earnings with low cooldown." },
             { name: `\`${prefix}crime\``, value: "High risk, high reward." },
             { name: `\`${prefix}slut\``, value: "Risky income command." },
-            { name: `\`${prefix}collect\``, value: "Claim role income." }
+            { name: `\`${prefix}collect\``, value: "Claim role income." },
+            { name: `\`${prefix}daily\``, value: "Claim your daily reward." },
+            { name: `\`${prefix}weekly\``, value: "Claim your weekly reward." },
+            { name: `\`${prefix}monthly\``, value: "Claim your monthly reward." }
           );
         await i.reply({ embeds: [embed], ephemeral: true });
       }

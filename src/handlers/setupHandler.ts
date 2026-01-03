@@ -200,6 +200,53 @@ export async function handleSetupInteraction(interaction: Interaction) {
 
             await interaction.reply({ content: "**Select a cooldown to configure:**", components: [row], ephemeral: true });
             return;
+        } else if (id === "setup_chatmoney") {
+            const config = await getGuildConfig(interaction.guildId!);
+            const modal = new ModalBuilder()
+                .setCustomId("modal_setup_chatmoney")
+                .setTitle("Chat Money Settings");
+
+            const status = new TextInputBuilder()
+                .setCustomId("chat_status")
+                .setLabel("Enable System? (yes/no)")
+                .setValue(config.chatMoneyEnabled ? "yes" : "no")
+                .setStyle(TextInputStyle.Short);
+
+            const interval = new TextInputBuilder()
+                .setCustomId("chat_interval")
+                .setLabel("Interval (seconds)")
+                .setValue(config.chatMoneyInterval.toString())
+                .setStyle(TextInputStyle.Short);
+
+            const min = new TextInputBuilder()
+                .setCustomId("chat_min")
+                .setLabel("Min Reward")
+                .setValue(config.chatMoneyMin.toString())
+                .setStyle(TextInputStyle.Short);
+
+            const max = new TextInputBuilder()
+                .setCustomId("chat_max")
+                .setLabel("Max Reward")
+                .setValue(config.chatMoneyMax.toString())
+                .setStyle(TextInputStyle.Short);
+
+            const channels = new TextInputBuilder()
+                .setCustomId("chat_channels")
+                .setLabel("Channel IDs (comma separated)")
+                .setValue(config.chatMoneyChannels.join(", "))
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(false);
+
+            modal.addComponents(
+                new ActionRowBuilder<TextInputBuilder>().addComponents(status),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(interval),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(min),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(max),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(channels)
+            );
+
+            await interaction.showModal(modal);
+
         } else if (id === "setup_next_steps") {
             const embed = new EmbedBuilder()
                 .setTitle(`${Mascot.Emotes.Accept} Next Steps - Setup Complete!`)
@@ -333,6 +380,31 @@ export async function handleSetupInteraction(interaction: Interaction) {
                 studyCooldown: studyCd
             });
             await interaction.editReply(`✅ Education config updated!`);
+        }
+        else if (id === "modal_setup_chatmoney") {
+            const statusRaw = interaction.fields.getTextInputValue("chat_status").toLowerCase();
+            const interval = parseInt(interaction.fields.getTextInputValue("chat_interval"));
+            const min = parseSmartAmount(interaction.fields.getTextInputValue("chat_min"));
+            const max = parseSmartAmount(interaction.fields.getTextInputValue("chat_max"));
+            const channelsRaw = interaction.fields.getTextInputValue("chat_channels");
+
+            if (isNaN(interval) || isNaN(min) || isNaN(max)) return interaction.editReply("Invalid numbers provided.");
+            if (min > max) return interaction.editReply("Min reward cannot be greater than Max reward.");
+
+            const enabled = ["yes", "on", "true", "enable", "1"].includes(statusRaw);
+            const channels = channelsRaw ? channelsRaw.split(",").map(id => id.trim()).filter(id => id.length > 0) : [];
+
+            if (channels.length > 5) return interaction.editReply("You can only have up to 5 chat money channels.");
+
+            await updateGuildConfig(interaction.guildId!, {
+                chatMoneyEnabled: enabled,
+                chatMoneyInterval: interval,
+                chatMoneyMin: min,
+                chatMoneyMax: max,
+                chatMoneyChannels: channels
+            });
+
+            await interaction.editReply(`✅ Chat Money updated! Status: **${enabled ? "On" : "Off"}**, Range: **${min}-${max}**, Interval: **${interval}s**.`);
         }
         else if (id === "modal_setup_job_sector") {
             const sector = interaction.fields.getTextInputValue("sector_name").toLowerCase();

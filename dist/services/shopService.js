@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.resetShop = resetShop;
 exports.getShopItems = getShopItems;
 exports.getShopItemByName = getShopItemByName;
 exports.createShopItem = createShopItem;
@@ -15,8 +16,13 @@ const prisma_1 = __importDefault(require("../utils/prisma"));
 const effectService_1 = require("./effectService");
 const discordLogger_1 = require("../utils/discordLogger");
 const discord_js_1 = require("discord.js");
-async function getShopItems(guildId) {
-    return prisma_1.default.shopItem.findMany({ where: { guildId } });
+async function resetShop(guildId, category = "GENERAL") {
+    return prisma_1.default.shopItem.deleteMany({
+        where: { guildId, category }
+    });
+}
+async function getShopItems(guildId, category = "GENERAL") {
+    return prisma_1.default.shopItem.findMany({ where: { guildId, category } });
 }
 async function getShopItemByName(guildId, name) {
     return prisma_1.default.shopItem.findFirst({
@@ -26,7 +32,7 @@ async function getShopItemByName(guildId, name) {
         }
     });
 }
-async function createShopItem(guildId, name, price, description, roleId, itemType, effects, consumable) {
+async function createShopItem(guildId, name, price, description, roleId, itemType, effects, consumable, category = "GENERAL") {
     return prisma_1.default.shopItem.create({
         data: {
             guildId,
@@ -37,7 +43,8 @@ async function createShopItem(guildId, name, price, description, roleId, itemTyp
             stock: -1,
             itemType: itemType || "COLLECTIBLE",
             effects: effects ? effects : undefined,
-            consumable: consumable || false
+            consumable: consumable || false,
+            category
         }
     });
 }

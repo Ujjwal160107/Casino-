@@ -8,6 +8,7 @@ import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
 import { formatDuration } from "../../utils/format";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
+import { updateQuestProgress } from "../../services/questService";
 
 export async function handleCoinflip(message: Message, args: string[]) {
   const config = await getGuildConfig(message.guildId!);
@@ -19,7 +20,7 @@ export async function handleCoinflip(message: Message, args: string[]) {
         errorEmbed(
           message.author,
           "Invalid Usage",
-          `Usage: \`${config.prefix}cf <amount> <heads|tails>\``
+          `Usage: \`${config.prefix}coinflip <amount> <heads|tails>\``
         ),
       ],
     });
@@ -114,6 +115,10 @@ export async function handleCoinflip(message: Message, args: string[]) {
     );
   }
   payout = actualPayout;
+
+  await updateQuestProgress(user.id, "GAMBLE").catch(console.error);
+  if (didWin) await updateQuestProgress(user.id, "WIN_COINFLIP").catch(console.error);
+
   const finalWalletBalance = user.wallet.balance - amount + payout;
   const finalWalletBalanceIntl = finalWalletBalance.toLocaleString("en-US");
   let footerIconURL: string | undefined;

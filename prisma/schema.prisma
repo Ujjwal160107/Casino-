@@ -29,6 +29,8 @@ model User {
   inventory   Inventory[] // Relation to Inventory items
   
   lastDaily   DateTime?
+  lastWeekly  DateTime?
+  lastMonthly DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
@@ -63,7 +65,9 @@ model User {
   lastJobShift      DateTime?
   lastJobPromotion  DateTime?
   shiftsWorked Int      @default(0)
+
   lastShift   DateTime?
+  lastChatMoney DateTime?
 
   // Life Sim Relations
   workLogs    WorkLog[]
@@ -73,6 +77,8 @@ model User {
   // Marriage Relations
   marriagesAsSpouse1 Marriage[] @relation("Spouse1")
   marriagesAsSpouse2 Marriage[] @relation("Spouse2")
+  
+  dailyQuests DailyQuest[]
 }
 
 model WorkLog {
@@ -174,7 +180,8 @@ model ShopItem {
   roleId       String?  // Deprecated, use effects instead
   
   // Dynamic item system
-  itemType     String   @default("COLLECTIBLE") // CONSUMABLE, ROLE, BUFF, COLLECTIBLE
+  itemType     String   @default("COLLECTIBLE") // CONSUMABLE, ROLE, BUFF, COLLECTIBLE, EQUIPMENT, UNI_BOOK
+  category     String   @default("GENERAL") // GENERAL, EDUCATION, GAMES, JOBS
   effects      Json?    // Array of effect objects
   consumable   Boolean  @default(false)
   maxUses      Int?     // For consumables, null = unlimited uses
@@ -327,6 +334,19 @@ model GuildConfig {
   // Advanced Permissions
   casinoChannels    String[] @default([]) // Whitelisted channels
 
+
+
+  // Chat Money Config
+  chatMoneyEnabled   Boolean  @default(false)
+  chatMoneyChannels  String[] @default([]) // Array of allowed channel IDs
+  chatMoneyInterval  Int      @default(60) // Seconds
+  chatMoneyMin       Int      @default(10)
+  chatMoneyMax       Int      @default(50)
+
+  // Reward Configs
+  dailyAmount   Int      @default(1000)
+  weeklyAmount  Int      @default(5000)
+  monthlyAmount Int      @default(20000)
 
   // Job System Configs
   jobSectorBasePay    Json?    @default("{}") // { "tech": 1000 }
@@ -574,4 +594,25 @@ model Marriage {
   @@unique([spouse1Id]) // User can only be spouse1 once
   @@unique([spouse2Id]) // User can only be spouse2 once
   // Application logic must enforce that a user is not BOTH spouse1 and spouse2 in different records
+}
+
+model DailyQuest {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId       String
+  user          User     @relation(fields: [userId], references: [id])
+  userId        String   @db.ObjectId
+  
+  dayKey        String   // Format: "YYYY-MM-DD"
+  
+  // Storing tasks as JSON to allow flexibility in task types
+  // e.g. [{ type: "WORK", target: 3, progress: 1, completed: false, description: "Work 3 times" }]
+  tasks         Json     
+  
+  completed     Boolean  @default(false) // All tasks completed
+  rewardClaimed Boolean  @default(false)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, dayKey])
 }

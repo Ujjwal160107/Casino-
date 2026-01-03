@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.routeMessage = routeMessage;
 const help_1 = require("./commands/general/help");
+const casinoGuide_1 = require("./commands/general/casinoGuide");
 const setPrefix_1 = require("./commands/admin/setPrefix");
 const setIncome_1 = require("./commands/admin/setIncome");
 const addEmoji_1 = require("./commands/admin/addEmoji");
@@ -17,6 +18,8 @@ const incomeCommands_1 = require("./commands/economy/incomeCommands");
 const rob_1 = require("./commands/economy/rob");
 const shop_1 = require("./commands/economy/shop");
 const inventory_1 = require("./commands/economy/inventory");
+const properties_1 = require("./commands/economy/properties");
+const adminProperty_1 = require("./commands/admin/adminProperty");
 const profile_1 = require("./commands/economy/profile");
 const leaderboard_1 = require("./commands/economy/leaderboard");
 const bank_1 = require("./commands/economy/bank");
@@ -33,7 +36,7 @@ const setCurrencyEmoji_1 = require("./commands/admin/setCurrencyEmoji");
 const viewConfig_1 = require("./commands/admin/viewConfig");
 const addShopItem_1 = require("./commands/admin/addShopItem");
 const manageShop_1 = require("./commands/admin/manageShop");
-const setTheme_1 = require("./commands/general/setTheme");
+// Removed handleSetTheme import
 const casinoBan_1 = require("./commands/admin/casinoBan");
 const casinoUnban_1 = require("./commands/admin/casinoUnban");
 const casinoBanList_1 = require("./commands/admin/casinoBanList");
@@ -41,12 +44,14 @@ const setGameCooldown_1 = require("./commands/admin/setGameCooldown");
 const roulette_1 = require("./commands/games/roulette");
 const blackjack_1 = require("./commands/games/blackjack");
 const coinflip_1 = require("./commands/games/coinflip");
+const russianRoulette_1 = require("./commands/games/russianRoulette");
 const slots_1 = require("./commands/games/slots");
 const cockfight_1 = require("./commands/games/cockfight");
 const setMinBet_1 = require("./commands/admin/setMinBet");
 const adminDashboard_1 = require("./commands/admin/adminDashboard");
 const resetAdminConfig_1 = require("./commands/admin/resetAdminConfig");
 const betLimit_1 = require("./commands/admin/betLimit");
+const setup_1 = require("./commands/admin/setup");
 const prisma_1 = __importDefault(require("./utils/prisma"));
 const embed_1 = require("./utils/embed");
 const stringUtils_1 = require("./utils/stringUtils");
@@ -60,6 +65,10 @@ async function routeMessage(client, message, prefix) {
     if (command === "set" && args[0]?.toLowerCase() === "casino" && args[1]?.toLowerCase() === "channel") {
         command = "set-casino-channel";
         args.splice(0, 2);
+    }
+    if (command === "set" && args[0]?.toLowerCase() === "prefix") {
+        command = "setprefix";
+        args.shift();
     }
     if (command === "channel" && args[0]?.toLowerCase() === "override") {
         command = "channel-override";
@@ -129,9 +138,15 @@ async function routeMessage(client, message, prefix) {
             return (0, addEmoji_1.handleAddEmoji)(message, args);
         case "help":
             return (0, help_1.handleHelp)(message);
+        case "casino":
+        case "guide":
+        case "games":
+        case "casinoguide":
+            return (0, casinoGuide_1.handleCasinoGuide)(message);
         case "setincome":
             return (0, setIncome_1.handleSetIncome)(message, args);
         case "setprefix":
+        case "set-prefix":
             return (0, setPrefix_1.handleSetPrefix)(message, args);
         case "setrob":
         case "set-rob":
@@ -197,10 +212,16 @@ async function routeMessage(client, message, prefix) {
             return rank(client, message, args);
         case "lb-wallet":
             return (0, leaderboard_1.handleLeaderboard)(message, ["cash"]);
+        case "roulette-guide":
+        case "roul-guide":
+            return (0, roulette_1.handleRouletteMenu)(message);
         case "bet":
             return (0, roulette_1.handleBet)(message, args);
         case "blackjack":
             return (0, blackjack_1.handleBlackjack)(message, args);
+        case "rr":
+        case "russianroulette":
+            return (0, russianRoulette_1.handleRussianRoulette)(message, args);
         case "coinflip":
             return (0, coinflip_1.handleCoinflip)(message, args);
         case "slots":
@@ -273,8 +294,11 @@ async function routeMessage(client, message, prefix) {
         case "clear-inv":
             const { handleRemoveItem } = require("./commands/admin/removeItem");
             return handleRemoveItem(message, args);
-        case "set-theme":
-            return (0, setTheme_1.handleSetTheme)(message, args);
+        case "reset-shop":
+        case "reset-store":
+            const { handleResetShop } = require("./commands/admin/resetShop");
+            return handleResetShop(message, args);
+        // Removed set-theme case
         case "casino-ban":
         case "ban-user":
             return (0, casinoBan_1.handleCasinoBan)(message, args);
@@ -285,6 +309,7 @@ async function routeMessage(client, message, prefix) {
         case "ban-list":
             return (0, casinoBanList_1.handleCasinoBanList)(message, args);
         case "bm":
+        case "market":
         case "black-market":
             return (0, market_1.execute)(message, args);
         case "set-loan-interest":
@@ -303,6 +328,15 @@ async function routeMessage(client, message, prefix) {
         case "set-fd-interest":
         case "set-fd":
             return (0, setEconomyConfig_1.handleSetEconomyConfig)(message, args, "fd");
+        case "set-log-channel":
+        case "set-logs":
+        case "log-channel":
+            const { handleSetLogChannel } = require("./commands/admin/setLogChannel");
+            return handleSetLogChannel(message, args);
+        case "set-casino-channel":
+        case "casino-channel":
+            const { handleSetCasinoChannel } = require("./commands/admin/setCasinoChannel");
+            return handleSetCasinoChannel(message, args);
         case "set-rd-interest":
         case "set-rd":
             return (0, setEconomyConfig_1.handleSetEconomyConfig)(message, args, "rd");
@@ -342,6 +376,10 @@ async function routeMessage(client, message, prefix) {
         case "unban-loan":
             const { handleLoanUnban } = require("./commands/admin/manageLoanBan");
             return handleLoanUnban(message, args);
+        case "reset-loans":
+        case "resetloans":
+            const { handleResetLoans } = require("./commands/admin/resetLoans");
+            return handleResetLoans(message, args);
         case "make-casino-admin":
         case "promote-casino-admin":
         case "casino-admin-add":
@@ -376,6 +414,10 @@ async function routeMessage(client, message, prefix) {
         case "ask-money":
             const { handleAsk } = require("./commands/economy/ask");
             return handleAsk(message, args);
+        case "setup":
+        case "config": // Alias config to setup as it's the new master config
+        case "admin-setup":
+            return (0, setup_1.handleSetup)(message, args);
         case "test": {
             const { handleCommandStatus } = require("./commands/admin/debugPermissions");
             return handleCommandStatus(message, args);
@@ -477,6 +519,43 @@ async function routeMessage(client, message, prefix) {
             const { handleUniStore } = require("./commands/life/uniStore");
             return handleUniStore(message);
         }
+        // MARRIAGE COMMANDS
+        case "marry":
+        case "propose": {
+            const { handleMarry } = require("./commands/life/marriage");
+            return handleMarry(message, args);
+        }
+        case "divorce": {
+            const { handleDivorce } = require("./commands/life/marriage");
+            return handleDivorce(message);
+        }
+        case "family":
+        case "spouse":
+        case "marriage": {
+            const { handleFamily } = require("./commands/life/marriage");
+            return handleFamily(message, args);
+        }
+        // PROPERTY COMMANDS
+        case "properties":
+        case "realestate":
+        case "estate":
+            return (0, properties_1.propertiesHandler)(message, args);
+        case "buy-property":
+        case "buyprop":
+            return (0, properties_1.buyPropertyHandler)(message, args);
+        case "sell-property": // System sell
+        case "sellprop":
+            return (0, properties_1.sellPropertyHandler)(message, args);
+        case "my-properties":
+        case "myprops":
+        case "portfolio": // Overlap with stock portfolio? Maybe check args or context, for now alias is fine if stock uses "stock-portfolio"
+            return (0, properties_1.myPropertiesHandler)(message);
+        case "collect-rent":
+        case "rent":
+            return (0, properties_1.collectRentHandler)(message);
+        case "manage-property":
+        case "property-admin":
+            return (0, adminProperty_1.managePropertyHandler)(message, args);
         case "manage-uni":
         case "uni-admin": {
             const { handleManageUniStore } = require("./commands/admin/manageUniStore");
@@ -513,7 +592,7 @@ async function routeMessage(client, message, prefix) {
             return handleSetDegreeCost(message, args);
         }
         case "set-study-cooldown":
-        case "setstudycd": {
+        case "set-study-cd": {
             const { handleSetStudyCooldown } = require("./commands/admin/educationAdmin");
             return handleSetStudyCooldown(message, args);
         }
@@ -523,7 +602,7 @@ async function routeMessage(client, message, prefix) {
                 "work", "crime", "beg", "slut", "rob", "shop", "inventory", "profile",
                 "leaderboard", "rank", "bet", "blackjack", "coinflip", "slots",
                 "add-money", "remove-money", "set-start-money", "reset-economy", "set-currency",
-                "min-bet", "viewconfig", "shop-add", "manage-item", "set-theme",
+                "min-bet", "viewconfig", "shop-add", "manage-item",
                 "casino-ban", "casino-unban", "banlist", "black-market",
                 "set-loan-interest", "set-fd-interest", "set-rd-interest", "set-tax",
                 "set-credit-reward", "set-credit-penalty", "set-credit-cap",

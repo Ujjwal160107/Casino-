@@ -1,8 +1,12 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleRouletteMenu = handleRouletteMenu;
 exports.handleBet = handleBet;
 const discord_js_1 = require("discord.js");
+const path_1 = __importDefault(require("path"));
 const walletService_1 = require("../../services/walletService");
 const gameService_1 = require("../../services/gameService");
 const guildConfigService_1 = require("../../services/guildConfigService");
@@ -20,11 +24,13 @@ async function handleRouletteMenu(message) {
     const eRedCoin = "<:redcoin:1446217599439343772>";
     const eDiceSpecific = "<a:dice:1446217848551899300>";
     const parseEmojiId = (str) => str.match(/:(\d+)>/)?.[1] ?? (str.match(/^\d+$/) ? str : str);
+    const bannerPath = path_1.default.join(process.cwd(), "src", "assets", "roulette_banner.png");
+    const attachment = new discord_js_1.AttachmentBuilder(bannerPath, { name: "roulette_banner.png" });
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle(`${eCasino} Roulette Table`)
         .setDescription(`Welcome to ${branding_1.Mascot.Name}'s Casino! Test your luck on the wheel.`)
         .setColor(discord_js_1.Colors.Red)
-        .setImage("https://media.tenor.com/7gKkK6W85GgAAAAC/roulette-casino.gif")
+        .setImage("attachment://roulette_banner.png")
         .setFooter({ text: "Click 'Guide' for rules or 'Play' to start." });
     const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
         .setCustomId("roul_guide")
@@ -35,7 +41,7 @@ async function handleRouletteMenu(message) {
         .setLabel("How to Play")
         .setStyle(discord_js_1.ButtonStyle.Success)
         .setEmoji(parseEmojiId(eDicesBtn)));
-    const sent = await message.reply({ embeds: [embed], components: [row] });
+    const sent = await message.reply({ embeds: [embed], components: [row], files: [attachment] });
     const collector = sent.createMessageComponentCollector({
         componentType: discord_js_1.ComponentType.Button,
         time: 60000,
@@ -103,9 +109,20 @@ async function handleBet(message, args) {
             });
         }
     }
+    // ... (validations passed) ...
     if (user.wallet.balance < amount) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Insufficient Funds", "You don't have enough money in your wallet.")] });
     }
+    // SPIN ANIMATION
+    const spinTime = config.rouletteSpinTime || 3;
+    const eCasino = "<a:casino:1445732641545654383>";
+    const spinningEmbed = new discord_js_1.EmbedBuilder()
+        .setTitle(`${eCasino} The wheel is spinning...`)
+        .setDescription(`Rolling the ball... Good luck!`)
+        .setColor(discord_js_1.Colors.Yellow)
+        .setImage("https://media.tenor.com/7gKkK6W85GgAAAAC/roulette-casino.gif");
+    const spinMsg = await message.reply({ embeds: [spinningEmbed] });
+    await new Promise(resolve => setTimeout(resolve, spinTime * 1000));
     const spin = Math.floor(Math.random() * 37);
     const redNumbers = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
     const isRed = redNumbers.has(spin);
@@ -135,6 +152,8 @@ async function handleBet(message, args) {
             multiplier = 35;
         }
         else {
+            // Clean up if error
+            await spinMsg.delete().catch(() => { });
             return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Choice", "Bet on `red`, `black`, `odd`, `even`, or a number `0-36`.")] });
         }
     }
@@ -147,6 +166,8 @@ async function handleBet(message, args) {
         actualPayout = await (0, gameService_1.placeBetFallback)(user.wallet.id, user.id, "roulette_v1", amount, choiceRaw, didWin, payout, message.guildId);
     }
     payout = actualPayout;
+    // Cleanup spinning message
+    await spinMsg.delete().catch(() => { });
     const eRedCoin = "<:redcoin:1446217599439343772>";
     const eBlackCoin = "<:BlackCoin:1446217613632999565>";
     const displayColor = spin === 0 ? "🟢" : (isRed ? eRedCoin : eBlackCoin);
@@ -157,6 +178,6 @@ async function handleBet(message, args) {
         `**Your Bet:** ${choiceRaw}\n` +
         `**${didWin ? "Won" : "Lost"}:** ${(0, format_1.fmtCurrency)(didWin ? payout : amount, emoji)}`)
         .setFooter({ text: `${branding_1.Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet.balance - amount + payout).toLocaleString()}` });
-    return message.reply({ embeds: [resultEmbed] });
+    return message.reply({ content: `<@${message.author.id}>`, embeds: [resultEmbed] });
 }
 //# sourceMappingURL=roulette.js.map

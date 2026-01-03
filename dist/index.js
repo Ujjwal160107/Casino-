@@ -40,7 +40,7 @@ if (!token) {
     console.error("DISCORD_TOKEN is missing in your .env");
     process.exit(1);
 }
-const client = new discord_js_1.Client({ intents: [discord_js_1.GatewayIntentBits.Guilds, discord_js_1.GatewayIntentBits.GuildMessages, discord_js_1.GatewayIntentBits.MessageContent,], partials: [discord_js_1.Partials.Channel], });
+const client = new discord_js_1.Client({ intents: [discord_js_1.GatewayIntentBits.Guilds, discord_js_1.GatewayIntentBits.GuildMessages, discord_js_1.GatewayIntentBits.MessageContent, discord_js_1.GatewayIntentBits.GuildMembers], partials: [discord_js_1.Partials.Channel], });
 client.once("ready", async () => { console.log(`✅ Logged in as ${client.user?.tag}`); try {
     await prisma_1.default.$connect();
     console.log("📦 Prisma connected");
@@ -95,6 +95,10 @@ client.on("interactionCreate", async (interaction) => {
         if (id.startsWith("ask_")) {
             const { handleAskInteraction } = require("./handlers/askInteractionHandler");
             return await handleAskInteraction(interaction);
+        }
+        if (id.startsWith("setup_") || id.startsWith("modal_setup_") || id.startsWith("select_setup_")) {
+            const { handleSetupInteraction } = require("./handlers/setupHandler");
+            return await handleSetupInteraction(interaction);
         }
     }
     catch (err) {

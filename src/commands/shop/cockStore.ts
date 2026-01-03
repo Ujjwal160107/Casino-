@@ -53,7 +53,7 @@ async function handleSetPrice(message: Message, args: string[]) {
         await updateShopItem(guildId, existing.id, { price });
         return message.reply(`Updated price of **${preDef.name}** to ${price}.`);
     } else {
-        await createShopItem(guildId, preDef.name, price, preDef.description, undefined, "EQUIPMENT");
+        await createShopItem(guildId, preDef.name, price, preDef.description, undefined, "EQUIPMENT", undefined, false, "GAMES");
         return message.reply(`Created **${preDef.name}** in shop with price ${price}.`);
     }
 }
@@ -205,7 +205,7 @@ async function handleBuy(message: Message, args: string[]) {
         if (!existing) {
             if (!preDef.defaultPrice) throw new Error("This item is not priced yet.");
             // Lazy create
-            await createShopItem(message.guildId!, preDef.name, preDef.defaultPrice, preDef.description, undefined, "EQUIPMENT");
+            await createShopItem(message.guildId!, preDef.name, preDef.defaultPrice, preDef.description, undefined, "EQUIPMENT", undefined, false, "GAMES");
         }
         // -------------------------
 

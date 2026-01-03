@@ -20,6 +20,7 @@ import { formatDuration } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import { Mascot } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
+import { updateQuestProgress } from "../../services/questService";
 
 export async function handleRouletteMenu(message: Message) {
   const config = await getGuildConfig(message.guildId!);
@@ -179,6 +180,8 @@ export async function handleBet(message: Message, args: string[]) {
     actualPayout = await placeBetFallback(user.wallet!.id, user.id, "roulette_v1", amount, choiceRaw, didWin, payout, message.guildId!);
   }
   payout = actualPayout;
+  await updateQuestProgress(user.id, "GAMBLE").catch(console.error);
+  if (didWin) await updateQuestProgress(user.id, "WIN_ROULETTE").catch(console.error);
 
   // Cleanup spinning message
   await spinMsg.delete().catch(() => { });

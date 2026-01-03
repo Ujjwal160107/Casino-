@@ -139,7 +139,7 @@ export async function repayLoan(discordId: string, guildId: string, amount: numb
                 where: { id: userId },
                 data: {
                     creditScore: {
-                        set: Math.min(Math.max((user.creditScore + scoreChange), ((config as any).minCreditScore || 0)), (config.maxCreditScore || 2000))
+                        set: Math.min(Math.max((user.creditScore + scoreChange), 50), (config.maxCreditScore || 2000))
                     }
                 }
             })
@@ -311,7 +311,7 @@ export async function processOverdueLoans(client: Client) {
 
         const config = await getGuildConfig(user.guildId);
         const penalty = config.creditScorePenalty || 20;
-        const minScore = (config as any).minCreditScore ?? 0;
+        const minScore = 50;
 
         await prisma.bank.update({
             where: { userId: user.id },

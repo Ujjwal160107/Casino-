@@ -98,7 +98,8 @@ async function handleJobStore(message, args) {
                     price: item.price,
                     itemType: item.type,
                     consumable: item.consumable,
-                    effects: [item.effect]
+                    effects: [item.effect],
+                    category: "JOBS"
                 }
             });
         }

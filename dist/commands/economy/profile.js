@@ -1,104 +1,162 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getProfileEmbed = getProfileEmbed;
 exports.handleProfile = handleProfile;
 const discord_js_1 = require("discord.js");
+const prisma_1 = __importDefault(require("../../utils/prisma"));
 const walletService_1 = require("../../services/walletService");
-const bankService_1 = require("../../services/bankService");
-const shopService_1 = require("../../services/shopService");
 const guildConfigService_1 = require("../../services/guildConfigService");
 const format_1 = require("../../utils/format");
-const embed_1 = require("../../utils/embed");
-const emojiRegistry_1 = require("../../utils/emojiRegistry");
-const imageService_1 = require("../../services/imageService");
 const branding_1 = require("../../config/branding");
-async function handleProfile(message, args) {
-    try {
-        const targetUser = message.mentions.users.first() || message.author;
-        if (targetUser.bot)
-            return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Error", "Bots do not have profiles.")] });
-        const user = await (0, walletService_1.ensureUserAndWallet)(targetUser.id, message.guildId, targetUser.tag);
-        const [inventory, bank, config] = await Promise.all([
-            (0, shopService_1.getUserInventory)(targetUser.id, message.guildId),
-            (0, bankService_1.getBankByUserId)(user.id),
-            (0, guildConfigService_1.getGuildConfig)(message.guildId)
-        ]);
-        const currencyEmoji = config.currencyEmoji;
-        const walletBal = user.wallet?.balance ?? 0;
-        const bankBal = bank?.balance ?? 0;
-        const inventoryValue = inventory.reduce((sum, slot) => {
-            return sum + (slot.shopItem.price * slot.amount);
-        }, 0);
-        const netWorth = walletBal + bankBal + inventoryValue;
-        let attachment;
-        try {
-            attachment = await (0, imageService_1.generateProfileImage)({ username: targetUser.username, creditScore: user.creditScore, level: user.level }, walletBal, bankBal, netWorth, targetUser.displayAvatarURL({ extension: "png", size: 256 }), user.profileTheme);
+const jobService_1 = require("../../services/jobService");
+const stockService_1 = require("../../services/stockService");
+const propertyService_1 = require("../../services/propertyService");
+async function getProfileEmbed(targetUser, guildId) {
+    // 1. Fetch Comprehensive Data
+    let userDb = await prisma_1.default.user.findUnique({
+        where: { discordId_guildId: { discordId: targetUser.id, guildId } },
+        include: {
+            wallet: true,
+            bank: true,
+            loans: true,
+            degrees: { include: { degree: true } },
+            inventory: { include: { shopItem: true } },
+            workLogs: false
         }
-        catch (e) {
-            console.error("Canvas Error:", e);
-            return message.reply("Failed to generate profile image.");
-        }
-        const eWallet = (0, emojiRegistry_1.emojiInline)("wallet", message.guild) || "👛";
-        const eInv = (0, emojiRegistry_1.emojiInline)("inventory", message.guild) || "🎒";
-        const eGraph = (0, emojiRegistry_1.emojiInline)("graph", message.guild) || "📈";
-        const parseEmojiForButton = (str) => str.match(/:(\d+)>/)?.[1] ?? (str.match(/^\d+$/) ? str : str);
-        const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
-            .setCustomId("prof_inv")
-            .setLabel("Inventory")
-            .setStyle(discord_js_1.ButtonStyle.Secondary)
-            .setEmoji(parseEmojiForButton(eInv)), new discord_js_1.ButtonBuilder()
-            .setCustomId("prof_bal")
-            .setLabel("Balance")
-            .setStyle(discord_js_1.ButtonStyle.Secondary)
-            .setEmoji(parseEmojiForButton(eWallet)));
-        const sentMsg = await message.reply({
-            files: [attachment],
-            components: [row]
-        });
-        const collector = sentMsg.createMessageComponentCollector({
-            componentType: discord_js_1.ComponentType.Button,
-            time: 60000,
-            filter: (i) => i.user.id === message.author.id
-        });
-        collector.on("collect", async (interaction) => {
-            if (interaction.customId === "prof_inv") {
-                if (inventory.length === 0) {
-                    await interaction.reply({ content: "Inventory is empty.", ephemeral: true });
-                }
-                else {
-                    const itemsList = inventory.slice(0, 10).map(i => `• ${i.shopItem.name} (x${i.amount})`).join("\n");
-                    const invEmbed = new discord_js_1.EmbedBuilder()
-                        .setTitle(`Quick Inventory`)
-                        .setColor(branding_1.Mascot.Colors.Base)
-                        .setDescription(itemsList + (inventory.length > 10 ? `\n...and ${inventory.length - 10} more` : ""));
-                    const thinkUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Think);
-                    if (thinkUrl)
-                        invEmbed.setThumbnail(thinkUrl);
-                    await interaction.reply({ embeds: [invEmbed], ephemeral: true });
-                }
+    });
+    if (!userDb) {
+        await (0, walletService_1.ensureUserAndWallet)(targetUser.id, guildId, targetUser.username);
+        userDb = await prisma_1.default.user.findUnique({
+            where: { discordId_guildId: { discordId: targetUser.id, guildId } },
+            include: {
+                wallet: true,
+                bank: true,
+                loans: true,
+                degrees: { include: { degree: true } },
+                inventory: { include: { shopItem: true } },
+                workLogs: false
             }
-            if (interaction.customId === "prof_bal") {
-                const balEmbed = new discord_js_1.EmbedBuilder()
-                    .setTitle(`Detailed Balance`)
-                    .setColor(discord_js_1.Colors.Green)
-                    .addFields({ name: "Wallet", value: (0, format_1.fmtCurrency)(walletBal, currencyEmoji), inline: true }, { name: "Bank", value: (0, format_1.fmtCurrency)(bankBal, currencyEmoji), inline: true }, { name: "Inventory", value: (0, format_1.fmtCurrency)(inventoryValue, currencyEmoji), inline: true }, { name: "Net Worth", value: (0, format_1.fmtCurrency)(netWorth, currencyEmoji), inline: true })
-                    .setFooter({ text: `${branding_1.Mascot.Name} Private View` });
-                const moneyUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Money);
-                if (moneyUrl)
-                    balEmbed.setThumbnail(moneyUrl);
-                await interaction.reply({ embeds: [balEmbed], ephemeral: true });
+        });
+        if (!userDb)
+            throw new Error("Failed to initialize user.");
+    }
+    const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
+    const emoji = config.currencyEmoji;
+    // 2. Financials
+    const walletBal = userDb.wallet?.balance || 0;
+    const bankBal = userDb.bank?.balance || 0;
+    const loanDebt = userDb.loans.reduce((sum, loan) => sum + (loan.status === "ACTIVE" ? loan.totalRepayment : 0), 0);
+    // Stock Portfolio
+    const portfolio = await (0, stockService_1.getPortfolio)(guildId, targetUser.id);
+    let stockValue = 0;
+    if (portfolio) {
+        stockValue = portfolio.holdings.reduce((sum, h) => sum + (h.stock.currentPrice * h.quantity), 0);
+    }
+    // Inventory Value
+    const invValue = userDb.inventory.reduce((sum, item) => sum + (item.shopItem.price * item.amount), 0);
+    // Net Worth
+    const netWorth = walletBal + bankBal + stockValue + invValue - loanDebt;
+    // 3. Career & Education
+    let jobDisplay = "Unemployed";
+    let salaryDisplay = "0";
+    if (userDb.jobId) {
+        const job = (0, jobService_1.getJob)(userDb.jobId);
+        if (job) {
+            const pay = await (0, jobService_1.getJobPay)(job, guildId);
+            jobDisplay = `${job.emoji} ${job.title} (${job.sector})`;
+            salaryDisplay = (0, format_1.fmtCurrency)(pay, emoji);
+        }
+    }
+    const degrees = userDb.degrees.map(d => d.degree.name).join("\n") || "No Degrees";
+    // 4. Chicken Stats
+    const chickenItem = userDb.inventory.find(i => i.shopItem.name.toLowerCase() === "chicken");
+    let chickenDisplay = "No Chicken";
+    if (chickenItem) {
+        const meta = chickenItem.meta || {};
+        const level = meta.level || 0;
+        const wins = meta.wins || 0;
+        const name = meta.name || "Chicken";
+        chickenDisplay = `${branding_1.Mascot.Emotes.Chicken} **${name}** (Lvl ${level} | ${wins} Wins)`;
+    }
+    // 5. Property Stats
+    const ownedProperties = await propertyService_1.PropertyService.getOwnedProperties(targetUser.id, guildId);
+    const propertyCount = ownedProperties.length;
+    const totalPropertyIncome = ownedProperties.reduce((sum, p) => sum + p.property.incomePerCycle, 0);
+    // 6. Construct Embed
+    return new discord_js_1.EmbedBuilder()
+        .setColor(branding_1.Mascot.Colors.Base)
+        .setTitle(`${branding_1.Mascot.Emotes.Success} User Profile: ${targetUser.username}`)
+        .setThumbnail(targetUser.displayAvatarURL())
+        .setDescription(`**Level ${userDb.level}** • **${userDb.xp} XP**\nCredit Score: **${userDb.creditScore}**`)
+        .addFields({
+        name: `${branding_1.Mascot.Emotes.MoneyBag} Wealth`,
+        value: `
+**Wallet:** ${(0, format_1.fmtCurrency)(walletBal, emoji)}
+**Bank:** ${(0, format_1.fmtCurrency)(bankBal, emoji)}
+**Stocks:** ${(0, format_1.fmtCurrency)(stockValue, emoji)}
+**Net Worth:** ${(0, format_1.fmtCurrency)(netWorth, emoji)}
+`,
+        inline: true
+    }, {
+        name: `${branding_1.Mascot.Emotes.JobWorking} Career`,
+        value: `
+**Job:** ${jobDisplay}
+**Salary:** ${salaryDisplay}/shift
+**Shifts:** ${userDb.shiftsWorked}
+**Stress:** ${userDb.jobStress}%
+`,
+        inline: true
+    }, {
+        name: `${branding_1.Mascot.Emotes.Graduate} Education`,
+        value: degrees,
+        inline: false
+    }, {
+        name: `${branding_1.Mascot.Emotes.Graph} Assets & Liabilities`,
+        value: `
+**Inventory Value:** ${(0, format_1.fmtCurrency)(invValue, emoji)}
+**Active Debt:** ${(0, format_1.fmtCurrency)(loanDebt, emoji)}
+**Properties:** ${propertyCount} (Inc: ${(0, format_1.fmtCurrency)(totalPropertyIncome, emoji)})
+**Chicken:** ${chickenDisplay}
+`,
+        inline: false
+    })
+        .setFooter({ text: `${branding_1.Mascot.Name} System • ID: ${targetUser.id}` });
+}
+async function handleProfile(message, args) {
+    const targetUser = message.mentions.users.first() || message.author;
+    const guildId = message.guildId;
+    try {
+        const embed = await getProfileEmbed(targetUser, guildId);
+        // Interactive Buttons
+        const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId("prof_refresh").setLabel("Refresh").setStyle(discord_js_1.ButtonStyle.Secondary).setEmoji("🔄"));
+        const reply = await message.reply({ embeds: [embed], components: [row] });
+        // Refresh Collector
+        const collector = reply.createMessageComponentCollector({ componentType: discord_js_1.ComponentType.Button, time: 60000 });
+        collector.on("collect", async (i) => {
+            // Allow only the original command author to control? Or maybe the target user too?
+            // Usually author.
+            if (i.user.id !== message.author.id)
+                return i.reply({ content: "Not your session.", ephemeral: true });
+            if (i.customId === "prof_refresh") {
+                try {
+                    const newEmbed = await getProfileEmbed(targetUser, guildId);
+                    await i.update({ embeds: [newEmbed] });
+                }
+                catch (err) {
+                    await i.reply({ content: "Failed to refresh.", ephemeral: true });
+                }
             }
         });
         collector.on("end", () => {
-            try {
-                const disabledRow = discord_js_1.ActionRowBuilder.from(row).setComponents(row.components.map(c => discord_js_1.ButtonBuilder.from(c).setDisabled(true)));
-                sentMsg.edit({ components: [disabledRow] }).catch(() => { });
-            }
-            catch { }
+            reply.edit({ components: [] }).catch(() => { });
         });
     }
-    catch (err) {
-        console.error("Profile Error:", err);
-        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Error", "Failed to load profile.")] });
+    catch (e) {
+        console.error("Profile Error:", e);
+        message.reply({ embeds: [new discord_js_1.EmbedBuilder().setColor("Red").setTitle("Error").setDescription("Failed to load profile.")] });
     }
 }
 //# sourceMappingURL=profile.js.map

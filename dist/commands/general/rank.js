@@ -36,7 +36,8 @@ const rank = async (client, message, args) => {
             requiredXp: xpForNext,
             rank: rankPosition,
             avatarUrl: targetUser.displayAvatarURL({ extension: 'png', size: 256 })
-        }, user.profileTheme || 'classic');
+        }, 'classic' // Hardcoded default, removing theme dependancy
+        );
         message.reply({ files: [attachment] });
     }
     catch (error) {

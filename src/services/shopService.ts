@@ -4,8 +4,14 @@ import { applyItemEffects, ItemEffect } from "./effectService";
 import { logToChannel } from "../utils/discordLogger";
 import { Colors } from "discord.js";
 
-export async function getShopItems(guildId: string) {
-  return prisma.shopItem.findMany({ where: { guildId } });
+export async function resetShop(guildId: string, category: string = "GENERAL") {
+  return prisma.shopItem.deleteMany({
+    where: { guildId, category }
+  });
+}
+
+export async function getShopItems(guildId: string, category: string = "GENERAL") {
+  return prisma.shopItem.findMany({ where: { guildId, category } });
 }
 
 export async function getShopItemByName(guildId: string, name: string) {
@@ -25,7 +31,8 @@ export async function createShopItem(
   roleId?: string,
   itemType?: string,
   effects?: ItemEffect[],
-  consumable?: boolean
+  consumable?: boolean,
+  category: string = "GENERAL"
 ) {
   return prisma.shopItem.create({
     data: {
@@ -37,7 +44,8 @@ export async function createShopItem(
       stock: -1,
       itemType: itemType || "COLLECTIBLE",
       effects: effects ? (effects as any) : undefined,
-      consumable: consumable || false
+      consumable: consumable || false,
+      category
     }
   });
 }
@@ -55,6 +63,7 @@ export async function updateShopItem(
     effects: ItemEffect[];
     consumable: boolean;
     maxUses: number;
+    category: string;
   }>
 ) {
   const updateData: any = { ...data };

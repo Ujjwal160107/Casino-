@@ -7,7 +7,6 @@ exports.handleStudy = handleStudy;
 const discord_js_1 = require("discord.js");
 const educationService_1 = require("../../services/educationService");
 const embed_1 = require("../../utils/embed");
-const cooldown_1 = require("../../utils/cooldown");
 const branding_1 = require("../../config/branding");
 const guildConfigService_1 = require("../../services/guildConfigService");
 const format_1 = require("../../utils/format");
@@ -17,23 +16,27 @@ async function handleStudy(message) {
     if (!message.guild)
         return;
     // Check Enrollment First
+    // Check Enrollment First
+    const config = await (0, guildConfigService_1.getGuildConfig)(message.guild.id);
+    const prefix = config.prefix || "!";
     const user = await prisma_1.default.user.findUnique({
         where: { discordId_guildId: { discordId: message.author.id, guildId: message.guild.id } },
         include: { currentEducation: true }
     });
     if (!user || !user.currentEducation) {
-        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Not Enrolled", "You are not enrolled in any degree. Use `!enroll` to start your education!")] });
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Not Enrolled", `You are not enrolled in any degree. Use \`${prefix}enroll\` to start your education!`)] });
     }
-    // Cooldown
-    const config = await (0, guildConfigService_1.getGuildConfig)(message.guild.id);
-    const cooldownTime = config?.studyCooldown ?? 300;
-    const cooldownKey = `study:${message.author.id}`;
-    const cd = (0, cooldown_1.checkCooldown)(cooldownKey, cooldownTime);
-    if (cd > 0) {
-        const expiresAt = (0, cooldown_1.getCooldownExpiry)(cooldownKey);
+    // DB-Based Cooldown (Dynamic)
+    const cooldownSeconds = config?.studyCooldown ?? 300;
+    const cooldownMs = cooldownSeconds * 1000;
+    const lastStudyTime = user.currentEducation.lastStudy ? new Date(user.currentEducation.lastStudy).getTime() : 0;
+    const now = Date.now();
+    if (now - lastStudyTime < cooldownMs) {
+        const remainingMs = cooldownMs - (now - lastStudyTime);
+        const expiresAt = Math.floor((now + remainingMs) / 1000);
         const embed = new discord_js_1.EmbedBuilder()
             .setTitle(`Cooldown`)
-            .setDescription(`You are tired of studying! Try again <t:${Math.floor(expiresAt / 1000)}:R>.`)
+            .setDescription(`You are tired of studying! Try again <t:${expiresAt}:R>.`)
             .setColor("#E74C3C"); // Red
         const angryUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.TeacherAngry);
         if (angryUrl)
@@ -116,14 +119,17 @@ async function handleStudy(message) {
             isWin = false; // Timeout
         }
     }
+    // Disable buttons on game message
+    if (reply)
+        await reply.edit({ components: [] }).catch(() => { });
     // Result Handling
     if (!isWin) {
         const failEmbed = new discord_js_1.EmbedBuilder()
             .setTitle("📖 Study Session Failed")
             .setDescription(`${branding_1.Mascot.Emotes.Confused} You failed the test!\n\n**Correct Answer:** ${game.answer}`)
             .setColor("#E74C3C"); // Red
-        if (reply)
-            await reply.edit({ embeds: [failEmbed], components: [] });
+        // NEW: Reply to USER MESSAGE with result
+        await message.reply({ embeds: [failEmbed] });
         return;
     }
     // Success - Execute Study
@@ -151,12 +157,11 @@ async function handleStudy(message) {
         const thumb = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Teacher);
         if (thumb)
             resultEmbed.setThumbnail(thumb);
-        if (reply)
-            await reply.edit({ embeds: [resultEmbed], components: comps });
+        // NEW: Reply to USER MESSAGE with result
+        await message.reply({ embeds: [resultEmbed], components: comps });
     }
     catch (err) {
-        if (reply)
-            await reply.edit({ embeds: [(0, embed_1.errorEmbed)(message.author, "Study Error", err.message)], components: [] });
+        await message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Study Error", err.message)] });
     }
 }
 //# sourceMappingURL=study.js.map

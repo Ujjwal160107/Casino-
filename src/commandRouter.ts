@@ -1,5 +1,6 @@
 import { Client, Message } from "discord.js";
 import { handleHelp } from "./commands/general/help";
+import { handleCasinoGuide } from "./commands/general/casinoGuide";
 import { handleSetPrefix } from "./commands/admin/setPrefix";
 import { handleSetIncome } from "./commands/admin/setIncome";
 import { handleAddEmoji } from "./commands/admin/addEmoji";
@@ -18,11 +19,15 @@ import { handleProfile } from "./commands/economy/profile";
 import { handleLeaderboard } from "./commands/economy/leaderboard";
 import { execute as handleBank } from "./commands/economy/bank";
 import { execute as handleMarket } from "./commands/economy/market";
+import { handleDaily } from "./commands/economy/daily";
+import { handleWeekly } from "./commands/economy/weekly";
+import { handleMonthly } from "./commands/economy/monthly";
 import { handleBankInteraction } from "./handlers/bankInteractionHandler";
 import { handleMarketInteraction } from "./handlers/marketInteractionHandler";
 import { handleAddMoney } from "./commands/admin/addMoney";
 import { handleSetEconomyConfig } from "./commands/admin/setEconomyConfig";
 import { handleSetRoleIncome } from "./commands/admin/setRoleIncome";
+import { handleSetMoney } from "./commands/admin/setMoney";
 import { handleRemoveMoney } from "./commands/admin/removeMoney";
 import { handleCollectRoleIncome } from "./commands/economy/collect";
 import { handleSetStartMoney } from "./commands/admin/setStartMoney";
@@ -39,6 +44,7 @@ import { handleCasinoUnban } from "./commands/admin/casinoUnban";
 import { handleCasinoBanList } from "./commands/admin/casinoBanList";
 import { handleSetGameCooldown } from "./commands/admin/setGameCooldown";
 import { handleSetLogChannel } from "./commands/admin/setLogChannel";
+import { handleChatMoneyConfig } from "./commands/admin/chatMoneyConfig";
 import { handleBet, handleRouletteMenu } from "./commands/games/roulette";
 import { handleBlackjack } from "./commands/games/blackjack";
 import { handleCoinflip } from "./commands/games/coinflip";
@@ -139,6 +145,11 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleAddEmoji(message, args);
     case "help":
       return handleHelp(message);
+    case "casino":
+    case "guide":
+    case "games":
+    case "casinoguide":
+      return handleCasinoGuide(message);
     case "setincome":
       return handleSetIncome(message, args);
     case "setprefix":
@@ -168,6 +179,18 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "beg":
     case "slut":
       return handleIncome(message);
+    case "daily":
+      return handleDaily(message);
+    case "weekly":
+      return handleWeekly(message);
+    case "monthly":
+      return handleMonthly(message);
+    case "quests":
+    case "dailyquest":
+    case "missions":
+    case "daily-quests":
+      const { handleDailyQuest } = require("./commands/life/dailyQuest");
+      return handleDailyQuest(message, args);
 
     case "stock":
     case "stocks":
@@ -247,6 +270,9 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "add-money":
     case "admin-add":
       return handleAddMoney(message, args);
+    case "set-money":
+    case "setmoney":
+      return handleSetMoney(message, args);
     case "remove-money":
     case "remove":
     case "take-money":
@@ -295,6 +321,10 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "clear-inv":
       const { handleRemoveItem } = require("./commands/admin/removeItem");
       return handleRemoveItem(message, args);
+    case "reset-shop":
+    case "reset-store":
+      const { handleResetShop } = require("./commands/admin/resetShop");
+      return handleResetShop(message, args);
     // Removed set-theme case
     case "casino-ban":
     case "ban-user":
@@ -316,6 +346,15 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleSetEconomyConfig(message, args, "bank-limit");
     case "set-wallet-limit":
       return handleSetEconomyConfig(message, args, "wallet-limit");
+    case "set-daily":
+    case "set-daily-amount":
+      return handleSetEconomyConfig(message, args, "daily-amount");
+    case "set-weekly":
+    case "set-weekly-amount":
+      return handleSetEconomyConfig(message, args, "weekly-amount");
+    case "set-monthly":
+    case "set-monthly-amount":
+      return handleSetEconomyConfig(message, args, "monthly-amount");
     case "uni":
     case "university":
       {
@@ -330,6 +369,10 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "log-channel":
       const { handleSetLogChannel } = require("./commands/admin/setLogChannel");
       return handleSetLogChannel(message, args);
+    case "chatmoney":
+    case "chat-money":
+    case "cm":
+      return handleChatMoneyConfig(message, args);
     case "set-casino-channel":
     case "casino-channel":
       const { handleSetCasinoChannel } = require("./commands/admin/setCasinoChannel");
@@ -373,6 +416,10 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "unban-loan":
       const { handleLoanUnban } = require("./commands/admin/manageLoanBan");
       return handleLoanUnban(message, args);
+    case "reset-loans":
+    case "resetloans":
+      const { handleResetLoans } = require("./commands/admin/resetLoans");
+      return handleResetLoans(message, args);
     case "make-casino-admin":
     case "promote-casino-admin":
     case "casino-admin-add":

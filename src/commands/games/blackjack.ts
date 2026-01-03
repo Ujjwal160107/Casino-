@@ -5,10 +5,12 @@ import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
+
 import { formatDuration } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
+import { updateQuestProgress } from "../../services/questService";
 
 type Card = { suit: string; rank: string; value: number };
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
@@ -54,7 +56,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
     const config = await getGuildConfig(message.guildId!);
     const { min, max } = getGameBetLimits(config, "blackjack");
 
-    const eCasino = "<:casino:1445732641545654383>";
+    const eCasino = "<a:casino:1445732641545654383>";
     let currencyEmoji = config.currencyEmoji;
     if (/^\d+$/.test(currencyEmoji)) {
         const e = message.guild?.emojis.cache.get(currencyEmoji);
@@ -123,5 +125,118 @@ export async function handleBlackjack(message: Message, args: string[]) {
         embed.setDescription(statusText);
         embed.setFooter({ text: `${Mascot.Name} • ${message.author.username}'s Game` });
         return embed;
-    }; const getRows = (disabled: boolean) => { return [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId("bj_hit").setLabel("Hit").setStyle(ButtonStyle.Primary).setEmoji("👊").setDisabled(disabled), new ButtonBuilder().setCustomId("bj_stand").setLabel("Stand").setStyle(ButtonStyle.Secondary).setEmoji("🛑").setDisabled(disabled), new ButtonBuilder().setCustomId("bj_double").setLabel("Double").setStyle(ButtonStyle.Success).setEmoji("💰").setDisabled(disabled || playerHand.length > 2 || user.wallet!.balance < currentBet * 2))]; }; if (gameOver) { try { const actualPayout = await placeBetWithTransaction(user.id, user.wallet!.id, "blackjack", currentBet, "blackjack", payout > currentBet, payout, message.guildId!); payout = actualPayout; } catch (e) { return message.reply({ content: "Transaction failed." }); } return message.reply({ embeds: [getEmbed(true)] }); } const msg = await message.reply({ embeds: [getEmbed(false)], components: getRows(false) }); const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60_000, filter: i => i.user.id === message.author.id }); collector.on("collect", async (i) => { const action = i.customId; if (action === "bj_hit") { playerHand.push(deck.pop()!); playerScore = calculateScore(playerHand); if (playerScore > 21) { gameOver = true; result = "Bust! You went over 21."; payout = 0; collector.stop(); } } else if (action === "bj_stand") { gameOver = true; collector.stop(); } else if (action === "bj_double") { if (user.wallet!.balance < currentBet * 2) { await i.reply({ content: "Insufficient funds to double.", ephemeral: true }); return; } currentBet *= 2; playerHand.push(deck.pop()!); playerScore = calculateScore(playerHand); if (playerScore > 21) { result = "Bust! You went over 21."; payout = 0; } gameOver = true; collector.stop(); } if (!gameOver) { await i.update({ embeds: [getEmbed(false)], components: getRows(false) }); } else { if (playerScore <= 21) { while (dealerScore < 17) { dealerHand.push(deck.pop()!); dealerScore = calculateScore(dealerHand); } if (dealerScore > 21) { result = "Dealer Busts! You Win!"; payout = currentBet * 2; } else if (dealerScore > playerScore) { result = "Dealer Wins."; payout = 0; } else if (dealerScore < playerScore) { result = "You Win!"; payout = currentBet * 2; } else { result = "Push."; payout = currentBet; } } let actualPayout = payout; try { actualPayout = await placeBetWithTransaction(user.id, user.wallet!.id, "blackjack", currentBet, "blackjack", payout > currentBet, payout, message.guildId!); } catch (e) { await i.update({ content: `Transaction failed: ${(e as Error).message}`, components: [] }); return; } payout = actualPayout; await i.update({ embeds: [getEmbed(true)], components: [] }); } }); collector.on("end", (_, reason) => { if (reason === "time" && !gameOver) { msg.edit({ content: "Game timed out. You surrendered.", components: [] }); } });
+    };
+
+    const getRows = (disabled: boolean) => {
+        return [
+            new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder().setCustomId("bj_hit").setLabel("Hit").setStyle(ButtonStyle.Primary).setEmoji("👊").setDisabled(disabled),
+                new ButtonBuilder().setCustomId("bj_stand").setLabel("Stand").setStyle(ButtonStyle.Secondary).setEmoji("🛑").setDisabled(disabled),
+                new ButtonBuilder().setCustomId("bj_double").setLabel("Double").setStyle(ButtonStyle.Success).setEmoji("💰").setDisabled(disabled || playerHand.length > 2 || user.wallet!.balance < currentBet * 2)
+            )
+        ];
+    };
+
+    if (gameOver) {
+        try {
+            const actualPayout = await placeBetWithTransaction(user.id, user.wallet!.id, "blackjack", currentBet, "blackjack", payout > currentBet, payout, message.guildId!);
+            payout = actualPayout;
+            await updateQuestProgress(user.id, "GAMBLE").catch(console.error);
+            if (payout > currentBet) await updateQuestProgress(user.id, "WIN_BLACKJACK").catch(console.error);
+        } catch (e) {
+            return message.reply({ content: "Transaction failed." });
+        }
+        return message.reply({ embeds: [getEmbed(true)] });
+    }
+
+    const msg = await message.reply({ embeds: [getEmbed(false)], components: getRows(false) });
+    const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60_000, filter: i => i.user.id === message.author.id });
+
+    collector.on("collect", async (i) => {
+        const action = i.customId;
+        if (action === "bj_hit") {
+            playerHand.push(deck.pop()!);
+            playerScore = calculateScore(playerHand);
+            if (playerScore > 21) {
+                gameOver = true;
+                result = "Bust! You went over 21.";
+                payout = 0;
+                collector.stop();
+            }
+        } else if (action === "bj_stand") {
+            gameOver = true;
+            collector.stop();
+        } else if (action === "bj_double") {
+            if (user.wallet!.balance < currentBet * 2) {
+                await i.reply({ content: "Insufficient funds to double.", ephemeral: true });
+                return;
+            }
+            currentBet *= 2;
+            playerHand.push(deck.pop()!);
+            playerScore = calculateScore(playerHand);
+            if (playerScore > 21) {
+                result = "Bust! You went over 21.";
+                payout = 0;
+            }
+            gameOver = true;
+            collector.stop();
+        }
+
+        if (!gameOver) {
+            await i.update({ embeds: [getEmbed(false)], components: getRows(false) });
+        } else {
+            if (playerScore <= 21) {
+                while (dealerScore < 17) {
+                    dealerHand.push(deck.pop()!);
+                    dealerScore = calculateScore(dealerHand);
+                }
+                if (dealerScore > 21) {
+                    result = "Dealer Busts! You Win!";
+                    payout = currentBet * 2;
+                } else if (dealerScore > playerScore) {
+                    result = "Dealer Wins.";
+                    payout = 0;
+                } else if (dealerScore < playerScore) {
+                    result = "You Win!";
+                    payout = currentBet * 2;
+                } else {
+                    result = "Push.";
+                    payout = currentBet;
+                }
+            }
+            let actualPayout;
+            try {
+                actualPayout = await placeBetWithTransaction(user.id, user.wallet!.id, "blackjack", currentBet, "blackjack", payout > currentBet, payout, message.guildId!);
+            } catch (e) {
+                await i.update({ content: `Transaction failed: ${(e as Error).message}`, components: [] });
+                return;
+            }
+            payout = actualPayout;
+            await updateQuestProgress(user.id, "GAMBLE").catch(console.error);
+            if (payout > currentBet) await updateQuestProgress(user.id, "WIN_BLACKJACK").catch(console.error);
+
+            await i.update({ embeds: [getEmbed(true)], components: [] });
+        }
+    });
+
+    collector.on("end", async (_, reason) => {
+        if (reason === "time" && !gameOver) {
+            gameOver = true;
+            result = "Game timed out. You surrendered.";
+            payout = 0;
+
+            let actualPayout;
+            try {
+                actualPayout = await placeBetWithTransaction(user.id, user.wallet!.id, "blackjack", currentBet, "blackjack", payout > currentBet, payout, message.guildId!);
+            } catch (e) {
+                await msg.edit({ content: `Transaction failed: ${(e as Error).message}`, components: [] });
+                return;
+            }
+            payout = actualPayout;
+            await updateQuestProgress(user.id, "GAMBLE").catch(console.error);
+            // No WIN_BLACKJACK update
+
+            await msg.edit({ embeds: [getEmbed(true)], components: [] });
+        }
+    });
 }

@@ -183,15 +183,20 @@ async function handleSetDegreeCost(message, args) {
 async function handleSetStudyCooldown(message, args) {
     if (!(await checkAdmin(message)))
         return;
-    const cdStr = args[0];
-    const cd = parseInt(cdStr);
-    if (isNaN(cd) || cd < 0)
-        return message.reply(`${branding_1.Mascot.Emotes.Fail} Usage: \`!setstudycd <seconds>\``);
+    const cdStr = args[0]?.toLowerCase();
+    let cd = 0;
+    if (cdStr === "off") {
+        cd = 0;
+    }
+    else {
+        const parsed = (0, format_1.parseDuration)(cdStr);
+        if (parsed === null || parsed < 0)
+            return message.reply(`${branding_1.Mascot.Emotes.Fail} Usage: \`!setstudycd <30s/5m/1h>\` or \`!setstudycd off\``);
+        cd = parsed;
+    }
     const guildId = message.guild.id;
-    await prisma_1.default.guildConfig.update({
-        where: { guildId },
-        data: { studyCooldown: cd }
-    });
-    message.reply(`${branding_1.Mascot.Emotes.Success} Study cooldown set to **${cd}** seconds.`);
+    await (0, guildConfigService_1.updateGuildConfig)(guildId, { studyCooldown: cd });
+    const valStr = cd === 0 ? "OFF" : `**${(0, format_1.formatDuration)(cd * 1000)}**`;
+    message.reply(`${branding_1.Mascot.Emotes.Success} Study cooldown set to ${valStr}.`);
 }
 //# sourceMappingURL=educationAdmin.js.map

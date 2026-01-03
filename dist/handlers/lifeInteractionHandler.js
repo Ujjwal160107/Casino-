@@ -21,12 +21,21 @@ async function handleButton(interaction) {
     if (!guild)
         return;
     if (customId.startsWith("enroll_confirm_")) {
-        const degreeId = customId.replace("enroll_confirm_", "");
-        await interaction.deferReply({ ephemeral: true });
+        const parts = customId.split("_");
+        // format: enroll_confirm_degreeId_userId
+        // parts: ['enroll', 'confirm', degreeId, userId]
+        // Backwards compatibility handling or robust parsing
+        const degreeId = parts[2];
+        const targetUserId = parts[3];
+        if (targetUserId && targetUserId !== user.id) {
+            return interaction.reply({ content: `${branding_1.Mascot.Emotes.Fail} This interaction is not for you.`, ephemeral: true });
+        }
+        await interaction.deferReply({ ephemeral: false });
         try {
             const result = await (0, educationService_1.enroll)(user.id, guild.id, degreeId);
             const config = await (0, guildConfigService_1.getGuildConfig)(guild.id);
             const embed = new discord_js_1.EmbedBuilder()
+                .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
                 .setTitle(`${branding_1.Mascot.Emotes.Accept} Enrollment Successful`)
                 .setDescription(`You have successfully enrolled in **${result.degree.name}**!`)
                 .addFields({ name: "Tuition Paid", value: (0, format_1.fmtCurrency)(result.degree.tuitionPerSem, config.currencyEmoji) })

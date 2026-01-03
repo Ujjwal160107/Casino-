@@ -10,7 +10,7 @@ const effectService_1 = require("./services/effectService");
 const stockService_1 = require("./services/stockService");
 function initScheduler(client) {
     // ... existing
-    // Update Stock Market every 10 minutes
+    // Update Stock Market Loop (Checks each guild's refresh rate independently)
     setInterval(async () => {
         try {
             await (0, stockService_1.updateMarket)();
@@ -18,7 +18,7 @@ function initScheduler(client) {
         catch (err) {
             console.error("Failed to update stock market:", err);
         }
-    }, 10 * 60 * 1000);
+    }, 60 * 1000);
     // Initial update to ensure prices exist
     (0, stockService_1.updateMarket)().catch(e => console.error("Initial market update failed:", e));
     // Initial update to ensure prices exist

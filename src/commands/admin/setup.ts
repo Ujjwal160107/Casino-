@@ -42,6 +42,11 @@ export async function handleSetup(message: Message, args: string[]) {
                 inline: true
             },
             {
+                name: `${Mascot.Emotes.Channel} Chat Money`,
+                value: `**Status:** ${config.chatMoneyEnabled ? "✅ On" : "❌ Off"}\n**Range:** ${config.chatMoneyMin}-${config.chatMoneyMax}\n**Interval:** ${config.chatMoneyInterval}s`,
+                inline: true
+            },
+            {
                 name: `${Mascot.Emotes.Graph} Cooldowns`,
                 value: "Set cooldowns for Work, Crime, Study, and Games.",
                 inline: true
@@ -84,6 +89,10 @@ export async function handleSetup(message: Message, args: string[]) {
 
     const row3 = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(
+            new ButtonBuilder()
+                .setCustomId("setup_chatmoney")
+                .setLabel("Chat Money")
+                .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId("setup_cooldowns")
                 .setLabel("Cooldowns")

@@ -11,7 +11,12 @@ exports.getAllStocks = getAllStocks;
 exports.getPortfolio = getPortfolio;
 exports.buyStock = buyStock;
 exports.sellStock = sellStock;
+exports.createStock = createStock;
+exports.editStock = editStock;
+exports.deleteStock = deleteStock;
+exports.getStockById = getStockById;
 const prisma_1 = __importDefault(require("../utils/prisma"));
+const guildConfigService_1 = require("./guildConfigService");
 exports.STARTING_STOCKS = [
     { symbol: "CRSH", name: "CasinoCoin", price: 50, volatility: 15 }, // High risk
     { symbol: "TECH", name: "TechGiant Corp", price: 200, volatility: 5 }, // Stable
@@ -41,33 +46,54 @@ async function initStocks(guildId) {
     }
 }
 /**
- * Updates all stock prices based on their volatility.
- * Random Walk: New Price = Old Price * (1 + Random(-Vol, +Vol)%)
- * Updates ALL stocks across ALL guilds.
+ * Updates stock prices for all guilds, respecting their individual refresh rates.
  */
 async function updateMarket() {
-    const stocks = await prisma_1.default.stock.findMany();
-    // Global trend factor (Global Bull/Bear market) - affects everyone slightly
-    const globalBias = (Math.random() * 2 - 1); // -1% to +1%
-    for (const stock of stocks) {
-        // Random fluctuation between -Volatility and +Volatility
-        const percentChange = (Math.random() * (stock.volatility * 2) - stock.volatility) + globalBias;
-        // Calculate new price
-        let newPrice = Math.floor(stock.currentPrice * (1 + percentChange / 100));
-        // Crash/Spike protection (Soft limits relative to base price)
-        if (newPrice < stock.basePrice * 0.1)
-            newPrice = Math.floor(stock.basePrice * 0.15);
-        if (newPrice > stock.basePrice * 5)
-            newPrice = Math.floor(newPrice * 0.95);
-        // Ensure price never hits 0 or negative
-        if (newPrice < 1)
-            newPrice = 1;
-        await prisma_1.default.stock.update({
-            where: { id: stock.id },
-            data: { currentPrice: newPrice, lastUpdate: new Date() }
+    // 1. Get all guilds that have stocks (optimization: could fetch all configs, but let's go by stocks)
+    // Actually, simpler to iterate all GuildConfigs that we have recorded? 
+    // Or just distinct guildIds from Stock. 
+    // Let's use groupBy to get active guildIds.
+    const guildsWithStocks = await prisma_1.default.stock.groupBy({
+        by: ['guildId'],
+    });
+    for (const g of guildsWithStocks) {
+        const guildId = g.guildId;
+        const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
+        const refreshRateMs = (config.stockRefreshRate || 600) * 1000;
+        // Find stocks for this guild that need updating
+        // We can't do complex date math in "where" easily for "lastUpdate + refreshRate < now" without raw query
+        // typically. But we can select stocks where lastUpdate < (Now - Rate)
+        const cutoff = new Date(Date.now() - refreshRateMs);
+        const stocksToUpdate = await prisma_1.default.stock.findMany({
+            where: {
+                guildId,
+                lastUpdate: { lt: cutoff }
+            }
         });
+        if (stocksToUpdate.length === 0)
+            continue;
+        // Global trend factor (Global Bull/Bear market) - affects this guild's batch
+        const globalBias = (Math.random() * 2 - 1); // -1% to +1%
+        for (const stock of stocksToUpdate) {
+            // Random fluctuation between -Volatility and +Volatility
+            const percentChange = (Math.random() * (stock.volatility * 2) - stock.volatility) + globalBias;
+            // Calculate new price
+            let newPrice = Math.floor(stock.currentPrice * (1 + percentChange / 100));
+            // Crash/Spike protection (Soft limits relative to base price)
+            if (newPrice < stock.basePrice * 0.1)
+                newPrice = Math.floor(stock.basePrice * 0.15);
+            if (newPrice > stock.basePrice * 5)
+                newPrice = Math.floor(newPrice * 0.95);
+            // Ensure price never hits 0 or negative
+            if (newPrice < 1)
+                newPrice = 1;
+            await prisma_1.default.stock.update({
+                where: { id: stock.id },
+                data: { currentPrice: newPrice, lastUpdate: new Date() }
+            });
+        }
+        // console.log(`📈 Updated ${stocksToUpdate.length} stocks for guild ${guildId}`);
     }
-    // console.log("📈 Stock Market Updated (Global)");
 }
 async function getStock(guildId, symbol) {
     return prisma_1.default.stock.findUnique({
@@ -85,24 +111,40 @@ async function getAllStocks(guildId) {
         orderBy: { currentPrice: 'desc' }
     });
 }
-async function getPortfolio(userId) {
+// Helper to resolve User ObjectID from Discord ID
+async function getUserObjectId(guildId, discordId) {
+    const user = await prisma_1.default.user.findUnique({
+        where: { discordId_guildId: { discordId, guildId } }
+    });
+    return user ? user.id : null;
+}
+async function getPortfolio(guildId, discordId) {
+    const userId = await getUserObjectId(guildId, discordId);
+    if (!userId)
+        return null;
     return prisma_1.default.portfolio.findUnique({
         where: { userId },
         include: { holdings: { include: { stock: true } } }
     });
 }
-async function buyStock(guildId, userId, symbol, quantity) {
+async function buyStock(guildId, discordId, symbol, quantity) {
     if (quantity <= 0)
         throw new Error("Quantity must be positive.");
     const stock = await getStock(guildId, symbol);
     if (!stock)
         throw new Error(`Stock **${symbol}** not found in this market.`);
     const cost = stock.currentPrice * quantity;
-    // Check balance
-    const user = await prisma_1.default.user.findUnique({ where: { id: userId }, include: { wallet: true } });
-    if (!user || !user.wallet || user.wallet.balance < cost) {
+    // Resolve User
+    const user = await prisma_1.default.user.findUnique({
+        where: { discordId_guildId: { discordId, guildId } },
+        include: { wallet: true }
+    });
+    if (!user)
+        throw new Error("User not found. Try chatting first to register.");
+    if (!user.wallet || user.wallet.balance < cost) {
         throw new Error(`Insufficient funds. Cost: ${cost}`);
     }
+    const userId = user.id; // User's ObjectID
     // Ensure Portfolio
     let portfolio = await prisma_1.default.portfolio.findUnique({ where: { userId } });
     if (!portfolio) {
@@ -138,15 +180,15 @@ async function buyStock(guildId, userId, symbol, quantity) {
     }
     return { stock, cost, newQty: (holding ? holding.quantity : 0) + quantity };
 }
-async function sellStock(guildId, userId, symbol, quantity) {
+async function sellStock(guildId, discordId, symbol, quantity) {
     if (quantity <= 0)
         throw new Error("Quantity must be positive.");
-    // We need to find the stock ensuring it belongs to this guild, 
-    // although for selling, we care more that the user OWNS it.
-    // However, prices should come from the current guild's market.
     const stock = await getStock(guildId, symbol);
     if (!stock)
         throw new Error(`Stock **${symbol}** not found in this market.`);
+    const userId = await getUserObjectId(guildId, discordId);
+    if (!userId)
+        throw new Error("User not found.");
     const portfolio = await prisma_1.default.portfolio.findUnique({
         where: { userId },
         include: { holdings: true }
@@ -178,5 +220,34 @@ async function sellStock(guildId, userId, symbol, quantity) {
     }
     const profit = value - (holding.avgBuyPrice * quantity);
     return { stock, value, profit, remaining: holding.quantity - quantity };
+}
+// --- ADMIN MANAGEMENT ---
+async function createStock(guildId, symbol, name, price, volatility) {
+    const exists = await getStock(guildId, symbol);
+    if (exists)
+        throw new Error(`Stock with symbol ${symbol} already exists.`);
+    return prisma_1.default.stock.create({
+        data: {
+            guildId,
+            symbol: symbol.toUpperCase(),
+            name,
+            currentPrice: price,
+            basePrice: price,
+            volatility,
+            lastUpdate: new Date()
+        }
+    });
+}
+async function editStock(stockId, data) {
+    return prisma_1.default.stock.update({
+        where: { id: stockId },
+        data
+    });
+}
+async function deleteStock(stockId) {
+    return prisma_1.default.stock.delete({ where: { id: stockId } });
+}
+async function getStockById(stockId) {
+    return prisma_1.default.stock.findUnique({ where: { id: stockId } });
 }
 //# sourceMappingURL=stockService.js.map

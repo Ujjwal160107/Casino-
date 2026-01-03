@@ -69,7 +69,8 @@ async function checkAndSeedUniItems(guildId) {
                     effects: item.effects,
                     consumable: item.consumable,
                     maxUses: item.maxUses,
-                    stock: item.stock
+                    stock: item.stock,
+                    category: "EDUCATION"
                 }
             });
         }

@@ -5,6 +5,7 @@ import { fmtCurrency, formatDuration } from "../utils/format";
 import { Mascot, getEmoteUrl } from "../config/branding";
 import prisma from "../utils/prisma";
 import { logToChannel } from "../utils/discordLogger";
+import { updateQuestProgress } from "../services/questService";
 
 export async function handleLifeInteraction(interaction: Interaction) {
     if (interaction.isButton()) {
@@ -727,6 +728,9 @@ async function handleButton(interaction: ButtonInteraction) {
                 thumbnail: user.displayAvatarURL(),
                 color: 0x2ECC71
             });
+
+            // Update Quest Progress
+            await updateQuestProgress(userData.id, "WORK").catch(console.error);
 
             if (userMessage) {
                 await (userMessage as Message).reply({ embeds: [winEmbed], components: rows });

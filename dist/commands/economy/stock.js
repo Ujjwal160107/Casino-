@@ -47,7 +47,7 @@ async function handleStock(message, args) {
         }
     }
     if (sub === "portfolio" || sub === "port") {
-        const pf = await (0, stockService_1.getPortfolio)(message.author.id);
+        const pf = await (0, stockService_1.getPortfolio)(message.guildId, message.author.id);
         if (!pf || pf.holdings.length === 0) {
             return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Portfolio Empty", "You don't own any stocks.")] });
         }

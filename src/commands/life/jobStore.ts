@@ -94,7 +94,8 @@ export async function handleJobStore(message: Message, args: string[]) {
                     price: item.price,
                     itemType: item.type,
                     consumable: item.consumable,
-                    effects: [item.effect]
+                    effects: [item.effect],
+                    category: "JOBS"
                 }
             });
         }

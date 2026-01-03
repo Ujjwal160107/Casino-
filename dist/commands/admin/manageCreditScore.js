@@ -14,17 +14,19 @@ async function handleSetCreditScore(message, args) {
     if (!message.member || !(await (0, permissionUtils_1.canExecuteAdminCommand)(message, message.member))) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Access Denied", "Admins or Bot Commanders only.")] });
     }
+    const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
+    const maxScore = config.maxCreditScore;
+    const minScore = 50;
     if (args[0]?.toLowerCase() === "all" || args[0]?.toLowerCase() === "everyone") {
         const amountArg = args[1];
         if (!amountArg) {
-            const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
             return message.reply({
                 embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Usage", `Usage: \`${config.prefix}set-credit-score all <amount>\`\nExample: \`${config.prefix}set-credit-score all 500\``)]
             });
         }
         const amount = parseInt(amountArg);
-        if (isNaN(amount) || amount < 0 || amount > 5000) {
-            return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Amount", "Score must be between 0 and 5000.")] });
+        if (isNaN(amount) || amount < minScore || amount > maxScore) {
+            return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Amount", `Score must be between **${minScore}** and **${maxScore}**.`)] });
         }
         const result = await prisma_1.default.user.updateMany({
             where: { guildId: message.guildId },
@@ -44,14 +46,14 @@ async function handleSetCreditScore(message, args) {
     const targetUser = message.mentions.users.first();
     const amountArg = args.find(a => !a.startsWith("<@") && !isNaN(parseInt(a)));
     if (!targetUser || !amountArg) {
-        const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
         return message.reply({
             embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Usage", `Usage: \`${config.prefix}set-credit-score @user <amount>\` or \`${config.prefix}set-credit-score all <amount>\``)]
         });
     }
     const amount = parseInt(amountArg);
-    if (isNaN(amount) || amount < 0 || amount > 5000)
-        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Amount", "Score must be between 0 and 5000.")] });
+    if (isNaN(amount) || amount < minScore || amount > maxScore) {
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Amount", `Score must be between **${minScore}** and **${maxScore}**.`)] });
+    }
     const user = await (0, walletService_1.ensureUserAndWallet)(targetUser.id, message.guildId, targetUser.tag);
     const updatedUser = await prisma_1.default.user.update({
         where: { id: user.id },
