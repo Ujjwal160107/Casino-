@@ -11,6 +11,7 @@ const format_1 = require("../utils/format");
 const branding_1 = require("../config/branding");
 const prisma_1 = __importDefault(require("../utils/prisma"));
 const discordLogger_1 = require("../utils/discordLogger");
+const questService_1 = require("../services/questService");
 async function handleLifeInteraction(interaction) {
     if (interaction.isButton()) {
         await handleButton(interaction);
@@ -626,6 +627,8 @@ async function handleButton(interaction) {
                 thumbnail: user.displayAvatarURL(),
                 color: 0x2ECC71
             });
+            // Update Quest Progress
+            await (0, questService_1.updateQuestProgress)(userData.id, "WORK").catch(console.error);
             if (userMessage) {
                 await userMessage.reply({ embeds: [winEmbed], components: rows });
             }

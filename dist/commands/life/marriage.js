@@ -11,6 +11,7 @@ const prisma_1 = __importDefault(require("../../utils/prisma"));
 const embed_1 = require("../../utils/embed");
 const branding_1 = require("../../config/branding");
 const marriageService_1 = require("../../services/life/marriageService");
+const discordLogger_1 = require("../../utils/discordLogger");
 async function handleMarry(message, args) {
     if (message.mentions.users.size === 0) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Usage", "You must mention someone to marry!")] });
@@ -66,25 +67,42 @@ async function handleMarry(message, args) {
             return;
         }
         if (i.customId === 'accept_proposal') {
-            // Re-check ring just in case they dropped it? Unlikely in 60s but safe.
-            // FIX: Pass guildId
-            const stillHasRing = await (0, marriageService_1.checkHasRing)(message.author.id, message.guildId);
-            if (!stillHasRing) {
-                await i.update({ content: " Proposal Failed", embeds: [(0, embed_1.errorEmbed)(target, "Proposal Failed", "The proposer lost the ring!")], components: [] });
-                return;
+            try {
+                // Re-check ring just in case they dropped it? Unlikely in 60s but safe.
+                const stillHasRing = await (0, marriageService_1.checkHasRing)(message.author.id, message.guildId);
+                if (!stillHasRing) {
+                    await i.update({ content: " Proposal Failed", embeds: [(0, embed_1.errorEmbed)(target, "Proposal Failed", "The proposer lost the ring!")], components: [] });
+                    return;
+                }
+                // Check if target is already married before consuming ring (race condition check)
+                if (await (0, marriageService_1.isMarried)(target.id, message.guildId)) {
+                    await i.update({ content: null, embeds: [(0, embed_1.errorEmbed)(target, "Proposal Failed", "You are already married!")], components: [] });
+                    return;
+                }
+                // Check if author is already married (race condition check)
+                if (await (0, marriageService_1.isMarried)(message.author.id, message.guildId)) {
+                    await i.update({ content: null, embeds: [(0, embed_1.errorEmbed)(target, "Proposal Failed", "The proposer is already married!")], components: [] });
+                    return;
+                }
+                await (0, marriageService_1.consumeRing)(message.author.id, message.guildId);
+                await (0, marriageService_1.marry)(message.author.id, message.author.username, target.id, target.username, message.guildId);
+                await (0, discordLogger_1.logToChannel)(message.client, {
+                    guild: message.guild,
+                    type: "TRADE",
+                    title: "Marriage Created",
+                    description: `**${message.author.tag}** married **${target.tag}**!`,
+                    color: 0xFF69B4
+                });
+                const acceptEmbed = new discord_js_1.EmbedBuilder()
+                    .setColor("#ff69b4")
+                    .setTitle(`💖 Just Married! 💖`)
+                    .setDescription(`Congratulations! **${message.author.username}** and **${target.username}** are now married! 🎉`)
+                    .setThumbnail((0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Love) || "");
+                await i.update({ content: null, embeds: [acceptEmbed], components: [], files: [], attachments: [] });
             }
-            // FIX: Pass guildId and usernames for creation
-            await (0, marriageService_1.consumeRing)(message.author.id, message.guildId);
-            await (0, marriageService_1.marry)(message.author.id, message.author.username, target.id, target.username, message.guildId);
-            const acceptEmbed = new discord_js_1.EmbedBuilder()
-                .setColor("#ff69b4")
-                .setTitle(`💖 Just Married! 💖`)
-                .setDescription(`Congratulations! **${message.author.username}** and **${target.username}** are now married! 🎉`)
-                .setThumbnail((0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Love) || ""); // Use a happy emote
-            // Image removed as per user request
-            // Actually user asked for "marriage acceptance or decline embed"
-            // Let's use a nice description.
-            await i.update({ content: null, embeds: [acceptEmbed], components: [], files: [], attachments: [] });
+            catch (err) {
+                await i.update({ content: null, embeds: [(0, embed_1.errorEmbed)(target, "Marriage Failed", err.message || "An error occurred.")], components: [] });
+            }
         }
         else {
             const declineEmbed = new discord_js_1.EmbedBuilder()
@@ -137,6 +155,13 @@ async function handleDivorce(message) {
         }
         if (i.customId === 'confirm_divorce') {
             await (0, marriageService_1.divorce)(message.author.id, message.guildId);
+            await (0, discordLogger_1.logToChannel)(message.client, {
+                guild: message.guild,
+                type: "TRADE",
+                title: "Divorce Finalized",
+                description: `**${message.author.tag}** divorced <@${spouseId}>.`,
+                color: 0x000000
+            });
             const divorcedEmbed = new discord_js_1.EmbedBuilder()
                 .setColor("#000000")
                 .setTitle("💔 Divorced")
@@ -195,6 +220,12 @@ async function handleJointDeposit(message, args) {
     }
     try {
         const newBal = await (0, marriageService_1.depositToJoint)(message.author.id, message.guildId, amount);
+        await (0, discordLogger_1.logToChannel)(message.client, {
+            guild: message.guild,
+            type: "ECONOMY",
+            title: "Joint Account Deposit",
+            description: `**User:** ${message.author.tag}\n**Amount:** ${amount.toLocaleString()} coins\n**New Balance:** ${newBal.toLocaleString()}`
+        });
         const embed = (0, embed_1.successEmbed)(message.author, "Deposit Successful", `Deposited **${amount.toLocaleString()}** coins to your joint account.\nNew Balance: **${newBal.toLocaleString()}**`);
         return message.reply({ embeds: [embed] });
     }
@@ -222,6 +253,12 @@ async function handleJointWithdraw(message, args) {
     }
     try {
         const newBal = await (0, marriageService_1.withdrawFromJoint)(message.author.id, message.guildId, amount);
+        await (0, discordLogger_1.logToChannel)(message.client, {
+            guild: message.guild,
+            type: "ECONOMY",
+            title: "Joint Account Withdrawal",
+            description: `**User:** ${message.author.tag}\n**Amount:** ${amount.toLocaleString()} coins\n**New Balance:** ${newBal.toLocaleString()}`
+        });
         const embed = (0, embed_1.successEmbed)(message.author, "Withdrawal Successful", `Withdrew **${amount.toLocaleString()}** coins from your joint account.\nNew Balance: **${newBal.toLocaleString()}**`);
         return message.reply({ embeds: [embed] });
     }

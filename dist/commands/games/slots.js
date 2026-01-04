@@ -10,6 +10,7 @@ const format_1 = require("../../utils/format");
 const embed_1 = require("../../utils/embed");
 const cooldown_1 = require("../../utils/cooldown");
 const gameUtils_1 = require("../../utils/gameUtils");
+const questService_1 = require("../../services/questService");
 const CHERRY = "<:cherri:1446428169786622053>";
 const BANANA = "<:banano:1446428190837968989>";
 const GRAPES = "<:graps:1446428294483542040>";
@@ -82,6 +83,9 @@ async function handleSlots(message, args) {
         actualPayout = await (0, gameService_1.placeBetFallback)(user.wallet.id, user.id, "slots", amount, "spin", win, payout, message.guildId);
     }
     payout = actualPayout;
+    await (0, questService_1.updateQuestProgress)(user.id, "GAMBLE").catch(console.error);
+    if (win)
+        await (0, questService_1.updateQuestProgress)(user.id, "WIN_SLOTS").catch(console.error);
     const eTitle = "<a:casino:1445732641545654383>";
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle(`${eTitle} Slots`)

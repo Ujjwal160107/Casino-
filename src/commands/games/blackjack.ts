@@ -16,6 +16,73 @@ type Card = { suit: string; rank: string; value: number };
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
 
+const EMOJI_MAP: Record<string, Record<string, string>> = {
+    "♠️": {
+        "A": "<:3606playingcardspadesace:1457404330503045273>",
+        "2": "<:8524playingcardspadestwo:1457404368956690633>",
+        "3": "<:1367playingcardspadesthree:1457404324350132385>",
+        "4": "<:9806playingcardspadesfour:1457404380830765066>",
+        "5": "<:5162playingcardspadesfive:1457404343228829727>",
+        "6": "<:4160playingcardspadessix:1457404334529843220>",
+        "7": "<:9649playingcardspadesseven:1457404378599133344>",
+        "8": "<:5501playingcardspadeseight:1457404347947422003>",
+        "9": "<:5071playingcardspadesnine:1457404341693448302>",
+        "10": "<:8896playingcardspadesten:1457404373435940935>",
+        "J": "<:7377playingcardspadesjack:1457404358231724267>",
+        "Q": "<:4328playingcardspadesqueen:1457404338367500481>",
+        "K": "<:9846playingcardspadesking:1457404383376576655>"
+    },
+    "♥️": {
+        "A": "<:7039playingcardheartsace:1457404091322859686>",
+        "2": "<:7102playingcardheartstwo:1457404094359666770>",
+        "3": "<:9383playingcardheartsthree:1457404110214135952>",
+        "4": "<:5715playingcardheartsfour:1457404085069287625>",
+        "5": "<:8796playingcardheartsfive:1457404108234293269>",
+        "6": "<:7193playingcardheartssix:1457404098747039927>",
+        "7": "<:5765playingcardheartsseven:1457404087111913573>",
+        "8": "<:3572playingcardheartseight:1457404073837072474>",
+        "9": "<:5451playingcardheartsnine:1457404083010011259>",
+        "10": "<:7963playingcardheartsten:1457404106116436161>",
+        "J": "<:5593playingcardheartsjack:1457406307551416412>",
+        "Q": "<:4703playingcardheartsqueen:1457404078991872082>",
+        "K": "<:7669playingcardheartsking:1457404103570362464>"
+    },
+    "♦️": {
+        "A": "<:1454playingcarddiamondsace:1457404065288945747>",
+        "2": "<:7165playingcarddiamondstwo:1457404096817660025>",
+        "3": "<:5772playingcarddiamondsthree:1457404089171181711>",
+        "4": "<:1497playingcarddiamondsfour:1457404067302346772>",
+        "5": "<:4065playingcarddiamondsfive:1457404075829235824>",
+        "6": "<:1169playingcarddiamondssix:1457404063191925023>",
+        "7": "<:2336playingcarddiamondsseven:1457404069344706642>",
+        "8": "<:9921playingcarddiamondseight:1457404115117150431>",
+        "9": "<:9976playingcarddiamondsnine:1457404117667282974>",
+        "10": "<:2715playingcarddiamondsten:1457404071467290644>",
+        "J": "<:9562playingcarddiamondsjack:1457404113221320869>",
+        "Q": "<:5305playingcarddiamondsqueen:1457404081231364126>",
+        "K": "<:7596playingcarddiamondsking:1457404100990861532>"
+    },
+    "♣️": {
+        "A": "<:2918playingcardclubsace:1457404328733053061>",
+        "2": "<:8842playingcardclubstwo:1457404371158569109>",
+        "3": "<:4263playingcardclubsthree:1457404336559755570>",
+        "4": "<:3948playingcardclubsfour:1457404332466241711>",
+        "5": "<:5269playingcardclubsfive:1457404345124655135>",
+        "6": "<:7348playingcardclubssix:1457404356168126484>",
+        "7": "<:9858playingcardclubsseven:1457404386052411493>",
+        "8": "<:8965playingcardclubseight:1457404376175083630>",
+        "9": "<:2529playingcardclubsnine:1457404326904467456>",
+        "10": "<:7160playingcardclubsten:1457404353911590922>",
+        "J": "<:6968playingcardclubsjack:1457404350358884386>",
+        "Q": "<:7744playingcardclubsqueen:1457404363730587769>",
+        "K": "<:9978playingcardclubsking:1457404388858658936>"
+    }
+};
+
+function getCardEmoji(card: Card): string {
+    return EMOJI_MAP[card.suit]?.[card.rank] || `\`${card.rank}${card.suit}\``;
+}
+
 function createDeck(): Card[] {
     const deck: Card[] = [];
     for (const suit of SUITS) {
@@ -41,9 +108,9 @@ function calculateScore(hand: Card[]): number {
 
 function formatHand(hand: Card[], hideFirst = false): string {
     if (hideFirst) {
-        return `**??** ${hand.slice(1).map(c => `\`${c.rank}${c.suit}\``).join("  ")}`;
+        return `**??**   ${hand.slice(1).map(c => getCardEmoji(c)).join("  ")}`;
     }
-    return hand.map(c => `\`${c.rank}${c.suit}\``).join("  ");
+    return hand.map(c => getCardEmoji(c)).join("  ");
 }
 
 export async function handleBlackjack(message: Message, args: string[]) {
@@ -107,7 +174,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
     }
     const getEmbed = (reveal: boolean) => {
         const pScore = calculateScore(playerHand);
-        const dScore = reveal ? calculateScore(dealerHand) : "?";
+        const dScore = reveal ? calculateScore(dealerHand) : calculateScore(dealerHand.slice(1));
         const embed = new EmbedBuilder().setTitle(`${eCasino} Blackjack Table`).setColor(gameOver ? (payout > currentBet ? Colors.Green : (payout === currentBet ? Colors.Yellow : Colors.Red)) : Colors.Blue).addFields({ name: `Your Hand (${pScore})`, value: formatHand(playerHand), inline: true }, { name: `Dealer's Hand (${dScore})`, value: formatHand(dealerHand, !reveal), inline: true });
         let statusText = `**Bet:** ${fmtCurrency(currentBet, currencyEmoji)}`;
         if (gameOver) {
@@ -120,7 +187,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
             else if (payout === 0 && failUrl) embed.setThumbnail(failUrl);
 
         } else {
-            statusText += `\n\nChoose an action below.`;
+            statusText += `\n\n**Hit** - Take another card\n**Stand** - End the game\n**Double Down** - Double your bet, hit once, then stand`;
         }
         embed.setDescription(statusText);
         embed.setFooter({ text: `${Mascot.Name} • ${message.author.username}'s Game` });
@@ -130,9 +197,9 @@ export async function handleBlackjack(message: Message, args: string[]) {
     const getRows = (disabled: boolean) => {
         return [
             new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder().setCustomId("bj_hit").setLabel("Hit").setStyle(ButtonStyle.Primary).setEmoji("👊").setDisabled(disabled),
-                new ButtonBuilder().setCustomId("bj_stand").setLabel("Stand").setStyle(ButtonStyle.Secondary).setEmoji("🛑").setDisabled(disabled),
-                new ButtonBuilder().setCustomId("bj_double").setLabel("Double").setStyle(ButtonStyle.Success).setEmoji("💰").setDisabled(disabled || playerHand.length > 2 || user.wallet!.balance < currentBet * 2)
+                new ButtonBuilder().setCustomId("bj_hit").setLabel("Hit").setStyle(ButtonStyle.Primary).setDisabled(disabled),
+                new ButtonBuilder().setCustomId("bj_stand").setLabel("Stand").setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+                new ButtonBuilder().setCustomId("bj_double").setLabel("Double").setStyle(ButtonStyle.Success).setDisabled(disabled || playerHand.length > 2 || user.wallet!.balance < currentBet * 2)
             )
         ];
     };

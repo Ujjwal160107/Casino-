@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import prisma from "./utils/prisma";
+import { CasinoDropService } from "./services/casinoDropService";
 import { checkMaturedInvestments, processAllInvestments, processOverdueLoans } from "./services/bankingService";
 import { removeTemporaryRoles } from "./services/effectService";
 import { Client } from "discord.js";
@@ -34,8 +35,37 @@ export function initScheduler(client: Client) {
             }
 
             await removeTemporaryRoles(client);
+
+            // Casino Drops
+            await CasinoDropService.processDrops(client).catch(e => console.error("Casino drop error:", e));
         } catch (err) {
             console.error("Scheduler error:", err);
+        }
+    });
+
+    // Cleanup Job: Runs every hour
+    cron.schedule("0 * * * *", async () => {
+        console.log("🧹 Running guild data cleanup...");
+        try {
+            const threshold = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
+
+            const guildsToDelete = await prisma.guildConfig.findMany({
+                where: {
+                    deletedAt: {
+                        lte: threshold
+                    }
+                }
+            });
+
+            if (guildsToDelete.length > 0) {
+                console.log(`Found ${guildsToDelete.length} guilds pending permanent deletion.`);
+                const { guildCleanupService } = require("./services/guildCleanupService");
+                for (const guild of guildsToDelete) {
+                    await guildCleanupService.permanentlyDeleteGuild(guild.guildId);
+                }
+            }
+        } catch (err) {
+            console.error("Error in guild cleanup job:", err);
         }
     });
     console.log("⏳ Banking scheduler initialized.");

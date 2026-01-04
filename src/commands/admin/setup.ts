@@ -28,7 +28,7 @@ export async function handleSetup(message: Message, args: string[]) {
             },
             {
                 name: `${Mascot.Emotes.Alert} Crime`,
-                value: `**Rob Chance:** ${config.robSuccessPct}%\n**Rob Fine:** ${config.robFinePct}%\n**Rob Cooldown:** ${config.robCooldown}s`,
+                value: `**Rob Chance:** ${config.robSuccessPct}%\n**Rob Fine:** ${config.robFinePct}%\n**Rob Cooldown:** ${config.robCooldown}s\n**Jail Fine:** ${config.jailFine}\n**Jail Time:** ${config.jailTime}s`,
                 inline: true
             },
             {

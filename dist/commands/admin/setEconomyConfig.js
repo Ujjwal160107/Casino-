@@ -5,6 +5,7 @@ const format_1 = require("../../utils/format");
 const guildConfigService_1 = require("../../services/guildConfigService");
 const embed_1 = require("../../utils/embed");
 const permissionUtils_1 = require("../../utils/permissionUtils");
+const discordLogger_1 = require("../../utils/discordLogger");
 async function handleSetEconomyConfig(message, args, type) {
     if (!message.guild)
         return;
@@ -77,10 +78,24 @@ async function handleSetEconomyConfig(message, args, type) {
             name = "Wallet Capacity Limit";
             suffix = "";
             break;
+        case "daily-amount":
+            field = "dailyAmount";
+            name = "Daily Reward Amount";
+            suffix = "";
+            break;
+        case "weekly-amount":
+            field = "weeklyAmount";
+            name = "Weekly Reward Amount";
+            suffix = "";
+            break;
+        case "monthly-amount":
+            field = "monthlyAmount";
+            name = "Monthly Reward Amount";
+            suffix = "";
+            break;
     }
     await (0, guildConfigService_1.updateGuildConfig)(message.guild.id, { [field]: value });
-    const { logToChannel } = require("../../utils/discordLogger");
-    await logToChannel(message.client, {
+    await (0, discordLogger_1.logToChannel)(message.client, {
         guild: message.guild,
         type: "ADMIN",
         title: "Economy Config Updated",

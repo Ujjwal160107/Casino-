@@ -79,6 +79,11 @@ model User {
   marriagesAsSpouse2 Marriage[] @relation("Spouse2")
   
   dailyQuests DailyQuest[]
+
+
+  // Jail System
+  isJailed        Boolean  @default(false)
+  jailReleaseTime DateTime?
 }
 
 model WorkLog {
@@ -298,6 +303,9 @@ model GuildConfig {
   robFinePct     Int      @default(20)
   robCooldown    Int      @default(300)
   robImmuneRoles String[] @default([])
+
+  jailFine       Int      @default(1000)
+  jailTime       Int      @default(600) // Seconds
   
   minBet         Int      @default(100)
   maxBet         Int?     @default(100000)
@@ -354,6 +362,8 @@ model GuildConfig {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  deletedAt DateTime? 
 }
 
 model MarketListing {
@@ -615,4 +625,33 @@ model DailyQuest {
   updatedAt     DateTime @updatedAt
 
   @@unique([userId, dayKey])
+}
+
+model CasinoDropConfig {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId     String
+  channelId   String
+  
+  type        String   // SCHEDULED, INTERVAL, MESSAGE_COUNT, RANDOM, MANUAL
+  
+  // Configuration Values
+  scheduleTime String? // For SCHEDULED (e.g., "13:00")
+  interval     Int?    // For INTERVAL (minutes)
+  minInterval  Int?    // For RANDOM (minutes)
+  maxInterval  Int?    // For RANDOM (minutes)
+  messageCount Int?    // For MESSAGE_COUNT
+  
+  // Drop content
+  minAmount    Int
+  maxAmount    Int
+  currency     String  @default("Coins")
+  
+  // State
+  lastDropAt   DateTime?
+  messageCounter Int      @default(0)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([guildId, type])
 }

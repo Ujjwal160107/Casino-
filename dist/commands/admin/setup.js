@@ -26,7 +26,7 @@ async function handleSetup(message, args) {
         inline: true
     }, {
         name: `${branding_1.Mascot.Emotes.Alert} Crime`,
-        value: `**Rob Chance:** ${config.robSuccessPct}%\n**Rob Fine:** ${config.robFinePct}%\n**Rob Cooldown:** ${config.robCooldown}s`,
+        value: `**Rob Chance:** ${config.robSuccessPct}%\n**Rob Fine:** ${config.robFinePct}%\n**Rob Cooldown:** ${config.robCooldown}s\n**Jail Fine:** ${config.jailFine}\n**Jail Time:** ${config.jailTime}s`,
         inline: true
     }, {
         name: `${branding_1.Mascot.Emotes.Money} Gambling`,
@@ -35,6 +35,10 @@ async function handleSetup(message, args) {
     }, {
         name: `${branding_1.Mascot.Emotes.Teacher} Education`,
         value: "Manage tuition fees, scholarship chances, and degree income boosts.",
+        inline: true
+    }, {
+        name: `${branding_1.Mascot.Emotes.Channel} Chat Money`,
+        value: `**Status:** ${config.chatMoneyEnabled ? "✅ On" : "❌ Off"}\n**Range:** ${config.chatMoneyMin}-${config.chatMoneyMax}\n**Interval:** ${config.chatMoneyInterval}s`,
         inline: true
     }, {
         name: `${branding_1.Mascot.Emotes.Graph} Cooldowns`,
@@ -67,6 +71,9 @@ async function handleSetup(message, args) {
         .setStyle(discord_js_1.ButtonStyle.Primary));
     const row3 = new discord_js_1.ActionRowBuilder()
         .addComponents(new discord_js_1.ButtonBuilder()
+        .setCustomId("setup_chatmoney")
+        .setLabel("Chat Money")
+        .setStyle(discord_js_1.ButtonStyle.Primary), new discord_js_1.ButtonBuilder()
         .setCustomId("setup_cooldowns")
         .setLabel("Cooldowns")
         .setStyle(discord_js_1.ButtonStyle.Secondary), new discord_js_1.ButtonBuilder()

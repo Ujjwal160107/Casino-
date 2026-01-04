@@ -121,7 +121,7 @@ exports.Mascot = {
         XpFull: "<:xp_full:1456569047758929931>",
     },
     Images: {
-        Main: path_1.default.join(process.cwd(), "src", "assets", "fortuna.jpg")
+        Main: path_1.default.join(process.cwd(), "src", "assets", "guide_banner.png")
     },
     Colors: {
         Base: "#9B59B6", // Purple-ish to match her hair?

@@ -21,9 +21,21 @@ export async function handleSetBetLimit(message: Message, args: string[]) {
         currencyEmoji = "<a:money:1445732360204193824>";
     }
 
-    // View Mode
+    const validGames = ["blackjack", "roulette", "slots", "coinflip", "cockfight"];
+    // Helper to normalize game name
+    const normalizeGame = (input: string) => {
+        if (!input) return null;
+        input = input.toLowerCase();
+        if (input === "bj") return "blackjack";
+        if (input === "roul") return "roulette";
+        if (input === "cf") return "cockfight";
+        if (input === "slot") return "slots";
+        if (validGames.includes(input)) return input;
+        return null;
+    };
+
+    // View Mode (All)
     if (args.length === 0) {
-        const games = ["blackjack", "roulette", "slots", "coinflip", "cockfight"];
         const embed = new EmbedBuilder()
             .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
             .setTitle(`${currencyEmoji} Game Bet Limits`)
@@ -37,12 +49,28 @@ export async function handleSetBetLimit(message: Message, args: string[]) {
 
         let desc = `**Global Defaults:**\nMin: **${globalMin}** | Max: **${globalMax}**\n\n`;
 
-        for (const game of games) {
+        for (const game of validGames) {
             const limits = getGameBetLimits(config, game);
             desc += `**${game.charAt(0).toUpperCase() + game.slice(1)}**\nMin: \`${limits.min}\` | Max: \`${limits.max}\`\n\n`;
         }
 
         embed.setDescription(desc);
+        return message.reply({ embeds: [embed] });
+    }
+
+    // Check if first arg is a game for Specific View Mode
+    // If arg[0] is game and NO arg[1] (or arg[1] is not amount/min/max properly?)
+    // Actually standard syntax is: set-bet-limit min <game> <amount>
+    // New requested syntax: bet-limit <game>
+
+    const possibleGame = normalizeGame(args[0]);
+    if (possibleGame && args.length === 1) {
+        const limits = getGameBetLimits(config, possibleGame);
+        const maxDisplay = limits.max === Infinity ? "Infinity" : limits.max;
+        const embed = new EmbedBuilder()
+            .setTitle(`${currencyEmoji} ${possibleGame.charAt(0).toUpperCase() + possibleGame.slice(1)} Limits`)
+            .setColor(Colors.Blue)
+            .setDescription(`**Min:** \`${limits.min}\`\n**Max:** \`${maxDisplay}\``);
         return message.reply({ embeds: [embed] });
     }
 
@@ -52,37 +80,41 @@ export async function handleSetBetLimit(message: Message, args: string[]) {
     const amountRaw = args[2];
 
     if (!["min", "max"].includes(type)) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}set-bet-limit max|min <game> <amount>\`\nExample: \`${prefix}set-bet-limit max blackjack 5000\``)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage:\n\`${prefix}bet-limit\` (View All)\n\`${prefix}bet-limit <game>\` (View Game)\n\`${prefix}bet-limit max|min <game> <amount|infinity>\` (Set Limit)`)] });
     }
 
-    const validGames = ["blackjack", "roulette", "slots", "coinflip", "cockfight"];
-    const game = validGames.find(g => g === gameRaw || (g === "bj" && gameRaw === "blackjack") || (g === "cf" && gameRaw === "cockfight"));
+    const game = normalizeGame(gameRaw);
 
-    if (!gameRaw || !validGames.includes(gameRaw)) {
-        // Here also use prefix if needed, but errorEmbed title "Invalid Game" is fine.
+    if (!game) {
         return message.reply({ embeds: [errorEmbed(message.author, "Invalid Game", `Supported games: ${validGames.map(g => `\`${g}\``).join(", ")}`)] });
     }
 
-    const amount = parseInt(amountRaw);
-    if (isNaN(amount) || amount < 0) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please provide a valid positive number.")] });
+    let amount = parseInt(amountRaw);
+    if (["infinity", "inf", "unlimited", "none"].includes(amountRaw.toLowerCase())) {
+        amount = -1;
+    }
+
+    if (isNaN(amount) || (amount < 0 && amount !== -1)) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please provide a valid positive number or 'infinity'.")] });
     }
 
     // Update Config
     const currentLimits = (config.gameBetLimits as any) || {};
-    if (!currentLimits[gameRaw]) currentLimits[gameRaw] = {};
+    if (!currentLimits[game]) currentLimits[game] = {}; // Use normalized key
 
     if (type === "min") {
-        currentLimits[gameRaw].min = amount;
+        currentLimits[game].min = amount;
     } else {
-        currentLimits[gameRaw].max = amount;
+        currentLimits[game].max = amount;
     }
 
     await updateGuildConfig(message.guildId!, { gameBetLimits: currentLimits });
 
+    const displayAmount = amount === -1 ? "Infinity" : amount;
+
     const embed = new EmbedBuilder()
         .setColor(Colors.Green)
-        .setDescription(`${EMOJI_TICK} Successfully set **${gameRaw}** **${type}** bet limit to **${amount}**.`);
+        .setDescription(`${EMOJI_TICK} Successfully set **${game}** **${type}** bet limit to **${displayAmount}**.`);
 
     return message.reply({ embeds: [embed] });
 }

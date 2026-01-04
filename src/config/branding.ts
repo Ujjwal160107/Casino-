@@ -116,7 +116,7 @@ export const Mascot = {
         XpFull: "<:xp_full:1456569047758929931>",
     },
     Images: {
-        Main: path.join(process.cwd(), "src", "assets", "fortuna.jpg")
+        Main: path.join(process.cwd(), "src", "assets", "guide_banner.png")
     },
     Colors: {
         Base: "#9B59B6", // Purple-ish to match her hair?
@@ -127,9 +127,11 @@ export const Mascot = {
 
 export function getEmoteUrl(emote: string): string | null {
     if (!emote) return null;
+    const isAnimated = emote.startsWith("<a:");
     const match = emote.match(/:(\d+)>/);
     if (match && match[1]) {
-        return `https://cdn.discordapp.com/emojis/${match[1]}.png`;
+        const ext = isAnimated ? "gif" : "png";
+        return `https://cdn.discordapp.com/emojis/${match[1]}.${ext}`;
     }
     return null;
 }

@@ -4,6 +4,8 @@ import prisma from "../../utils/prisma";
 import { errorEmbed, successEmbed } from "../../utils/embed";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 import { marry, divorce, getMarriage, isMarried, checkHasRing, consumeRing, depositToJoint, withdrawFromJoint } from "../../services/life/marriageService";
+import { logToChannel } from "../../utils/discordLogger";
+import { fmtCurrency } from "../../utils/format";
 
 export async function handleMarry(message: Message, args: string[]) {
     if (message.mentions.users.size === 0) {
@@ -72,28 +74,47 @@ export async function handleMarry(message: Message, args: string[]) {
         }
 
         if (i.customId === 'accept_proposal') {
-            // Re-check ring just in case they dropped it? Unlikely in 60s but safe.
-            // FIX: Pass guildId
-            const stillHasRing = await checkHasRing(message.author.id, message.guildId!);
-            if (!stillHasRing) {
-                await i.update({ content: " Proposal Failed", embeds: [errorEmbed(target, "Proposal Failed", "The proposer lost the ring!")], components: [] });
-                return;
+            try {
+                // Re-check ring just in case they dropped it? Unlikely in 60s but safe.
+                const stillHasRing = await checkHasRing(message.author.id, message.guildId!);
+                if (!stillHasRing) {
+                    await i.update({ content: " Proposal Failed", embeds: [errorEmbed(target, "Proposal Failed", "The proposer lost the ring!")], components: [] });
+                    return;
+                }
+
+                // Check if target is already married before consuming ring (race condition check)
+                if (await isMarried(target.id, message.guildId!)) {
+                    await i.update({ content: null, embeds: [errorEmbed(target, "Proposal Failed", "You are already married!")], components: [] });
+                    return;
+                }
+
+                // Check if author is already married (race condition check)
+                if (await isMarried(message.author.id, message.guildId!)) {
+                    await i.update({ content: null, embeds: [errorEmbed(target, "Proposal Failed", "The proposer is already married!")], components: [] });
+                    return;
+                }
+
+                await consumeRing(message.author.id, message.guildId!);
+                await marry(message.author.id, message.author.username, target.id, target.username, message.guildId!);
+
+                await logToChannel(message.client, {
+                    guild: message.guild!,
+                    type: "TRADE",
+                    title: "Marriage Created",
+                    description: `**${message.author.tag}** married **${target.tag}**!`,
+                    color: 0xFF69B4
+                });
+
+                const acceptEmbed = new EmbedBuilder()
+                    .setColor("#ff69b4")
+                    .setTitle(`💖 Just Married! 💖`)
+                    .setDescription(`Congratulations! **${message.author.username}** and **${target.username}** are now married! 🎉`)
+                    .setThumbnail(getEmoteUrl(Mascot.Emotes.Love) || "")
+
+                await i.update({ content: null, embeds: [acceptEmbed], components: [], files: [], attachments: [] });
+            } catch (err: any) {
+                await i.update({ content: null, embeds: [errorEmbed(target, "Marriage Failed", err.message || "An error occurred.")], components: [] });
             }
-
-            // FIX: Pass guildId and usernames for creation
-            await consumeRing(message.author.id, message.guildId!);
-            await marry(message.author.id, message.author.username, target.id, target.username, message.guildId!);
-
-            const acceptEmbed = new EmbedBuilder()
-                .setColor("#ff69b4")
-                .setTitle(`💖 Just Married! 💖`)
-                .setDescription(`Congratulations! **${message.author.username}** and **${target.username}** are now married! 🎉`)
-                .setThumbnail(getEmoteUrl(Mascot.Emotes.Love) || "") // Use a happy emote
-            // Image removed as per user request
-            // Actually user asked for "marriage acceptance or decline embed"
-            // Let's use a nice description.
-
-            await i.update({ content: null, embeds: [acceptEmbed], components: [], files: [], attachments: [] });
         } else {
             const declineEmbed = new EmbedBuilder()
                 .setColor("#ff0000")
@@ -158,6 +179,15 @@ export async function handleDivorce(message: Message) {
 
         if (i.customId === 'confirm_divorce') {
             await divorce(message.author.id, message.guildId!);
+
+            await logToChannel(message.client, {
+                guild: message.guild!,
+                type: "TRADE",
+                title: "Divorce Finalized",
+                description: `**${message.author.tag}** divorced <@${spouseId}>.`,
+                color: 0x000000
+            });
+
             const divorcedEmbed = new EmbedBuilder()
                 .setColor("#000000")
                 .setTitle("💔 Divorced")
@@ -220,6 +250,14 @@ async function handleJointDeposit(message: Message, args: string[]) {
 
     try {
         const newBal = await depositToJoint(message.author.id, message.guildId!, amount);
+
+        await logToChannel(message.client, {
+            guild: message.guild!,
+            type: "ECONOMY",
+            title: "Joint Account Deposit",
+            description: `**User:** ${message.author.tag}\n**Amount:** ${amount.toLocaleString()} coins\n**New Balance:** ${newBal.toLocaleString()}`
+        });
+
         const embed = successEmbed(message.author, "Deposit Successful", `Deposited **${amount.toLocaleString()}** coins to your joint account.\nNew Balance: **${newBal.toLocaleString()}**`);
         return message.reply({ embeds: [embed] });
     } catch (e: any) {
@@ -246,6 +284,14 @@ async function handleJointWithdraw(message: Message, args: string[]) {
 
     try {
         const newBal = await withdrawFromJoint(message.author.id, message.guildId!, amount);
+
+        await logToChannel(message.client, {
+            guild: message.guild!,
+            type: "ECONOMY",
+            title: "Joint Account Withdrawal",
+            description: `**User:** ${message.author.tag}\n**Amount:** ${amount.toLocaleString()} coins\n**New Balance:** ${newBal.toLocaleString()}`
+        });
+
         const embed = successEmbed(message.author, "Withdrawal Successful", `Withdrew **${amount.toLocaleString()}** coins from your joint account.\nNew Balance: **${newBal.toLocaleString()}**`);
         return message.reply({ embeds: [embed] });
     } catch (e: any) {

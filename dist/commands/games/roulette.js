@@ -15,6 +15,7 @@ const embed_1 = require("../../utils/embed");
 const cooldown_1 = require("../../utils/cooldown");
 const branding_1 = require("../../config/branding");
 const gameUtils_1 = require("../../utils/gameUtils");
+const questService_1 = require("../../services/questService");
 async function handleRouletteMenu(message) {
     const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
     const eCasino = "<a:casino:1445732641545654383>";
@@ -166,6 +167,9 @@ async function handleBet(message, args) {
         actualPayout = await (0, gameService_1.placeBetFallback)(user.wallet.id, user.id, "roulette_v1", amount, choiceRaw, didWin, payout, message.guildId);
     }
     payout = actualPayout;
+    await (0, questService_1.updateQuestProgress)(user.id, "GAMBLE").catch(console.error);
+    if (didWin)
+        await (0, questService_1.updateQuestProgress)(user.id, "WIN_ROULETTE").catch(console.error);
     // Cleanup spinning message
     await spinMsg.delete().catch(() => { });
     const eRedCoin = "<:redcoin:1446217599439343772>";

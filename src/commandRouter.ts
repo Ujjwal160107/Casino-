@@ -1,8 +1,10 @@
 import { Client, Message } from "discord.js";
 import { handleHelp } from "./commands/general/help";
 import { handleCasinoGuide } from "./commands/general/casinoGuide";
+import { handleGuide } from "./commands/general/guide";
 import { handleSetPrefix } from "./commands/admin/setPrefix";
 import { handleSetIncome } from "./commands/admin/setIncome";
+import { handleSetIncomeCooldown } from "./commands/admin/setIncomeCooldown";
 import { handleAddEmoji } from "./commands/admin/addEmoji";
 import { handleSetRobConfig } from "./commands/admin/setRob";
 import { handleBalance } from "./commands/economy/balance";
@@ -31,7 +33,7 @@ import { handleSetMoney } from "./commands/admin/setMoney";
 import { handleRemoveMoney } from "./commands/admin/removeMoney";
 import { handleCollectRoleIncome } from "./commands/economy/collect";
 import { handleSetStartMoney } from "./commands/admin/setStartMoney";
-import { handleSetIncomeCooldown } from "./commands/admin/setIncomeCooldown";
+// handleSetIncomeCooldown import moved up
 import { handleResetEconomy } from "./commands/admin/resetEconomy";
 import { handleSetCurrency } from "./commands/admin/setCurrency";
 import { handleSetCurrencyEmoji } from "./commands/admin/setCurrencyEmoji";
@@ -55,13 +57,18 @@ import { handleSetMinBet } from "./commands/admin/setMinBet";
 import { handleAdminDashboard } from "./commands/admin/adminDashboard";
 import { handleResetAdminSettings } from "./commands/admin/resetAdminConfig";
 import { handleSetBetLimit } from "./commands/admin/betLimit";
+
 import { handleSetup } from "./commands/admin/setup";
+import { setupDrop } from "./commands/admin/setupDrop";
+import { drop } from "./commands/admin/drop";
 import prisma from "./utils/prisma";
 import { errorEmbed } from "./utils/embed";
 import { findBestMatch } from "./utils/stringUtils";
 import { handleUse } from "./commands/economy/use";
 import { handleItemInfo } from "./commands/economy/iteminfo";
 import { Mascot, getEmoteUrl } from "./config/branding";
+import { handleCrime } from "./commands/economy/crime";
+import { handleJail, handleBail } from "./commands/economy/jail";
 
 export async function routeMessage(client: Client, message: Message, prefix: string) {
   const raw = message.content.slice(1).trim();
@@ -71,6 +78,10 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     command = "set-casino-channel";
     args.splice(0, 2);
   }
+  if ((command === "set" && args[0]?.toLowerCase() === "casinochannel") || command === "setcasinochannel") {
+    command = "set-casino-channel";
+    if (command !== "setcasinochannel") args.shift();
+  }
   if (command === "set" && args[0]?.toLowerCase() === "prefix") {
     command = "setprefix";
     args.shift();
@@ -79,16 +90,27 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     command = "channel-override";
     args.shift();
   }
+  if (command === "channeloverride") {
+    command = "channel-override";
+  }
   if (command === "bot" && args[0]?.toLowerCase() === "commander") {
     command = "bot-commander";
     args.shift();
+  }
+  if (command === "botcommander") {
+    command = "bot-commander";
   }
   if (command === "command" && args[0]?.toLowerCase() === "status") {
     command = "command-status";
     args.shift();
   }
+  if (command === "commandstatus") {
+    command = "command-status";
+  }
+  // Hoist user variable for later use
+  let user = null;
   if (message.author.id && message.guildId) {
-    const user = await prisma.user.findUnique({
+    user = await prisma.user.findUnique({
       where: { discordId_guildId: { discordId: message.author.id, guildId: message.guildId } }
     });
     if (user?.isBanned) {
@@ -109,10 +131,13 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       with: "withdraw",
       wd: "withdraw",
       add: "add-money",
+      addmoney: "add-money",
       adminadd: "add-money",
       remove: "remove-money",
+      removemoney: "remove-money",
       take: "remove-money",
       "setstart": "set-start-money",
+      "setstartmoney": "set-start-money",
       inv: "inventory",
       lb: "leaderboard",
       top: "leaderboard",
@@ -139,18 +164,41 @@ export async function routeMessage(client: Client, message: Message, prefix: str
         embeds: [errorEmbed(message.author, "Command Blocked", `🚫 ${reason || "You do not have permission to use this command."}`)]
       });
     }
+
   }
+
+  // Check Jail Status for Economy Commands
+  const RESTRICTED_IN_JAIL = [
+    "work", "crime", "beg", "slut", "rob", "shop", "buy", "sell", "market",
+    "bet", "blackjack", "roulette", "slots", "coinflip", "cockfight", "chicken",
+    "withdraw", "deposit", "transfer", "give", "collect", "daily", "weekly", "monthly",
+    "invest", "stock", "trade"
+  ];
+
+  if (RESTRICTED_IN_JAIL.includes(normalized) && user) {
+    const { checkJailStatus } = require("./services/jailService");
+    const { isJailed } = await checkJailStatus(user.id);
+    if (isJailed) {
+      return message.reply({
+        embeds: [errorEmbed(message.author, "🔒 You are in Jail", "You cannot perform this action while incarcerated. Use `!jail` to check your status or `!bail` to pay your way out.")]
+      });
+    }
+  }
+
   switch (normalized) {
     case "addemoji":
       return handleAddEmoji(message, args);
     case "help":
       return handleHelp(message);
     case "casino":
-    case "guide":
     case "games":
     case "casinoguide":
+    case "casino-guide":
       return handleCasinoGuide(message);
+    case "guide":
+      return handleGuide(message);
     case "setincome":
+    case "set-income":
       return handleSetIncome(message, args);
     case "setprefix":
     case "set-prefix":
@@ -160,7 +208,9 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       await handleSetRobConfig(message, args);
       break;
     case "setcurrencyemoji":
+    case "set-currency-emoji":
     case "setemoji":
+    case "set-emoji":
       return handleSetCurrencyEmoji(message, args);
     case "balance":
       return handleBalance(message);
@@ -176,9 +226,18 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "collect":
       return handleCollectRoleIncome(message, args);
     case "crime":
+      return handleCrime(message);
     case "beg":
     case "slut":
       return handleIncome(message);
+    case "jail":
+    case "status":
+      return handleJail(message);
+    case "bail":
+    case "release":
+    case "paybail":
+    case "pay-bail":
+      return handleBail(message);
     case "daily":
       return handleDaily(message);
     case "weekly":
@@ -188,13 +247,17 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "quests":
     case "dailyquest":
     case "missions":
+    case "missions":
     case "daily-quests":
+    case "dailyquests":
       const { handleDailyQuest } = require("./commands/life/dailyQuest");
       return handleDailyQuest(message, args);
 
     case "stock":
     case "stocks":
-    case "stock-market": {
+    case "stocks":
+    case "stock-market":
+    case "stockmarket": {
       const { handleStock } = require("./commands/economy/stock");
       return handleStock(message, args);
     }
@@ -236,21 +299,27 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleLeaderboard(message, ["cash"]);
     case "roulette-guide":
     case "roul-guide":
+    case "rouletteguide":
+    case "roulguide":
       return handleRouletteMenu(message);
     case "bet":
       return handleBet(message, args);
     case "blackjack":
       return handleBlackjack(message, args);
     case "rr":
+    case "rr":
     case "russianroulette":
+    case "russian-roulette":
       return handleRussianRoulette(message, args);
     case "coinflip":
+    case "coin-flip":
       return handleCoinflip(message, args);
 
 
     case "slots":
       return handleSlots(message, args);
     case "cockfight":
+    case "cock-fight":
       return handleCockFight(message, args);
     case "chicken":
       const { handleChicken } = require("./commands/games/chicken");
@@ -264,38 +333,56 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleSetCockfight(message, args);
     case "set-chicken":
     case "manage-chicken":
+    case "managechicken":
     case "setchicken":
+    case "set-chicken": // Duplicate safe
       const { handleManageChicken } = require("./commands/admin/manageChicken");
       return handleManageChicken(message, args);
     case "add-money":
+    case "addmoney":
     case "admin-add":
+    case "adminadd":
       return handleAddMoney(message, args);
     case "set-money":
     case "setmoney":
       return handleSetMoney(message, args);
     case "remove-money":
+    case "removemoney":
     case "remove":
     case "take-money":
+    case "takemoney":
       return handleRemoveMoney(message, args);
     case "set-start-money":
+    case "setstartmoney":
     case "set-start":
+    case "setstart":
       return handleSetStartMoney(message, args);
     case "set-income-cooldown":
+    case "setincomecooldown":
     case "set-income-cd":
+    case "setincomecd":
       return handleSetIncomeCooldown(message, args);
     case "set-global-game-cooldown":
+    case "setglobalgamecooldown":
     case "set-global-cd":
+    case "setglobalcd":
       const { handleSetGlobalGameCooldown } = require("./commands/admin/setGlobalGameCooldown");
       return handleSetGlobalGameCooldown(message, args);
     case "set-game-cooldown":
+    case "setgamecooldown":
     case "set-game-cd":
+    case "setgamecd":
     case "game-cd":
+    case "gamecd":
       return handleSetGameCooldown(message, args);
     case "reset-economy":
+    case "reseteconomy":
       return handleResetEconomy(message, args);
     case "set-currency":
+    case "setcurrency":
       return handleSetCurrency(message, args);
     case "min-bet":
+    case "minbet":
       return handleSetMinBet(message, args);
     case "set-bet-limit":
     case "setbetlimit":
@@ -303,57 +390,89 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "bet-limit":
       return handleSetBetLimit(message, args);
     case "admin-view-config":
+    case "adminviewconfig":
     case "view-config":
+    case "viewconfig":
       return handleAdminViewConfig(message, args);
     case "shop-add":
+    case "shopadd":
     case "add-shop-item":
+    case "addshopitem":
       return handleAddShopItem(message, args);
     case "manage-item":
+    case "manageitem":
     case "edit-item":
+    case "edititem":
     case "del-item":
+    case "delitem":
     case "edit-shop":
+    case "editshop":
     case "delete-shop":
+    case "deleteshop":
       return handleManageShop(message, args);
     case "remove-item":
-    case "del-item":
+    case "removeitem":
+    case "del-item": // Duplicate, but safe in switch if grouped or distinct
     case "delete-item":
+    case "deleteitem":
     case "remove-inv":
+    case "removeinv":
     case "clear-inv":
+    case "clearinv":
       const { handleRemoveItem } = require("./commands/admin/removeItem");
       return handleRemoveItem(message, args);
     case "reset-shop":
+    case "resetshop":
     case "reset-store":
+    case "resetstore":
       const { handleResetShop } = require("./commands/admin/resetShop");
       return handleResetShop(message, args);
     // Removed set-theme case
     case "casino-ban":
+    case "casinoban":
     case "ban-user":
+    case "banuser":
       return handleCasinoBan(message, args);
     case "casino-unban":
+    case "casinounban":
     case "unban-user":
+    case "unbanuser":
       return handleCasinoUnban(message, args);
     case "casino-ban-list":
+    case "casinobanlist":
     case "ban-list":
+    case "banlist":
       return handleCasinoBanList(message, args);
     case "bm":
     case "market":
     case "black-market":
+    case "blackmarket":
       return handleMarket(message, args);
     case "set-loan-interest":
+    case "setloaninterest":
     case "set-loan":
+    case "setloan":
       return handleSetEconomyConfig(message, args, "loan");
     case "set-bank-limit":
+    case "setbanklimit":
       return handleSetEconomyConfig(message, args, "bank-limit");
     case "set-wallet-limit":
+    case "setwalletlimit":
       return handleSetEconomyConfig(message, args, "wallet-limit");
     case "set-daily":
+    case "setdaily":
     case "set-daily-amount":
+    case "setdailyamount":
       return handleSetEconomyConfig(message, args, "daily-amount");
     case "set-weekly":
+    case "setweekly":
     case "set-weekly-amount":
+    case "setweeklyamount":
       return handleSetEconomyConfig(message, args, "weekly-amount");
     case "set-monthly":
+    case "setmonthly":
     case "set-monthly-amount":
+    case "setmonthlyamount":
       return handleSetEconomyConfig(message, args, "monthly-amount");
     case "uni":
     case "university":
@@ -362,11 +481,16 @@ export async function routeMessage(client: Client, message: Message, prefix: str
         return handleEducation(message, args);
       }
     case "set-fd-interest":
+    case "setfdinterest":
     case "set-fd":
+    case "setfd":
       return handleSetEconomyConfig(message, args, "fd");
     case "set-log-channel":
+    case "setlogchannel":
     case "set-logs":
+    case "setlogs":
     case "log-channel":
+    case "logchannel":
       const { handleSetLogChannel } = require("./commands/admin/setLogChannel");
       return handleSetLogChannel(message, args);
     case "chatmoney":
@@ -374,46 +498,68 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "cm":
       return handleChatMoneyConfig(message, args);
     case "set-casino-channel":
+    case "setcasinochannel":
     case "casino-channel":
+    case "casinochannel":
       const { handleSetCasinoChannel } = require("./commands/admin/setCasinoChannel");
       return handleSetCasinoChannel(message, args);
     case "set-rd-interest":
+    case "setrdinterest":
     case "set-rd":
+    case "setrd":
       return handleSetEconomyConfig(message, args, "rd");
     case "set-tax":
+    case "settax":
     case "market-tax":
+    case "markettax":
       return handleSetEconomyConfig(message, args, "tax");
     case "set-credit-reward":
+    case "setcreditreward":
     case "set-reward":
+    case "setreward":
       return handleSetEconomyConfig(message, args, "credit-reward");
     case "set-credit-penalty":
+    case "setcreditpenalty":
     case "set-penalty":
+    case "setpenalty":
       return handleSetEconomyConfig(message, args, "credit-penalty");
     case "set-credit-cap":
+    case "setcreditcap":
     case "credit-cap":
+    case "creditcap":
       return handleSetEconomyConfig(message, args, "credit-cap");
     case "set-min-credit-cap":
+    case "setmincreditcap":
     case "min-credit-cap":
+    case "mincreditcap":
       return handleSetEconomyConfig(message, args, "min-credit-cap");
     case "set-max-loans":
+    case "setmaxloans":
     case "max-loans":
+    case "maxloans":
       return handleSetEconomyConfig(message, args, "max-loans");
     case "credit":
     case "score":
       const { handleCredit } = require("./commands/economy/credit");
       return handleCredit(message, args);
     case "set-credit-score":
+    case "setcreditscore":
       const { handleSetCreditScore } = require("./commands/admin/manageCreditScore");
       return handleSetCreditScore(message, args);
     case "add-credit-tier":
+    case "addcredittier":
       const { handleAddCreditTier } = require("./commands/admin/addCreditTier");
       return handleAddCreditTier(message, args);
     case "loan-ban":
+    case "loanban":
     case "ban-loan":
+    case "banloan":
       const { handleLoanBan } = require("./commands/admin/manageLoanBan");
       return handleLoanBan(message, args);
     case "loan-unban":
+    case "loanunban":
     case "unban-loan":
+    case "unbanloan":
       const { handleLoanUnban } = require("./commands/admin/manageLoanBan");
       return handleLoanUnban(message, args);
     case "reset-loans":
@@ -421,43 +567,62 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const { handleResetLoans } = require("./commands/admin/resetLoans");
       return handleResetLoans(message, args);
     case "make-casino-admin":
+    case "makecasinoadmin":
     case "promote-casino-admin":
+    case "promotecasinoadmin":
     case "casino-admin-add":
+    case "casinoadminadd":
       const { handleMakeCasinoAdmin } = require("./commands/admin/manageCasinoAdmin");
       return handleMakeCasinoAdmin(message, args);
     case "remove-casino-admin":
+    case "removecasinoadmin":
     case "demote-casino-admin":
+    case "demotecasinoadmin":
       const { handleRemoveCasinoAdmin } = require("./commands/admin/manageCasinoAdmin");
       return handleRemoveCasinoAdmin(message, args);
     case "casino-admins-list":
+    case "casinoadminslist":
     case "casino-admins":
+    case "casinoadmins":
       const { handleListCasinoAdmins } = require("./commands/admin/manageCasinoAdmin");
       return handleListCasinoAdmins(message);
     case "config-credit-tier":
+    case "configcredittier":
     case "config-credit":
+    case "configcredit":
     case "edit-credit-tier":
+    case "editcredittier":
       const { handleConfigCreditTier } = require("./commands/admin/configCreditTier");
       return handleConfigCreditTier(message, args);
     case "config-jobs":
+    case "configjobs":
     case "config-job":
+    case "configjob":
     case "set-job-salary":
+    case "setjobsalary":
       const { handleConfigJobs } = require("./commands/admin/configJobs");
       return handleConfigJobs(message, args);
     case "view-credit-tiers":
+    case "viewcredittiers":
     case "view-credit-config":
+    case "viewcreditconfig":
       const { handleViewCreditTiers } = require("./commands/admin/manageCreditConfig");
       return handleViewCreditTiers(message);
     case "delete-credit-tier":
+    case "deletecredittier":
     case "del-credit-tier":
+    case "delcredittier":
       const { handleDeleteCreditTier } = require("./commands/admin/manageCreditConfig");
       return handleDeleteCreditTier(message, args);
     case "ask-money":
+    case "askmoney":
       const { handleAsk } = require("./commands/economy/ask");
       return handleAsk(message, args);
 
     case "setup":
     case "config": // Alias config to setup as it's the new master config
     case "admin-setup":
+    case "adminsetup":
       return handleSetup(message, args);
 
     case "test": {
@@ -470,9 +635,13 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleAdminDashboard(message);
     }
     case "reset-admin-settings":
+    case "resetadminsettings":
     case "reset-permissions":
+    case "resetpermissions":
     case "reset-perms":
-    case "reset-access": {
+    case "resetperms":
+    case "reset-access":
+    case "resetaccess": {
       return handleResetAdminSettings(message);
     }
     case "use": {
@@ -488,6 +657,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleEquip(message, args);
     }
     case "cockstore":
+    case "cock-store":
     case "cs": {
       const { handleCockStore } = require("./commands/shop/cockStore");
       return handleCockStore(message, args);
@@ -517,8 +687,11 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleRelax(message);
     }
     case "jobstore":
+    case "job-store":
     case "workstore":
-    case "jobshop": {
+    case "work-store":
+    case "jobshop":
+    case "job-shop": {
       const { handleJobStore } = require("./commands/life/jobStore");
       return handleJobStore(message, args);
     }
@@ -560,7 +733,9 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleDropout(message);
     }
     case "unistore":
-    case "bookstore": {
+    case "uni-store":
+    case "bookstore":
+    case "book-store": {
       const { handleUniStore } = require("./commands/life/uniStore");
       return handleUniStore(message);
     }
@@ -588,59 +763,87 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "estate":
       return propertiesHandler(message, args);
     case "buy-property":
+    case "buyproperty":
     case "buyprop":
       return buyPropertyHandler(message, args);
     case "sell-property": // System sell
+    case "sellproperty":
     case "sellprop":
       return sellPropertyHandler(message, args);
     case "my-properties":
+    case "myproperties":
     case "myprops":
     case "portfolio": // Overlap with stock portfolio? Maybe check args or context, for now alias is fine if stock uses "stock-portfolio"
       return myPropertiesHandler(message);
     case "collect-rent":
+    case "collectrent":
     case "rent":
       return collectRentHandler(message);
     case "manage-property":
+    case "manageproperty":
     case "property-admin":
+    case "propertyadmin":
       return managePropertyHandler(message, args);
     case "manage-uni":
-    case "uni-admin": {
+    case "manageuni":
+    case "uni-admin":
+    case "uniadmin": {
       const { handleManageUniStore } = require("./commands/admin/manageUniStore");
       return handleManageUniStore(message, args);
     }
     case "manage-jobstore":
-    case "job-admin": {
+    case "managejobstore":
+    case "job-admin":
+    case "jobadmin": {
       const { handleManageJobStore } = require("./commands/admin/manageJobStore");
       return handleManageJobStore(message, args);
     }
 
+    // --- Casino Drops ---
+    case "setup-drop":
+    case "setupdrop":
+    case "config-drop":
+    case "drop-setup":
+      return setupDrop(message, args);
+    case "drop":
+    case "manual-drop":
+    case "spawn-drop":
+      return drop(message, args);
+
     // --- Education Admin ---
     case "setint":
+    case "set-int":
     case "setintelligence": {
       const { handleSetInt } = require("./commands/admin/educationAdmin");
       return handleSetInt(message, args);
     }
     case "setdis":
+    case "set-dis":
     case "setdiscipline": {
       const { handleSetDis } = require("./commands/admin/educationAdmin");
       return handleSetDis(message, args);
     }
-    case "resetedu": {
+    case "resetedu":
+    case "reset-edu": {
       const { handleResetEdu } = require("./commands/admin/educationAdmin");
       return handleResetEdu(message, args);
     }
-    case "grantdegree": {
+    case "grantdegree":
+    case "grant-degree": {
       const { handleGrantDegree } = require("./commands/admin/educationAdmin");
       return handleGrantDegree(message, args);
     }
     case "set-degree-cost":
+    case "setdegreecost":
     case "setdegree":
     case "settuition": {
       const { handleSetDegreeCost } = require("./commands/admin/educationAdmin");
       return handleSetDegreeCost(message, args);
     }
     case "set-study-cooldown":
-    case "set-study-cd": {
+    case "setstudycooldown":
+    case "set-study-cd":
+    case "setstudycd": {
       const { handleSetStudyCooldown } = require("./commands/admin/educationAdmin");
       return handleSetStudyCooldown(message, args);
     }

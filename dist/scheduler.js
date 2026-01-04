@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initScheduler = initScheduler;
 const node_cron_1 = __importDefault(require("node-cron"));
+const prisma_1 = __importDefault(require("./utils/prisma"));
 const bankingService_1 = require("./services/bankingService");
 const effectService_1 = require("./services/effectService");
 const stockService_1 = require("./services/stockService");
@@ -36,6 +37,30 @@ function initScheduler(client) {
         }
         catch (err) {
             console.error("Scheduler error:", err);
+        }
+    });
+    // Cleanup Job: Runs every hour
+    node_cron_1.default.schedule("0 * * * *", async () => {
+        console.log("🧹 Running guild data cleanup...");
+        try {
+            const threshold = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
+            const guildsToDelete = await prisma_1.default.guildConfig.findMany({
+                where: {
+                    deletedAt: {
+                        lte: threshold
+                    }
+                }
+            });
+            if (guildsToDelete.length > 0) {
+                console.log(`Found ${guildsToDelete.length} guilds pending permanent deletion.`);
+                const { guildCleanupService } = require("./services/guildCleanupService");
+                for (const guild of guildsToDelete) {
+                    await guildCleanupService.permanentlyDeleteGuild(guild.guildId);
+                }
+            }
+        }
+        catch (err) {
+            console.error("Error in guild cleanup job:", err);
         }
     });
     console.log("⏳ Banking scheduler initialized.");

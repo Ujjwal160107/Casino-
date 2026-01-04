@@ -7,8 +7,10 @@ exports.placeBetWithTransaction = placeBetWithTransaction;
 exports.placeBetFallback = placeBetFallback;
 const prisma_1 = __importDefault(require("../utils/prisma"));
 const guildConfigService_1 = require("./guildConfigService");
-async function placeBetWithTransaction(userId, walletId, gameId, amount, choice, didWin, payout, guildId) {
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+async function placeBetWithTransaction(userId, walletId, gameId, amount, choice, didWin, payout, guildId, retries = 3) {
     const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
+    // Check wallet limit logic outside transaction to avoid holding locks too long for reads
     const currentWallet = await prisma_1.default.wallet.findUnique({ where: { id: walletId } });
     if (!currentWallet)
         throw new Error("Wallet not found");
@@ -21,64 +23,53 @@ async function placeBetWithTransaction(userId, walletId, gameId, amount, choice,
         }
     }
     const netChange = actualPayout - amount;
-    await prisma_1.default.$transaction(async (tx) => {
-        await tx.bet.create({
-            data: {
-                userId,
-                gameId,
-                amount,
-                choice,
-                result: didWin ? "win" : "lose",
-                payout: actualPayout
+    while (retries > 0) {
+        try {
+            await prisma_1.default.$transaction(async (tx) => {
+                await tx.bet.create({
+                    data: {
+                        userId,
+                        gameId,
+                        amount,
+                        choice,
+                        result: didWin ? "win" : "lose",
+                        payout: actualPayout
+                    }
+                });
+                await tx.transaction.create({
+                    data: {
+                        walletId,
+                        amount: netChange,
+                        type: didWin ? "payout" : "bet",
+                        meta: { choice, payout: actualPayout, originalPayout: payout, didWin }
+                    }
+                });
+                await tx.wallet.update({
+                    where: { id: walletId },
+                    data: { balance: { increment: netChange } }
+                });
+            });
+            return actualPayout;
+        }
+        catch (error) {
+            if (error.code === 'P2034') { // Write conflict / deadlock
+                retries--;
+                console.warn(`[PlaceBet] Deadlock detected for ${userId}, retrying... (${retries} left)`);
+                await sleep(200); // Random jitter could be better, but fixed 200ms is a start
+                continue;
             }
-        });
-        await tx.transaction.create({
-            data: {
-                walletId,
-                amount: netChange,
-                type: didWin ? "payout" : "bet",
-                meta: { choice, payout: actualPayout, originalPayout: payout, didWin }
-            }
-        });
-        await tx.wallet.update({
-            where: { id: walletId },
-            data: { balance: { increment: netChange } }
-        });
-    });
-    return actualPayout;
+            throw error;
+        }
+    }
+    throw new Error("Transaction failed after retries due to deadlock.");
 }
 async function placeBetFallback(walletId, userId, gameId, amount, choice, didWin, payout, guildId) {
-    const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
-    const currentWallet = await prisma_1.default.wallet.findUnique({ where: { id: walletId } });
-    if (!currentWallet)
-        throw new Error("Wallet not found");
-    let actualPayout = payout;
-    if (didWin && config.walletLimit) {
-        const projected = currentWallet.balance - amount + payout;
-        if (projected > config.walletLimit) {
-            actualPayout = Math.max(0, config.walletLimit - (currentWallet.balance - amount));
-        }
-    }
-    const res = await prisma_1.default.wallet.updateMany({
-        where: { id: walletId, balance: { gte: amount } },
-        data: { balance: { decrement: amount } }
-    });
-    if (res.count === 0)
-        throw new Error("Insufficient funds during betting stage");
-    await prisma_1.default.bet.create({
-        data: { userId, gameId, amount, choice, result: didWin ? "win" : "lose", payout: actualPayout }
-    });
-    await prisma_1.default.transaction.create({
-        data: {
-            walletId,
-            amount: didWin ? (actualPayout - amount) : -amount,
-            type: didWin ? "payout" : "bet",
-            meta: { choice, payout: actualPayout, didWin }
-        }
-    });
-    if (didWin) {
-        await prisma_1.default.wallet.update({ where: { id: walletId }, data: { balance: { increment: actualPayout } } });
-    }
-    return actualPayout;
+    // This function originally tried not to use a transaction for everything to avoid locking, but caused issues.
+    // It's better to just use the main transactional function with retries.
+    // However, if we MUST keep the existing logic separate, we should wrap the critical updates in retries too.
+    // For now, let's redirect to usage of the robust transaction function above, 
+    // unless there is a specific reason for 'fallback' logic (e.g. partial failures allowed).
+    // The original code did manual decrement then separate logic.
+    return placeBetWithTransaction(userId, walletId, gameId, amount, choice, didWin, payout, guildId);
 }
 //# sourceMappingURL=gameService.js.map

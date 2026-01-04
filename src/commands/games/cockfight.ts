@@ -17,7 +17,7 @@ import { errorEmbed } from "../../utils/embed";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { generateVsImage, generateWinnerImage } from "../../utils/imageUtils";
 import { checkCooldown, getCooldownExpiry, setCooldown } from "../../utils/cooldown";
-import { formatDuration } from "../../utils/format";
+import { formatDuration, parseBetAmount } from "../../utils/format";
 import { calculateTotalStats, calculateCombatScore, getWinChance, getGameBetLimits } from "../../utils/gameUtils";
 import { GameConfig } from "../../config/gameConfig";
 import { Mascot } from "../../config/branding";
@@ -36,7 +36,9 @@ export async function handleCockFight(message: Message, args: string[]) {
     const config = await getGuildConfig(message.guild.id);
 
     const targetUser = message.mentions.users.first();
-    const rawAmount = args.find(a => !a.startsWith("<@") && /^\d+$/.test(a));
+    // Allow finding any argument that looks like a number/amount (including 10k, 1e5)
+    // Or simpler: find first arg that is NOT a mention.
+    const rawAmount = args.find(a => !a.startsWith("<@"));
 
     if (!targetUser || !rawAmount) {
         return message.reply({
@@ -52,9 +54,11 @@ export async function handleCockFight(message: Message, args: string[]) {
         return message.reply({ embeds: [errorEmbed(message.author, "Error", "You cannot fight a bot.")] });
     }
 
-    const betAmount = parseInt(rawAmount);
+    // Use parseBetAmount to handle 10k, 1e5, etc.
+    const betAmount = parseBetAmount(rawAmount);
+
     if (isNaN(betAmount) || betAmount <= 0) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please enter a valid positive integer.")] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please enter a valid positive integer (e.g. 100, 10k, 1e5).")] });
     }
 
     const { min, max } = getGameBetLimits(config, "cockfight");

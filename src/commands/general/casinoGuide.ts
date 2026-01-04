@@ -114,33 +114,35 @@ export async function handleCasinoGuide(message: Message) {
                 break;
 
             case "guide_roulette":
+                const roulBannerPath = path.join(process.cwd(), "src", "assets", "roulette_guide.png");
+                const roulAttachment = new AttachmentBuilder(roulBannerPath, { name: "roulette_guide.png" });
+
                 guideEmbed = new EmbedBuilder()
-                    .setTitle(`${Mascot.Emotes.Dices} Roulette - How to Play`)
+                    .setTitle(`Roulette - How to Play`)
                     .setColor(Mascot.Colors.Base as any)
                     .setDescription(
                         `**Objective:** Predict where the ball will land on the roulette wheel.\n\n` +
-                        `**Betting Options:**\n` +
-                        `${Mascot.Emotes.Redcoin} **Red/Black** - Pays 2x (50% chance)\n` +
-                        `${Mascot.Emotes.Graph} **Odd/Even** - Pays 2x (50% chance)\n` +
-                        `${Mascot.Emotes.Seven} **Specific Number** (0-36) - Pays 36x (2.7% chance)\n` +
-                        `${Mascot.Emotes.GraphUp} **1-18/19-36** - Pays 2x (50% chance)\n` +
-                        `${Mascot.Emotes.GraphUp} **Dozens** (1-12, 13-24, 25-36) - Pays 3x (33% chance)\n` +
-                        `${Mascot.Emotes.GraphUp} **Columns** - Pays 3x (33% chance)\n\n` +
+                        `**Payout Multipliers:**\n` +
+                        `[x36] Single Number\n` +
+                        `[x 3] Dozens (1-12, 13-24, 25-36)\n` +
+                        `[x 3] Columns (1st, 2nd, 3rd)\n` +
+                        `[x 2] Halves (1-18, 19-36)\n` +
+                        `[x 2] Odd/Even\n` +
+                        `[x 2] Colours (red, black)\n\n` +
                         `**How to Play:**\n` +
-                        `${Mascot.Emotes.Success} Use interactive buttons to place your bet\n` +
-                        `${Mascot.Emotes.Success} Choose your betting amount\n` +
-                        `${Mascot.Emotes.Success} Select your prediction (color, number, etc.)\n` +
-                        `${Mascot.Emotes.Dices} The wheel spins and determines the winner!\n\n` +
+                        `1. Use interactive buttons or commands to place bet.\n` +
+                        `2. Choose your betting amount.\n` +
+                        `3. Select your prediction (color, number, range).\n` +
+                        `4. The wheel spins and determines the winner!\n\n` +
                         `**Special Rules:**\n` +
-                        `${Mascot.Emotes.Alert} Landing on **0** wins only if you bet on it specifically\n` +
-                        `${Mascot.Emotes.Alert} Multiple bets can be placed on different outcomes\n\n` +
-                        `**Tips:**\n` +
-                        `${Mascot.Emotes.Think} Start with safer bets (Red/Black, Odd/Even)\n` +
-                        `${Mascot.Emotes.Think} Specific numbers have highest payout but lowest odds\n` +
-                        `${Mascot.Emotes.Think} Manage your bankroll wisely!`
+                        `- Landing on **0** wins only if you bet on it specifically.\n` +
+                        `- Multiple bets can be placed on different outcomes.`
                     )
+                    .setImage("attachment://roulette_guide.png")
                     .setFooter({ text: "Command: ,bet <amount> <choice> or ,roulette <amount> <choice>" });
-                break;
+
+                await interaction.reply({ embeds: [guideEmbed], files: [roulAttachment], ephemeral: true });
+                return; // Return early as we handled the reply manually due to file attachment
 
             case "guide_slots":
                 guideEmbed = new EmbedBuilder()

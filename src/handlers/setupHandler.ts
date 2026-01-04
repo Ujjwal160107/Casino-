@@ -2,7 +2,7 @@ import { ActionRowBuilder, ButtonInteraction, ModalBuilder, TextInputBuilder, Te
 import prisma from "../utils/prisma";
 import { updateGuildConfig, getGuildConfig } from "../services/guildConfigService";
 import { Mascot } from "../config/branding";
-import { parseSmartAmount } from "../utils/format";
+import { parseSmartAmount, formatDuration } from "../utils/format";
 import { parseDuration } from "../utils/duration";
 
 export async function handleSetupInteraction(interaction: Interaction) {
@@ -112,7 +112,13 @@ export async function handleSetupInteraction(interaction: Interaction) {
 
             modal.addComponents(
                 new ActionRowBuilder<TextInputBuilder>().addComponents(success),
-                new ActionRowBuilder<TextInputBuilder>().addComponents(fine)
+                new ActionRowBuilder<TextInputBuilder>().addComponents(fine),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(
+                    new TextInputBuilder().setCustomId("jail_fine").setLabel("Jail Bail Cost").setValue(config.jailFine.toString()).setStyle(TextInputStyle.Short)
+                ),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(
+                    new TextInputBuilder().setCustomId("jail_time").setLabel("Jail Time (e.g. 10m, 1h)").setValue(formatDuration(config.jailTime * 1000)).setStyle(TextInputStyle.Short)
+                )
             );
 
             await interaction.showModal(modal);
@@ -336,9 +342,17 @@ export async function handleSetupInteraction(interaction: Interaction) {
 
             if (isNaN(success) || isNaN(fine)) return interaction.editReply("Invalid percentages.");
 
+            const jailFine = parseInt(interaction.fields.getTextInputValue("jail_fine"));
+            const jailTimeStr = interaction.fields.getTextInputValue("jail_time");
+            const jailTime = parseDuration(jailTimeStr);
+
+            if (isNaN(success) || isNaN(fine) || isNaN(jailFine) || jailTime === null) return interaction.editReply("Invalid numbers or duration format.");
+
             await updateGuildConfig(interaction.guildId!, {
                 robSuccessPct: success,
-                robFinePct: fine
+                robFinePct: fine,
+                jailFine,
+                jailTime
             });
             await interaction.editReply(`✅ Crime config updated!`);
         }

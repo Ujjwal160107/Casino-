@@ -10,6 +10,7 @@ const embed_1 = require("../../utils/embed");
 const cooldown_1 = require("../../utils/cooldown");
 const branding_1 = require("../../config/branding");
 const gameUtils_1 = require("../../utils/gameUtils");
+const questService_1 = require("../../services/questService");
 async function handleCoinflip(message, args) {
     const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
     const amountStr = args[0];
@@ -17,7 +18,7 @@ async function handleCoinflip(message, args) {
     if (!amountStr || !choiceRaw) {
         return message.reply({
             embeds: [
-                (0, embed_1.errorEmbed)(message.author, "Invalid Usage", `Usage: \`${config.prefix}cf <amount> <heads|tails>\``),
+                (0, embed_1.errorEmbed)(message.author, "Invalid Usage", `Usage: \`${config.prefix}coinflip <amount> <heads|tails>\``),
             ],
         });
     }
@@ -82,6 +83,9 @@ async function handleCoinflip(message, args) {
         actualPayout = await (0, gameService_1.placeBetFallback)(user.wallet.id, user.id, "coinflip", amount, choice, didWin, payout, message.guildId);
     }
     payout = actualPayout;
+    await (0, questService_1.updateQuestProgress)(user.id, "GAMBLE").catch(console.error);
+    if (didWin)
+        await (0, questService_1.updateQuestProgress)(user.id, "WIN_COINFLIP").catch(console.error);
     const finalWalletBalance = user.wallet.balance - amount + payout;
     const finalWalletBalanceIntl = finalWalletBalance.toLocaleString("en-US");
     let footerIconURL;
