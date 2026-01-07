@@ -139,9 +139,10 @@ function getGameBetLimits(config, gameKey) {
     const gameLimits = limits[gameKey] || {};
     const globalMin = config.minBet || 100;
     const globalMax = config.maxBet || 100000;
-    return {
-        min: typeof gameLimits.min === "number" ? gameLimits.min : globalMin,
-        max: typeof gameLimits.max === "number" ? gameLimits.max : globalMax
-    };
+    const min = typeof gameLimits.min === "number" ? gameLimits.min : globalMin;
+    let max = typeof gameLimits.max === "number" ? gameLimits.max : globalMax;
+    if (max === -1)
+        max = Infinity;
+    return { min, max };
 }
 //# sourceMappingURL=gameUtils.js.map

@@ -14,9 +14,11 @@ const interactionHelpers_1 = require("./utils/interactionHelpers");
 const emojiRegistry_1 = require("./utils/emojiRegistry");
 const xpListener_1 = require("./listeners/xpListener");
 const chatMoneyListener_1 = require("./listeners/chatMoneyListener");
+const casinoDropListener_1 = require("./listeners/casinoDropListener");
 const bankInteractionHandler_1 = require("./handlers/bankInteractionHandler");
 const marketInteractionHandler_1 = require("./handlers/marketInteractionHandler");
 const inventoryInteractionHandler_1 = require("./handlers/inventoryInteractionHandler");
+const casinoDropService_1 = require("./services/casinoDropService");
 const guildDeleteListener_1 = require("./listeners/guildDeleteListener");
 const guildCreateListener_1 = require("./listeners/guildCreateListener");
 const scheduler_1 = require("./scheduler");
@@ -58,6 +60,7 @@ client.once("ready", async () => {
     console.log("Emoji registry keys:", (0, emojiRegistry_1.listEmojiKeys)().slice(0, 200));
     (0, xpListener_1.setupXpListener)(client);
     (0, chatMoneyListener_1.setupChatMoneyListener)(client);
+    (0, casinoDropListener_1.setupCasinoDropListener)(client);
     (0, guildDeleteListener_1.guildDeleteListener)(client);
     (0, guildCreateListener_1.guildCreateListener)(client);
     (0, scheduler_1.initScheduler)(client);
@@ -117,6 +120,9 @@ client.on("interactionCreate", async (interaction) => {
         if (id === "pay_bail") {
             const { handleJailInteraction } = require("./handlers/jailInteractionHandler");
             return await handleJailInteraction(interaction);
+        }
+        if (id.startsWith("casino_drop_claim_")) {
+            return await casinoDropService_1.CasinoDropService.handleClaim(interaction);
         }
     }
     catch (err) {

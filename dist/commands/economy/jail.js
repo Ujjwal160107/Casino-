@@ -22,7 +22,7 @@ async function handleJail(message) {
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle(`${POLICE_EMOTE} JAIL STATUS`)
         .setDescription(`You are currently incarcerated.`)
-        .addFields({ name: "Release In", value: (0, format_1.formatDuration)(Math.floor(timeLeft / 1000)), inline: true }, { name: "Bail Cost", value: (0, format_1.fmtCurrency)(config.jailFine, config.currencyEmoji), inline: true })
+        .addFields({ name: "Release In", value: status.releaseTime ? `<t:${Math.floor(status.releaseTime.getTime() / 1000)}:R>` : "N/A", inline: true }, { name: "Bail Cost", value: (0, format_1.fmtCurrency)(config.jailFine, config.currencyEmoji), inline: true })
         .setColor(0xFF0000)
         .setThumbnail("https://cdn.discordapp.com/emojis/1457053051582939237.png")
         .setFooter({ text: `Type ${config.prefix}bail to pay the fine and leave.` });

@@ -9,7 +9,7 @@ const embed_1 = require("../../utils/embed");
 const format_1 = require("../../utils/format");
 const permissionUtils_1 = require("../../utils/permissionUtils");
 const guildConfigService_1 = require("../../services/guildConfigService");
-const SUPPORTED = ["work", "beg", "crime", "slut"];
+const SUPPORTED = ["work", "beg", "crime", "slut", "rob"];
 async function handleSetIncomeCooldown(message, args) {
     try {
         if (!message.member || !(await (0, permissionUtils_1.canExecuteAdminCommand)(message, message.member))) {
@@ -27,16 +27,21 @@ async function handleSetIncomeCooldown(message, args) {
         }
         if (!SUPPORTED.includes(cmd) || seconds === null || seconds < 0) {
             return message.reply({
-                embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Usage", `Usage: \`${config.prefix}setincomecooldown <work|beg|crime|slut> <duration|off>\`\nExample: \`${config.prefix}setincomecooldown work 1h 30m\` or \`... work off\``)]
+                embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Usage", `Usage: \`${config.prefix}setincomecooldown <work|beg|crime|slut|rob> <duration|off>\`\nExample: \`${config.prefix}setincomecooldown work 1h 30m\` or \`... work off\``)]
             });
         }
-        await prisma_1.default.incomeConfig.upsert({
-            where: { guildId_commandKey: { guildId: message.guildId, commandKey: cmd } },
-            create: { guildId: message.guildId, commandKey: cmd, minPay: 10, maxPay: 50, cooldown: seconds, successPct: 100 },
-            update: { cooldown: seconds }
-        });
+        if (cmd === "rob") {
+            await (0, guildConfigService_1.updateGuildConfig)(message.guildId, { robCooldown: seconds });
+        }
+        else {
+            await prisma_1.default.incomeConfig.upsert({
+                where: { guildId_commandKey: { guildId: message.guildId, commandKey: cmd } },
+                create: { guildId: message.guildId, commandKey: cmd, minPay: 10, maxPay: 50, cooldown: seconds, successPct: 100 },
+                update: { cooldown: seconds }
+            });
+        }
         return message.reply({
-            embeds: [(0, embed_1.successEmbed)(message.author, "Cooldown Updated", `Set **${cmd}** cooldown to **${(0, format_1.formatDuration)(seconds * 1000)}**`)]
+            embeds: [(0, embed_1.successEmbed)(message.author, "Cooldown Updated", `Set **${cmd}** cooldown to **${(0, format_1.formatDuration)(seconds)}**`)]
         });
     }
     catch (err) {

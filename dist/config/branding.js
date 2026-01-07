@@ -132,9 +132,11 @@ exports.Mascot = {
 function getEmoteUrl(emote) {
     if (!emote)
         return null;
+    const isAnimated = emote.startsWith("<a:");
     const match = emote.match(/:(\d+)>/);
     if (match && match[1]) {
-        return `https://cdn.discordapp.com/emojis/${match[1]}.png`;
+        const ext = isAnimated ? "gif" : "png";
+        return `https://cdn.discordapp.com/emojis/${match[1]}.${ext}`;
     }
     return null;
 }

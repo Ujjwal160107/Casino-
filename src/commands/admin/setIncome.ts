@@ -2,10 +2,10 @@ import { Message } from "discord.js";
 import prisma from "../../utils/prisma";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { parseSmartAmount, fmtCurrency } from "../../utils/format";
-import { getGuildConfig } from "../../services/guildConfigService";
+import { getGuildConfig, updateGuildConfig } from "../../services/guildConfigService";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
 
-const SUPPORTED = ["work", "beg", "crime", "slut"];
+const SUPPORTED = ["work", "beg", "crime", "slut", "rob"]; // Added rob
 
 export async function handleSetIncome(message: Message, args: string[]) {
   try {
@@ -55,6 +55,26 @@ export async function handleSetIncome(message: Message, args: string[]) {
 
     const guildId = message.guildId!;
     const commandKey = cmd;
+
+    // Special handling for ROB (stored in GuildConfig, not IncomeConfig)
+    if (commandKey === "rob") {
+      const guildUpdates: any = {};
+
+      if (field === "cooldown") {
+        guildUpdates.robCooldown = updates.cooldown;
+      } else if (field === "success") {
+        guildUpdates.robSuccessPct = updates.successPct;
+      } else if (field === "penalty") {
+        guildUpdates.robFinePct = updates.failPenaltyPct;
+      } else {
+        return message.reply({ embeds: [errorEmbed(message.author, "Not Supported", "For 'rob', you can only set: cooldown, success, penalty.")] });
+      }
+
+      await updateGuildConfig(guildId, guildUpdates);
+
+      const formatted = Object.entries(guildUpdates).map(([k, v]) => `${k}=${v}`).join(", ");
+      return message.reply({ embeds: [successEmbed(message.author, "Rob Config Updated", `Updated **rob**: ${formatted}`)] });
+    }
 
     await prisma.incomeConfig.upsert({
       where: { guildId_commandKey: { guildId, commandKey } },

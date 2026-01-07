@@ -13,11 +13,12 @@ export async function handleStock(message: Message, args: string[]) {
     const sub = args[0]?.toLowerCase();
     const config = await getGuildConfig(message.guildId!);
     const emoji = config.currencyEmoji;
+    const prefix = config.prefix || "!";
 
     if (sub === "buy") {
         const symbol = args[1];
         const qty = parseInt(args[2]);
-        if (!symbol || isNaN(qty)) return message.reply("Usage: `!stock buy <symbol> <quantity>`");
+        if (!symbol || isNaN(qty)) return message.reply(`Usage: \`${prefix}stock buy <symbol> <quantity>\``);
 
         try {
             const res = await buyStock(message.guildId, message.author.id, symbol, qty);
@@ -32,7 +33,7 @@ export async function handleStock(message: Message, args: string[]) {
     if (sub === "sell") {
         const symbol = args[1];
         const qty = parseInt(args[2]);
-        if (!symbol || isNaN(qty)) return message.reply("Usage: `!stock sell <symbol> <quantity>`");
+        if (!symbol || isNaN(qty)) return message.reply(`Usage: \`${prefix}stock sell <symbol> <quantity>\``);
 
         try {
             const res = await sellStock(message.guildId, message.author.id, symbol, qty);
@@ -97,7 +98,7 @@ export async function handleStock(message: Message, args: string[]) {
         .setDescription(`Market updates every 10 minutes.\n\n${desc}`)
         .setColor(Mascot.Colors.Base as any)
         .setImage("attachment://stock_market.jpg")
-        .setFooter({ text: "Use !stock buy <symbol> <qty> to invest." });
+        .setFooter({ text: `Use ${prefix}stock buy <symbol> <qty> to invest.` });
 
     message.reply({ embeds: [embed], files: [file] });
 }

@@ -432,17 +432,26 @@ async function handleButton(interaction: ButtonInteraction) {
         }
     }
     else if (customId === "work_shift") {
+        // Defer immediately to prevent timeout (Unknown Interaction)
+        // We use ephemeral: false because the game is intended to be public.
+        // This means validation errors will also be public, which is a necessary trade-off to prevent crashes.
+        await interaction.deferReply({ ephemeral: false });
+
         // Import here to avoid circular dependencies if any
         const { getJob, getJobPay, checkPromotion, checkDemotion, getWorkEvent } = require("../services/jobService");
         const { getWorkGame } = require("../services/minigameService");
 
         const userData = await prisma.user.findUnique({ where: { discordId_guildId: { discordId: user.id, guildId: guild.id } } });
         if (!userData || !userData.jobId) {
-            return interaction.reply({ content: "You don't have a job!", ephemeral: true });
+            await interaction.deleteReply().catch(() => { });
+            return interaction.followUp({ content: "You don't have a job!", ephemeral: true });
         }
 
         const job = getJob(userData.jobId);
-        if (!job) return interaction.reply({ content: "Invalid job.", ephemeral: true });
+        if (!job) {
+            await interaction.deleteReply().catch(() => { });
+            return interaction.followUp({ content: "Invalid job.", ephemeral: true });
+        }
 
         // Cooldown check
         const incomeConfig = await prisma.incomeConfig.findUnique({
@@ -480,7 +489,8 @@ async function handleButton(interaction: ButtonInteraction) {
 
         if (now - lastShift < cooldownMs) {
             const remaining = Math.ceil((cooldownMs - (now - lastShift)) / 60000);
-            return interaction.reply({ content: `${Mascot.Emotes.Angry} You are tired! You can work again in **${remaining} minutes**.`, ephemeral: true });
+            await interaction.deleteReply().catch(() => { });
+            return interaction.followUp({ content: `${Mascot.Emotes.Angry} You are tired! You can work again in **${remaining} minutes**.`, ephemeral: true });
         }
 
         // --- STRESS CHECK ---
@@ -503,7 +513,8 @@ async function handleButton(interaction: ButtonInteraction) {
                     .setColor("#E74C3C")
                     .setThumbnail(getEmoteUrl(Mascot.Emotes.Fail));
 
-                return interaction.reply({ embeds: [burnoutEmbed], ephemeral: true });
+                await interaction.deleteReply().catch(() => { });
+                return interaction.followUp({ embeds: [burnoutEmbed], ephemeral: true });
             }
         }
 
@@ -532,7 +543,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(rows);
 
-                return interaction.reply({ embeds: [evEmbed], components: [row] });
+                return interaction.editReply({ embeds: [evEmbed], components: [row] });
             }
         }
 
@@ -556,7 +567,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setColor("#3498DB")
                 .setFooter({ text: `Memorize this for ${game.previewTime} seconds!` });
 
-            reply = await interaction.reply({ embeds: [previewEmbed], ephemeral: false, fetchReply: true });
+            reply = await interaction.editReply({ embeds: [previewEmbed] }); // Removed fetchReply as editReply returns Message or boolean/APIMessage
 
             // Wait
             await new Promise(resolve => setTimeout(resolve, game.previewTime! * 1000));
@@ -576,13 +587,17 @@ async function handleButton(interaction: ButtonInteraction) {
                 )
             );
 
-            if (reply) {
-                await interaction.editReply({ embeds: [embed], components: [row] });
-            } else {
-                reply = await interaction.reply({ embeds: [embed], components: [row], ephemeral: false, fetchReply: true });
-            }
+            // Since we already deferred, we always use editReply
+            // If reply was set by preview logic, we edit.
+            // If not set, we still edit the deferred message.
+            reply = await interaction.editReply({ embeds: [embed], components: [row] });
 
             try {
+                // If reply is not a message (failed edit?), fallback to fetchReply?
+                // editReply returns Message if successful in d.js v14?
+                // Actually editReply resolves to Message.
+                if (!reply) reply = await interaction.fetchReply();
+
                 const i = await reply.awaitMessageComponent({
                     componentType: ComponentType.Button,
                     time: game.time * 1000,
@@ -598,11 +613,9 @@ async function handleButton(interaction: ButtonInteraction) {
         }
         // --- TYPING GAME ---
         else {
-            if (reply) {
-                await interaction.editReply({ embeds: [embed], components: [] });
-            } else {
-                reply = await interaction.reply({ embeds: [embed], ephemeral: false, fetchReply: true });
-            }
+            // TYPING GAME
+            // We just edit the embed to show the question
+            reply = await interaction.editReply({ embeds: [embed], components: [] });
 
             if (interaction.channel) {
                 try {

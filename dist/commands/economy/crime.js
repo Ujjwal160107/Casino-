@@ -64,7 +64,7 @@ async function handleCrime(message) {
         const embed = new discord_js_1.EmbedBuilder()
             .setTitle(`${POLICE_EMOTE} BUSTED!`)
             .setDescription(`You tried to **${scenario.text}** but the police caught you!`)
-            .addFields({ name: "Sentence", value: `You have been sent to jail for **${(0, format_1.formatDuration)(config.jailTime)}**.`, inline: true }, { name: "Bail", value: `${(0, format_1.fmtCurrency)(fine, config.currencyEmoji)}`, inline: true })
+            .addFields({ name: "Sentence", value: `You have been sent to jail.\nReleases: <t:${Math.floor(releaseTime.getTime() / 1000)}:R>`, inline: true }, { name: "Bail", value: `${(0, format_1.fmtCurrency)(fine, config.currencyEmoji)}`, inline: true })
             .setColor(0xFF0000)
             .setThumbnail("https://cdn.discordapp.com/emojis/1457053051582939237.png")
             .setFooter({ text: `Use ${config.prefix}bail to pay your way out or wait it out.` });

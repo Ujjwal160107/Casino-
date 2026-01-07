@@ -3,11 +3,17 @@ import { Message, EmbedBuilder, AttachmentBuilder } from "discord.js";
 import { PropertyService } from "../../services/propertyService";
 import { fmtCurrency } from "../../utils/format";
 import { Mascot } from "../../config/branding";
+import { getGuildConfig } from "../../services/guildConfigService";
+
+
 
 export const propertiesHandler = async (message: Message, args: string[]) => {
     const subCommand = args[0]?.toLowerCase();
     const guildId = message.guildId!;
     const userId = message.author.id;
+    const guildConfig = await getGuildConfig(guildId);
+    const prefix = guildConfig.prefix || "!";
+
 
     // Banner Image
     const bannerPath = "C:/Users/ujjwa/.gemini/antigravity/brain/53146123-dc6c-4f9e-af36-1452d87996f0/uploaded_image_1767341302816.png";
@@ -23,7 +29,7 @@ export const propertiesHandler = async (message: Message, args: string[]) => {
             .setDescription("Invest in properties to earn passive income and grow your net worth!\nPrices fluctuate based on market demand.")
             .setColor(Mascot.Colors.Base as any)
             .setImage('attachment://property-banner.png')
-            .setFooter({ text: "Use !buy-property <key> to purchase" });
+            .setFooter({ text: `Use ${prefix}buy-property <key> to purchase` });
 
         if (properties.length === 0) {
             embed.setDescription("No properties available for sale right now. Ask an admin to create some!");

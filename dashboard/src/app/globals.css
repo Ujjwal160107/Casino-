@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+}
+
+:root {
+  /* Dark Theme Default - Zinc/Carbon */
+  /* Zinc 950 Background */
+  --background: 240 10% 4%;
+  /* Zinc 50 Foreground */
+  --foreground: 0 0% 98%;
+
+  /* Zinc 950 for Cards */
+  --card: 240 10% 4%;
+  --card-foreground: 0 0% 98%;
+
+  --popover: 240 10% 4%;
+  --popover-foreground: 0 0% 98%;
+
+  /* Gold for Primary Actions - Kept as requested accent */
+  --primary: 45 93% 47%;
+  --primary-foreground: 0 0% 9%;
+
+  /* Zinc 800 for Secondary */
+  --secondary: 240 4% 16%;
+  --secondary-foreground: 0 0% 98%;
+
+  /* Zinc 900 for Muted */
+  --muted: 240 4% 16%;
+  --muted-foreground: 240 5% 65%;
+
+  /* Hover/Accent state - Zinc 800 */
+  --accent: 240 4% 16%;
+  --accent-foreground: 0 0% 98%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+
+  /* Zinc 800 for Borders */
+  --border: 240 4% 16%;
+  --input: 240 4% 16%;
+
+  --ring: 45 93% 47%;
+
+  --radius: 0.5rem;
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  /* Remove default border style from Tailwind preflight if needed, 
+     but standard Tailwind usually handles this. */
+}

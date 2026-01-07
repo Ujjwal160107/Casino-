@@ -180,7 +180,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     const { isJailed } = await checkJailStatus(user.id);
     if (isJailed) {
       return message.reply({
-        embeds: [errorEmbed(message.author, "🔒 You are in Jail", "You cannot perform this action while incarcerated. Use `!jail` to check your status or `!bail` to pay your way out.")]
+        embeds: [errorEmbed(message.author, "🔒 You are in Jail", `You cannot perform this action while incarcerated. Use \`${prefix}jail\` to check your status or \`${prefix}bail\` to pay your way out.`)]
       });
     }
   }
@@ -260,6 +260,14 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "stockmarket": {
       const { handleStock } = require("./commands/economy/stock");
       return handleStock(message, args);
+    }
+    case "my-stocks":
+    case "mystocks":
+    case "my-stock":
+    case "mystock":
+    case "stock-portfolio": {
+      const { handleMyStocks } = require("./commands/economy/myStocks");
+      return handleMyStocks(message);
     }
 
     // ...

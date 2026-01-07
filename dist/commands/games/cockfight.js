@@ -10,6 +10,7 @@ const embed_1 = require("../../utils/embed");
 const guildConfigService_1 = require("../../services/guildConfigService");
 const imageUtils_1 = require("../../utils/imageUtils");
 const cooldown_1 = require("../../utils/cooldown");
+const format_1 = require("../../utils/format");
 const gameUtils_1 = require("../../utils/gameUtils");
 const gameConfig_1 = require("../../config/gameConfig");
 const branding_1 = require("../../config/branding");
@@ -22,7 +23,9 @@ async function handleCockFight(message, args) {
         return;
     const config = await (0, guildConfigService_1.getGuildConfig)(message.guild.id);
     const targetUser = message.mentions.users.first();
-    const rawAmount = args.find(a => !a.startsWith("<@") && /^\d+$/.test(a));
+    // Allow finding any argument that looks like a number/amount (including 10k, 1e5)
+    // Or simpler: find first arg that is NOT a mention.
+    const rawAmount = args.find(a => !a.startsWith("<@"));
     if (!targetUser || !rawAmount) {
         return message.reply({
             embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Usage", `Usage: \`${config.prefix}cockfight @user <amount>\`\nMin Bet logic applies.`)]
@@ -34,9 +37,10 @@ async function handleCockFight(message, args) {
     if (targetUser.bot) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Error", "You cannot fight a bot.")] });
     }
-    const betAmount = parseInt(rawAmount);
+    // Use parseBetAmount to handle 10k, 1e5, etc.
+    const betAmount = (0, format_1.parseBetAmount)(rawAmount);
     if (isNaN(betAmount) || betAmount <= 0) {
-        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Amount", "Please enter a valid positive integer.")] });
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Amount", "Please enter a valid positive integer (e.g. 100, 10k, 1e5).")] });
     }
     const { min, max } = (0, gameUtils_1.getGameBetLimits)(config, "cockfight");
     if (betAmount < min) {

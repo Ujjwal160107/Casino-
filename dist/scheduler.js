@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.initScheduler = initScheduler;
 const node_cron_1 = __importDefault(require("node-cron"));
 const prisma_1 = __importDefault(require("./utils/prisma"));
+const casinoDropService_1 = require("./services/casinoDropService");
 const bankingService_1 = require("./services/bankingService");
 const effectService_1 = require("./services/effectService");
 const stockService_1 = require("./services/stockService");
@@ -34,6 +35,8 @@ function initScheduler(client) {
                 console.log(`✅ Processed ${loanCount} overdue loans.`);
             }
             await (0, effectService_1.removeTemporaryRoles)(client);
+            // Casino Drops
+            await casinoDropService_1.CasinoDropService.processDrops(client).catch(e => console.error("Casino drop error:", e));
         }
         catch (err) {
             console.error("Scheduler error:", err);

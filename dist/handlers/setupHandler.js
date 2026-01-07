@@ -86,7 +86,7 @@ async function handleSetupInteraction(interaction) {
                 .setLabel("Rob Fine (%)")
                 .setValue(config.robFinePct.toString())
                 .setStyle(discord_js_1.TextInputStyle.Short);
-            modal.addComponents(new discord_js_1.ActionRowBuilder().addComponents(success), new discord_js_1.ActionRowBuilder().addComponents(fine), new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.TextInputBuilder().setCustomId("jail_fine").setLabel("Jail Bail Cost").setValue(config.jailFine.toString()).setStyle(discord_js_1.TextInputStyle.Short)), new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.TextInputBuilder().setCustomId("jail_time").setLabel("Jail Time (e.g. 10m, 1h)").setValue((0, format_1.formatDuration)(config.jailTime * 1000)).setStyle(discord_js_1.TextInputStyle.Short)));
+            modal.addComponents(new discord_js_1.ActionRowBuilder().addComponents(success), new discord_js_1.ActionRowBuilder().addComponents(fine), new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.TextInputBuilder().setCustomId("jail_fine").setLabel("Jail Bail Cost").setValue(config.jailFine.toString()).setStyle(discord_js_1.TextInputStyle.Short)), new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.TextInputBuilder().setCustomId("jail_time").setLabel("Jail Time (e.g. 10m, 1h)").setValue((0, format_1.formatDuration)(config.jailTime)).setStyle(discord_js_1.TextInputStyle.Short)));
             await interaction.showModal(modal);
         }
         else if (id === "setup_gambling") {
@@ -255,22 +255,25 @@ async function handleSetupInteraction(interaction) {
             await interaction.editReply(`✅ Banking config updated! Limits and interest rates set.`);
         }
         else if (id === "modal_setup_crime") {
-            const success = parseInt(interaction.fields.getTextInputValue("rob_success"));
-            const fine = parseInt(interaction.fields.getTextInputValue("rob_fine"));
-            if (isNaN(success) || isNaN(fine))
-                return interaction.editReply("Invalid percentages.");
-            const jailFine = parseInt(interaction.fields.getTextInputValue("jail_fine"));
-            const jailTimeStr = interaction.fields.getTextInputValue("jail_time");
-            const jailTime = (0, duration_1.parseDuration)(jailTimeStr);
-            if (isNaN(success) || isNaN(fine) || isNaN(jailFine) || jailTime === null)
-                return interaction.editReply("Invalid numbers or duration format.");
-            await (0, guildConfigService_1.updateGuildConfig)(interaction.guildId, {
-                robSuccessPct: success,
-                robFinePct: fine,
-                jailFine,
-                jailTime
-            });
-            await interaction.editReply(`✅ Crime config updated!`);
+            try {
+                const success = parseInt(interaction.fields.getTextInputValue("rob_success"));
+                const fine = parseInt(interaction.fields.getTextInputValue("rob_fine"));
+                const jailFine = parseInt(interaction.fields.getTextInputValue("jail_fine"));
+                const jailTimeStr = interaction.fields.getTextInputValue("jail_time");
+                if (isNaN(success) || isNaN(fine) || isNaN(jailFine))
+                    return interaction.editReply("Invalid numbers.");
+                const jailTime = (0, duration_1.parseDuration)(jailTimeStr);
+                await (0, guildConfigService_1.updateGuildConfig)(interaction.guildId, {
+                    robSuccessPct: success,
+                    robFinePct: fine,
+                    jailFine,
+                    jailTime
+                });
+                await interaction.editReply(`✅ Crime config updated! Jail Time set to: ${jailTimeStr}`);
+            }
+            catch (e) {
+                return interaction.editReply(`❌ Error: ${e.message}`);
+            }
         }
         else if (id === "modal_setup_gambling") {
             const minBet = (0, format_1.parseSmartAmount)(interaction.fields.getTextInputValue("min_bet"));

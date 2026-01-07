@@ -80,9 +80,9 @@ async function handleAdminDashboard(message) {
             return;
         }
         // Stocks
-        if (interaction.customId === "btn_stock_add")
+        if (interaction.customId === "btn_stock_add" && interaction.isButton())
             await handleStockAddBtn(interaction);
-        if (interaction.customId === "btn_stock_config")
+        if (interaction.customId === "btn_stock_config" && interaction.isButton())
             await handleStockConfigBtn(interaction);
         if (interaction.customId === "select_stock_manage" && interaction.isStringSelectMenu())
             await handleStockManageSelect(interaction);
@@ -92,7 +92,7 @@ async function handleAdminDashboard(message) {
             await interaction.reply({ content: "Stock deleted.", ephemeral: true });
             await renderStockModule(interaction, message.guildId);
         }
-        if (interaction.customId.startsWith("btn_stock_edit_"))
+        if (interaction.customId.startsWith("btn_stock_edit_") && interaction.isButton())
             await handleStockEditBtn(interaction);
         if (interaction.customId === "btn_stock_home")
             await renderStockModule(interaction, message.guildId);

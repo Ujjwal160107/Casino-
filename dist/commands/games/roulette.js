@@ -50,19 +50,21 @@ async function handleRouletteMenu(message) {
     });
     collector.on("collect", async (i) => {
         if (i.customId === "roul_guide") {
+            const bannerPath = path_1.default.join(process.cwd(), "src", "assets", "roulette_guide.png");
+            const guideAttachment = new discord_js_1.AttachmentBuilder(bannerPath, { name: "roulette_guide.png" });
             const guideEmbed = new discord_js_1.EmbedBuilder()
-                .setTitle(`${eScroll} Roulette Rules`)
+                .setTitle(`Roulette Rules`)
                 .setColor(discord_js_1.Colors.Blue)
-                .setDescription(`**Multipliers:**\n\n` +
-                `${eRedCoin} **Red / ${eBlackCoin} Black:**\n` +
-                `2x Payout (Win chance ~48.6%)\n\n` +
-                `${eDiceSpecific} **Specific Number (0-36):**\n` +
-                `35x Payout (Win chance ~2.7%)\n\n` +
-                `🔵 **Odd / 🟡 Even:**\n` +
-                `2x Payout\n\n` +
-                `**House Edge:** The green **0** belongs to the house!`)
+                .setDescription(`**Payout Multipliers:**\n` +
+                `[x36] Single Number\n` +
+                `[x 3] Dozens (1-12, 13-24, 25-36)\n` +
+                `[x 3] Columns (1st, 2nd, 3rd)\n` +
+                `[x 2] Halves (1-18, 19-36)\n` +
+                `[x 2] Odd/Even\n` +
+                `[x 2] Colours (red, black)`)
+                .setImage("attachment://roulette_guide.png")
                 .setFooter({ text: `${branding_1.Mascot.Name} Tips` });
-            await i.reply({ embeds: [guideEmbed], ephemeral: true });
+            await i.reply({ embeds: [guideEmbed], files: [guideAttachment], ephemeral: true });
         }
         if (i.customId === "roul_play") {
             await i.reply({
@@ -146,16 +148,48 @@ async function handleBet(message, args) {
         didWin = (spin !== 0 && spin % 2 === 0);
         multiplier = 2;
     }
+    else if (choiceRaw === "1-12") {
+        didWin = (spin >= 1 && spin <= 12);
+        multiplier = 3;
+    }
+    else if (choiceRaw === "13-24") {
+        didWin = (spin >= 13 && spin <= 24);
+        multiplier = 3;
+    }
+    else if (choiceRaw === "25-36") {
+        didWin = (spin >= 25 && spin <= 36);
+        multiplier = 3;
+    }
+    else if (choiceRaw === "1st") { // 1st Column: 1, 4, 7... (n%3 == 1)
+        didWin = (spin !== 0 && spin % 3 === 1);
+        multiplier = 3;
+    }
+    else if (choiceRaw === "2nd") { // 2nd Column: 2, 5, 8... (n%3 == 2)
+        didWin = (spin !== 0 && spin % 3 === 2);
+        multiplier = 3;
+    }
+    else if (choiceRaw === "3rd") { // 3rd Column: 3, 6, 9... (n%3 == 0)
+        didWin = (spin !== 0 && spin % 3 === 0);
+        multiplier = 3;
+    }
+    else if (choiceRaw === "1-18") {
+        didWin = (spin >= 1 && spin <= 18);
+        multiplier = 2;
+    }
+    else if (choiceRaw === "19-36") {
+        didWin = (spin >= 19 && spin <= 36);
+        multiplier = 2;
+    }
     else {
         const numChoice = parseInt(choiceRaw);
         if (!isNaN(numChoice) && numChoice >= 0 && numChoice <= 36) {
             didWin = (spin === numChoice);
-            multiplier = 35;
+            multiplier = 36;
         }
         else {
             // Clean up if error
             await spinMsg.delete().catch(() => { });
-            return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Choice", "Bet on `red`, `black`, `odd`, `even`, or a number `0-36`.")] });
+            return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Choice", "Bet on `red`, `black`, `odd`, `even`, `1-12`, `13-24`, `25-36`, `1st`, `2nd`, `3rd`, `1-18`, `19-36`, or a number `0-36`.")] });
         }
     }
     let payout = didWin ? Math.floor(amount * multiplier) : 0;

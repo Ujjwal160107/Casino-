@@ -77,7 +77,7 @@ export async function handleCrime(message: Message) {
             .setTitle(`${POLICE_EMOTE} BUSTED!`)
             .setDescription(`You tried to **${scenario.text}** but the police caught you!`)
             .addFields(
-                { name: "Sentence", value: `You have been sent to jail for **${formatDuration(config.jailTime)}**.`, inline: true },
+                { name: "Sentence", value: `You have been sent to jail.\nReleases: <t:${Math.floor(releaseTime.getTime() / 1000)}:R>`, inline: true },
                 { name: "Bail", value: `${fmtCurrency(fine, config.currencyEmoji)}`, inline: true }
             )
             .setColor(0xFF0000)

@@ -3,9 +3,9 @@ import prisma from "../../utils/prisma";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { parseDuration, formatDuration } from "../../utils/format";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
-import { getGuildConfig } from "../../services/guildConfigService";
+import { getGuildConfig, updateGuildConfig } from "../../services/guildConfigService";
 
-const SUPPORTED = ["work", "beg", "crime", "slut"];
+const SUPPORTED = ["work", "beg", "crime", "slut", "rob"];
 
 export async function handleSetIncomeCooldown(message: Message, args: string[]) {
   try {
@@ -26,18 +26,22 @@ export async function handleSetIncomeCooldown(message: Message, args: string[]) 
 
     if (!SUPPORTED.includes(cmd) || seconds === null || seconds < 0) {
       return message.reply({
-        embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}setincomecooldown <work|beg|crime|slut> <duration|off>\`\nExample: \`${config.prefix}setincomecooldown work 1h 30m\` or \`... work off\``)]
+        embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}setincomecooldown <work|beg|crime|slut|rob> <duration|off>\`\nExample: \`${config.prefix}setincomecooldown work 1h 30m\` or \`... work off\``)]
       });
     }
 
-    await prisma.incomeConfig.upsert({
-      where: { guildId_commandKey: { guildId: message.guildId!, commandKey: cmd } },
-      create: { guildId: message.guildId!, commandKey: cmd, minPay: 10, maxPay: 50, cooldown: seconds, successPct: 100 },
-      update: { cooldown: seconds }
-    });
+    if (cmd === "rob") {
+      await updateGuildConfig(message.guildId!, { robCooldown: seconds });
+    } else {
+      await prisma.incomeConfig.upsert({
+        where: { guildId_commandKey: { guildId: message.guildId!, commandKey: cmd } },
+        create: { guildId: message.guildId!, commandKey: cmd, minPay: 10, maxPay: 50, cooldown: seconds, successPct: 100 },
+        update: { cooldown: seconds }
+      });
+    }
 
     return message.reply({
-      embeds: [successEmbed(message.author, "Cooldown Updated", `Set **${cmd}** cooldown to **${formatDuration(seconds * 1000)}**`)]
+      embeds: [successEmbed(message.author, "Cooldown Updated", `Set **${cmd}** cooldown to **${formatDuration(seconds)}**`)]
     });
 
   } catch (err) {

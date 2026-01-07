@@ -40,7 +40,7 @@ const EMOJI_MAP = {
         "8": "<:3572playingcardheartseight:1457404073837072474>",
         "9": "<:5451playingcardheartsnine:1457404083010011259>",
         "10": "<:7963playingcardheartsten:1457404106116436161>",
-        "J": "♥️J", // Missing in source
+        "J": "<:5593playingcardheartsjack:1457406307551416412>",
         "Q": "<:4703playingcardheartsqueen:1457404078991872082>",
         "K": "<:7669playingcardheartsking:1457404103570362464>"
     },
@@ -167,7 +167,7 @@ async function handleBlackjack(message, args) {
     }
     const getEmbed = (reveal) => {
         const pScore = calculateScore(playerHand);
-        const dScore = reveal ? calculateScore(dealerHand) : "?";
+        const dScore = reveal ? calculateScore(dealerHand) : calculateScore(dealerHand.slice(1));
         const embed = new discord_js_1.EmbedBuilder().setTitle(`${eCasino} Blackjack Table`).setColor(gameOver ? (payout > currentBet ? discord_js_1.Colors.Green : (payout === currentBet ? discord_js_1.Colors.Yellow : discord_js_1.Colors.Red)) : discord_js_1.Colors.Blue).addFields({ name: `Your Hand (${pScore})`, value: formatHand(playerHand), inline: true }, { name: `Dealer's Hand (${dScore})`, value: formatHand(dealerHand, !reveal), inline: true });
         let statusText = `**Bet:** ${(0, format_1.fmtCurrency)(currentBet, currencyEmoji)}`;
         if (gameOver) {
@@ -180,7 +180,7 @@ async function handleBlackjack(message, args) {
                 embed.setThumbnail(failUrl);
         }
         else {
-            statusText += `\n\nChoose an action below.`;
+            statusText += `\n\n**Hit** - Take another card\n**Stand** - End the game\n**Double Down** - Double your bet, hit once, then stand`;
         }
         embed.setDescription(statusText);
         embed.setFooter({ text: `${branding_1.Mascot.Name} • ${message.author.username}'s Game` });
@@ -188,7 +188,7 @@ async function handleBlackjack(message, args) {
     };
     const getRows = (disabled) => {
         return [
-            new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId("bj_hit").setLabel("Hit").setStyle(discord_js_1.ButtonStyle.Primary).setEmoji("👊").setDisabled(disabled), new discord_js_1.ButtonBuilder().setCustomId("bj_stand").setLabel("Stand").setStyle(discord_js_1.ButtonStyle.Secondary).setEmoji("🛑").setDisabled(disabled), new discord_js_1.ButtonBuilder().setCustomId("bj_double").setLabel("Double").setStyle(discord_js_1.ButtonStyle.Success).setEmoji("💰").setDisabled(disabled || playerHand.length > 2 || user.wallet.balance < currentBet * 2))
+            new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId("bj_hit").setLabel("Hit").setStyle(discord_js_1.ButtonStyle.Primary).setDisabled(disabled), new discord_js_1.ButtonBuilder().setCustomId("bj_stand").setLabel("Stand").setStyle(discord_js_1.ButtonStyle.Secondary).setDisabled(disabled), new discord_js_1.ButtonBuilder().setCustomId("bj_double").setLabel("Double").setStyle(discord_js_1.ButtonStyle.Success).setDisabled(disabled || playerHand.length > 2 || user.wallet.balance < currentBet * 2))
         ];
     };
     if (gameOver) {

@@ -59,6 +59,8 @@ const adminDashboard_1 = require("./commands/admin/adminDashboard");
 const resetAdminConfig_1 = require("./commands/admin/resetAdminConfig");
 const betLimit_1 = require("./commands/admin/betLimit");
 const setup_1 = require("./commands/admin/setup");
+const setupDrop_1 = require("./commands/admin/setupDrop");
+const drop_1 = require("./commands/admin/drop");
 const prisma_1 = __importDefault(require("./utils/prisma"));
 const embed_1 = require("./utils/embed");
 const stringUtils_1 = require("./utils/stringUtils");
@@ -173,7 +175,7 @@ async function routeMessage(client, message, prefix) {
         const { isJailed } = await checkJailStatus(user.id);
         if (isJailed) {
             return message.reply({
-                embeds: [(0, embed_1.errorEmbed)(message.author, "🔒 You are in Jail", "You cannot perform this action while incarcerated. Use `!jail` to check your status or `!bail` to pay your way out.")]
+                embeds: [(0, embed_1.errorEmbed)(message.author, "🔒 You are in Jail", `You cannot perform this action while incarcerated. Use \`${prefix}jail\` to check your status or \`${prefix}bail\` to pay your way out.`)]
             });
         }
     }
@@ -778,6 +780,16 @@ async function routeMessage(client, message, prefix) {
             const { handleManageJobStore } = require("./commands/admin/manageJobStore");
             return handleManageJobStore(message, args);
         }
+        // --- Casino Drops ---
+        case "setup-drop":
+        case "setupdrop":
+        case "config-drop":
+        case "drop-setup":
+            return (0, setupDrop_1.setupDrop)(message, args);
+        case "drop":
+        case "manual-drop":
+        case "spawn-drop":
+            return (0, drop_1.drop)(message, args);
         // --- Education Admin ---
         case "setint":
         case "set-int":

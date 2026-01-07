@@ -117,7 +117,7 @@ export async function handleSetupInteraction(interaction: Interaction) {
                     new TextInputBuilder().setCustomId("jail_fine").setLabel("Jail Bail Cost").setValue(config.jailFine.toString()).setStyle(TextInputStyle.Short)
                 ),
                 new ActionRowBuilder<TextInputBuilder>().addComponents(
-                    new TextInputBuilder().setCustomId("jail_time").setLabel("Jail Time (e.g. 10m, 1h)").setValue(formatDuration(config.jailTime * 1000)).setStyle(TextInputStyle.Short)
+                    new TextInputBuilder().setCustomId("jail_time").setLabel("Jail Time (e.g. 10m, 1h)").setValue(formatDuration(config.jailTime)).setStyle(TextInputStyle.Short)
                 )
             );
 
@@ -337,24 +337,26 @@ export async function handleSetupInteraction(interaction: Interaction) {
             await interaction.editReply(`✅ Banking config updated! Limits and interest rates set.`);
         }
         else if (id === "modal_setup_crime") {
-            const success = parseInt(interaction.fields.getTextInputValue("rob_success"));
-            const fine = parseInt(interaction.fields.getTextInputValue("rob_fine"));
+            try {
+                const success = parseInt(interaction.fields.getTextInputValue("rob_success"));
+                const fine = parseInt(interaction.fields.getTextInputValue("rob_fine"));
+                const jailFine = parseInt(interaction.fields.getTextInputValue("jail_fine"));
+                const jailTimeStr = interaction.fields.getTextInputValue("jail_time");
 
-            if (isNaN(success) || isNaN(fine)) return interaction.editReply("Invalid percentages.");
+                if (isNaN(success) || isNaN(fine) || isNaN(jailFine)) return interaction.editReply("Invalid numbers.");
 
-            const jailFine = parseInt(interaction.fields.getTextInputValue("jail_fine"));
-            const jailTimeStr = interaction.fields.getTextInputValue("jail_time");
-            const jailTime = parseDuration(jailTimeStr);
+                const jailTime = parseDuration(jailTimeStr);
 
-            if (isNaN(success) || isNaN(fine) || isNaN(jailFine) || jailTime === null) return interaction.editReply("Invalid numbers or duration format.");
-
-            await updateGuildConfig(interaction.guildId!, {
-                robSuccessPct: success,
-                robFinePct: fine,
-                jailFine,
-                jailTime
-            });
-            await interaction.editReply(`✅ Crime config updated!`);
+                await updateGuildConfig(interaction.guildId!, {
+                    robSuccessPct: success,
+                    robFinePct: fine,
+                    jailFine,
+                    jailTime
+                });
+                await interaction.editReply(`✅ Crime config updated! Jail Time set to: ${jailTimeStr}`);
+            } catch (e: any) {
+                return interaction.editReply(`❌ Error: ${e.message}`);
+            }
         }
         else if (id === "modal_setup_gambling") {
             const minBet = parseSmartAmount(interaction.fields.getTextInputValue("min_bet"));

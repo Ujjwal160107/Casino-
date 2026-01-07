@@ -25,7 +25,7 @@ export async function handleJail(message: Message) {
         .setTitle(`${POLICE_EMOTE} JAIL STATUS`)
         .setDescription(`You are currently incarcerated.`)
         .addFields(
-            { name: "Release In", value: formatDuration(Math.floor(timeLeft / 1000)), inline: true },
+            { name: "Release In", value: status.releaseTime ? `<t:${Math.floor(status.releaseTime.getTime() / 1000)}:R>` : "N/A", inline: true },
             { name: "Bail Cost", value: fmtCurrency(config.jailFine, config.currencyEmoji), inline: true }
         )
         .setColor(0xFF0000)

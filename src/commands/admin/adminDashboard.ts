@@ -26,6 +26,7 @@ import { getGuildConfig, updateGuildConfig } from "../../services/guildConfigSer
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
 import { errorEmbed, successEmbed } from "../../utils/embed";
 import { getAllStocks, createStock, deleteStock, editStock, getStockById } from "../../services/stockService";
+import { formatDuration } from "../../utils/duration";
 
 const MODULE_HOME = "module_home";
 const MODULE_DISABLES = "module_disabled";
@@ -113,8 +114,8 @@ export async function handleAdminDashboard(message: Message) {
             return;
         }
         // Stocks
-        if (interaction.customId === "btn_stock_add") await handleStockAddBtn(interaction);
-        if (interaction.customId === "btn_stock_config") await handleStockConfigBtn(interaction);
+        if (interaction.customId === "btn_stock_add" && interaction.isButton()) await handleStockAddBtn(interaction);
+        if (interaction.customId === "btn_stock_config" && interaction.isButton()) await handleStockConfigBtn(interaction);
         if (interaction.customId === "select_stock_manage" && interaction.isStringSelectMenu()) await handleStockManageSelect(interaction);
         if (interaction.customId.startsWith("btn_stock_delete_")) {
             const stockId = interaction.customId.replace("btn_stock_delete_", "");
@@ -122,7 +123,7 @@ export async function handleAdminDashboard(message: Message) {
             await interaction.reply({ content: "Stock deleted.", ephemeral: true });
             await renderStockModule(interaction, message.guildId!);
         }
-        if (interaction.customId.startsWith("btn_stock_edit_")) await handleStockEditBtn(interaction);
+        if (interaction.customId.startsWith("btn_stock_edit_") && interaction.isButton()) await handleStockEditBtn(interaction);
         if (interaction.customId === "btn_stock_home") await renderStockModule(interaction, message.guildId!);
 
 

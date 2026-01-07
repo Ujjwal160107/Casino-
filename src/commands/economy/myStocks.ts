@@ -1,0 +1,45 @@
+
+import { Message, EmbedBuilder } from "discord.js";
+import { getPortfolio } from "../../services/stockService";
+import { getGuildConfig } from "../../services/guildConfigService";
+import { fmtCurrency } from "../../utils/format";
+import { Mascot } from "../../config/branding";
+import { errorEmbed } from "../../utils/embed";
+
+export async function handleMyStocks(message: Message) {
+    if (!message.guildId) return;
+
+    const config = await getGuildConfig(message.guildId);
+    const emoji = config.currencyEmoji;
+
+    const pf = await getPortfolio(message.guildId, message.author.id);
+    if (!pf || pf.holdings.length === 0) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Portfolio Empty", "You don't own any stocks.")] });
+    }
+
+    let totalValue = 0;
+    let totalCost = 0;
+
+    const lines = pf.holdings.map(h => {
+        const val = h.stock.currentPrice * h.quantity;
+        const cost = h.avgBuyPrice * h.quantity;
+        totalValue += val;
+        totalCost += cost;
+
+        const pnl = val - cost;
+        const pnlIcon = pnl >= 0 ? Mascot.Emotes.Graph : Mascot.Emotes.GraphDown;
+        const pnlStr = pnl >= 0 ? `+${fmtCurrency(pnl, emoji)}` : `-${fmtCurrency(Math.abs(pnl), emoji)}`;
+
+        return `**${h.stock.symbol}**: ${h.quantity} shares @ ${fmtCurrency(h.stock.currentPrice, emoji)} (Avg: ${h.avgBuyPrice})\nValue: **${fmtCurrency(val, emoji)}** (${pnlIcon} ${pnlStr})`;
+    });
+
+    const totalPnl = totalValue - totalCost;
+    const totalPnlStr = totalPnl >= 0 ? `+${fmtCurrency(totalPnl, emoji)}` : `-${fmtCurrency(Math.abs(totalPnl), emoji)}`;
+
+    const embed = new EmbedBuilder()
+        .setTitle(`📊 Stock Portfolio: ${message.author.username}`)
+        .setDescription(`**Total Value:** ${fmtCurrency(totalValue, emoji)}\n**Total Profit:** ${totalPnlStr}\n\n${lines.join("\n\n")}`)
+        .setColor(Mascot.Colors.Base as any);
+
+    return message.reply({ embeds: [embed] });
+}

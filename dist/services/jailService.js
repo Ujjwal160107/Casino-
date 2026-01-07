@@ -60,24 +60,39 @@ async function payBail(userId, guildId) {
         return { success: false, message: `You need **${fine}** coins to post bail.` };
     }
     // Deduct money and release
-    await prisma_1.default.$transaction([
-        prisma_1.default.wallet.update({
-            where: { id: user.wallet.id },
-            data: { balance: { decrement: fine } }
-        }),
-        prisma_1.default.transaction.create({
-            data: {
-                walletId: user.wallet.id,
-                amount: -fine,
-                type: "jail_bail",
-                meta: { fine }
+    // Deduct money and release
+    let retries = 3;
+    while (retries > 0) {
+        try {
+            await prisma_1.default.$transaction([
+                prisma_1.default.wallet.update({
+                    where: { id: user.wallet.id },
+                    data: { balance: { decrement: fine } }
+                }),
+                prisma_1.default.transaction.create({
+                    data: {
+                        walletId: user.wallet.id,
+                        amount: -fine,
+                        type: "jail_bail",
+                        meta: { fine }
+                    }
+                }),
+                prisma_1.default.user.update({
+                    where: { id: userId },
+                    data: { isJailed: false, jailReleaseTime: null }
+                })
+            ]);
+            break; // Success
+        }
+        catch (error) {
+            if (error.code === 'P2034' && retries > 1) {
+                retries--;
+                await new Promise(res => setTimeout(res, 200)); // Backoff
+                continue;
             }
-        }),
-        prisma_1.default.user.update({
-            where: { id: userId },
-            data: { isJailed: false, jailReleaseTime: null }
-        })
-    ]);
+            throw error; // Re-throw other errors or if retries exhausted
+        }
+    }
     return { success: true, message: `You paid **${fine}** coins and have been released from jail.` };
 }
 //# sourceMappingURL=jailService.js.map
