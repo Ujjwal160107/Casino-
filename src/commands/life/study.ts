@@ -23,7 +23,7 @@ export async function handleStudy(message: Message) {
     });
 
     if (!user || !user.currentEducation) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Not Enrolled", `You are not enrolled in any degree. Use \`${prefix}enroll\` to start your education!`)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Not Enrolled", `You are not enrolled in any degree. Use \`${prefix}education\` to start your education!`)] });
     }
 
     // DB-Based Cooldown (Dynamic)

@@ -35,45 +35,47 @@
 }
 
 :root {
-  /* Dark Theme Default - Zinc/Carbon */
-  /* Zinc 950 Background */
-  --background: 240 10% 4%;
-  /* Zinc 50 Foreground */
-  --foreground: 0 0% 98%;
+  /* Cyber-Japanese Theme */
 
-  /* Zinc 950 for Cards */
-  --card: 240 10% 4%;
-  --card-foreground: 0 0% 98%;
+  /* Deep Navy Background (#0b0d17) */
+  --background: 230 35% 7%;
+  /* White Foreground */
+  --foreground: 0 0% 100%;
 
-  --popover: 240 10% 4%;
-  --popover-foreground: 0 0% 98%;
+  /* Glass/Deep Navy for Cards */
+  --card: 230 35% 10%;
+  --card-foreground: 0 0% 100%;
 
-  /* Gold for Primary Actions - Kept as requested accent */
-  --primary: 45 93% 47%;
-  --primary-foreground: 0 0% 9%;
+  --popover: 230 35% 7%;
+  --popover-foreground: 0 0% 100%;
 
-  /* Zinc 800 for Secondary */
-  --secondary: 240 4% 16%;
-  --secondary-foreground: 0 0% 98%;
+  /* Neon Cyan for Primary (#00f0ff) */
+  --primary: 183 100% 50%;
+  --primary-foreground: 230 35% 7%;
 
-  /* Zinc 900 for Muted */
-  --muted: 240 4% 16%;
-  --muted-foreground: 240 5% 65%;
+  /* Hot Pink for Secondary/Accents (#ff0055) */
+  --secondary: 340 100% 50%;
+  --secondary-foreground: 0 0% 100%;
 
-  /* Hover/Accent state - Zinc 800 */
-  --accent: 240 4% 16%;
-  --accent-foreground: 0 0% 98%;
+  /* Muted Deep Blue */
+  --muted: 230 25% 15%;
+  --muted-foreground: 230 10% 70%;
+
+  /* Neon Cyan for Accents */
+  --accent: 183 100% 50%;
+  --accent-foreground: 230 35% 7%;
 
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
 
-  /* Zinc 800 for Borders */
-  --border: 240 4% 16%;
-  --input: 240 4% 16%;
+  /* Cyan Border */
+  --border: 230 25% 20%;
+  --input: 230 25% 20%;
 
-  --ring: 45 93% 47%;
+  --ring: 183 100% 50%;
 
-  --radius: 0.5rem;
+  --radius: 0.75rem;
+  /* Slightly larger radius for modern look */
 }
 
 body {
