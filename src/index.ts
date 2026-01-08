@@ -57,9 +57,16 @@ import { initScheduler } from "./scheduler"; const slashCommands = new Map<strin
     } finally {
       (message as any).content = originalContent;
     }
-  } catch (err) {
-    console.error("Message handler error:", err); try { await message.reply("An internal error occurred while processing your command."); } catch (replyErr) {
-      console.error("Failed to notify user about message handler error:", replyErr);
+  } catch (err: any) {
+    if (err.code === 10008) return; // Ignore unknown message errors
+    console.error("Message handler error:", err);
+    try {
+      await message.reply("An internal error occurred while processing your command.");
+    } catch (replyErr: any) {
+      // Ignore Invalid Form Body (50035) or Unknown Message (10008) during error reply
+      if (replyErr.code !== 50035 && replyErr.code !== 10008) {
+        console.error("Failed to notify user about message handler error:", replyErr);
+      }
     }
   }
 });

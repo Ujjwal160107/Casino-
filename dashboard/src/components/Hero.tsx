@@ -51,17 +51,17 @@ export function Hero() {
                             href="https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="bg-primary hover:bg-primary/90 text-black text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 shadow-[0_0_20px_rgba(0,240,255,0.4)] flex items-center justify-center gap-2"
+                            className="bg-primary hover:bg-primary/90 text-black text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 shadow-[0_0_20px_rgba(0,240,255,0.4)] flex items-center justify-center gap-2 cursor-pointer"
                         >
                             <ExternalLink size={20} />
                             Add to Discord
                         </a>
                         <button
                             onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
-                            className="bg-zinc-800 hover:bg-zinc-700 text-white text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 border border-white/10 flex items-center justify-center gap-2"
+                            className="bg-zinc-800 hover:bg-zinc-700 text-white text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 border border-white/10 flex items-center justify-center gap-2 cursor-pointer"
                         >
                             <LayoutDashboard size={20} />
-                            See Features
+                            Dashboard
                         </button>
                     </ScrollReveal>
 

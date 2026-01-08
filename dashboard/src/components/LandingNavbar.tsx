@@ -29,77 +29,38 @@ export function LandingNavbar() {
         >
             <div className="max-w-7xl mx-auto px-6">
                 <GlassCard
-                    className={`flex items-center justify-between px-6 py-4 ${isScrolled ? "bg-black/40 backdrop-blur-xl border-white/10" : "bg-transparent border-transparent shadow-none backdrop-blur-none"
-                        }`}
+                    className="px-6 py-3 bg-black/10 backdrop-blur-md border-white/5 shadow-none transition-all duration-300 rounded-full"
                 >
-                    {/* Logo */}
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded bg-gradient-to-br from-primary to-secondary flex items-center justify-center font-bold text-black">
-                            F
+                    <div className="flex items-center justify-between w-full">
+                        {/* Logo */}
+                        <Link href="/" className="flex items-center gap-3 group cursor-pointer">
+                            <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-white/10 shadow-[0_0_15px_rgba(168,85,247,0.4)] group-hover:shadow-[0_0_25px_rgba(168,85,247,0.6)] transition-all">
+                                <img
+                                    src="/fortuna_icon.png"
+                                    alt="Fortuna"
+                                    className="w-full h-full object-cover"
+                                />
+                            </div>
+                            <span className="text-xl font-bold tracking-wider text-white group-hover:text-primary transition-colors">FORTUNA</span>
+                        </Link>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => signIn("discord")}
+                                className="px-6 py-2 rounded-full border border-white/10 text-zinc-300 font-medium text-sm hover:bg-white/5 hover:text-white hover:border-white/20 transition-all cursor-pointer"
+                            >
+                                Login
+                            </button>
+                            <button
+                                className="px-6 py-2 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold text-sm hover:brightness-110 transition-all shadow-lg hover:shadow-indigo-500/25 cursor-pointer"
+                            >
+                                Premium
+                            </button>
                         </div>
-                        <span className="text-xl font-bold tracking-wider text-white">FORTUNA</span>
                     </div>
-
-                    {/* Desktop Links */}
-                    <div className="hidden md:flex items-center gap-8">
-                        <NavLink href="#features">Features</NavLink>
-                        <NavLink href="#stats">Statistics</NavLink>
-                        <NavLink href="#community">Community</NavLink>
-                    </div>
-
-                    {/* Action Button */}
-                    <div className="hidden md:flex items-center gap-4">
-                        <button
-                            onClick={() => signIn("discord")}
-                            className="text-sm font-semibold text-zinc-300 hover:text-white transition-colors"
-                        >
-                            Login
-                        </button>
-                        <button
-                            onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
-                            className="px-5 py-2 rounded-full bg-white text-black font-bold text-sm hover:bg-primary hover:text-black transition-colors shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(0,240,255,0.5)]"
-                        >
-                            Get Started
-                        </button>
-                    </div>
-
-                    {/* Mobile Menu Toggle */}
-                    <button
-                        className="md:hidden text-white"
-                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    >
-                        {mobileMenuOpen ? <X /> : <Menu />}
-                    </button>
                 </GlassCard>
             </div>
-
-            {/* Mobile Menu Overlay */}
-            {mobileMenuOpen && (
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="absolute top-full left-0 right-0 p-4 md:hidden"
-                >
-                    <GlassCard className="flex flex-col gap-4 p-6 bg-black/90 backdrop-blur-xl border-white/10">
-                        <MobileNavLink href="#features">Features</MobileNavLink>
-                        <MobileNavLink href="#stats">Statistics</MobileNavLink>
-                        <MobileNavLink href="#community">Community</MobileNavLink>
-                        <div className="h-px bg-white/10 my-2" />
-                        <button
-                            onClick={() => signIn("discord")}
-                            className="w-full py-3 text-center font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-                        >
-                            Login
-                        </button>
-                        <button
-                            onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
-                            className="w-full py-3 text-center font-bold bg-primary text-black rounded-lg hover:bg-white transition-colors"
-                        >
-                            Get Started
-                        </button>
-                    </GlassCard>
-                </motion.div>
-            )}
         </motion.nav>
     );
 }

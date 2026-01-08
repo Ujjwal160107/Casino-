@@ -90,6 +90,10 @@ export const sellPropertyHandler = async (message: Message, args: string[]) => {
 };
 
 export const myPropertiesHandler = async (message: Message) => {
+    const guildConfig = await getGuildConfig(message.guildId!);
+    const prefix = guildConfig.prefix || "!";
+    const currencyEmoji = guildConfig.currencyEmoji || "🪙";
+
     const owned = await PropertyService.getOwnedProperties(message.author.id, message.guildId!);
 
     const embed = new EmbedBuilder()
@@ -97,7 +101,7 @@ export const myPropertiesHandler = async (message: Message) => {
         .setColor(Mascot.Colors.Base as any);
 
     if (owned.length === 0) {
-        embed.setDescription("You don't own any properties yet. Use `!properties` to view the market.");
+        embed.setDescription(`You don't own any properties yet. Use \`${prefix}properties\` to view the market.`);
     } else {
         let totalIncome = 0;
         owned.forEach(op => {
@@ -110,12 +114,12 @@ export const myPropertiesHandler = async (message: Message) => {
 
             embed.addFields({
                 name: `${p.name}`,
-                value: `${Mascot.Emotes.Price} Purchased: ${fmtCurrency(op.purchasedPrice)}\n${Mascot.Emotes.GraphUp} Current Val: ${fmtCurrency(p.price)}\n${Mascot.Emotes.MoneyBag} Income: ${fmtCurrency(p.incomePerCycle)}\n${status}`,
+                value: `${Mascot.Emotes.Price} Purchased: ${fmtCurrency(op.purchasedPrice, currencyEmoji)}\n${Mascot.Emotes.GraphUp} Current Val: ${fmtCurrency(p.price, currencyEmoji)}\n${Mascot.Emotes.MoneyBag} Income: ${fmtCurrency(p.incomePerCycle, currencyEmoji)}\n${status}`,
                 inline: true
             });
         });
 
-        embed.setDescription(`Total Properties: **${owned.length}**\nTotal Potential Income: **${fmtCurrency(totalIncome)}** per cycle.`);
+        embed.setDescription(`Total Properties: **${owned.length}**\nTotal Potential Income: **${fmtCurrency(totalIncome, currencyEmoji)}** per cycle.`);
     }
 
     return message.reply({ embeds: [embed] });

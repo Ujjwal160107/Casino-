@@ -42,112 +42,146 @@ const CARDS = [
 ];
 
 export function InteractiveCardDeck() {
-    const [activeIndex, setActiveIndex] = useState(0);
-    const [isFlipped, setIsFlipped] = useState(false);
+    const [isSpread, setIsSpread] = useState(false);
+    const [flippedIndices, setFlippedIndices] = useState<number[]>([]);
 
-    const activeCard = CARDS[activeIndex];
-
-    const handleNext = () => {
-        setIsFlipped(false); // Flip back to face down
-        setTimeout(() => {
-            setActiveIndex((prev) => (prev + 1) % CARDS.length);
-        }, 300);
+    const handleDeckClick = () => {
+        if (!isSpread) {
+            setIsSpread(true);
+        } else {
+            // Optional: clicking center again could collapse, but we'll use a close button/background for better UX
+            // setIsSpread(false);
+        }
     };
 
-    const handleFlip = () => {
-        setIsFlipped(!isFlipped);
+    const handleCardClick = (index: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!isSpread) {
+            setIsSpread(true);
+            return;
+        }
+
+        setFlippedIndices((prev) => {
+            if (prev.includes(index)) {
+                return prev.filter((i) => i !== index);
+            }
+            return [...prev, index];
+        });
+    };
+
+    const handleClose = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsSpread(false);
+        setFlippedIndices([]); // Reset flips on close
     };
 
     return (
-        <div className="relative w-full h-[500px] flex items-center justify-center perspective-1000">
-            {/* Background/Stack Cards (Face Down) */}
-            <div className="absolute inset-0 flex items-center justify-center z-0">
-                {[1, 2].map((offset) => {
+        <div className="relative w-full h-[600px] flex items-center justify-center perspective-1000">
+            {/* Clickable Backdrop to close spread */}
+            {isSpread && (
+                <div
+                    className="absolute inset-0 z-0 cursor-pointer"
+                    onClick={handleClose}
+                />
+            )}
+
+            {/* Hint Text */}
+            {!isSpread && (
+                <div className="absolute top-10 text-zinc-500 text-sm font-mono animate-pulse">
+                    &lt; Click Deck to Deal &gt;
+                </div>
+            )}
+
+            <div
+                className="relative w-full h-full flex items-center justify-center"
+                onClick={handleDeckClick}
+            >
+                {CARDS.map((card, index) => {
+                    const isFlipped = flippedIndices.includes(index);
+
+                    // Spread Calculations
+                    const totalCards = CARDS.length;
+                    // Spread: -45deg to +45deg
+                    const angleStep = 60 / (totalCards - 1);
+                    const baseAngle = -30 + (index * angleStep);
+
+                    // Stacked: subtle randomness
+                    const stackAngle = (index % 2 === 0 ? -2 : 2) * (index + 1);
+                    const stackX = index * 4;
+                    const stackY = index * -4;
+
+                    // Final Transforms
+                    const rotate = isSpread ? baseAngle : stackAngle;
+                    // Move cards out along the radius when spread
+                    const x = isSpread ? Math.sin(baseAngle * (Math.PI / 180)) * 300 : stackX;
+                    const y = isSpread ? -Math.cos(baseAngle * (Math.PI / 180)) * 200 + 100 : stackY;
+
                     return (
-                        <div
-                            key={offset}
-                            className="absolute w-[300px] h-[450px] rounded-2xl border-2 border-zinc-900 shadow-2xl overflow-hidden"
-                            style={{
-                                transform: `translateX(${offset * 12}px) translateY(${offset * 8}px) rotate(${offset * 4}deg) scale(${1 - offset * 0.05})`,
-                                zIndex: -offset,
+                        <motion.div
+                            key={card.id}
+                            initial={false}
+                            animate={{
+                                x: x,
+                                y: y,
+                                rotate: rotate,
+                                scale: isSpread ? 1 : 1 - index * 0.05,
+                                zIndex: isSpread ? 10 + index : totalCards - index,
                             }}
+                            transition={{
+                                type: "spring",
+                                stiffness: 200,
+                                damping: 20,
+                                delay: isSpread ? index * 0.05 : 0
+                            }}
+                            className="absolute w-[280px] h-[420px] cursor-pointer group"
+                            onClick={(e) => handleCardClick(index, e)}
+                            whileHover={isSpread ? { scale: 1.1, zIndex: 50, rotate: 0 } : {}}
                         >
-                            <Image
-                                src="/card_back.png"
-                                alt="Card Back"
-                                fill
-                                className="object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/20" />
-                        </div>
+                            <motion.div
+                                className="w-full h-full relative preserve-3d transition-all duration-500"
+                                animate={{ rotateY: isFlipped ? 180 : 0 }}
+                                transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                                style={{ transformStyle: "preserve-3d" }}
+                            >
+                                {/* Front Face (Face Down / Card Back) */}
+                                <div className="absolute inset-0 backface-hidden w-full h-full rounded-2xl overflow-hidden border-4 border-yellow-900/50 shadow-2xl bg-zinc-900">
+                                    <Image
+                                        src="/card_back.png"
+                                        alt="Back"
+                                        fill
+                                        className="object-cover"
+                                    />
+                                    {/* Texture Overlay */}
+                                    <div className="absolute inset-0 bg-black/20" />
+                                </div>
+
+                                {/* Back Face (Revealed Content) */}
+                                <div
+                                    className="absolute inset-0 backface-hidden w-full h-full rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-zinc-900"
+                                    style={{ transform: "rotateY(180deg)" }}
+                                >
+                                    <Image
+                                        src={card.image}
+                                        alt={card.title}
+                                        fill
+                                        className="object-cover"
+                                    />
+                                </div>
+                            </motion.div>
+                        </motion.div>
                     );
                 })}
             </div>
 
-            {/* Main Active Card */}
-            <div
-                className="relative w-[300px] h-[450px] cursor-pointer group z-10"
-                onClick={handleFlip}
-            >
-                <div className="absolute -top-12 left-1/2 -translate-x-1/2 text-zinc-500 text-sm font-mono animate-pulse whitespace-nowrap">
-                    {isFlipped ? "Click Next ->" : "< Click to Reveal >"}
-                </div>
-
-                <motion.div
-                    className="w-full h-full relative preserve-3d transition-all duration-500"
-                    animate={{ rotateY: isFlipped ? 180 : 0 }}
-                    transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                    style={{ transformStyle: "preserve-3d" }}
+            {/* Close Button (Optional UX aid) */}
+            {isSpread && (
+                <button
+                    onClick={handleClose}
+                    className="absolute bottom-10 px-6 py-2 rounded-full bg-zinc-800/80 text-white font-mono text-sm backdrop-blur border border-white/10 hover:bg-zinc-700 transition-colors z-50"
                 >
-                    {/* Front Face (Face Down / Card Back) */}
-                    <div className="absolute inset-0 backface-hidden w-full h-full rounded-2xl overflow-hidden border-4 border-yellow-900/50 shadow-2xl">
-                        <Image
-                            src="/card_back.png"
-                            alt="Lady Fortuna"
-                            fill
-                            className="object-cover"
-                            priority
-                        />
-                    </div>
-
-                    {/* Back Face (Revealed Content) */}
-                    <div
-                        className="absolute inset-0 backface-hidden w-full h-full rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-zinc-900"
-                        style={{ transform: "rotateY(180deg)" }}
-                    >
-                        {/* Full Bleed Feature Image */}
-                        <Image
-                            src={activeCard.image}
-                            alt={activeCard.title}
-                            fill
-                            className="object-cover"
-                        />
-
-                        {/* Overlay for Text Readability */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col items-center justify-end p-6 text-center">
-
-                            <div className="mb-4 p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/10">
-                                <activeCard.icon className="text-white w-8 h-8" />
-                            </div>
-
-                            <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-wider drop-shadow-lg">{activeCard.title}</h3>
-                            <p className="text-zinc-200 text-sm leading-relaxed mb-6 font-medium drop-shadow-md">
-                                {activeCard.description}
-                            </p>
-
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleNext();
-                                }}
-                                className="px-6 py-2 rounded-full bg-white text-black font-bold hover:bg-primary hover:scale-105 transition-all shadow-lg"
-                            >
-                                Next Feature
-                            </button>
-                        </div>
-                    </div>
-                </motion.div>
-            </div>
+                    Close Hand
+                </button>
+            )}
         </div>
     );
 }

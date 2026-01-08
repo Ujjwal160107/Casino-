@@ -111,7 +111,7 @@ export async function handleCockFight(message: Message, args: string[]) {
         });
     }
     if (challengerMeta.injured) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Injured", "Your chicken is injured! Heal it via `!chicken`.")] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Injured", `Your chicken is injured! Heal it via \`${config.prefix}chicken\`.`)] });
     }
 
     const invTarget = await prisma.inventory.findUnique({
