@@ -47,7 +47,7 @@ export function LandingNavbar() {
                         {/* Action Buttons */}
                         <div className="flex items-center gap-4">
                             <button
-                                onClick={() => signIn("discord")}
+                                onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
                                 className="px-6 py-2 rounded-full border border-white/10 text-zinc-300 font-medium text-sm hover:bg-white/5 hover:text-white hover:border-white/20 transition-all cursor-pointer"
                             >
                                 Login

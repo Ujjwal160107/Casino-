@@ -34,7 +34,7 @@ export default async function AdminLayout({ children, params }: DashboardLayoutP
     // Proceeding assuming initial entry was valid, but a real prod app needs strict per-route checks.
 
     return (
-        <div className="flex min-h-screen bg-zinc-950 text-zinc-200 font-sans">
+        <div className="flex min-h-screen bg-zinc-900 text-zinc-200 font-sans">
             {/* Sidebar - Desktop */}
             <div className="hidden md:block w-64 shrink-0">
                 <AdminSidebar guild={guild} />
@@ -43,7 +43,7 @@ export default async function AdminLayout({ children, params }: DashboardLayoutP
             {/* Main Content Area */}
             <main className="flex-1 min-w-0 md:ml-64 relative"> {/* md:ml-64 because sidebar is fixed */}
                 {/* Mobile Header Placeholder */}
-                <div className="md:hidden p-4 border-b border-white/5 bg-zinc-950 flex items-center justify-between sticky top-0 z-30">
+                <div className="md:hidden p-4 border-b border-white/5 bg-zinc-900 flex items-center justify-between sticky top-0 z-30">
                     <span className="font-bold text-white">Fortuna Admin</span>
                     {/* Add Mobile Menu Toggle Here */}
                 </div>

@@ -32,10 +32,14 @@ export default async function DashboardPage() {
     });
 
     return (
-        <div className="min-h-screen bg-zinc-950 relative overflow-hidden">
-            {/* Creative Background */}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-800/20 via-zinc-950 to-zinc-950 pointer-events-none" />
-            <div className="absolute top-0 w-full h-px bg-gradient-to-r from-transparent via-zinc-700 to-transparent opacity-20" />
+        <div className="min-h-screen bg-zinc-950 relative overflow-hidden font-sans text-foreground selection:bg-primary/30">
+            {/* Background Image with Overlay */}
+            <div
+                className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat fixed"
+                style={{ backgroundImage: 'url("/server_list_bg.png")' }}
+            >
+                <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-[2px]" />
+            </div>
 
             {/* Navbar */}
             <DashboardNavbar user={session.user} />

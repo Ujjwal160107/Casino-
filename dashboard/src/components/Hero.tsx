@@ -48,7 +48,7 @@ export function Hero() {
 
                     <ScrollReveal delay={0.3} direction="up" className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
                         <a
-                            href="https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot"
+                            href="https://discord.com/oauth2/authorize?client_id=1371816936857669702"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="bg-primary hover:bg-primary/90 text-black text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 shadow-[0_0_20px_rgba(0,240,255,0.4)] flex items-center justify-center gap-2 cursor-pointer"
