@@ -10,7 +10,8 @@
     "prisma:push": "npx prisma db push",
     "prisma:generate": "npx prisma generate",
     "prisma:studio": "npx prisma studio",
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node prisma/seed.ts",
+    "postinstall": "npx prisma generate"
   },
   "repository": {
     "type": "git",
