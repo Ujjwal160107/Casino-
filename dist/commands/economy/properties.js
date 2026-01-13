@@ -5,10 +5,13 @@ const discord_js_1 = require("discord.js");
 const propertyService_1 = require("../../services/propertyService");
 const format_1 = require("../../utils/format");
 const branding_1 = require("../../config/branding");
+const guildConfigService_1 = require("../../services/guildConfigService");
 const propertiesHandler = async (message, args) => {
     const subCommand = args[0]?.toLowerCase();
     const guildId = message.guildId;
     const userId = message.author.id;
+    const guildConfig = await (0, guildConfigService_1.getGuildConfig)(guildId);
+    const prefix = guildConfig.prefix || "!";
     // Banner Image
     const bannerPath = "C:/Users/ujjwa/.gemini/antigravity/brain/53146123-dc6c-4f9e-af36-1452d87996f0/uploaded_image_1767341302816.png";
     const bannerFile = new discord_js_1.AttachmentBuilder(bannerPath, { name: 'property-banner.png' });
@@ -20,7 +23,7 @@ const propertiesHandler = async (message, args) => {
             .setDescription("Invest in properties to earn passive income and grow your net worth!\nPrices fluctuate based on market demand.")
             .setColor(branding_1.Mascot.Colors.Base)
             .setImage('attachment://property-banner.png')
-            .setFooter({ text: "Use !buy-property <key> to purchase" });
+            .setFooter({ text: `Use ${prefix}buy-property <key> to purchase` });
         if (properties.length === 0) {
             embed.setDescription("No properties available for sale right now. Ask an admin to create some!");
         }
@@ -80,12 +83,15 @@ const sellPropertyHandler = async (message, args) => {
 };
 exports.sellPropertyHandler = sellPropertyHandler;
 const myPropertiesHandler = async (message) => {
+    const guildConfig = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
+    const prefix = guildConfig.prefix || "!";
+    const currencyEmoji = guildConfig.currencyEmoji || "🪙";
     const owned = await propertyService_1.PropertyService.getOwnedProperties(message.author.id, message.guildId);
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle(`${message.author.username}'s Portfolio`)
         .setColor(branding_1.Mascot.Colors.Base);
     if (owned.length === 0) {
-        embed.setDescription("You don't own any properties yet. Use `!properties` to view the market.");
+        embed.setDescription(`You don't own any properties yet. Use \`${prefix}properties\` to view the market.`);
     }
     else {
         let totalIncome = 0;
@@ -97,11 +103,11 @@ const myPropertiesHandler = async (message) => {
             const status = ready ? `${branding_1.Mascot.Emotes.Accept} **Rent Due**` : `${branding_1.Mascot.Emotes.Cooldown} Due <t:${Math.floor(nextCollect.getTime() / 1000)}:R>`;
             embed.addFields({
                 name: `${p.name}`,
-                value: `${branding_1.Mascot.Emotes.Price} Purchased: ${(0, format_1.fmtCurrency)(op.purchasedPrice)}\n${branding_1.Mascot.Emotes.GraphUp} Current Val: ${(0, format_1.fmtCurrency)(p.price)}\n${branding_1.Mascot.Emotes.MoneyBag} Income: ${(0, format_1.fmtCurrency)(p.incomePerCycle)}\n${status}`,
+                value: `${branding_1.Mascot.Emotes.Price} Purchased: ${(0, format_1.fmtCurrency)(op.purchasedPrice, currencyEmoji)}\n${branding_1.Mascot.Emotes.GraphUp} Current Val: ${(0, format_1.fmtCurrency)(p.price, currencyEmoji)}\n${branding_1.Mascot.Emotes.MoneyBag} Income: ${(0, format_1.fmtCurrency)(p.incomePerCycle, currencyEmoji)}\n${status}`,
                 inline: true
             });
         });
-        embed.setDescription(`Total Properties: **${owned.length}**\nTotal Potential Income: **${(0, format_1.fmtCurrency)(totalIncome)}** per cycle.`);
+        embed.setDescription(`Total Properties: **${owned.length}**\nTotal Potential Income: **${(0, format_1.fmtCurrency)(totalIncome, currencyEmoji)}** per cycle.`);
     }
     return message.reply({ embeds: [embed] });
 };

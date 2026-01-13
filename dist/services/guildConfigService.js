@@ -8,24 +8,16 @@ exports.updateGuildConfig = updateGuildConfig;
 const prisma_1 = __importDefault(require("../utils/prisma"));
 const configCache = new Map();
 async function getGuildConfig(guildId) {
-    if (configCache.has(guildId)) {
-        return configCache.get(guildId);
-    }
+    // Disable cache for now to ensure dashboard updates are reflected immediately
+    // if (configCache.has(guildId)) {
+    //   return configCache.get(guildId)!;
+    // }
     let cfg = await prisma_1.default.guildConfig.findUnique({ where: { guildId } });
     if (!cfg) {
-        cfg = await prisma_1.default.guildConfig.create({
-            data: { guildId }
-        });
+        cfg = await prisma_1.default.guildConfig.create({ data: { guildId } });
     }
     configCache.set(guildId, cfg);
     return cfg;
 }
-async function updateGuildConfig(guildId, data) {
-    const updated = await prisma_1.default.guildConfig.update({
-        where: { guildId },
-        data
-    });
-    configCache.set(guildId, updated);
-    return updated;
-}
+async function updateGuildConfig(guildId, data) { const updated = await prisma_1.default.guildConfig.update({ where: { guildId }, data }); configCache.set(guildId, updated); return updated; }
 //# sourceMappingURL=guildConfigService.js.map

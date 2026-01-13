@@ -16,8 +16,8 @@ export async function handleAdminViewConfig(message: Message, args: string[]) {
 
     // Formatting Helpers
     const formatPct = (val: number | undefined | null) => `${val ?? 0}%`;
-    const formatLimit = (val: number | undefined | null) => val ? val.toLocaleString() : "Unlimited";
-    const formatMoney = (val: number) => `${cfg.currencyEmoji} ${val.toLocaleString()}`;
+    const formatLimit = (val: number | undefined | null) => val ? val.toLocaleString('en-US') : "Unlimited";
+    const formatMoney = (val: number) => `${cfg.currencyEmoji} ${val.toLocaleString('en-US')}`;
 
     // Job Formatters
     const sectors = cfg.jobSectorBasePay as Record<string, number> || {};

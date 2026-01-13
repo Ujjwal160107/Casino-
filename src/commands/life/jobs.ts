@@ -101,10 +101,14 @@ export async function handleJobs(message: Message) {
             currentPage = Math.min(SECTORS.length - 1, currentPage + 1);
         }
 
-        await i.update({
-            embeds: [generateEmbed(currentPage)],
-            components: [generateRow(currentPage)]
-        });
+        try {
+            await i.update({
+                embeds: [generateEmbed(currentPage)],
+                components: [generateRow(currentPage)]
+            });
+        } catch (e) {
+            console.error("Failed to update jobs interaction:", e);
+        }
     });
 
     collector.on('end', () => {

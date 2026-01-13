@@ -114,9 +114,24 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       where: { discordId_guildId: { discordId: message.author.id, guildId: message.guildId } }
     });
     if (user?.isBanned) {
-      return message.reply({
-        embeds: [errorEmbed(message.author, "Banned", "🚫 You are banned from the casino.")]
-      });
+      if (user.banExpiresAt) {
+        if (new Date() > user.banExpiresAt) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { isBanned: false, banExpiresAt: null }
+          });
+          user.isBanned = false; // Update local object
+          user.banExpiresAt = null;
+        } else {
+          return message.reply({
+            embeds: [errorEmbed(message.author, "Banned", `🚫 You are banned from the casino until <t:${Math.floor(user.banExpiresAt.getTime() / 1000)}:R>.`)]
+          });
+        }
+      } else {
+        return message.reply({
+          embeds: [errorEmbed(message.author, "Banned", "🚫 You are permanently banned from the casino.")]
+        });
+      }
     }
   }
   const normalized = ((
@@ -245,8 +260,8 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "monthly":
       return handleMonthly(message);
     case "quests":
+    case "quest":
     case "dailyquest":
-    case "missions":
     case "missions":
     case "daily-quests":
     case "dailyquests":
@@ -320,16 +335,18 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "russian-roulette":
       return handleRussianRoulette(message, args);
     case "coinflip":
-    case "coin-flip":
+    case "coinflip":
       return handleCoinflip(message, args);
 
 
     case "slots":
+    case "slot":
       return handleSlots(message, args);
     case "cockfight":
     case "cock-fight":
       return handleCockFight(message, args);
     case "chicken":
+    case "cock":
       const { handleChicken } = require("./commands/games/chicken");
       return handleChicken(message, args);
     case "feed":
@@ -395,6 +412,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "set-bet-limit":
     case "setbetlimit":
     case "betlimit":
+    case "betlimits":
     case "bet-limit":
       return handleSetBetLimit(message, args);
     case "admin-view-config":

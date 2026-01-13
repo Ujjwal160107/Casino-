@@ -14,13 +14,22 @@ export async function handleAddMoney(message: Message, args: string[]) {
     return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "You need Administrator or Bot Commander permissions.")] });
   }
 
+  // Cap at 32-bit signed integer max to prevent DB crashes
+  const MAX_INT = 2147483647;
+
   if (args.length < 2) {
     return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", "Usage: `!add-money @user/@role <amount> [wallet/bank]`")] });
   }
 
   const mention = args[0];
   const amountStr = args[1];
-  const amount = parseSmartAmount(amountStr);
+  let amount = parseSmartAmount(amountStr);
+
+  // Cap amount to prevent DB crashes and handle "Infinity" request
+  if (amount === Infinity || amount > MAX_INT) {
+    amount = MAX_INT;
+  }
+
   const typeArg = args[2]?.toLowerCase();
   const targetType = typeArg === "bank" ? "bank" : "wallet";
 
@@ -126,8 +135,9 @@ export async function handleAddMoney(message: Message, args: string[]) {
       description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Amount:** +${fmtCurrency(amount, emoji)}\n**New Bank Balance:** ${fmtCurrency(updatedBank.balance, emoji)}`,
       color: 0x00FF00
     });
+    const displayAmount = amount === MAX_INT ? "Infinity" : fmtCurrency(amount, emoji);
     return message.reply({
-      embeds: [successEmbed(message.author, "Money Added", `Added **${fmtCurrency(amount, emoji)}** to ${mention}'s **Bank**.\nNew Balance: **${fmtCurrency(updatedBank.balance, emoji)}**`)]
+      embeds: [successEmbed(message.author, "Money Added", `Added **${displayAmount}** to ${mention}'s **Bank**.\nNew Balance: **${fmtCurrency(updatedBank.balance, emoji)}**`)]
     });
   } else {
     const [_, updatedWallet] = await prisma.$transaction([
@@ -161,8 +171,9 @@ export async function handleAddMoney(message: Message, args: string[]) {
         description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Amount:** +${fmtCurrency(amount, emoji)}\n**New Wallet Balance:** ${fmtCurrency(updatedWallet.balance, emoji)}`,
         color: 0x00FF00
       });
+      const displayAmount = amount === MAX_INT ? "Infinity" : fmtCurrency(amount, emoji);
       return message.reply({
-        embeds: [successEmbed(message.author, "Money Added", `Added **${fmtCurrency(amount, emoji)}** to ${mention}'s **Wallet**.\nNew Balance: **${fmtCurrency(updatedWallet.balance, emoji)}**`)]
+        embeds: [successEmbed(message.author, "Money Added", `Added **${displayAmount}** to ${mention}'s **Wallet**.\nNew Balance: **${fmtCurrency(updatedWallet.balance, emoji)}**`)]
       });
     }
   }

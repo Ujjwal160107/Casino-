@@ -32,6 +32,32 @@ const BEG_FAIL_MESSAGES = [
   "You begged the wrong mafia boss. You paid **{amount}** for 'protection'."
 ];
 
+const SLUT_MESSAGES = [
+  "You did 'favors' for a stranger and earned **{amount}**.",
+  "You posted feet pics and made **{amount}**.",
+  "You sold your bath water for **{amount}**. Weirdo.",
+  "You danced on a mailbox and someone threw **{amount}** at you.",
+  "You worked the corner and made **{amount}**.",
+  "You let someone call you 'mommy' for an hour and earned **{amount}**.",
+  "You streamed on OnlyFans for 10 minutes and made **{amount}**.",
+  "You sold a jar of your farts for **{amount}**. Capitalism, baby.",
+  "You dated a discord mod and he gave you **{amount}** for Nitro.",
+  "You wore a maid outfit to Walmart and strangers gave you **{amount}**.",
+  "You sold your used socks to a sniffing enthusiast for **{amount}**.",
+  "You whispered 'UWU' in a stranger's ear and they paid you **{amount}** to leave.",
+  "You accidentally became a sugar baby and got **{amount}** allowance.",
+  "You sold 'premium' snaps that were just pictures of your elbow for **{amount}**.",
+  "You pretended to be an e-girl and scammed a simp for **{amount}**."
+];
+
+const SLUT_FAIL_MESSAGES = [
+  "You tried to seduce a cop and got fined **{amount}**.",
+  "Your 'client' ran off without paying. You lost **{amount}** on cab fare.",
+  "You broke a heel running from the shame. Replacement cost: **{amount}**.",
+  "You got caught by your mom! She took **{amount}** as punishment."
+];
+
+
 function getRandomMessage(messages: string[], amount: string): string {
   const msg = messages[Math.floor(Math.random() * messages.length)];
   return msg.replace("{amount}", amount);
@@ -68,8 +94,14 @@ export async function handleIncome(message: Message) {
       });
 
       let description = `You earned **${fmtCurrency(res.amount, emoji)}**!`;
-      if (commandKey === "beg") {
+
+      // Use custom messages if available, otherwise fallback
+      if (res.messages && res.messages.success && res.messages.success.length > 0) {
+        description = getRandomMessage(res.messages.success, fmtCurrency(res.amount, emoji));
+      } else if (commandKey === "beg") {
         description = getRandomMessage(BEG_MESSAGES, fmtCurrency(res.amount, emoji));
+      } else if (commandKey === "slut") {
+        description = getRandomMessage(SLUT_MESSAGES, fmtCurrency(res.amount, emoji));
       }
 
       const branded = successEmbed(message.author, `${commandKey.toUpperCase()} SUCCESS`, description);
@@ -98,8 +130,14 @@ export async function handleIncome(message: Message) {
       });
 
       let description = `You lost **${fmtCurrency(Math.abs(res.amount), emoji)}**!`;
-      if (commandKey === "beg") {
+
+      // Use custom messages if available, otherwise fallback
+      if (res.messages && res.messages.fail && res.messages.fail.length > 0) {
+        description = getRandomMessage(res.messages.fail, fmtCurrency(Math.abs(res.amount), emoji));
+      } else if (commandKey === "beg") {
         description = getRandomMessage(BEG_FAIL_MESSAGES, fmtCurrency(Math.abs(res.amount), emoji));
+      } else if (commandKey === "slut") {
+        description = getRandomMessage(SLUT_FAIL_MESSAGES, fmtCurrency(Math.abs(res.amount), emoji));
       }
 
       const branded = errorEmbed(message.author, `${commandKey.toUpperCase()} FAILED`, description);

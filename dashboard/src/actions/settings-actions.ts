@@ -12,6 +12,7 @@ export async function getGeneralSettings(guildId: string) {
                 startMoney: true,
                 currencyName: true,
                 currencyEmoji: true,
+                chatMoneyEnabled: true,
             }
         });
 
@@ -20,7 +21,8 @@ export async function getGeneralSettings(guildId: string) {
             prefix: "!",
             startMoney: 1000,
             currencyName: "Coins",
-            currencyEmoji: "🪙"
+            currencyEmoji: "🪙",
+            chatMoneyEnabled: false
         };
     } catch (error) {
         console.error("Failed to fetch general settings:", error);
@@ -33,6 +35,7 @@ export async function updateGeneralSettings(guildId: string, data: {
     startMoney: number;
     currencyName: string;
     currencyEmoji: string;
+    chatMoneyEnabled: boolean;
 }) {
     try {
         // Basic validation
@@ -47,6 +50,7 @@ export async function updateGeneralSettings(guildId: string, data: {
                 startMoney: data.startMoney,
                 currencyName: data.currencyName,
                 currencyEmoji: data.currencyEmoji,
+                chatMoneyEnabled: data.chatMoneyEnabled,
             },
             create: {
                 guildId,
@@ -54,6 +58,7 @@ export async function updateGeneralSettings(guildId: string, data: {
                 startMoney: data.startMoney,
                 currencyName: data.currencyName,
                 currencyEmoji: data.currencyEmoji,
+                chatMoneyEnabled: data.chatMoneyEnabled,
             }
         });
 
@@ -62,5 +67,56 @@ export async function updateGeneralSettings(guildId: string, data: {
     } catch (error) {
         console.error("Failed to update general settings:", error);
         return { success: false, error: "Failed to update settings" };
+    }
+
+
+}
+
+
+export async function resetEconomy(guildId: string) {
+    try {
+        const config = await prisma.guildConfig.findUnique({ where: { guildId } });
+        const startMoney = config?.startMoney ?? 1000;
+
+        await prisma.$transaction([
+            // Delete related data first
+            prisma.inventory.deleteMany({ where: { guildId } }),
+            prisma.transaction.deleteMany({ where: { wallet: { user: { guildId } } } }),
+            prisma.bank.deleteMany({ where: { user: { guildId } } }),
+            prisma.loan.deleteMany({ where: { user: { guildId } } }),
+            prisma.investment.deleteMany({ where: { user: { guildId } } }),
+            prisma.marketListing.deleteMany({ where: { guildId } }),
+            prisma.ownedProperty.deleteMany({ where: { user: { guildId } } }),
+            prisma.portfolio.deleteMany({ where: { user: { guildId } } }),
+            prisma.bet.deleteMany({ where: { user: { guildId } } }),
+            prisma.workLog.deleteMany({ where: { guildId } }),
+            prisma.dailyQuest.deleteMany({ where: { guildId } }),
+            prisma.activeEffect.deleteMany({ where: { guildId } }),
+
+            // Reset Wallets
+            prisma.wallet.updateMany({
+                where: { user: { guildId } },
+                data: { balance: startMoney }
+            }),
+
+            // Reset User Stats
+            prisma.user.updateMany({
+                where: { guildId },
+                data: {
+                    xp: 0,
+                    level: 0,
+                    creditScore: 500,
+                    jobId: null,
+                    jobXp: 0,
+                    jobStress: 0,
+                    shiftsWorked: 0
+                }
+            })
+        ]);
+
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to reset economy:", error);
+        return { success: false, error: "Failed to reset economy system." };
     }
 }

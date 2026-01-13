@@ -40,6 +40,7 @@ model User {
 
   // Ban System
   isBanned    Boolean  @default(false)
+  banExpiresAt DateTime?
 
   loans       Loan[]
   isLoanBanned Boolean @default(false)
@@ -247,6 +248,8 @@ model IncomeConfig {
   cooldown       Int      
   successPct     Int?     @default(100)
   failPenaltyPct Int?     @default(50)
+  successMessages String[] @default([])
+  failMessages    String[] @default([])
   createdAt      DateTime @default(now())
 
   @@unique([guildId, commandKey])
@@ -355,6 +358,10 @@ model GuildConfig {
   dailyAmount   Int      @default(1000)
   weeklyAmount  Int      @default(5000)
   monthlyAmount Int      @default(20000)
+
+  // Quest Configs
+  questPay      Int      @default(2500)
+  questXp       Int      @default(100)
 
   // Job System Configs
   jobSectorBasePay    Json?    @default("{}") // { "tech": 1000 }

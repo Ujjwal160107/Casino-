@@ -100,6 +100,7 @@ async function handleStoreUI(message: Message) {
     const guildId = message.guildId!;
     const config = await getGuildConfig(guildId);
     const currencyEmoji = config.currencyEmoji || "🪙";
+    const prefix = config.prefix || "!";
     const EMOJI_CHICKEN = GameConfig.Emojis.Chicken;
     const EMOJI_SPEAR = GameConfig.Emojis.MenuSpear;
     const EMOJI_SHIELD = GameConfig.Emojis.MenuShield;
@@ -130,12 +131,12 @@ Use the menu below to browse different categories.
 
 **Categories:**
 ${EMOJI_SPEAR} **Spears** (Weapons) - Increase Strength
-${EMOJI_SHIELD} **Armor** (Shields) - Increase Defense
+${EMOJI_SHIELD} **Armour** (Shields) - Increase Defense
 ${EMOJI_BOOTS} **Boots** (Accessories) - Increase Agility
 
-*Use \`!cs buy <item name>\` to purchase.*`);
+*Use \`${prefix}cs buy <item name>\` to purchase.*`);
         } else {
-            const catName = category === "weapon" ? `Spears ${EMOJI_SPEAR}` : category === "armor" ? `Armor ${EMOJI_SHIELD}` : `Boots ${EMOJI_BOOTS}`;
+            const catName = category === "weapon" ? `Spears ${EMOJI_SPEAR}` : category === "armor" ? `Armour ${EMOJI_SHIELD}` : `Boots ${EMOJI_BOOTS}`;
             embed.setTitle(`${EMOJI_CHICKEN} Cock Store: ${catName}`);
 
             // Filter
@@ -151,7 +152,8 @@ ${EMOJI_BOOTS} **Boots** (Accessories) - Increase Agility
                 embed.setDescription(desc);
             }
         }
-        embed.setFooter({ text: "Use !cs buy <item name> to purchase!" });
+
+        embed.setFooter({ text: `Use ${prefix}cs buy <item name> to purchase!` });
         return embed;
     };
 
@@ -160,7 +162,7 @@ ${EMOJI_BOOTS} **Boots** (Accessories) - Increase Agility
         .setPlaceholder("Select a Category")
         .addOptions(
             new StringSelectMenuOptionBuilder().setLabel("Spears (Weapons)").setValue("weapon").setEmoji(getEmojiId(EMOJI_SPEAR)),
-            new StringSelectMenuOptionBuilder().setLabel("Armor").setValue("armor").setEmoji(getEmojiId(EMOJI_SHIELD)),
+            new StringSelectMenuOptionBuilder().setLabel("Armour").setValue("armor").setEmoji(getEmojiId(EMOJI_SHIELD)),
             new StringSelectMenuOptionBuilder().setLabel("Boots (Accessories)").setValue("accessory").setEmoji(getEmojiId(EMOJI_BOOTS)),
         );
 
@@ -209,8 +211,19 @@ async function handleBuy(message: Message, args: string[]) {
         }
         // -------------------------
 
+        // -------------------------
+
         await buyItem(message.guildId!, message.author.id, preDef.name, message.member!);
-        return message.reply(`${Mascot.Emotes.Accept} You successfully bought **${preDef.name}**! Don't forget to \`!equip ${preDef.name}\`!`);
+        const config = await getGuildConfig(message.guildId!);
+        const prefix = config.prefix || "!";
+
+        const embed = new EmbedBuilder()
+            .setTitle(`${Mascot.Emotes.Accept} Purchase Successful`)
+            .setDescription(`You successfully bought **${preDef.name}**!\n\n**Tip:** Don't forget to equip it using:\n\`${prefix}equip ${preDef.name}\``)
+            .setColor("#00FF00")
+            .setThumbnail(message.author.displayAvatarURL());
+
+        return message.reply({ embeds: [embed] });
     } catch (e: any) {
         return message.reply({ embeds: [errorEmbed(message.author, "Purchase Failed", e.message || "Unknown error")] });
     }

@@ -378,16 +378,23 @@ async function handleButton(interaction) {
         }
     }
     else if (customId === "work_shift") {
+        // Defer immediately to prevent timeout (Unknown Interaction)
+        // We use ephemeral: false because the game is intended to be public.
+        // This means validation errors will also be public, which is a necessary trade-off to prevent crashes.
+        await interaction.deferReply({ ephemeral: false });
         // Import here to avoid circular dependencies if any
         const { getJob, getJobPay, checkPromotion, checkDemotion, getWorkEvent } = require("../services/jobService");
         const { getWorkGame } = require("../services/minigameService");
         const userData = await prisma_1.default.user.findUnique({ where: { discordId_guildId: { discordId: user.id, guildId: guild.id } } });
         if (!userData || !userData.jobId) {
-            return interaction.reply({ content: "You don't have a job!", ephemeral: true });
+            await interaction.deleteReply().catch(() => { });
+            return interaction.followUp({ content: "You don't have a job!", ephemeral: true });
         }
         const job = getJob(userData.jobId);
-        if (!job)
-            return interaction.reply({ content: "Invalid job.", ephemeral: true });
+        if (!job) {
+            await interaction.deleteReply().catch(() => { });
+            return interaction.followUp({ content: "Invalid job.", ephemeral: true });
+        }
         // Cooldown check
         const incomeConfig = await prisma_1.default.incomeConfig.findUnique({
             where: { guildId_commandKey: { guildId: guild.id, commandKey: "work" } }
@@ -420,7 +427,8 @@ async function handleButton(interaction) {
         const cooldownMs = cooldownSeconds * 1000;
         if (now - lastShift < cooldownMs) {
             const remaining = Math.ceil((cooldownMs - (now - lastShift)) / 60000);
-            return interaction.reply({ content: `${branding_1.Mascot.Emotes.Angry} You are tired! You can work again in **${remaining} minutes**.`, ephemeral: true });
+            await interaction.deleteReply().catch(() => { });
+            return interaction.followUp({ content: `${branding_1.Mascot.Emotes.Angry} You are tired! You can work again in **${remaining} minutes**.`, ephemeral: true });
         }
         // --- STRESS CHECK ---
         const isBurnoutImmune = userData.jobId === "med_chief";
@@ -440,7 +448,8 @@ async function handleButton(interaction) {
                     .setDescription(`You are too stressed to work well! You collapsed from exhaustion.\n\n**Stress Level:** ${userData.jobStress}/100\n\nUse \`!relax\` to recover before working again.`)
                     .setColor("#E74C3C")
                     .setThumbnail((0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Fail));
-                return interaction.reply({ embeds: [burnoutEmbed], ephemeral: true });
+                await interaction.deleteReply().catch(() => { });
+                return interaction.followUp({ embeds: [burnoutEmbed], ephemeral: true });
             }
         }
         // --- WORK EVENT CHECK ---
@@ -459,7 +468,7 @@ async function handleButton(interaction) {
                     c.style === 'danger' ? discord_js_1.ButtonStyle.Danger :
                         c.style === 'primary' ? discord_js_1.ButtonStyle.Primary : discord_js_1.ButtonStyle.Secondary));
                 const row = new discord_js_1.ActionRowBuilder().addComponents(rows);
-                return interaction.reply({ embeds: [evEmbed], components: [row] });
+                return interaction.editReply({ embeds: [evEmbed], components: [row] });
             }
         }
         const game = getWorkGame();
@@ -478,7 +487,7 @@ async function handleButton(interaction) {
                 .setDescription(game.previewText || game.description)
                 .setColor("#3498DB")
                 .setFooter({ text: `Memorize this for ${game.previewTime} seconds!` });
-            reply = await interaction.reply({ embeds: [previewEmbed], ephemeral: false, fetchReply: true });
+            reply = await interaction.editReply({ embeds: [previewEmbed] }); // Removed fetchReply as editReply returns Message or boolean/APIMessage
             // Wait
             await new Promise(resolve => setTimeout(resolve, game.previewTime * 1000));
             // Update to Question
@@ -490,13 +499,16 @@ async function handleButton(interaction) {
                 .setCustomId(`work_game_${i}_${opt}`)
                 .setLabel(opt)
                 .setStyle(discord_js_1.ButtonStyle.Primary)));
-            if (reply) {
-                await interaction.editReply({ embeds: [embed], components: [row] });
-            }
-            else {
-                reply = await interaction.reply({ embeds: [embed], components: [row], ephemeral: false, fetchReply: true });
-            }
+            // Since we already deferred, we always use editReply
+            // If reply was set by preview logic, we edit.
+            // If not set, we still edit the deferred message.
+            reply = await interaction.editReply({ embeds: [embed], components: [row] });
             try {
+                // If reply is not a message (failed edit?), fallback to fetchReply?
+                // editReply returns Message if successful in d.js v14?
+                // Actually editReply resolves to Message.
+                if (!reply)
+                    reply = await interaction.fetchReply();
                 const i = await reply.awaitMessageComponent({
                     componentType: discord_js_1.ComponentType.Button,
                     time: game.time * 1000,
@@ -512,12 +524,9 @@ async function handleButton(interaction) {
         }
         // --- TYPING GAME ---
         else {
-            if (reply) {
-                await interaction.editReply({ embeds: [embed], components: [] });
-            }
-            else {
-                reply = await interaction.reply({ embeds: [embed], ephemeral: false, fetchReply: true });
-            }
+            // TYPING GAME
+            // We just edit the embed to show the question
+            reply = await interaction.editReply({ embeds: [embed], components: [] });
             if (interaction.channel) {
                 try {
                     // We listen to the channel the interaction happened in

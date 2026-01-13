@@ -78,9 +78,21 @@
   /* Slightly larger radius for modern look */
 }
 
+
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
-  /* Remove default border style from Tailwind preflight if needed, 
-     but standard Tailwind usually handles this. */
+}
+
+/* Force cursor pointer on all interactive elements */
+button,
+a,
+input[type="button"],
+input[type="submit"],
+input[type="checkbox"],
+input[type="radio"],
+select,
+label,
+[role="button"] {
+  cursor: pointer;
 }

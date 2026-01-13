@@ -52,7 +52,14 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
         {
             title: "Overview",
             items: [
-                { label: "Dashboard", href: `/dashboard/${guild.id}`, icon: LayoutDashboard, matches: [`/dashboard/${guild.id}`] }
+                { label: "Overview", href: `/dashboard/${guild.id}`, icon: LayoutDashboard, matches: [`/dashboard/${guild.id}`] }
+            ]
+        },
+        {
+            title: "General Economy",
+            items: [
+                { label: "Income", href: `/dashboard/${guild.id}/general-economy/income`, icon: Coins },
+                { label: "Configuration", href: `/dashboard/${guild.id}/general-economy/config`, icon: Settings },
             ]
         },
         {
@@ -62,13 +69,6 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
                 { label: "Jobs", href: `/dashboard/${guild.id}/life-economy/job`, icon: Briefcase },
                 { label: "Properties", href: `/dashboard/${guild.id}/life-economy/property`, icon: Home },
                 { label: "Marriage", href: `/dashboard/${guild.id}/life-economy/marriage`, icon: Heart },
-            ]
-        },
-        {
-            title: "General Economy",
-            items: [
-                { label: "Income", href: `/dashboard/${guild.id}/general-economy/income`, icon: Coins },
-                { label: "Configuration", href: `/dashboard/${guild.id}/general-economy/config`, icon: Settings },
             ]
         },
         {

@@ -37,6 +37,7 @@ exports.handleCasinoGuide = handleCasinoGuide;
 const discord_js_1 = require("discord.js");
 const path = __importStar(require("path"));
 const branding_1 = require("../../config/branding");
+const slots_1 = require("../games/slots");
 async function handleCasinoGuide(message) {
     const bannerPath = path.join(process.cwd(), "src", "assets", "casino_banner.png");
     const attachment = new discord_js_1.AttachmentBuilder(bannerPath, { name: "casino_banner.png" });
@@ -151,11 +152,11 @@ async function handleCasinoGuide(message) {
                     .setColor(branding_1.Mascot.Colors.Base)
                     .setDescription(`**Objective:** Match 3 symbols in a row to win!\n\n` +
                     `**Symbols & Payouts:**\n` +
-                    `${branding_1.Mascot.Emotes.Seven} **7 7 7** - JACKPOT! 10x your bet\n` +
-                    `${branding_1.Mascot.Emotes.Cherry} **🍒 🍒 🍒** - 5x your bet\n` +
-                    `${branding_1.Mascot.Emotes.Watermelonm} **🍉 🍉 🍉** - 4x your bet\n` +
-                    `${branding_1.Mascot.Emotes.Grapes} **🍇 🍇 🍇** - 3x your bet\n` +
-                    `${branding_1.Mascot.Emotes.Banana} **🍌 🍌 🍌** - 2x your bet\n\n` +
+                    `${slots_1.SEVEN} ${slots_1.SEVEN} ${slots_1.SEVEN} - **20x** Payout\n` +
+                    `${slots_1.GEM} ${slots_1.GEM} ${slots_1.GEM} - **10x** Payout\n` +
+                    `${slots_1.BELL} ${slots_1.BELL} ${slots_1.BELL} - **5x** Payout\n` +
+                    `${slots_1.GRAPES} / ${slots_1.MELON} - **3x** Payout\n` +
+                    `${slots_1.CHERRY} / ${slots_1.BANANA} - **2x** Payout\n\n` +
                     `**How to Play:**\n` +
                     `${branding_1.Mascot.Emotes.Success} Choose your bet amount\n` +
                     `${branding_1.Mascot.Emotes.Dices} Pull the lever (automatically spins)\n` +

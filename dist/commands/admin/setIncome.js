@@ -9,7 +9,7 @@ const embed_1 = require("../../utils/embed");
 const format_1 = require("../../utils/format");
 const guildConfigService_1 = require("../../services/guildConfigService");
 const permissionUtils_1 = require("../../utils/permissionUtils");
-const SUPPORTED = ["work", "beg", "crime", "slut"];
+const SUPPORTED = ["work", "beg", "crime", "slut", "rob"]; // Added rob
 async function handleSetIncome(message, args) {
     try {
         if (!message.member || !(await (0, permissionUtils_1.canExecuteAdminCommand)(message, message.member))) {
@@ -59,6 +59,25 @@ async function handleSetIncome(message, args) {
         }
         const guildId = message.guildId;
         const commandKey = cmd;
+        // Special handling for ROB (stored in GuildConfig, not IncomeConfig)
+        if (commandKey === "rob") {
+            const guildUpdates = {};
+            if (field === "cooldown") {
+                guildUpdates.robCooldown = updates.cooldown;
+            }
+            else if (field === "success") {
+                guildUpdates.robSuccessPct = updates.successPct;
+            }
+            else if (field === "penalty") {
+                guildUpdates.robFinePct = updates.failPenaltyPct;
+            }
+            else {
+                return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Not Supported", "For 'rob', you can only set: cooldown, success, penalty.")] });
+            }
+            await (0, guildConfigService_1.updateGuildConfig)(guildId, guildUpdates);
+            const formatted = Object.entries(guildUpdates).map(([k, v]) => `${k}=${v}`).join(", ");
+            return message.reply({ embeds: [(0, embed_1.successEmbed)(message.author, "Rob Config Updated", `Updated **rob**: ${formatted}`)] });
+        }
         await prisma_1.default.incomeConfig.upsert({
             where: { guildId_commandKey: { guildId, commandKey } },
             create: {

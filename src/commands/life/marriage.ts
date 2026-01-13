@@ -222,7 +222,7 @@ async function handleJointBalance(message: Message) {
     const embed = new EmbedBuilder()
         .setColor("#FFD700")
         .setTitle(`🏦 Joint Bank Account`)
-        .setDescription(`**Balance**: ${marriage.jointBalance.toLocaleString()} coins`)
+        .setDescription(`**Balance**: ${marriage.jointBalance.toLocaleString('en-US')} coins`)
         .setFooter({ text: "Secure from robberies!" });
 
     return message.reply({ embeds: [embed] });
@@ -255,10 +255,10 @@ async function handleJointDeposit(message: Message, args: string[]) {
             guild: message.guild!,
             type: "ECONOMY",
             title: "Joint Account Deposit",
-            description: `**User:** ${message.author.tag}\n**Amount:** ${amount.toLocaleString()} coins\n**New Balance:** ${newBal.toLocaleString()}`
+            description: `**User:** ${message.author.tag}\n**Amount:** ${amount.toLocaleString('en-US')} coins\n**New Balance:** ${newBal.toLocaleString('en-US')}`
         });
 
-        const embed = successEmbed(message.author, "Deposit Successful", `Deposited **${amount.toLocaleString()}** coins to your joint account.\nNew Balance: **${newBal.toLocaleString()}**`);
+        const embed = successEmbed(message.author, "Deposit Successful", `Deposited **${amount.toLocaleString('en-US')}** coins to your joint account.\nNew Balance: **${newBal.toLocaleString('en-US')}**`);
         return message.reply({ embeds: [embed] });
     } catch (e: any) {
         return message.reply({ embeds: [errorEmbed(message.author, "Transaction Failed", e.message)] });
@@ -289,10 +289,10 @@ async function handleJointWithdraw(message: Message, args: string[]) {
             guild: message.guild!,
             type: "ECONOMY",
             title: "Joint Account Withdrawal",
-            description: `**User:** ${message.author.tag}\n**Amount:** ${amount.toLocaleString()} coins\n**New Balance:** ${newBal.toLocaleString()}`
+            description: `**User:** ${message.author.tag}\n**Amount:** ${amount.toLocaleString('en-US')} coins\n**New Balance:** ${newBal.toLocaleString('en-US')}`
         });
 
-        const embed = successEmbed(message.author, "Withdrawal Successful", `Withdrew **${amount.toLocaleString()}** coins from your joint account.\nNew Balance: **${newBal.toLocaleString()}**`);
+        const embed = successEmbed(message.author, "Withdrawal Successful", `Withdrew **${amount.toLocaleString('en-US')}** coins from your joint account.\nNew Balance: **${newBal.toLocaleString('en-US')}**`);
         return message.reply({ embeds: [embed] });
     } catch (e: any) {
         return message.reply({ embeds: [errorEmbed(message.author, "Transaction Failed", e.message)] });
@@ -331,7 +331,7 @@ export async function handleFamily(message: Message, args: string[] = []) {
         .addFields(
             { name: "💍 Partner", value: spouseName, inline: true },
             { name: "❤️ Affection", value: `${marriage.affection}`, inline: true },
-            { name: "🏦 Joint Savings", value: `${marriage.jointBalance.toLocaleString()}`, inline: true },
+            { name: "🏦 Joint Savings", value: `${marriage.jointBalance.toLocaleString('en-US')}`, inline: true },
             { name: "📅 Married Since", value: `<t:${Math.floor(new Date(marriage.marriedAt).getTime() / 1000)}:R>`, inline: true }
         );
 

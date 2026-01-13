@@ -1,13 +1,27 @@
-export default function IncomePage() {
+import { getIncomeSettings } from "@/actions/income-actions";
+
+export const dynamic = "force-dynamic";
+
+import { IncomePanel } from "@/components/dashboard/income/IncomePanel";
+
+interface PageProps {
+    params: Promise<{
+        guildId: string;
+    }>;
+}
+
+export default async function IncomePage({ params }: PageProps) {
+    const { guildId } = await params;
+    const data = await getIncomeSettings(guildId);
+
     return (
         <div>
-            <h1 className="text-3xl font-bold text-white mb-6 font-serif">Income Settings</h1>
-            <div className="p-12 border border-white/5 bg-zinc-900 rounded-xl text-center">
-                <p className="text-zinc-400">Adjust UBI, daily rewards, and activity-based income.</p>
-                <div className="mt-4 inline-block px-4 py-2 bg-yellow-500/10 text-yellow-500 rounded-lg text-sm font-semibold border border-yellow-500/20">
-                    Coming Soon
-                </div>
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold text-white mb-2 font-serif">Income Settings</h1>
+                <p className="text-zinc-400">Configure payouts, cooldowns, and rewards for economy commands.</p>
             </div>
+
+            <IncomePanel guildId={guildId} data={data} />
         </div>
     );
 }

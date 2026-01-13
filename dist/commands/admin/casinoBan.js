@@ -8,15 +8,15 @@ const prisma_1 = __importDefault(require("../../utils/prisma"));
 const embed_1 = require("../../utils/embed");
 const permissionUtils_1 = require("../../utils/permissionUtils");
 const guildConfigService_1 = require("../../services/guildConfigService");
+const duration_1 = require("../../utils/duration");
 async function handleCasinoBan(message, args) {
     if (!message.member || !(await (0, permissionUtils_1.canExecuteAdminCommand)(message, message.member))) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "No Permission", "Administrator or Bot Commander required.")] });
     }
     const mention = args[0];
-    const reason = args.slice(1).join(" ") || "No reason provided.";
     if (!mention) {
         const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
-        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Usage", `Usage: \`${config.prefix}casinoban @user <reason>\``)] });
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Usage", `Usage: \`${config.prefix}casinoban @user [duration] [reason]\`\nExamples:\n\`${config.prefix}casinoban @user 1d Rule violation\`\n\`${config.prefix}casinoban @user Perma ban\``)] });
     }
     const discordId = mention.replace(/[<@!>]/g, "");
     const targetMember = await message.guild?.members.fetch(discordId).catch(() => null);
@@ -41,22 +41,49 @@ async function handleCasinoBan(message, args) {
     if (!(await canActOn(actorLevel, targetLevel))) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Access Denied", "You cannot ban this user due to privilege hierarchy.")] });
     }
+    // Parse duration
+    let durationSeconds = 0;
+    let reasonStartIndex = 1;
+    let banExpiresAt = null;
+    let durationStr = "";
+    try {
+        if (args[1]) {
+            durationSeconds = (0, duration_1.parseDuration)(args[1]);
+            // If parseDuration succeeds, args[1] was a duration
+            banExpiresAt = new Date(Date.now() + durationSeconds * 1000);
+            durationStr = (0, duration_1.formatDuration)(durationSeconds);
+            reasonStartIndex = 2;
+        }
+    }
+    catch (e) {
+        // Not a duration, simple fallback to permanent
+    }
+    const reason = args.slice(reasonStartIndex).join(" ") || "No reason provided.";
     try {
         await prisma_1.default.user.upsert({
             where: { discordId_guildId: { discordId, guildId: message.guildId } },
-            create: { discordId, guildId: message.guildId, username: "Unknown", isBanned: true },
-            update: { isBanned: true }
+            create: {
+                discordId,
+                guildId: message.guildId,
+                username: "Unknown",
+                isBanned: true,
+                banExpiresAt: banExpiresAt
+            },
+            update: {
+                isBanned: true,
+                banExpiresAt: banExpiresAt
+            }
         });
         const { logToChannel } = require("../../utils/discordLogger");
         await logToChannel(message.client, {
             guild: message.guild,
             type: "MODERATION",
             title: "User Banned (Casino)",
-            description: `**User:** <@${discordId}>\n**Banned By:** ${message.author.tag}\n**Reason:** ${reason}`,
+            description: `**User:** <@${discordId}>\n**Banned By:** ${message.author.tag}\n**Duration:** ${banExpiresAt ? durationStr : "Permanent"}\n**Reason:** ${reason}`,
             color: 0xFF0000
         });
         return message.reply({
-            embeds: [(0, embed_1.successEmbed)(message.author, "User Banned", `🚫 **<@${discordId}>** has been banned from the casino.\nReason: ${reason}`)]
+            embeds: [(0, embed_1.successEmbed)(message.author, "User Banned", `🚫 **<@${discordId}>** has been banned from the casino.\n**Duration:** ${banExpiresAt ? durationStr : "Permanent"}\n**Reason:** ${reason}`)]
         });
     }
     catch (e) {

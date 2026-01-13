@@ -225,7 +225,7 @@ export async function handleBet(message: Message, args: string[]) {
       `**Your Bet:** ${choiceRaw}\n` +
       `**${didWin ? "Won" : "Lost"}:** ${fmtCurrency(didWin ? payout : amount, emoji)}`
     )
-    .setFooter({ text: `${Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet!.balance - amount + payout).toLocaleString()}` });
+    .setFooter({ text: `${Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet!.balance - amount + payout).toLocaleString('en-US')}` });
 
   return message.reply({ content: `<@${message.author.id}>`, embeds: [resultEmbed] });
 }

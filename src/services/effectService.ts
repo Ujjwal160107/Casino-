@@ -169,7 +169,7 @@ async function applyEffect(
             }
 
             return {
-                message: `💰 Received ${effect.amount.toLocaleString()} coins!`,
+                message: `💰 Received ${effect.amount.toLocaleString('en-US')} coins!`,
                 type: "MONEY"
             };
 

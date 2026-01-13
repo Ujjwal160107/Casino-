@@ -114,9 +114,26 @@ async function routeMessage(client, message, prefix) {
             where: { discordId_guildId: { discordId: message.author.id, guildId: message.guildId } }
         });
         if (user?.isBanned) {
-            return message.reply({
-                embeds: [(0, embed_1.errorEmbed)(message.author, "Banned", "🚫 You are banned from the casino.")]
-            });
+            if (user.banExpiresAt) {
+                if (new Date() > user.banExpiresAt) {
+                    await prisma_1.default.user.update({
+                        where: { id: user.id },
+                        data: { isBanned: false, banExpiresAt: null }
+                    });
+                    user.isBanned = false; // Update local object
+                    user.banExpiresAt = null;
+                }
+                else {
+                    return message.reply({
+                        embeds: [(0, embed_1.errorEmbed)(message.author, "Banned", `🚫 You are banned from the casino until <t:${Math.floor(user.banExpiresAt.getTime() / 1000)}:R>.`)]
+                    });
+                }
+            }
+            else {
+                return message.reply({
+                    embeds: [(0, embed_1.errorEmbed)(message.author, "Banned", "🚫 You are permanently banned from the casino.")]
+                });
+            }
         }
     }
     const normalized = ({
@@ -254,6 +271,14 @@ async function routeMessage(client, message, prefix) {
             const { handleStock } = require("./commands/economy/stock");
             return handleStock(message, args);
         }
+        case "my-stocks":
+        case "mystocks":
+        case "my-stock":
+        case "mystock":
+        case "stock-portfolio": {
+            const { handleMyStocks } = require("./commands/economy/myStocks");
+            return handleMyStocks(message);
+        }
         // ...
         case "apply": {
             const { handleApply } = require("./commands/life/apply");
@@ -303,9 +328,10 @@ async function routeMessage(client, message, prefix) {
         case "russian-roulette":
             return (0, russianRoulette_1.handleRussianRoulette)(message, args);
         case "coinflip":
-        case "coin-flip":
+        case "coinflip":
             return (0, coinflip_1.handleCoinflip)(message, args);
         case "slots":
+        case "slot":
             return (0, slots_1.handleSlots)(message, args);
         case "cockfight":
         case "cock-fight":
@@ -376,6 +402,7 @@ async function routeMessage(client, message, prefix) {
         case "set-bet-limit":
         case "setbetlimit":
         case "betlimit":
+        case "betlimits":
         case "bet-limit":
             return (0, betLimit_1.handleSetBetLimit)(message, args);
         case "admin-view-config":

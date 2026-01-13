@@ -10,23 +10,61 @@ import { formatDuration } from "../../utils/format";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { updateQuestProgress } from "../../services/questService";
 
-const CHERRY = "<:cherri:1446428169786622053>";
-const BANANA = "<:banano:1446428190837968989>";
-const GRAPES = "<:graps:1446428294483542040>";
-const MELON = "<:watermelon2:1446428567402709115>";
-const BELL = "<:Bel:1446428665176129716>";
-const GEM = "<:Gemm:1446428771266592819>";
-const SEVEN = "<:sevenn:1446428916867661846>";
+export const CHERRY = "<:cherri:1446428169786622053>";
+export const BANANA = "<:banano:1446428190837968989>";
+export const GRAPES = "<:graps:1446428294483542040>";
+export const MELON = "<:watermelon2:1446428567402709115>";
+export const BELL = "<:Bel:1446428665176129716>";
+export const GEM = "<:Gemm:1446428771266592819>";
+export const SEVEN = "<:sevenn:1446428916867661846>";
+
 const SYMBOLS = [CHERRY, BANANA, GRAPES, MELON, BELL, GEM, SEVEN];
-const MULTIPLIERS: Record<string, number> = {
-  [CHERRY]: 2,
-  [BANANA]: 2,
-  [GRAPES]: 3,
-  [MELON]: 3,
-  [BELL]: 5,
-  [GEM]: 10,
-  [SEVEN]: 20
-};
+
+// Probabilities for each tier (cumulative check)
+// 2x: 15%, 3x: 7%, 5x: 4%, 10x: 1.5%, 20x: 0.5%
+// Total Win Chance: ~28%
+const PROBABILITIES = [
+  { chance: 0.005, multiplier: 20, symbols: [SEVEN] },
+  { chance: 0.015, multiplier: 10, symbols: [GEM] },
+  { chance: 0.040, multiplier: 5, symbols: [BELL] },
+  { chance: 0.070, multiplier: 3, symbols: [GRAPES, MELON] },
+  { chance: 0.150, multiplier: 2, symbols: [CHERRY, BANANA] }
+];
+
+function getSpinResult(): { reels: string[], win: boolean, multiplier: number, payout: number } {
+  const roll = Math.random();
+  let cumulative = 0;
+
+  for (const tier of PROBABILITIES) {
+    cumulative += tier.chance;
+    if (roll < cumulative) {
+      // WINNER
+      const symbol = tier.symbols[Math.floor(Math.random() * tier.symbols.length)];
+      return {
+        reels: [symbol, symbol, symbol],
+        win: true,
+        multiplier: tier.multiplier,
+        payout: 0 // Calculated later based on bet
+      };
+    }
+  }
+
+  // LOSER - Generate 3 reels that NOT all match
+  // We pick random symbols until we get a non-win state
+  let r1, r2, r3;
+  do {
+    r1 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+    r2 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+    r3 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+  } while (r1 === r2 && r2 === r3);
+
+  return {
+    reels: [r1, r2, r3],
+    win: false,
+    multiplier: 0,
+    payout: 0
+  };
+}
 
 export async function handleSlots(message: Message, args: string[]) {
   const config = await getGuildConfig(message.guildId!);
@@ -65,17 +103,17 @@ export async function handleSlots(message: Message, args: string[]) {
   if (user.wallet!.balance < amount) {
     return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You don't have enough money.")] });
   }
-  const reel1 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
-  const reel2 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
-  const reel3 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
-  let win = false;
-  let payout = 0;
-  let multiplier = 0;
-  if (reel1 === reel2 && reel2 === reel3) {
-    win = true;
-    multiplier = MULTIPLIERS[reel1];
-    payout = amount * multiplier;
-  }
+
+  // Use new Probability Logic
+  const result = getSpinResult();
+  const reel1 = result.reels[0];
+  const reel2 = result.reels[1];
+  const reel3 = result.reels[2];
+
+  let win = result.win;
+  let multiplier = result.multiplier;
+  let payout = amount * multiplier;
+
   let actualPayout = payout;
   try {
     actualPayout = await placeBetWithTransaction(user.id, user.wallet!.id, "slots", amount, "spin", win, payout, message.guildId!);
@@ -83,6 +121,7 @@ export async function handleSlots(message: Message, args: string[]) {
     actualPayout = await placeBetFallback(user.wallet!.id, user.id, "slots", amount, "spin", win, payout, message.guildId!);
   }
   payout = actualPayout;
+
   await updateQuestProgress(user.id, "GAMBLE").catch(console.error);
   if (win) await updateQuestProgress(user.id, "WIN_SLOTS").catch(console.error);
 
@@ -97,7 +136,7 @@ export async function handleSlots(message: Message, args: string[]) {
         ? `**JACKPOT!** You won **${fmtCurrency(payout, emoji)}**! (x${multiplier})`
         : `Better luck next time... You lost **${fmtCurrency(amount, emoji)}**.`)
     )
-    .setFooter({ text: `${Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet!.balance - amount + payout).toLocaleString()}` });
+    .setFooter({ text: `${Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet!.balance - amount + payout).toLocaleString('en-US')}` });
 
   if (win) {
     const url = getEmoteUrl(Mascot.Emotes.Money);

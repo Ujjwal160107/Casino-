@@ -65,7 +65,11 @@ async function handleIncome(message) {
                 color: 0x00FF00
             });
             let description = `You earned **${(0, format_1.fmtCurrency)(res.amount, emoji)}**!`;
-            if (commandKey === "beg") {
+            // Use custom messages if available, otherwise fallback
+            if (res.messages && res.messages.success && res.messages.success.length > 0) {
+                description = getRandomMessage(res.messages.success, (0, format_1.fmtCurrency)(res.amount, emoji));
+            }
+            else if (commandKey === "beg") {
                 description = getRandomMessage(BEG_MESSAGES, (0, format_1.fmtCurrency)(res.amount, emoji));
             }
             const branded = (0, embed_1.successEmbed)(message.author, `${commandKey.toUpperCase()} SUCCESS`, description);
@@ -92,7 +96,11 @@ async function handleIncome(message) {
                 color: 0xFF0000
             });
             let description = `You lost **${(0, format_1.fmtCurrency)(Math.abs(res.amount), emoji)}**!`;
-            if (commandKey === "beg") {
+            // Use custom messages if available, otherwise fallback
+            if (res.messages && res.messages.fail && res.messages.fail.length > 0) {
+                description = getRandomMessage(res.messages.fail, (0, format_1.fmtCurrency)(Math.abs(res.amount), emoji));
+            }
+            else if (commandKey === "beg") {
                 description = getRandomMessage(BEG_FAIL_MESSAGES, (0, format_1.fmtCurrency)(Math.abs(res.amount), emoji));
             }
             const branded = (0, embed_1.errorEmbed)(message.author, `${commandKey.toUpperCase()} FAILED`, description);

@@ -15,11 +15,12 @@ async function handleStock(message, args) {
     const sub = args[0]?.toLowerCase();
     const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
     const emoji = config.currencyEmoji;
+    const prefix = config.prefix || "!";
     if (sub === "buy") {
         const symbol = args[1];
         const qty = parseInt(args[2]);
         if (!symbol || isNaN(qty))
-            return message.reply("Usage: `!stock buy <symbol> <quantity>`");
+            return message.reply(`Usage: \`${prefix}stock buy <symbol> <quantity>\``);
         try {
             const res = await (0, stockService_1.buyStock)(message.guildId, message.author.id, symbol, qty);
             return message.reply({
@@ -34,7 +35,7 @@ async function handleStock(message, args) {
         const symbol = args[1];
         const qty = parseInt(args[2]);
         if (!symbol || isNaN(qty))
-            return message.reply("Usage: `!stock sell <symbol> <quantity>`");
+            return message.reply(`Usage: \`${prefix}stock sell <symbol> <quantity>\``);
         try {
             const res = await (0, stockService_1.sellStock)(message.guildId, message.author.id, symbol, qty);
             const profitStr = res.profit >= 0 ? `+${(0, format_1.fmtCurrency)(res.profit, emoji)}` : `-${(0, format_1.fmtCurrency)(Math.abs(res.profit), emoji)}`;
@@ -87,7 +88,7 @@ async function handleStock(message, args) {
         .setDescription(`Market updates every 10 minutes.\n\n${desc}`)
         .setColor(branding_1.Mascot.Colors.Base)
         .setImage("attachment://stock_market.jpg")
-        .setFooter({ text: "Use !stock buy <symbol> <qty> to invest." });
+        .setFooter({ text: `Use ${prefix}stock buy <symbol> <qty> to invest.` });
     message.reply({ embeds: [embed], files: [file] });
 }
 //# sourceMappingURL=stock.js.map

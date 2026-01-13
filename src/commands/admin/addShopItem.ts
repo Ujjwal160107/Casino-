@@ -345,7 +345,7 @@ function formatEffectList(effects: ItemEffect[]): string {
         desc += `📈 +${effect.levels} levels`;
         break;
       case "MONEY":
-        desc += `💰 ${effect.amount?.toLocaleString()} coins`;
+        desc += `💰 ${effect.amount?.toLocaleString('en-US')} coins`;
         break;
       case "ROLE_PERMANENT":
         desc += `👑 Permanent role <@&${effect.roleId}>`;

@@ -9,6 +9,7 @@ import {
 } from "discord.js";
 import * as path from "path";
 import { Mascot } from "../../config/branding";
+import { CHERRY, BANANA, GRAPES, MELON, BELL, GEM, SEVEN } from "../games/slots";
 
 export async function handleCasinoGuide(message: Message) {
     const bannerPath = path.join(process.cwd(), "src", "assets", "casino_banner.png");
@@ -151,11 +152,11 @@ export async function handleCasinoGuide(message: Message) {
                     .setDescription(
                         `**Objective:** Match 3 symbols in a row to win!\n\n` +
                         `**Symbols & Payouts:**\n` +
-                        `${Mascot.Emotes.Seven} **7 7 7** - JACKPOT! 10x your bet\n` +
-                        `${Mascot.Emotes.Cherry} **🍒 🍒 🍒** - 5x your bet\n` +
-                        `${Mascot.Emotes.Watermelonm} **🍉 🍉 🍉** - 4x your bet\n` +
-                        `${Mascot.Emotes.Grapes} **🍇 🍇 🍇** - 3x your bet\n` +
-                        `${Mascot.Emotes.Banana} **🍌 🍌 🍌** - 2x your bet\n\n` +
+                        `${SEVEN} ${SEVEN} ${SEVEN} - **20x** Payout\n` +
+                        `${GEM} ${GEM} ${GEM} - **10x** Payout\n` +
+                        `${BELL} ${BELL} ${BELL} - **5x** Payout\n` +
+                        `${GRAPES} / ${MELON} - **3x** Payout\n` +
+                        `${CHERRY} / ${BANANA} - **2x** Payout\n\n` +
                         `**How to Play:**\n` +
                         `${Mascot.Emotes.Success} Choose your bet amount\n` +
                         `${Mascot.Emotes.Dices} Pull the lever (automatically spins)\n` +

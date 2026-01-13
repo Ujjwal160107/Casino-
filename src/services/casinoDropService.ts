@@ -21,7 +21,7 @@ export const CasinoDropService = {
 
             const embed = new EmbedBuilder()
                 .setTitle(`${Mascot.Emotes.FortunaSparkle} Casino Drop!`)
-                .setDescription(`${Mascot.Emotes.FortunaMoney} A money bag has been dropped! First to claim gets it!\n\n**Amount:** ${currencyEmoji} ${amount.toLocaleString()}`)
+                .setDescription(`${Mascot.Emotes.FortunaMoney} A money bag has been dropped! First to claim gets it!\n\n**Amount:** ${currencyEmoji} ${amount.toLocaleString('en-US')}`)
                 .setColor("#FFD700")
                 .setFooter({ text: "Click the button below to claim!", iconURL: client.user?.displayAvatarURL() });
 
@@ -87,7 +87,7 @@ export const CasinoDropService = {
 
             const claimEmbed = new EmbedBuilder()
                 .setColor("#00FF00")
-                .setDescription(`${Mascot.Emotes.Success} **${interaction.user.username}** claimed the drop of **${config.currencyEmoji} ${amount.toLocaleString()}**!`);
+                .setDescription(`${Mascot.Emotes.Success} **${interaction.user.username}** claimed the drop of **${config.currencyEmoji} ${amount.toLocaleString('en-US')}**!`);
 
             await interaction.followUp({ embeds: [claimEmbed] });
 
@@ -97,7 +97,7 @@ export const CasinoDropService = {
                     guild: interaction.guild,
                     type: "ECONOMY",
                     title: "Casino Drop Claimed",
-                    description: `**User:** ${interaction.user.toString()}\n**Amount:** ${config.currencyEmoji} ${amount.toLocaleString()}\n**Channel:** ${interaction.channel?.toString()}`,
+                    description: `**User:** ${interaction.user.toString()}\n**Amount:** ${config.currencyEmoji} ${amount.toLocaleString('en-US')}\n**Channel:** ${interaction.channel?.toString()}`,
                     color: 0x00FF00,
                     thumbnail: interaction.user.displayAvatarURL()
                 });

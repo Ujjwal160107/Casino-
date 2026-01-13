@@ -12,6 +12,7 @@ interface GeneralSettingsProps {
         startMoney: number;
         currencyName: string;
         currencyEmoji: string;
+        chatMoneyEnabled: boolean;
     };
 }
 
@@ -127,6 +128,23 @@ export function GeneralSettings({ guildId, initialSettings }: GeneralSettingsPro
                         placeholder="🪙"
                         maxLength={64}
                     />
+                </div>
+
+                {/* Chat Money Toggle */}
+                <div className="md:col-span-2 flex items-center justify-between p-4 bg-zinc-950 border border-white/10 rounded-xl">
+                    <div>
+                        <h3 className="text-sm font-bold text-white uppercase tracking-wider">Chat Money</h3>
+                        <p className="text-[10px] text-zinc-600">Earn currency by chatting in text channels.</p>
+                    </div>
+                    <button
+                        onClick={() => setSettings(prev => ({ ...prev, chatMoneyEnabled: !prev.chatMoneyEnabled }))}
+                        className={`w-12 h-6 rounded-full transition-colors relative ${settings.chatMoneyEnabled ? "bg-yellow-500" : "bg-zinc-800"}`}
+                    >
+                        <motion.div
+                            animate={{ x: settings.chatMoneyEnabled ? 26 : 2 }}
+                            className="absolute top-1 left-0 bg-white w-4 h-4 rounded-full shadow-sm"
+                        />
+                    </button>
                 </div>
             </div>
 

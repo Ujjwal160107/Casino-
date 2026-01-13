@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.SEVEN = exports.GEM = exports.BELL = exports.MELON = exports.GRAPES = exports.BANANA = exports.CHERRY = void 0;
 exports.handleSlots = handleSlots;
 const discord_js_1 = require("discord.js");
 const branding_1 = require("../../config/branding");
@@ -11,23 +12,55 @@ const embed_1 = require("../../utils/embed");
 const cooldown_1 = require("../../utils/cooldown");
 const gameUtils_1 = require("../../utils/gameUtils");
 const questService_1 = require("../../services/questService");
-const CHERRY = "<:cherri:1446428169786622053>";
-const BANANA = "<:banano:1446428190837968989>";
-const GRAPES = "<:graps:1446428294483542040>";
-const MELON = "<:watermelon2:1446428567402709115>";
-const BELL = "<:Bel:1446428665176129716>";
-const GEM = "<:Gemm:1446428771266592819>";
-const SEVEN = "<:sevenn:1446428916867661846>";
-const SYMBOLS = [CHERRY, BANANA, GRAPES, MELON, BELL, GEM, SEVEN];
-const MULTIPLIERS = {
-    [CHERRY]: 2,
-    [BANANA]: 2,
-    [GRAPES]: 3,
-    [MELON]: 3,
-    [BELL]: 5,
-    [GEM]: 10,
-    [SEVEN]: 20
-};
+exports.CHERRY = "<:cherri:1446428169786622053>";
+exports.BANANA = "<:banano:1446428190837968989>";
+exports.GRAPES = "<:graps:1446428294483542040>";
+exports.MELON = "<:watermelon2:1446428567402709115>";
+exports.BELL = "<:Bel:1446428665176129716>";
+exports.GEM = "<:Gemm:1446428771266592819>";
+exports.SEVEN = "<:sevenn:1446428916867661846>";
+const SYMBOLS = [exports.CHERRY, exports.BANANA, exports.GRAPES, exports.MELON, exports.BELL, exports.GEM, exports.SEVEN];
+// Probabilities for each tier (cumulative check)
+// 2x: 15%, 3x: 7%, 5x: 4%, 10x: 1.5%, 20x: 0.5%
+// Total Win Chance: ~28%
+const PROBABILITIES = [
+    { chance: 0.005, multiplier: 20, symbols: [exports.SEVEN] },
+    { chance: 0.015, multiplier: 10, symbols: [exports.GEM] },
+    { chance: 0.040, multiplier: 5, symbols: [exports.BELL] },
+    { chance: 0.070, multiplier: 3, symbols: [exports.GRAPES, exports.MELON] },
+    { chance: 0.150, multiplier: 2, symbols: [exports.CHERRY, exports.BANANA] }
+];
+function getSpinResult() {
+    const roll = Math.random();
+    let cumulative = 0;
+    for (const tier of PROBABILITIES) {
+        cumulative += tier.chance;
+        if (roll < cumulative) {
+            // WINNER
+            const symbol = tier.symbols[Math.floor(Math.random() * tier.symbols.length)];
+            return {
+                reels: [symbol, symbol, symbol],
+                win: true,
+                multiplier: tier.multiplier,
+                payout: 0 // Calculated later based on bet
+            };
+        }
+    }
+    // LOSER - Generate 3 reels that NOT all match
+    // We pick random symbols until we get a non-win state
+    let r1, r2, r3;
+    do {
+        r1 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+        r2 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+        r3 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+    } while (r1 === r2 && r2 === r3);
+    return {
+        reels: [r1, r2, r3],
+        win: false,
+        multiplier: 0,
+        payout: 0
+    };
+}
 async function handleSlots(message, args) {
     const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
     const user = await (0, walletService_1.ensureUserAndWallet)(message.author.id, message.guildId, message.author.tag);
@@ -64,17 +97,14 @@ async function handleSlots(message, args) {
     if (user.wallet.balance < amount) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Insufficient Funds", "You don't have enough money.")] });
     }
-    const reel1 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
-    const reel2 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
-    const reel3 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
-    let win = false;
-    let payout = 0;
-    let multiplier = 0;
-    if (reel1 === reel2 && reel2 === reel3) {
-        win = true;
-        multiplier = MULTIPLIERS[reel1];
-        payout = amount * multiplier;
-    }
+    // Use new Probability Logic
+    const result = getSpinResult();
+    const reel1 = result.reels[0];
+    const reel2 = result.reels[1];
+    const reel3 = result.reels[2];
+    let win = result.win;
+    let multiplier = result.multiplier;
+    let payout = amount * multiplier;
     let actualPayout = payout;
     try {
         actualPayout = await (0, gameService_1.placeBetWithTransaction)(user.id, user.wallet.id, "slots", amount, "spin", win, payout, message.guildId);

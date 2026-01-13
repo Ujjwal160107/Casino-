@@ -3,7 +3,7 @@ import prisma from "../../utils/prisma";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { jailUser } from "../../services/jailService";
-import { checkCooldown } from "../../utils/cooldown";
+import { checkDynamicCooldown } from "../../utils/cooldown";
 import { getIncomeConfigOrDefault } from "../../services/incomeService";
 import { fmtCurrency, formatDuration } from "../../utils/format";
 import { errorEmbed, successEmbed } from "../../utils/embed";
@@ -36,7 +36,7 @@ export async function handleCrime(message: Message) {
     const cooldownKey = `crime:${message.guildId}:${message.author.id}`;
     const cooldownTime = incomeConfig.cooldown;
 
-    const remaining = checkCooldown(cooldownKey, cooldownTime);
+    const remaining = checkDynamicCooldown(cooldownKey, cooldownTime);
     if (remaining > 0) {
         return message.reply({
             embeds: [errorEmbed(message.author, "Cool Down", `You must wait **${formatDuration(remaining * 1000)}** before committing another crime.`)]
@@ -46,12 +46,15 @@ export async function handleCrime(message: Message) {
     // Pick a random crime scenario
     const scenario = CRIMES[Math.floor(Math.random() * CRIMES.length)];
 
-    // Risk calculation (random 0-100)
+    // Risk calculation using Dashboard Config
+    // If config.successPct is set (e.g. 60%), we succeed if roll <= 60.
+    // We ignore the hardcoded scenario risk to allow dashboard control.
     const roll = Math.random() * 100;
 
-    if (roll > scenario.risk) {
-        // Success
-        const amount = Math.floor(Math.random() * (scenario.max - scenario.min + 1)) + scenario.min;
+    // We use <= because successPct is "Success Rate" (e.g. 75 means 75% success)
+    if (roll <= incomeConfig.successPct) {
+        // Success - Use Dashboard Configured Payouts
+        const amount = Math.floor(Math.random() * (incomeConfig.maxPay - incomeConfig.minPay + 1)) + incomeConfig.minPay;
 
         await prisma.wallet.update({
             where: { id: user.wallet!.id },

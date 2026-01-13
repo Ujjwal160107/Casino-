@@ -67,3 +67,26 @@ export async function getGuild(guildId: string): Promise<DiscordGuild | null> {
 
     return res.json();
 }
+
+export interface DiscordRole {
+    id: string;
+    name: string;
+    color: number;
+    hoist: boolean;
+    position: number;
+    permissions: string;
+    managed: boolean;
+    mentionable: boolean;
+}
+
+export async function getGuildRoles(guildId: string): Promise<DiscordRole[]> {
+    if (!process.env.DISCORD_BOT_TOKEN) return [];
+
+    const res = await fetch(`${DISCORD_API_URL}/guilds/${guildId}/roles`, {
+        headers: { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` },
+        next: { revalidate: 600 } // Cache for 10 minutes
+    });
+
+    if (!res.ok) return [];
+    return res.json();
+}

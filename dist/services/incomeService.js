@@ -25,7 +25,9 @@ async function getIncomeConfigOrDefault(guildId, commandKey) {
             maxPay: cfg.maxPay,
             cooldown: cfg.cooldown,
             successPct: cfg.successPct ?? 100,
-            failPenaltyPct: cfg.failPenaltyPct ?? 50
+            failPenaltyPct: cfg.failPenaltyPct ?? 50,
+            successMessages: cfg.successMessages || [],
+            failMessages: cfg.failMessages || []
         };
     }
     return { minPay: 10, maxPay: 50, cooldown: 60, successPct: 100, failPenaltyPct: 50 };
@@ -49,10 +51,9 @@ const executeTx = async (fn, retries = 3) => {
 async function runIncomeCommand({ commandKey, discordId, guildId, userId, walletId }) {
     const cfg = await getIncomeConfigOrDefault(guildId, commandKey);
     const cooldownKey = `income:${guildId}:${discordId}:${commandKey}`;
-    const cd = (0, cooldown_1.checkCooldown)(cooldownKey, cfg.cooldown);
+    const cd = (0, cooldown_1.checkDynamicCooldown)(cooldownKey, cfg.cooldown);
     if (cd > 0) {
-        const expiresAt = (0, cooldown_1.getCooldownExpiry)(cooldownKey);
-        const timestamp = expiresAt ? Math.floor(expiresAt / 1000) : Math.floor((Date.now() / 1000) + cd);
+        const timestamp = Math.floor((Date.now() / 1000) + cd);
         throw new Error(`Cooldown active. Try again <t:${timestamp}:R>.`);
     }
     const amount = rand(cfg.minPay, cfg.maxPay);
@@ -77,7 +78,13 @@ async function runIncomeCommand({ commandKey, discordId, guildId, userId, wallet
                 })
             ]);
         });
-        return { success: false, amount: -penalty, penalty, attempted: amount };
+        return {
+            success: false,
+            amount: -penalty,
+            penalty,
+            attempted: amount,
+            messages: { success: cfg.successMessages, fail: cfg.failMessages }
+        };
     }
     if (guildId) {
         const guildConfig = await (0, guildConfigService_1.getGuildConfig)(guildId);
@@ -105,6 +112,10 @@ async function runIncomeCommand({ commandKey, discordId, guildId, userId, wallet
             })
         ]);
     });
-    return { success: true, amount };
+    return {
+        success: true,
+        amount,
+        messages: { success: cfg.successMessages, fail: cfg.failMessages }
+    };
 }
 //# sourceMappingURL=incomeService.js.map

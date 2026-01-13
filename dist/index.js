@@ -161,12 +161,19 @@ client.on("messageCreate", async (message) => {
         }
     }
     catch (err) {
+        // 10008: Unknown Message - Message was deleted before we could process/reply
+        // 50035: Invalid Form Body - Often 'message_reference: Unknown message' if we try to reply to a deleted msg
+        if (err.code === 10008 || err.code === 50035)
+            return;
         console.error("Message handler error:", err);
         try {
             await message.reply("An internal error occurred while processing your command.");
         }
         catch (replyErr) {
-            console.error("Failed to notify user about message handler error:", replyErr);
+            // Ignore Invalid Form Body (50035) or Unknown Message (10008) during error reply attempt
+            if (replyErr.code !== 50035 && replyErr.code !== 10008) {
+                console.error("Failed to notify user about message handler error:", replyErr);
+            }
         }
     }
 });

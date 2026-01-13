@@ -43,7 +43,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setColor("#FFD700")
                 .setDescription(`Welcome to the ${config.currencyName} Bank.`)
                 .addFields(
-                    { name: "<:MoneyBag:1446970451606896781> Net Worth", value: `${config.currencyEmoji} ${summary.netWorth.toLocaleString()}`, inline: true },
+                    { name: "<:MoneyBag:1446970451606896781> Net Worth", value: `${config.currencyEmoji} ${summary.netWorth.toLocaleString('en-US')}`, inline: true },
                     { name: "<a:credits:1445689337172721716> Credit Score", value: `${summary.creditScore}`, inline: true },
                     {
                         name: "<:OnLoan:1446971056865935381> Active Loans", value: summary.activeLoans.length > 0
@@ -161,7 +161,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setColor("#FFD700")
                 .setDescription(`Welcome to the ${config.currencyName} Bank.`)
                 .addFields(
-                    { name: "<:MoneyBag:1446970451606896781> Net Worth", value: `${config.currencyEmoji} ${summary.netWorth.toLocaleString()}`, inline: true },
+                    { name: "<:MoneyBag:1446970451606896781> Net Worth", value: `${config.currencyEmoji} ${summary.netWorth.toLocaleString('en-US')}`, inline: true },
                     { name: "<a:credits:1445689337172721716> Credit Score", value: `${summary.creditScore}`, inline: true },
                     {
                         name: "<:OnLoan:1446971056865935381> Active Loans", value: summary.activeLoans.length > 0

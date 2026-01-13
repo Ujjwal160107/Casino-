@@ -35,7 +35,7 @@ async function handleCrime(message) {
     // We'll stick to a simple key for crime but use the configurable duration.
     const cooldownKey = `crime:${message.guildId}:${message.author.id}`;
     const cooldownTime = incomeConfig.cooldown;
-    const remaining = (0, cooldown_1.checkCooldown)(cooldownKey, cooldownTime);
+    const remaining = (0, cooldown_1.checkDynamicCooldown)(cooldownKey, cooldownTime);
     if (remaining > 0) {
         return message.reply({
             embeds: [(0, embed_1.errorEmbed)(message.author, "Cool Down", `You must wait **${(0, format_1.formatDuration)(remaining * 1000)}** before committing another crime.`)]
@@ -43,11 +43,14 @@ async function handleCrime(message) {
     }
     // Pick a random crime scenario
     const scenario = CRIMES[Math.floor(Math.random() * CRIMES.length)];
-    // Risk calculation (random 0-100)
+    // Risk calculation using Dashboard Config
+    // If config.successPct is set (e.g. 60%), we succeed if roll <= 60.
+    // We ignore the hardcoded scenario risk to allow dashboard control.
     const roll = Math.random() * 100;
-    if (roll > scenario.risk) {
-        // Success
-        const amount = Math.floor(Math.random() * (scenario.max - scenario.min + 1)) + scenario.min;
+    // We use <= because successPct is "Success Rate" (e.g. 75 means 75% success)
+    if (roll <= incomeConfig.successPct) {
+        // Success - Use Dashboard Configured Payouts
+        const amount = Math.floor(Math.random() * (incomeConfig.maxPay - incomeConfig.minPay + 1)) + incomeConfig.minPay;
         await prisma_1.default.wallet.update({
             where: { id: user.wallet.id },
             data: { balance: { increment: amount } }

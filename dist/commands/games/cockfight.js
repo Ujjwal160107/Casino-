@@ -86,7 +86,7 @@ async function handleCockFight(message, args) {
         });
     }
     if (challengerMeta.injured) {
-        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Injured", "Your chicken is injured! Heal it via `!chicken`.")] });
+        return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Injured", `Your chicken is injured! Heal it via \`${config.prefix}chicken\`.`)] });
     }
     const invTarget = await prisma_1.default.inventory.findUnique({
         where: { userId_shopItemId: { userId: (await getUserId(targetUser.id, message.guild.id)), shopItemId: shopItem.id } }

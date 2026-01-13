@@ -1,6 +1,5 @@
 import prisma from "../utils/prisma";
-import { checkCooldown, getCooldownExpiry } from "../utils/cooldown";
-import { formatDuration } from "../utils/format";
+import { checkDynamicCooldown } from "../utils/cooldown";
 import { getGuildConfig } from "./guildConfigService";
 import { getWalletById } from "./walletService";
 
@@ -21,7 +20,9 @@ export async function getIncomeConfigOrDefault(guildId: string | null, commandKe
       maxPay: cfg.maxPay,
       cooldown: cfg.cooldown,
       successPct: cfg.successPct ?? 100,
-      failPenaltyPct: cfg.failPenaltyPct ?? 50
+      failPenaltyPct: cfg.failPenaltyPct ?? 50,
+      successMessages: cfg.successMessages || [],
+      failMessages: cfg.failMessages || []
     };
   }
   return { minPay: 10, maxPay: 50, cooldown: 60, successPct: 100, failPenaltyPct: 50 };
@@ -58,11 +59,10 @@ export async function runIncomeCommand({
 }) {
   const cfg = await getIncomeConfigOrDefault(guildId, commandKey);
   const cooldownKey = `income:${guildId}:${discordId}:${commandKey}`;
-  const cd = checkCooldown(cooldownKey, cfg.cooldown);
+  const cd = checkDynamicCooldown(cooldownKey, cfg.cooldown);
 
   if (cd > 0) {
-    const expiresAt = getCooldownExpiry(cooldownKey);
-    const timestamp = expiresAt ? Math.floor(expiresAt / 1000) : Math.floor((Date.now() / 1000) + cd);
+    const timestamp = Math.floor((Date.now() / 1000) + cd);
     throw new Error(`Cooldown active. Try again <t:${timestamp}:R>.`);
   }
 
@@ -91,7 +91,13 @@ export async function runIncomeCommand({
       ]);
     });
 
-    return { success: false, amount: -penalty, penalty, attempted: amount };
+    return {
+      success: false,
+      amount: -penalty,
+      penalty,
+      attempted: amount,
+      messages: { success: cfg.successMessages, fail: cfg.failMessages }
+    };
   }
 
   if (guildId) {
@@ -122,5 +128,9 @@ export async function runIncomeCommand({
     ]);
   });
 
-  return { success: true, amount };
+  return {
+    success: true,
+    amount,
+    messages: { success: cfg.successMessages, fail: cfg.failMessages }
+  };
 }
