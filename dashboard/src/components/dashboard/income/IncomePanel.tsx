@@ -5,7 +5,8 @@ import { RewardEditor } from "./RewardEditor";
 import { CommandEditor } from "./CommandEditor";
 import { RobEditor } from "./RobEditor";
 import { QuestEditor } from "./QuestEditor";
-import { Crown, HandCoins, Heart, AlertTriangle, Shield, ScrollText } from "lucide-react";
+import { CasinoDropsEditor } from "./CasinoDropsEditor";
+import { Crown, HandCoins, Heart, AlertTriangle, Shield, ScrollText, Timer } from "lucide-react";
 
 interface IncomePanelProps {
     guildId: string;
@@ -18,12 +19,14 @@ interface IncomePanelProps {
         };
         rob: any;
         quests: any;
+        drops: any[];
         roles: any[];
+        channels: any[];
     };
 }
 
 export function IncomePanel({ guildId, data }: IncomePanelProps) {
-    const [activeTab, setActiveTab] = useState<"rewards" | "beg" | "slut" | "crime" | "rob" | "quests">("rewards");
+    const [activeTab, setActiveTab] = useState<"rewards" | "beg" | "slut" | "crime" | "rob" | "quests" | "drops">("rewards");
 
     return (
         <div className="space-y-6">
@@ -82,6 +85,15 @@ export function IncomePanel({ guildId, data }: IncomePanelProps) {
                         }`}
                 >
                     <ScrollText size={16} /> Quests
+                </button>
+                <button
+                    onClick={() => setActiveTab("drops")}
+                    className={`px-4 py-2 rounded-t-lg font-bold text-sm flex items-center gap-2 transition-colors ${activeTab === "drops"
+                        ? "bg-yellow-500 text-black"
+                        : "text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10"
+                        }`}
+                >
+                    <Timer size={16} /> Drops
                 </button>
             </div>
 
@@ -149,6 +161,16 @@ export function IncomePanel({ guildId, data }: IncomePanelProps) {
                         <QuestEditor
                             guildId={guildId}
                             initialData={data.quests}
+                        />
+                    </div>
+                )}
+
+                {activeTab === "drops" && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <CasinoDropsEditor
+                            guildId={guildId}
+                            initialData={data.drops || []}
+                            channels={data.channels || []}
                         />
                     </div>
                 )}

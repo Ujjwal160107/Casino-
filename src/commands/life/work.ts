@@ -39,7 +39,14 @@ export async function handleWork(message: Message) {
 
     // Simple promo logic for display (Real logic in work result later)
     if (nextLevelJob) {
-        const shiftsReq = 20; // Example requirement
+        let shiftsReq = 20; // Default requirement
+        if (config && config.jobShiftReqs) {
+            const reqs = config.jobShiftReqs as Record<string, number>;
+            if (reqs[nextLevelJob.id]) {
+                shiftsReq = reqs[nextLevelJob.id];
+            }
+        }
+
         progress = Math.min((user.shiftsWorked / shiftsReq) * 100, 100);
         promoText = `Next Promotion: **${nextLevelJob.title}**\nProgress: ${makeProgressBar(progress)} (${user.shiftsWorked}/${shiftsReq} shifts)`;
     }

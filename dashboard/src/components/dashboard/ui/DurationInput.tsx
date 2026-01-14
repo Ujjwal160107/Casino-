@@ -6,9 +6,10 @@ interface DurationInputProps {
     value: number; // Total seconds
     onChange: (seconds: number) => void;
     label?: string;
+    disabled?: boolean;
 }
 
-export function DurationInput({ value, onChange, label = "Cooldown" }: DurationInputProps) {
+export function DurationInput({ value, onChange, label = "Cooldown", disabled = false }: DurationInputProps) {
     // Initialize state from value
     const [hours, setHours] = useState(Math.floor(value / 3600));
     const [minutes, setMinutes] = useState(Math.floor((value % 3600) / 60));
@@ -48,7 +49,7 @@ export function DurationInput({ value, onChange, label = "Cooldown" }: DurationI
     };
 
     return (
-        <div className="space-y-1">
+        <div className={`space-y-1 ${disabled ? 'opacity-60' : ''}`}>
             <label className="text-xs text-zinc-500">{label}</label>
             <div className="flex flex-wrap gap-1">
                 <div className="flex flex-col gap-0.5 flex-1 min-w-[60px]">
@@ -59,6 +60,7 @@ export function DurationInput({ value, onChange, label = "Cooldown" }: DurationI
                         onChange={handleH}
                         placeholder="Hr"
                         className="bg-black/40 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full"
+                        disabled={disabled}
                     />
                     <span className="text-[10px] text-zinc-600 text-center">Hrs</span>
                 </div>
@@ -72,6 +74,7 @@ export function DurationInput({ value, onChange, label = "Cooldown" }: DurationI
                         onChange={handleM}
                         placeholder="Min"
                         className="bg-black/40 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full"
+                        disabled={disabled}
                     />
                     <span className="text-[10px] text-zinc-600 text-center">Mins</span>
                 </div>
@@ -85,6 +88,7 @@ export function DurationInput({ value, onChange, label = "Cooldown" }: DurationI
                         onChange={handleS}
                         placeholder="Sec"
                         className="bg-black/40 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full"
+                        disabled={disabled}
                     />
                     <span className="text-[10px] text-zinc-600 text-center">Secs</span>
                 </div>

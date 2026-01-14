@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { DurationInput } from "../ui/DurationInput";
 import { SentenceEditor } from "./SentenceEditor";
 import { toast } from "sonner";
+import { Switch } from "../../ui/Switch";
 
 interface CommandConfig {
     minPay: number;
@@ -18,6 +19,7 @@ interface CommandConfig {
     failMessages?: string[];
     jailTime?: number;
     jailFine?: number;
+    enabled?: boolean;
 }
 
 interface CommandEditorProps {
@@ -61,12 +63,40 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
         setIsLoading(false);
     };
 
+    const handleToggle = (checked: boolean) => {
+        setFormData({ ...formData, enabled: checked });
+        // Optional: Auto-save on toggle? The user might prefer "Update" button, 
+        // but typically toggles are instant. 
+        // Given the "Update" button exists, I'll defer saving until click, 
+        // OR the user might expect instant toggle. 
+        // The prompt asked for a toggle in the dashboard where admins can toggle. 
+        // Usually settings forms with a Save button don't auto-save toggles.
+        // I'll keep it as part of the form data to be saved on "Update".
+    };
+
     return (
-        <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
-            <div className="flex items-start justify-between mb-4">
+        <div className={`bg-zinc-900/50 border border-white/5 rounded-xl p-6 relative transition-opacity ${formData.enabled === false ? 'opacity-70' : ''}`}>
+            {!formData.enabled && (
+                <div className="absolute inset-0 z-10 bg-black/50 backdrop-blur-[1px] rounded-xl flex items-center justify-center pointer-events-none">
+                    <span className="bg-black/80 px-4 py-2 rounded text-red-400 font-bold uppercase tracking-widest border border-red-500/20 transform -rotate-12">
+                        Module Disabled
+                    </span>
+                </div>
+            )}
+
+            <div className="flex items-start justify-between mb-4 relative z-20 pointer-events-auto">
                 <div>
                     <h3 className="text-lg font-bold text-white uppercase tracking-wider">{label}</h3>
                     <p className="text-sm text-zinc-400">{description}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-zinc-500 uppercase">
+                        {formData.enabled !== false ? "Enabled" : "Disabled"}
+                    </span>
+                    <Switch
+                        checked={formData.enabled !== false}
+                        onCheckedChange={handleToggle}
+                    />
                 </div>
             </div>
 
@@ -80,7 +110,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                         value={formData.minPay}
                         onChange={(e) => setFormData({ ...formData, minPay: parseInt(e.target.value) || 0 })}
                         className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white"
-                        disabled={false}
+                        disabled={formData.enabled === false}
                     />
                 </div>
                 <div className="space-y-1">
@@ -91,7 +121,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                         value={formData.maxPay}
                         onChange={(e) => setFormData({ ...formData, maxPay: parseInt(e.target.value) || 0 })}
                         className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white"
-                        disabled={false}
+                        disabled={formData.enabled === false}
                     />
                 </div>
                 <div className="space-y-1">
@@ -102,7 +132,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                         value={formData.successPct}
                         onChange={(e) => setFormData({ ...formData, successPct: parseInt(e.target.value) || 0 })}
                         className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white"
-                        disabled={false}
+                        disabled={formData.enabled === false}
                     />
                 </div>
                 <div className="space-y-1">
@@ -113,7 +143,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                         value={formData.failPenaltyPct}
                         onChange={(e) => setFormData({ ...formData, failPenaltyPct: parseInt(e.target.value) || 0 })}
                         className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white"
-                        disabled={false}
+                        disabled={formData.enabled === false}
                     />
                 </div>
             </div>
@@ -123,6 +153,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                     value={formData.cooldown}
                     onChange={(val) => setFormData({ ...formData, cooldown: val })}
                     label="Global Cooldown"
+                    disabled={formData.enabled === false}
                 />
             </div>
 
@@ -135,6 +166,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                         sentences={formData.successMessages || []}
                         onChange={(s) => setFormData({ ...formData, successMessages: s })}
                         placeholder="You found {amount} coins!"
+                        disabled={formData.enabled === false}
                     />
                     <SentenceEditor
                         title="Fail / Penalty Messages"
@@ -142,6 +174,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                         sentences={formData.failMessages || []}
                         onChange={(s) => setFormData({ ...formData, failMessages: s })}
                         placeholder="You were caught! Fined {penalty}."
+                        disabled={formData.enabled === false}
                     />
                 </div>
             )}
@@ -161,6 +194,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                                 onChange={(e) => setFormData({ ...formData, jailFine: parseInt(e.target.value) || 0 })}
                                 className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white"
                                 placeholder="1000"
+                                disabled={formData.enabled === false}
                             />
                             <p className="text-[10px] text-zinc-600">Cost to bail out instantly.</p>
                         </div>
@@ -169,6 +203,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                                 value={formData.jailTime || 0}
                                 onChange={(val) => setFormData({ ...formData, jailTime: val })}
                                 label="Jail Time"
+                                disabled={formData.enabled === false}
                             />
                             <p className="text-[10px] text-zinc-600">Time spent in jail.</p>
                         </div>
@@ -182,7 +217,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                 </p>
             )}
 
-            <div className="flex justify-end pt-4 border-t border-white/5">
+            <div className="flex justify-end pt-4 border-t border-white/5 relative z-20 pointer-events-auto">
                 <button
                     onClick={handleSave}
                     disabled={isLoading}

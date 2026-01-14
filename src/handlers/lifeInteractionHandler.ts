@@ -318,13 +318,13 @@ async function handleButton(interaction: ButtonInteraction) {
 
         // Promotion
         if (xpGain > 0) {
-            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain });
+            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
             if (promoCheck.eligible && promoCheck.nextJob) {
                 // Determine if we show celebration or just footer
                 // Let's just note it for now, implementation plan says Celebration later
                 footerText = `🎉 Promotion Available: ${promoCheck.nextJob.title}`;
             } else if (promoCheck.nextJob) {
-                footerText = `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingXp} XP to go)`;
+                footerText = `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingXp} xp, ${promoCheck.missingShifts} shifts to go)`;
             }
         }
 
@@ -345,7 +345,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
         if (xpGain > 0) {
             // Re-check promotion to get the object
-            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain });
+            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
             if (promoCheck.eligible && promoCheck.nextJob) {
                 resEmbed.addFields({ name: `${Mascot.Emotes.JobPromotion} Promotion Available!`, value: `You have qualified for **${promoCheck.nextJob.title}**!` });
                 resEmbed.setColor("#F1C40F");
@@ -355,10 +355,10 @@ async function handleButton(interaction: ButtonInteraction) {
                         .setCustomId(`promote_confirm_${promoCheck.nextJob.id}`)
                         .setLabel(`Check Eligibility: ${promoCheck.nextJob.title}`)
                         .setStyle(ButtonStyle.Success)
-                        .setEmoji(Mascot.Emotes.JobPromotion) // Use custom emoji for button too? Or keeps arrow? Button was "⬆️" before. User said NO DEFAULT EMOJIS.
+                        .setEmoji(Mascot.Emotes.JobPromotion)
                 ));
             } else if (promoCheck.nextJob) {
-                resEmbed.setFooter({ text: `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingXp} XP to go)` });
+                resEmbed.setFooter({ text: `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingXp} xp, ${promoCheck.missingShifts} shifts to go)` });
             }
         } else if (footerText) {
             resEmbed.setFooter({ text: footerText });
@@ -454,9 +454,8 @@ async function handleButton(interaction: ButtonInteraction) {
         }
 
         // Cooldown check
-        const incomeConfig = await prisma.incomeConfig.findUnique({
-            where: { guildId_commandKey: { guildId: guild.id, commandKey: "work" } }
-        });
+        const config = await getGuildConfig(guild.id);
+        const cooldownSeconds = config.jobCooldown || 3600;
 
         // Check Active Effects (Permanent Buffs)
         const activeEffects = await prisma.activeEffect.findMany({
@@ -481,11 +480,10 @@ async function handleButton(interaction: ButtonInteraction) {
 
         const lastShift = userData.lastShift ? new Date(userData.lastShift).getTime() : 0;
         const now = Date.now();
-        let cooldownSeconds = incomeConfig ? incomeConfig.cooldown : 0; // Default 0 if not set
 
         // Apply Reductions
-        cooldownSeconds = Math.max(0, cooldownSeconds - cooldownRed);
-        const cooldownMs = cooldownSeconds * 1000;
+        const finalCooldown = Math.max(0, cooldownSeconds - cooldownRed);
+        const cooldownMs = finalCooldown * 1000;
 
         if (now - lastShift < cooldownMs) {
             const remaining = Math.ceil((cooldownMs - (now - lastShift)) / 60000);
@@ -507,9 +505,12 @@ async function handleButton(interaction: ButtonInteraction) {
                     }
                 });
 
+                const config = await getGuildConfig(guild.id);
+                const prefix = config?.prefix || "!";
+
                 const burnoutEmbed = new EmbedBuilder()
                     .setTitle(`${Mascot.Emotes.Alert} BURNOUT!`)
-                    .setDescription(`You are too stressed to work well! You collapsed from exhaustion.\n\n**Stress Level:** ${userData.jobStress}/100\n\nUse \`!relax\` to recover before working again.`)
+                    .setDescription(`You are too stressed to work well! You collapsed from exhaustion.\n\n**Stress Level:** ${userData.jobStress}/100\n\nUse \`${prefix}relax\` to recover before working again.`)
                     .setColor("#E74C3C")
                     .setThumbnail(getEmoteUrl(Mascot.Emotes.Fail));
 
@@ -681,7 +682,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
             // Check Promotion
             // We use the UPDATED jobXp (add 10 to current)
-            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + 10 });
+            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + 10, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
 
             const config = await getGuildConfig(guild.id);
             const winEmbed = new EmbedBuilder()
@@ -708,7 +709,7 @@ async function handleButton(interaction: ButtonInteraction) {
                         .setEmoji(Mascot.Emotes.JobPromotion)
                 ));
             } else if (promoCheck.nextJob) {
-                winEmbed.setFooter({ text: `Next Job: ${promoCheck.nextJob.title} (Need ${promoCheck.missingXp} more XP)` });
+                winEmbed.setFooter({ text: `Next Job: ${promoCheck.nextJob.title} (Need ${promoCheck.missingXp} xp, ${promoCheck.missingShifts} shifts)` });
             }
 
             // Disable buttons on the original game embed

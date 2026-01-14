@@ -1,7 +1,7 @@
 import { Client, Message } from "discord.js";
 import { handleHelp } from "./commands/general/help";
 import { handleCasinoGuide } from "./commands/general/casinoGuide";
-import { handleGuide } from "./commands/general/guide";
+import { handleTutorial } from "./commands/general/tutorial";
 import { handleSetPrefix } from "./commands/admin/setPrefix";
 import { handleSetIncome } from "./commands/admin/setIncome";
 import { handleSetIncomeCooldown } from "./commands/admin/setIncomeCooldown";
@@ -211,7 +211,8 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "casino-guide":
       return handleCasinoGuide(message);
     case "guide":
-      return handleGuide(message);
+    case "tutorial":
+      return handleTutorial(message);
     case "setincome":
     case "set-income":
       return handleSetIncome(message, args);

@@ -90,3 +90,30 @@ export async function getGuildRoles(guildId: string): Promise<DiscordRole[]> {
     if (!res.ok) return [];
     return res.json();
 }
+
+export interface DiscordChannel {
+    id: string;
+    type: number; // 0 = GUILD_TEXT, 2 = GUILD_VOICE, ...
+    name: string;
+    position: number;
+    parent_id?: string;
+}
+
+export async function getGuildChannels(guildId: string): Promise<DiscordChannel[]> {
+    if (!process.env.DISCORD_BOT_TOKEN) return [];
+
+    const res = await fetch(`${DISCORD_API_URL}/guilds/${guildId}/channels`, {
+        headers: { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` },
+        next: { revalidate: 300 } // Cache for 5 minutes
+    });
+
+    if (!res.ok) {
+        console.error(`Failed to fetch channels for guild ${guildId}:`, await res.text());
+        return [];
+    }
+    // Filter for Text Channels (type 0) and Announcement Channels (type 5) if needed
+    // For now, let's return all, and filter in UI component if necessary, or just type 0.
+    // Usually drops are in text channels.
+    const channels = await res.json();
+    return channels.filter((c: any) => c.type === 0 || c.type === 5);
+}

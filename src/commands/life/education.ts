@@ -172,13 +172,16 @@ export async function handleListDegrees(message: Message) {
     const userId = message.author.id;
     const guildId = message.guild.id;
 
+    const config = await getGuildConfig(guildId);
+    const prefix = config?.prefix || "!";
+
     const user = await prisma.user.findUnique({
         where: { discordId_guildId: { discordId: userId, guildId } },
         include: { degrees: { include: { degree: true } } }
     });
 
     if (!user || user.degrees.length === 0) {
-        return message.reply({ embeds: [errorEmbed(message.author, "No Degrees", "You haven't earned any degrees yet. Use `!education` to find a program!")] });
+        return message.reply({ embeds: [errorEmbed(message.author, "No Degrees", `You haven't earned any degrees yet. Use \`${prefix}education\` to find a program!`)] });
     }
 
     const embed = new EmbedBuilder()

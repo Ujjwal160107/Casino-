@@ -51,6 +51,17 @@ export const guildCleanupService = {
 
             if (userIds.length > 0) {
                 // Delete related data for these users
+
+                // Fix: Transactions must be deleted before Wallets due to relation
+                const wallets = await prisma.wallet.findMany({
+                    where: { userId: { in: userIds } },
+                    select: { id: true }
+                });
+                const walletIds = wallets.map(w => w.id);
+                if (walletIds.length > 0) {
+                    await prisma.transaction.deleteMany({ where: { walletId: { in: walletIds } } });
+                }
+
                 await prisma.wallet.deleteMany({ where: { userId: { in: userIds } } });
                 await prisma.bank.deleteMany({ where: { userId: { in: userIds } } });
                 // Transactions handling is tricky if we don't have direct guildId relation, 
@@ -79,6 +90,18 @@ export const guildCleanupService = {
                 await prisma.dailyQuest.deleteMany({ where: { userId: { in: userIds } } });
                 await prisma.workLog.deleteMany({ where: { userId: { in: userIds } } });
 
+                // Additional Cleanup to prevent foreign key errors
+                await prisma.marketListing.deleteMany({ where: { sellerId: { in: userIds } } });
+                await prisma.roleIncomeClaim.deleteMany({ where: { userId: { in: userIds } } });
+                await prisma.marriage.deleteMany({
+                    where: {
+                        OR: [
+                            { spouse1Id: { in: userIds } },
+                            { spouse2Id: { in: userIds } }
+                        ]
+                    }
+                });
+
                 // Finally delete users
                 await prisma.user.deleteMany({ where: { guildId } });
             }
@@ -91,6 +114,8 @@ export const guildCleanupService = {
             await prisma.property.deleteMany({ where: { guildId } });
             await prisma.stock.deleteMany({ where: { guildId } }); // If stocks are guild specific
             await prisma.degree.deleteMany({ where: { guildId } });
+            await prisma.casinoDropConfig.deleteMany({ where: { guildId } });
+            await prisma.commandPermission.deleteMany({ where: { guildId } });
 
             // 3. Delete Guild Config
             await prisma.guildConfig.delete({ where: { guildId } });

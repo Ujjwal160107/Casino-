@@ -1,5 +1,6 @@
 import prisma from "../utils/prisma";
 import { Mascot } from "../config/branding";
+import { getGuildConfig } from "./guildConfigService";
 
 export async function checkAndSeedDegrees(guildId: string) {
     // 1. High School (Foundation)
@@ -399,12 +400,12 @@ export async function reduceStress(userId: string, guildId: string, activity: "s
     if (!user || !user.currentEducation) throw new Error("You are not enrolled.");
 
     const edu = user.currentEducation;
-    let multiplier = 0.5;
-    if (activity === "sports") multiplier = 0.75;
-    if (activity === "gym") multiplier = 0.5;
-    if (activity === "meditation") multiplier = 0.25;
+    const config = await getGuildConfig(guildId);
 
-    const cost = Math.floor(edu.degree.tuitionPerSem * multiplier);
+    let cost = 500;
+    if (activity === "sports") cost = config.sportsCost;
+    if (activity === "gym") cost = config.gymCost;
+    if (activity === "meditation") cost = config.meditationCost;
 
     if (user.wallet!.balance < cost) {
         throw new Error(`You need **${cost}** coins to go to the ${activity}.`);
@@ -416,8 +417,6 @@ export async function reduceStress(userId: string, guildId: string, activity: "s
         case "gym": reduction = 20; break;
         case "meditation": reduction = 15; break;
     }
-
-    // Apply discipline bonus? Maybe simple for now.
 
     const newStress = Math.max(0, edu.stress - reduction);
 
@@ -440,17 +439,9 @@ export async function reduceStress(userId: string, guildId: string, activity: "s
 }
 
 export async function getStressCost(userId: string, guildId: string, activity: "sports" | "gym" | "meditation" = "gym") {
-    const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
-        include: { currentEducation: { include: { degree: true } } }
-    });
-
-    if (!user || !user.currentEducation) return 0;
-
-    let multiplier = 0.5;
-    if (activity === "sports") multiplier = 0.75;
-    if (activity === "gym") multiplier = 0.5;
-    if (activity === "meditation") multiplier = 0.25;
-
-    return Math.floor(user.currentEducation.degree.tuitionPerSem * multiplier);
+    const config = await getGuildConfig(guildId);
+    if (activity === "sports") return config.sportsCost;
+    if (activity === "gym") return config.gymCost;
+    if (activity === "meditation") return config.meditationCost;
+    return 0;
 }

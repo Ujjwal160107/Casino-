@@ -138,6 +138,15 @@ export function getJobsBySector(sector: JobDefinition['sector']) {
 export function getJob(id: string) {
     return JOBS.find(j => j.id === id);
 }
+// Default Multipliers to use when a Sectore Base Pay is set
+export const DEFAULT_LEVEL_MULTIPLIERS: Record<string, number> = {
+    "Intern": 1.0,
+    "Freelance": 1.0,
+    "Junior": 2.0,
+    "Senior": 3.6, // Approx 5500/1500 ~ 3.66
+    "Lead": 5.3,   // Approx 8000/1500 ~ 5.33
+    "Executive": 8.0 // Approx 12000/1500 = 8
+};
 
 // --- Dynamic Pay Implementation ---
 
@@ -162,13 +171,22 @@ export function getJobPaySync(job: JobDefinition, config: GuildConfig | null): n
         }
     }
 
-    // 2. Determine Level Multiplier (Level Config > Default 1.0)
+    // 2. Determine Level Multiplier
+    // Logic: 
+    // - If config has an override for this specific level (e.g. Intern = 1.2), use it.
+    // - ELSE if we are using a Custom Sector Base Pay, use the DEFAULT multiplier (e.g. Senior = 3.6x), 
+    //   otherwise everyone gets the base pay which is wrong.
+    // - ELSE (Using default job.pay, no sector override), use 1.0 because job.pay is already scaled.
+
     let levelMult = 1.0;
-    if (config.jobLevelMultipliers) {
-        const levels = config.jobLevelMultipliers as Record<string, number>;
-        if (levels[job.level]) {
-            levelMult = levels[job.level];
-        }
+    const levelMultipliers = (config.jobLevelMultipliers as Record<string, number>) || {};
+
+    if (levelMultipliers[job.level]) {
+        // Explicit config override found
+        levelMult = levelMultipliers[job.level];
+    } else if (config.jobSectorBasePay && (config.jobSectorBasePay as Record<string, number>)[job.sector]) {
+        // We are using a custom base pay, so we MUST apply a default multiplier if no explicit one is set
+        levelMult = DEFAULT_LEVEL_MULTIPLIERS[job.level] || 1.0;
     }
 
     // Final Calculation
@@ -188,21 +206,45 @@ export async function getJobPay(job: JobDefinition, guildId: string): Promise<nu
 /**
  * Checks if a user is eligible for a promotion based on XP.
  */
-export async function checkPromotion(user: any): Promise<{ eligible: boolean; nextJob: JobDefinition | null; missingXp: number }> {
-    if (!user.jobId) return { eligible: false, nextJob: null, missingXp: 0 };
+export async function checkPromotion(user: any, guildId?: string): Promise<{ eligible: boolean; nextJob: JobDefinition | null; missingXp: number; missingShifts: number }> {
+    if (!user.jobId) return { eligible: false, nextJob: null, missingXp: 0, missingShifts: 0 };
 
     // Find a job that requires this current job as a prereq
     const nextJob = JOBS.find(j => j.reqJobId === user.jobId);
-    if (!nextJob) return { eligible: false, nextJob: null, missingXp: 0 };
+    if (!nextJob) return { eligible: false, nextJob: null, missingXp: 0, missingShifts: 0 };
 
-    const reqXp = nextJob.reqXp || 0;
-    const missingXp = Math.max(0, reqXp - user.jobXp);
+    let reqXp = nextJob.reqXp || 0;
+    let reqShifts = 0; // Default 0
 
-    if (missingXp === 0) {
-        return { eligible: true, nextJob, missingXp: 0 };
+    // Dynamic Requirements
+    if (guildId) {
+        const config = await getGuildConfig(guildId);
+        if (config) {
+            // Check XP Req Override
+            if (config.jobXpReqs) {
+                const xpReqs = config.jobXpReqs as Record<string, number>;
+                if (xpReqs[nextJob.id] !== undefined) {
+                    reqXp = xpReqs[nextJob.id];
+                }
+            }
+            // Check Shifts Req
+            if (config.jobShiftReqs) {
+                const shiftReqs = config.jobShiftReqs as Record<string, number>;
+                if (shiftReqs[nextJob.id] !== undefined) {
+                    reqShifts = shiftReqs[nextJob.id];
+                }
+            }
+        }
     }
 
-    return { eligible: false, nextJob, missingXp };
+    const missingXp = Math.max(0, reqXp - user.jobXp);
+    const missingShifts = Math.max(0, reqShifts - (user.shiftsWorked || 0));
+
+    if (missingXp === 0 && missingShifts === 0) {
+        return { eligible: true, nextJob, missingXp: 0, missingShifts: 0 };
+    }
+
+    return { eligible: false, nextJob, missingXp, missingShifts };
 }
 
 /**
@@ -249,30 +291,41 @@ export async function reduceJobStress(userId: string, guildId: string, activity:
 
     if (!user) throw new Error("User not found.");
 
-    // Calculate Dynamic Cost
-    let basePay = 1000; // Default if unemployed
-    if (user.jobId) {
-        const job = getJob(user.jobId);
-        if (job) {
-            basePay = await getJobPay(job, guildId);
+    // Dynamic Cost Calculation
+    let cost = 0;
+    const config = await getGuildConfig(guildId);
+
+    // Check Config first
+    if (config && config.jobRelaxControllers) {
+        const prices = config.jobRelaxControllers as Record<string, number>;
+        if (prices[activity]) {
+            cost = prices[activity];
         }
     }
 
-    let multiplier = 0.5;
-    let reduction = 20;
+    // Fallback if not configured
+    if (cost === 0) {
+        // Calculate Dynamic Cost based on Pay
+        let basePay = 1000; // Default if unemployed
+        if (user.jobId) {
+            const job = getJob(user.jobId);
+            if (job) {
+                basePay = await getJobPay(job, guildId);
+            }
+        }
 
-    if (activity === "gym") {
-        multiplier = 0.75;
-        reduction = 30;
-    } else if (activity === "sports") {
-        multiplier = 0.5;
-        reduction = 20;
-    } else if (activity === "meditation") {
-        multiplier = 0.25;
-        reduction = 15;
+        let multiplier = 0.5;
+
+        if (activity === "gym") {
+            multiplier = 0.75;
+        } else if (activity === "sports") {
+            multiplier = 0.5;
+        } else if (activity === "meditation") {
+            multiplier = 0.25;
+        }
+
+        cost = Math.floor(basePay * multiplier);
     }
-
-    const cost = Math.floor(basePay * multiplier);
 
     if (user.wallet!.balance < cost) {
         throw new Error(`You need **${cost}** coins to go to the ${activity}.`);

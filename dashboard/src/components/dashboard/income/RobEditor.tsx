@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { DurationInput } from "../ui/DurationInput";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { Switch } from "../../ui/Switch";
 
 interface Role {
     id: string;
@@ -21,6 +22,7 @@ interface RobConfig {
     robImmuneRoles: string[];
     jailTime?: number;
     jailFine?: number;
+    enabled?: boolean;
 }
 
 interface RobEditorProps {
@@ -52,6 +54,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
     };
 
     const toggleRole = (roleId: string) => {
+        if (formData.enabled === false) return;
         setFormData(prev => {
             const exists = prev.robImmuneRoles.includes(roleId);
             if (exists) {
@@ -74,6 +77,10 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
         }
     };
 
+    const handleToggle = (checked: boolean) => {
+        setFormData({ ...formData, enabled: checked });
+    };
+
     // Filter roles for dropdown
     const filteredRoles = availableRoles.filter(r =>
         r.name.toLowerCase().includes(searchRole.toLowerCase()) &&
@@ -81,14 +88,31 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
     ).slice(0, 10); // Limit to 10 suggestions
 
     return (
-        <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6 relative">
-            <div className="flex items-start justify-between mb-6">
+        <div className={`bg-zinc-900/50 border border-white/5 rounded-xl p-6 relative transition-opacity ${formData.enabled === false ? 'opacity-70' : ''}`}>
+            {!formData.enabled && (
+                <div className="absolute inset-0 z-10 bg-black/50 backdrop-blur-[1px] rounded-xl flex items-center justify-center pointer-events-none">
+                    <span className="bg-black/80 px-4 py-2 rounded text-red-400 font-bold uppercase tracking-widest border border-red-500/20 transform -rotate-12">
+                        Robbery Disabled
+                    </span>
+                </div>
+            )}
+
+            <div className="flex items-start justify-between mb-6 relative z-20 pointer-events-auto">
                 <div>
                     <h3 className="text-lg font-bold text-white uppercase tracking-wider flex items-center gap-2">
                         <Shield size={18} className="text-blue-400" />
                         Robbery Settings
                     </h3>
                     <p className="text-sm text-zinc-400">Configure robbery mechanics and immunity.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-zinc-500 uppercase">
+                        {formData.enabled !== false ? "Enabled" : "Disabled"}
+                    </span>
+                    <Switch
+                        checked={formData.enabled !== false}
+                        onCheckedChange={handleToggle}
+                    />
                 </div>
             </div>
 
@@ -102,6 +126,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                         value={formData.robSuccessPct}
                         onChange={(e) => setFormData({ ...formData, robSuccessPct: parseInt(e.target.value) || 0 })}
                         className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+                        disabled={formData.enabled === false}
                     />
                     <p className="text-[10px] text-zinc-600">Base chance to successfully rob someone.</p>
                 </div>
@@ -113,6 +138,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                         value={formData.robFinePct}
                         onChange={(e) => setFormData({ ...formData, robFinePct: parseInt(e.target.value) || 0 })}
                         className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+                        disabled={formData.enabled === false}
                     />
                     <p className="text-[10px] text-zinc-600">Percent of wallet lost if caught.</p>
                 </div>
@@ -121,6 +147,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                         value={formData.robCooldown}
                         onChange={(val) => setFormData({ ...formData, robCooldown: val })}
                         label="Robbery Cooldown"
+                        disabled={formData.enabled === false}
                     />
                 </div>
             </div>
@@ -140,6 +167,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                             onChange={(e) => setFormData({ ...formData, jailFine: parseInt(e.target.value) || 0 })}
                             className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-red-500/50"
                             placeholder="1000"
+                            disabled={formData.enabled === false}
                         />
                         <p className="text-[10px] text-zinc-600">Cost to bail out instantly.</p>
                     </div>
@@ -148,6 +176,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                             value={formData.jailTime || 0}
                             onChange={(val) => setFormData({ ...formData, jailTime: val })}
                             label="Jail Time"
+                            disabled={formData.enabled === false}
                         />
                         <p className="text-[10px] text-zinc-600">Time spent in jail.</p>
                     </div>
@@ -172,11 +201,12 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                                 onChange={(e) => setSearchRole(e.target.value)}
                                 placeholder="Search role or paste ID..."
                                 className="w-full bg-black/40 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
+                                disabled={formData.enabled === false}
                             />
                         </div>
                         <button
                             onClick={handleManualAdd}
-                            disabled={!searchRole}
+                            disabled={!searchRole || formData.enabled === false}
                             className="p-2 bg-blue-600/20 text-blue-400 rounded-lg hover:bg-blue-600/30 disabled:opacity-50"
                             title="Add ID"
                         >
@@ -185,7 +215,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                     </div>
 
                     {/* Results Dropdown */}
-                    {searchRole && filteredRoles.length > 0 && (
+                    {searchRole && filteredRoles.length > 0 && formData.enabled !== false && (
                         <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-white/10 rounded-lg shadow-xl overflow-hidden z-20">
                             {filteredRoles.map(role => (
                                 <button
@@ -229,6 +259,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                                     <button
                                         onClick={() => toggleRole(roleId)}
                                         className="p-1 hover:bg-white/10 rounded-full text-zinc-500 hover:text-red-400 transition-colors"
+                                        disabled={formData.enabled === false}
                                     >
                                         <X size={12} />
                                     </button>
@@ -242,14 +273,14 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                 </div>
             </div>
 
-            <div className="flex justify-end pt-6 mt-6 border-t border-white/5">
+            <div className="flex justify-end pt-6 mt-6 border-t border-white/5 relative z-20 pointer-events-auto">
                 <button
                     onClick={handleSave}
                     disabled={isLoading}
                     className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-500 text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-lg shadow-blue-500/20"
                 >
                     {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-                    Save Rob Settings
+                    Save RobSettings
                 </button>
             </div>
         </div>

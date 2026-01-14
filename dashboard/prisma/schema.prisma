@@ -313,6 +313,11 @@ model GuildConfig {
 
   studyCooldown Int @default(300) // Seconds
 
+  // Stress Relief Costs
+  gymCost        Int @default(500)
+  meditationCost Int @default(250)
+  sportsCost     Int @default(750)
+
   // Banking System Configs
   loanInterestRate Int  @default(5)
   fdInterestRate   Int  @default(10)
@@ -357,6 +362,12 @@ model GuildConfig {
   // Job System Configs
   jobSectorBasePay    Json? @default("{}") // { "tech": 1000 }
   jobLevelMultipliers Json? @default("{}") // { "Intern": 1.0 }
+
+  // New Job Configs
+  jobCooldown         Int      @default(3600) // Seconds
+  jobXpReqs           Json?    @default("{}") // { "tech_junior": 50 }
+  jobShiftReqs        Json?    @default("{}") // { "tech_junior": 20 }
+  jobRelaxControllers Json?    @default("{}") // { "gym": 500, "meditation": 250, "sports": 750 }
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

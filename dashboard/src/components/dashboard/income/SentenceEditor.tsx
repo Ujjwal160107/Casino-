@@ -10,6 +10,7 @@ interface SentenceEditorProps {
     onChange: (sentences: string[]) => void;
     placeholder?: string;
     maxLimit?: number;
+    disabled?: boolean;
 }
 
 export function SentenceEditor({
@@ -18,11 +19,13 @@ export function SentenceEditor({
     sentences = [],
     onChange,
     placeholder = "Type a funny response...",
-    maxLimit = 10
+    maxLimit = 10,
+    disabled = false
 }: SentenceEditorProps) {
     const [newItem, setNewItem] = useState("");
 
     const handleAdd = () => {
+        if (disabled) return;
         if (!newItem.trim()) return;
         if (sentences.length >= maxLimit) return;
 
@@ -31,11 +34,12 @@ export function SentenceEditor({
     };
 
     const handleDelete = (index: number) => {
+        if (disabled) return;
         onChange(sentences.filter((_, i) => i !== index));
     };
 
     return (
-        <div className="bg-black/20 rounded-lg border border-white/5 p-4">
+        <div className={`bg-black/20 rounded-lg border border-white/5 p-4 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
             <div className="flex items-center gap-2 mb-2">
                 <MessageSquare size={16} className="text-zinc-400" />
                 <h4 className="text-sm font-bold text-white">{title}</h4>
@@ -55,6 +59,7 @@ export function SentenceEditor({
                         <button
                             onClick={() => handleDelete(i)}
                             className="text-zinc-600 group-hover:text-red-400 transition-colors p-1"
+                            disabled={disabled}
                         >
                             <Trash2 size={14} />
                         </button>
@@ -69,11 +74,11 @@ export function SentenceEditor({
                     placeholder={placeholder}
                     className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-yellow-500/50 outline-none"
                     onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                    disabled={sentences.length >= maxLimit}
+                    disabled={disabled || sentences.length >= maxLimit}
                 />
                 <button
                     onClick={handleAdd}
-                    disabled={!newItem.trim() || sentences.length >= maxLimit}
+                    disabled={disabled || !newItem.trim() || sentences.length >= maxLimit}
                     className="bg-zinc-800 text-white px-3 py-2 rounded hover:bg-zinc-700 disabled:opacity-50"
                 >
                     <Plus size={16} />
