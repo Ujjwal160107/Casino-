@@ -10,7 +10,16 @@ export default async function JobPage({ params }: { params: Promise<{ guildId: s
         jobSectorBasePay: {},
         jobRelaxControllers: {},
         jobXpReqs: {},
-        jobShiftReqs: {}
+        jobShiftReqs: {},
+        defaultSectorPay: {
+            "tech": 1500,
+            "medical": 2000,
+            "business": 1800,
+            "legal": 2200,
+            "service": 1200,
+            "trade": 1600,
+            "freelance": 1000
+        }
     };
 
     return (
