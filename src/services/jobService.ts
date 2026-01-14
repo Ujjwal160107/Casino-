@@ -327,6 +327,12 @@ export async function reduceJobStress(userId: string, guildId: string, activity:
         cost = Math.floor(basePay * multiplier);
     }
 
+    // Define stress reduction amount based on activity
+    let reduction = 10;
+    if (activity === "gym") reduction = 20;
+    else if (activity === "sports") reduction = 15;
+    else if (activity === "meditation") reduction = 10;
+
     if (user.wallet!.balance < cost) {
         throw new Error(`You need **${cost}** coins to go to the ${activity}.`);
     }
