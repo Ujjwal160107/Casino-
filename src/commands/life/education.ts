@@ -6,6 +6,8 @@ import { getGuildConfig } from "../../services/guildConfigService";
 import { errorEmbed } from "../../utils/embed";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 
+import { getUser } from "../../services/userService";
+
 export async function handleEducation(message: Message, args: string[]) {
     if (!message.guild) return;
     const guildId = message.guild.id;
@@ -13,10 +15,7 @@ export async function handleEducation(message: Message, args: string[]) {
     const config = await getGuildConfig(guildId);
     const prefix = config?.prefix || "!";
 
-    const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
-        include: { currentEducation: { include: { degree: true } }, degrees: { include: { degree: true } } }
-    });
+    const user = await getUser(userId, guildId);
 
     if (!user) return;
 
@@ -106,14 +105,10 @@ export async function handleEducation(message: Message, args: string[]) {
     const degrees = await getDegrees(guildId);
     const myDegreeIds = new Set(user.degrees.map(d => d.degreeId));
 
-    const BANNER_PATH = "C:/Users/ujjwa/.gemini/antigravity/brain/b2dfa908-8bed-421c-a1af-8d2dea50cc66/uploaded_image_1766908422125.png";
-    const bannerAttachment = new AttachmentBuilder(BANNER_PATH, { name: 'uni_banner.png' });
-
     const embed = new EmbedBuilder()
         .setTitle("Education & Careers")
         .setDescription(`**Intelligence:** ${user.intelligence} | **Discipline:** ${user.discipline}\n\nSelect a program to enroll:`)
-        .setColor("#F1C40F")
-        .setImage("attachment://uni_banner.png");
+        .setColor("#F1C40F");
 
     const thumbUrl = getEmoteUrl(Mascot.Emotes.Think);
     if (thumbUrl) embed.setThumbnail(thumbUrl);
@@ -164,7 +159,7 @@ export async function handleEducation(message: Message, args: string[]) {
     embed.addFields(fields);
     embed.setFooter({ text: `Use ${prefix}enroll <name> to start. Warning: Dropping out leaves debt!` });
 
-    message.reply({ embeds: [embed], files: [bannerAttachment] });
+    message.reply({ embeds: [embed] });
 }
 
 export async function handleListDegrees(message: Message) {
@@ -175,10 +170,7 @@ export async function handleListDegrees(message: Message) {
     const config = await getGuildConfig(guildId);
     const prefix = config?.prefix || "!";
 
-    const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
-        include: { degrees: { include: { degree: true } } }
-    });
+    const user = await getUser(userId, guildId);
 
     if (!user || user.degrees.length === 0) {
         return message.reply({ embeds: [errorEmbed(message.author, "No Degrees", `You haven't earned any degrees yet. Use \`${prefix}education\` to find a program!`)] });
