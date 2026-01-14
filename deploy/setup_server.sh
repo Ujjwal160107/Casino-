@@ -33,6 +33,11 @@ fi
 echo ">>> Installing PM2..."
 npm install -g pm2 typescript ts-node
 
+echo ">>> Installing Redis..."
+apt install -y redis-server
+systemctl enable redis-server
+systemctl start redis-server
+
 echo ">>> Installing Nginx..."
 apt install -y nginx
 
