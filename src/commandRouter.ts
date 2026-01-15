@@ -1,4 +1,6 @@
 import { Client, Message } from "discord.js";
+import { checkCommandPermission } from "./services/permissionService";
+import { checkJailStatus } from "./services/jailService";
 import { handleHelp } from "./commands/general/help";
 import { handleCasinoGuide } from "./commands/general/casinoGuide";
 import { handleTutorial } from "./commands/general/tutorial";
@@ -169,7 +171,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     } as Record<string, string>
   )[command] ?? command);
   if (message.guildId) {
-    const { checkCommandPermission } = require("./services/permissionService");
+
     const { allowed, reason } = await checkCommandPermission(message, normalized);
     if (!allowed) {
       if (reason === "This channel is not a designated Casino Channel.") {
@@ -191,7 +193,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
   ];
 
   if (RESTRICTED_IN_JAIL.includes(normalized) && user) {
-    const { checkJailStatus } = require("./services/jailService");
+
     const { isJailed } = await checkJailStatus(user.id);
     if (isJailed) {
       return message.reply({
