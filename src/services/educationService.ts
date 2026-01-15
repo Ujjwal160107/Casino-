@@ -111,7 +111,11 @@ export async function checkAndSeedDegrees(guildId: string) {
 }
 
 export async function getDegrees(guildId: string) {
-    await checkAndSeedDegrees(guildId);
+    // Optimization: Check if degrees exist before running the expensive seed check
+    const count = await prisma.degree.count({ where: { guildId } });
+    if (count < 8) {
+        await checkAndSeedDegrees(guildId);
+    }
     return prisma.degree.findMany({ where: { guildId }, include: { requiredDegree: true }, orderBy: { minIntelligence: 'asc' } });
 }
 

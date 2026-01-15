@@ -3,6 +3,8 @@ module.exports = {
         {
             name: "casino-bot",
             script: "./dist/index.js",
+            instances: 1,
+            exec_mode: "fork",
             node_args: "--max-old-space-size=1536", // optimize for 2GB VPS
             max_memory_restart: "1800M",
             env: {
