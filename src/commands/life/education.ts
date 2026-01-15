@@ -1,4 +1,4 @@
-import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } from "discord.js";
+import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, ComponentType } from "discord.js";
 import { getDegrees } from "../../services/educationService";
 import prisma from "../../utils/prisma";
 import { fmtCurrency } from "../../utils/format";
@@ -17,7 +17,9 @@ export async function handleEducation(message: Message, args: string[]) {
 
     const user = await getUser(userId, guildId);
 
-    if (!user) return;
+    if (!user) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Profile Not Found", `You need to start your journey first. Use \`${prefix}start\` to create a profile!`)] });
+    }
 
     // User Avatar as Thumbnail
     const userAvatar = message.author.displayAvatarURL({ extension: "png", size: 256 });
@@ -101,65 +103,127 @@ export async function handleEducation(message: Message, args: string[]) {
         return message.reply({ embeds: [embed], components: [row] });
     }
 
-    // 2. Not Enrolled View (List Schools)
+    // 2. Not Enrolled View (List Schools) - PAGINATED
     const degrees = await getDegrees(guildId);
     const myDegreeIds = new Set(user.degrees.map(d => d.degreeId));
 
-    const embed = new EmbedBuilder()
-        .setTitle("Education & Careers")
-        .setDescription(`**Intelligence:** ${user.intelligence} | **Discipline:** ${user.discipline}\n\nSelect a program to enroll:`)
-        .setColor("#F1C40F");
+    if (degrees.length === 0) {
+        return message.reply({ embeds: [errorEmbed(message.author, "No Degrees Found", "There are no degrees available in this server currently.")] });
+    }
 
-    const thumbUrl = getEmoteUrl(Mascot.Emotes.Think);
-    if (thumbUrl) embed.setThumbnail(thumbUrl);
+    const ITEMS_PER_PAGE = 5;
+    const totalPages = Math.ceil(degrees.length / ITEMS_PER_PAGE);
+    let currentPage = 0;
 
-    const fields = degrees.map(d => {
-        const isCompleted = myDegreeIds.has(d.id);
-        const hasPrereq = !d.requiredDegreeId || myDegreeIds.has(d.requiredDegreeId);
-        const hasInt = user.intelligence >= d.minIntelligence;
+    const generateEmbed = (pageIndex: number) => {
+        const start = pageIndex * ITEMS_PER_PAGE;
+        const end = start + ITEMS_PER_PAGE;
+        const pageDegrees = degrees.slice(start, end);
 
-        let statusIcon = "";
-        let statusText = "";
-        let reqText = "";
+        const embed = new EmbedBuilder()
+            .setTitle("Education & Careers")
+            .setDescription(`**Intelligence:** ${user.intelligence} | **Discipline:** ${user.discipline}\n\nSelect a program to enroll:`)
+            .setColor("#F1C40F")
+            .setFooter({ text: `Page ${pageIndex + 1} of ${totalPages} • Use ${prefix}enroll <name> to start` });
 
-        if (isCompleted) {
-            statusIcon = Mascot.Emotes.Accept;
-            statusText = "Completed";
-            reqText = "None";
-        } else {
-            // Check Requirements
-            const missing = [];
-            if (!hasPrereq) {
-                const reqName = d.requiredDegree ? d.requiredDegree.name : "Prerequisite Degree";
-                missing.push(`Need ${reqName}`);
-            }
-            if (!hasInt) {
-                missing.push(`Need ${d.minIntelligence} Int`);
-            }
+        const thumbUrl = getEmoteUrl(Mascot.Emotes.Think);
+        if (thumbUrl) embed.setThumbnail(thumbUrl);
 
-            if (missing.length > 0) {
-                statusIcon = Mascot.Emotes.Decline;
-                statusText = "Locked";
-                reqText = missing.join(", ");
-            } else {
+        const fields = pageDegrees.map(d => {
+            const isCompleted = myDegreeIds.has(d.id);
+            const hasPrereq = !d.requiredDegreeId || myDegreeIds.has(d.requiredDegreeId);
+            const hasInt = user.intelligence >= d.minIntelligence;
+
+            let statusIcon = "";
+            let statusText = "";
+            let reqText = "";
+
+            if (isCompleted) {
                 statusIcon = Mascot.Emotes.Accept;
-                statusText = "Open";
-                reqText = "Eligible";
-            }
-        }
+                statusText = "Completed";
+                reqText = "None";
+            } else {
+                // Check Requirements
+                const missing = [];
+                if (!hasPrereq) {
+                    const reqName = d.requiredDegree ? d.requiredDegree.name : "Prerequisite Degree";
+                    missing.push(`Need ${reqName}`);
+                }
+                if (!hasInt) {
+                    missing.push(`Need ${d.minIntelligence} Int`);
+                }
 
-        const displayName = d.name.includes(d.type) ? d.name : `${d.name} (${d.type})`;
-        return {
-            name: `${statusIcon} ${displayName}`,
-            value: `**Status:** ${statusText}\n**Degree Fee:** ${fmtCurrency(d.tuitionPerSem, config.currencyEmoji)}\n**Reqs:** ${reqText}`,
-            inline: false
-        };
+                if (missing.length > 0) {
+                    statusIcon = Mascot.Emotes.Decline;
+                    statusText = "Locked";
+                    reqText = missing.join(", ");
+                } else {
+                    statusIcon = Mascot.Emotes.Accept;
+                    statusText = "Open";
+                    reqText = "Eligible";
+                }
+            }
+
+            const displayName = d.name.includes(d.type) ? d.name : `${d.name} (${d.type})`;
+            return {
+                name: `${statusIcon} ${displayName}`,
+                value: `**Status:** ${statusText}\n**Degree Fee:** ${fmtCurrency(d.tuitionPerSem, config.currencyEmoji)}\n**Reqs:** ${reqText}`,
+                inline: false
+            };
+        });
+
+        embed.addFields(fields);
+        return embed;
+    };
+
+    const generateRow = (pageIndex: number) => {
+        return new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+                .setCustomId("edu_prev")
+                .setLabel("Previous")
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(pageIndex === 0),
+            new ButtonBuilder()
+                .setCustomId("edu_next")
+                .setLabel("Next")
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(pageIndex === totalPages - 1)
+        );
+    };
+
+    const reply = await message.reply({
+        embeds: [generateEmbed(currentPage)],
+        components: totalPages > 1 ? [generateRow(currentPage)] : []
     });
 
-    embed.addFields(fields);
-    embed.setFooter({ text: `Use ${prefix}enroll <name> to start. Warning: Dropping out leaves debt!` });
+    if (totalPages > 1) {
+        const collector = reply.createMessageComponentCollector({
+            componentType: ComponentType.Button,
+            time: 120000,
+            filter: (i) => i.user.id === message.author.id
+        });
 
-    message.reply({ embeds: [embed] });
+        collector.on('collect', async (i) => {
+            if (i.customId === "edu_prev") {
+                currentPage = Math.max(0, currentPage - 1);
+            } else if (i.customId === "edu_next") {
+                currentPage = Math.min(totalPages - 1, currentPage + 1);
+            }
+
+            try {
+                await i.update({
+                    embeds: [generateEmbed(currentPage)],
+                    components: [generateRow(currentPage)]
+                });
+            } catch (e) {
+                console.error("Failed to update education interaction:", e);
+            }
+        });
+
+        collector.on('end', () => {
+            reply.edit({ components: [] }).catch(() => { });
+        });
+    }
 }
 
 export async function handleListDegrees(message: Message) {
