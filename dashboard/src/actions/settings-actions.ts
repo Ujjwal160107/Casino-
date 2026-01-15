@@ -45,6 +45,8 @@ export async function updateGeneralSettings(guildId: string, data: {
         if (data.startMoney < 0) throw new Error("Starting money cannot be negative");
         if (data.currencyName.length > 32) throw new Error("Currency name too long");
 
+        console.log(`[Dashboard] Updating settings for ${guildId}. New Prefix: "${data.prefix}"`); // DEBUG LOG
+
         await prisma.guildConfig.upsert({
             where: { guildId },
             update: {
