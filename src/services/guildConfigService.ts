@@ -13,11 +13,12 @@ export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
     return cached;
   }
 
-  // 2. Fetch DB
-  let cfg = await prisma.guildConfig.findUnique({ where: { guildId } });
-  if (!cfg) {
-    cfg = await prisma.guildConfig.create({ data: { guildId } });
-  }
+  // 2. Fetch or Create DB (Upsert to avoid race conditions)
+  const cfg = await prisma.guildConfig.upsert({
+    where: { guildId },
+    create: { guildId },
+    update: {},
+  });
 
   // 3. Set Cache
   await redisService.set(key, cfg, CACHE_TTL);
