@@ -33,24 +33,15 @@ export async function handlePing(message: Message) {
     const memory = process.memoryUsage();
     const ramUsed = (memory.rss / 1024 / 1024).toFixed(2);
 
-    // Technical Dashboard Look (Code Block, No Emojis)
-    // Using simple ASCII or box drawing for a clean console look
-    const dashboard = `
-SYSTEM STATUS DASHBOARD
-=========================
-[ Latency Metrics ]
-• API Response : ${apiLatency}ms
-• WebSocket    : ${wsLatency}ms
-• Database     : ${dbLatency}ms
-• Redis Cache  : ${redisLatency}ms
+    const embed = new EmbedBuilder()
+        .setTitle("System Status Dashboard")
+        .setColor("#2b2d31") // Dark/Technical gray
+        .addFields(
+            { name: "Latency Metrics", value: `**API Response:** ${apiLatency}ms\n**WebSocket:** ${wsLatency}ms\n**Database:** ${dbLatency}ms\n**Redis Cache:** ${redisLatency}ms`, inline: true },
+            { name: "System Health", value: `**Uptime:** ${uptimeHrs}h ${uptimeMins}m\n**RAM Usage:** ${ramUsed} MB\n**Status:** ONLINE`, inline: true }
+        )
+        .setFooter({ text: `Requested by ${message.author.tag}`, iconURL: message.author.displayAvatarURL() })
+        .setTimestamp();
 
-[ System Health ]
-• Uptime       : ${uptimeHrs}h ${uptimeMins}m
-• RAM Usage    : ${ramUsed} MB
-• Status       : ONLINE
-=========================
-`;
-
-    // Edit the message with the dashboard
-    await msg.edit({ content: `\`\`\`prolog\n${dashboard}\n\`\`\`` }); // Prolog syntax highlighting usually gives nice colors for comments/numbers
+    await msg.edit({ content: null, embeds: [embed] });
 }
