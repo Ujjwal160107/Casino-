@@ -17,9 +17,31 @@ export async function getUser(userId: string, guildId: string): Promise<UserWith
     // 1. Try Cache
     const cached = await redisService.get<UserWithRelations>(key);
     if (cached) {
-        // Deserialize dates if necessary (JSON.parse makes dates strings)
-        // For simple display this might be fine, but rigorous usage might need hydration
-        return cached;
+        return hydrateDates(cached);
+    } // End of cache check
+
+    function hydrateDates(obj: any): any {
+        if (obj === null || obj === undefined) return obj;
+        if (typeof obj !== 'object') return obj;
+
+        if (Array.isArray(obj)) {
+            return obj.map(v => hydrateDates(v));
+        }
+
+        for (const key of Object.keys(obj)) {
+            const value = obj[key];
+            if (typeof value === 'string') {
+                // Heuristic: Key ends in At/Time/Date and looks like a valid date
+                const isDateKey = key.endsWith('At') || key.endsWith('Time') || key.endsWith('Date');
+                // Also check specifically for known fields if heuristic is risky, but for this app it's safely consistent.
+                if (isDateKey && !isNaN(Date.parse(value))) {
+                    obj[key] = new Date(value);
+                }
+            } else if (typeof value === 'object') {
+                hydrateDates(value);
+            }
+        }
+        return obj;
     }
 
     // 2. Fetch from DB
