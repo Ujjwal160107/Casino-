@@ -203,6 +203,12 @@ export async function routeMessage(client: Client, message: Message, prefix: str
   switch (normalized) {
     case "addemoji":
       return handleAddEmoji(message, args);
+    case "ping":
+    case "latency": {
+      const { handlePing } = require("./commands/general/ping");
+      return handlePing(message);
+    }
+
     case "help":
       return handleHelp(message);
     case "casino":
