@@ -72,7 +72,7 @@ export async function handleJobs(message: Message) {
 
             embed.addFields({
                 name: `${job.title} (\`${job.id}\`)`,
-                value: `💰 **${fmtCurrency(getJobPaySync(job, config), config?.currencyEmoji)}** / shift\n📚 ${reqText}`,
+                value: `**${fmtCurrency(getJobPaySync(job, config), config?.currencyEmoji)}** / shift ${reqText}`,
                 inline: false
             });
         }
@@ -93,8 +93,8 @@ export async function handleJobs(message: Message) {
 
         const row1 = new ActionRowBuilder<ButtonBuilder>()
             .addComponents(
-                new ButtonBuilder().setCustomId("sector_tech").setLabel("Tech").setEmoji(Mascot.Emotes.JobTech).setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId("sector_medical").setLabel("Medical").setEmoji(Mascot.Emotes.JobMedical).setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId("sector_tech").setLabel("Tech").setEmoji(Mascot.Emotes.JobTech).setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId("sector_medical").setLabel("Medical").setEmoji(Mascot.Emotes.JobMedical).setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder().setCustomId("sector_business").setLabel("Business").setEmoji(Mascot.Emotes.JobBusiness).setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder().setCustomId("sector_legal").setLabel("Legal").setEmoji(Mascot.Emotes.JobLegal).setStyle(ButtonStyle.Secondary),
             );
