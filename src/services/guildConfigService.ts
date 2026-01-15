@@ -10,12 +10,12 @@ export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
   // 1. Try Cache
   const cached = await redisService.get<GuildConfig>(key);
   if (cached) {
+    console.log(`[Config] 🟢 Cache HIT for ${guildId}. Prefix: "${cached.prefix}"`);
     return cached;
   }
 
-  // 2. Fetch or Create DB (Manual Atomic Check)
-  // This is more robust than upsert for high-concurrency MongoDB handling
-  console.log(`[Config] Fetching config for ${guildId}`);
+  // 2. Fetch or Create DB
+  console.log(`[Config] 🟡 Cache MISS for ${guildId}. Fetching from DB...`);
 
   let cfg = await prisma.guildConfig.findUnique({ where: { guildId } });
 
@@ -24,7 +24,6 @@ export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
       cfg = await prisma.guildConfig.create({ data: { guildId } });
     } catch (error: any) {
       if (error.code === 'P2002') {
-        // Race condition hit: someone else created it just now. Fetch it.
         cfg = await prisma.guildConfig.findUnique({ where: { guildId } });
       } else {
         throw error;
@@ -32,8 +31,10 @@ export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
     }
   }
 
-  // Double check (should never happen unless DB is dying)
+  // Double check
   if (!cfg) throw new Error("Failed to fetch or create guild config");
+
+  console.log(`[Config] 🔵 DB Result for ${guildId}. Prefix: "${cfg.prefix}"`);
 
   // 3. Set Cache
   await redisService.set(key, cfg, CACHE_TTL);

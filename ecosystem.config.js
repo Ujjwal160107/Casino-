@@ -19,7 +19,8 @@ module.exports = {
             max_memory_restart: "500M",
             env: {
                 NODE_ENV: "production",
-                PORT: 3000
+                PORT: 3000,
+                NEXTAUTH_SECRET: "c404fd60b722051dfe1c9d57984682e1c5261b96e85" // Hardcoded for VPS reliability
             }
         }
     ]
