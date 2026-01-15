@@ -65,7 +65,9 @@ export async function updateGeneralSettings(guildId: string, data: {
         });
 
         // Invalidate Bot Cache
+        console.log(`[Dashboard] Invalidating cache for guild: ${guildId}`);
         await redis.del(`guild_config:${guildId}`);
+        console.log(`[Dashboard] Cache invalidated.`);
 
         revalidatePath(`/dashboard/${guildId}`);
         return { success: true };
