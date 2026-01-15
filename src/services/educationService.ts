@@ -1,6 +1,7 @@
 import prisma from "../utils/prisma";
 import { Mascot } from "../config/branding";
 import { getGuildConfig } from "./guildConfigService";
+import { invalidateUserCache } from "./userService";
 
 export async function checkAndSeedDegrees(guildId: string) {
     // 1. High School (Foundation)
@@ -152,7 +153,7 @@ export async function enroll(userId: string, guildId: string, degreeId: string) 
         throw new Error(`Insufficient funds for Degree Fee (${degree.tuitionPerSem}).`);
     }
 
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
         await tx.wallet.update({
             where: { id: user.wallet!.id },
             data: { balance: { decrement: degree.tuitionPerSem } }
@@ -169,6 +170,9 @@ export async function enroll(userId: string, guildId: string, degreeId: string) 
             include: { degree: true }
         });
     });
+
+    await invalidateUserCache(userId, guildId);
+    return result;
 }
 
 export async function study(userId: string, guildId: string, bonusGpa: number = 0) {
@@ -271,6 +275,8 @@ export async function study(userId: string, guildId: string, bonusGpa: number = 
         }
     });
 
+    await invalidateUserCache(userId, guildId);
+
     let scholarship: { milestone: number, amount: number } | null = null;
     const floorGpa = Math.floor(newGpa);
     if ([9, 10].includes(floorGpa)) {
@@ -343,6 +349,8 @@ export async function takeExam(userId: string, guildId: string): Promise<{ succe
         ...(boostEffect ? [prisma.activeEffect.delete({ where: { id: boostEffect.id } })] : [])
     ]);
 
+    await invalidateUserCache(userId, guildId);
+
     return { success: true, msg: `You have completed your **${deg.name}** with Final Intelligence Score: **${edu.currentGpa.toFixed(1)}**!`, finalGpa: edu.currentGpa };
 }
 
@@ -374,6 +382,8 @@ export async function claimScholarship(userId: string, guildId: string, mileston
         })
     ]);
 
+    await invalidateUserCache(userId, guildId);
+
     return amount;
 }
 
@@ -389,6 +399,8 @@ export async function dropout(userId: string, guildId: string) {
 
     // Just delete the enrollment. Tuition is already paid (sunk cost).
     await prisma.userEducation.delete({ where: { id: user.currentEducation.id } });
+
+    await invalidateUserCache(userId, guildId);
 
 
 
@@ -424,7 +436,7 @@ export async function reduceStress(userId: string, guildId: string, activity: "s
 
     const newStress = Math.max(0, edu.stress - reduction);
 
-    await prisma.$transaction([
+    const result = await prisma.$transaction([
         prisma.wallet.update({
             where: { id: user.wallet!.id },
             data: { balance: { decrement: cost } }
@@ -434,6 +446,8 @@ export async function reduceStress(userId: string, guildId: string, activity: "s
             data: { stress: newStress }
         })
     ]);
+
+    await invalidateUserCache(userId, guildId);
 
     return {
         newStress,
