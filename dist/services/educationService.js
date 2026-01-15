@@ -14,6 +14,8 @@ exports.reduceStress = reduceStress;
 exports.getStressCost = getStressCost;
 const prisma_1 = __importDefault(require("../utils/prisma"));
 const branding_1 = require("../config/branding");
+const guildConfigService_1 = require("./guildConfigService");
+const userService_1 = require("./userService");
 async function checkAndSeedDegrees(guildId) {
     // 1. High School (Foundation)
     let hs = await prisma_1.default.degree.findFirst({ where: { guildId, name: "High School Diploma" } });
@@ -122,7 +124,11 @@ async function checkAndSeedDegrees(guildId) {
     }
 }
 async function getDegrees(guildId) {
-    await checkAndSeedDegrees(guildId);
+    // Optimization: Check if degrees exist before running the expensive seed check
+    const count = await prisma_1.default.degree.count({ where: { guildId } });
+    if (count < 8) {
+        await checkAndSeedDegrees(guildId);
+    }
     return prisma_1.default.degree.findMany({ where: { guildId }, include: { requiredDegree: true }, orderBy: { minIntelligence: 'asc' } });
 }
 async function enroll(userId, guildId, degreeId) {
@@ -155,7 +161,7 @@ async function enroll(userId, guildId, degreeId) {
     if (user.wallet.balance < degree.tuitionPerSem) {
         throw new Error(`Insufficient funds for Degree Fee (${degree.tuitionPerSem}).`);
     }
-    return prisma_1.default.$transaction(async (tx) => {
+    const result = await prisma_1.default.$transaction(async (tx) => {
         await tx.wallet.update({
             where: { id: user.wallet.id },
             data: { balance: { decrement: degree.tuitionPerSem } }
@@ -171,6 +177,8 @@ async function enroll(userId, guildId, degreeId) {
             include: { degree: true }
         });
     });
+    await (0, userService_1.invalidateUserCache)(userId, guildId);
+    return result;
 }
 async function study(userId, guildId, bonusGpa = 0) {
     const user = await prisma_1.default.user.findUnique({
@@ -256,6 +264,7 @@ async function study(userId, guildId, bonusGpa = 0) {
             lastStudy: new Date()
         }
     });
+    await (0, userService_1.invalidateUserCache)(userId, guildId);
     let scholarship = null;
     const floorGpa = Math.floor(newGpa);
     if ([9, 10].includes(floorGpa)) {
@@ -319,6 +328,7 @@ async function takeExam(userId, guildId) {
         // Remove the boost effect as it is used
         ...(boostEffect ? [prisma_1.default.activeEffect.delete({ where: { id: boostEffect.id } })] : [])
     ]);
+    await (0, userService_1.invalidateUserCache)(userId, guildId);
     return { success: true, msg: `You have completed your **${deg.name}** with Final Intelligence Score: **${edu.currentGpa.toFixed(1)}**!`, finalGpa: edu.currentGpa };
 }
 async function claimScholarship(userId, guildId, milestone) {
@@ -347,6 +357,7 @@ async function claimScholarship(userId, guildId, milestone) {
             data: { scholarshipsClaimed: { push: milestone } }
         })
     ]);
+    await (0, userService_1.invalidateUserCache)(userId, guildId);
     return amount;
 }
 async function dropout(userId, guildId) {
@@ -359,6 +370,7 @@ async function dropout(userId, guildId) {
     const degreeName = user.currentEducation.degree.name;
     // Just delete the enrollment. Tuition is already paid (sunk cost).
     await prisma_1.default.userEducation.delete({ where: { id: user.currentEducation.id } });
+    await (0, userService_1.invalidateUserCache)(userId, guildId);
     return { degreeName };
 }
 async function reduceStress(userId, guildId, activity) {
@@ -369,14 +381,14 @@ async function reduceStress(userId, guildId, activity) {
     if (!user || !user.currentEducation)
         throw new Error("You are not enrolled.");
     const edu = user.currentEducation;
-    let multiplier = 0.5;
+    const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
+    let cost = 500;
     if (activity === "sports")
-        multiplier = 0.75;
+        cost = config.sportsCost;
     if (activity === "gym")
-        multiplier = 0.5;
+        cost = config.gymCost;
     if (activity === "meditation")
-        multiplier = 0.25;
-    const cost = Math.floor(edu.degree.tuitionPerSem * multiplier);
+        cost = config.meditationCost;
     if (user.wallet.balance < cost) {
         throw new Error(`You need **${cost}** coins to go to the ${activity}.`);
     }
@@ -392,9 +404,8 @@ async function reduceStress(userId, guildId, activity) {
             reduction = 15;
             break;
     }
-    // Apply discipline bonus? Maybe simple for now.
     const newStress = Math.max(0, edu.stress - reduction);
-    await prisma_1.default.$transaction([
+    const result = await prisma_1.default.$transaction([
         prisma_1.default.wallet.update({
             where: { id: user.wallet.id },
             data: { balance: { decrement: cost } }
@@ -404,6 +415,7 @@ async function reduceStress(userId, guildId, activity) {
             data: { stress: newStress }
         })
     ]);
+    await (0, userService_1.invalidateUserCache)(userId, guildId);
     return {
         newStress,
         cost,
@@ -411,19 +423,13 @@ async function reduceStress(userId, guildId, activity) {
     };
 }
 async function getStressCost(userId, guildId, activity = "gym") {
-    const user = await prisma_1.default.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
-        include: { currentEducation: { include: { degree: true } } }
-    });
-    if (!user || !user.currentEducation)
-        return 0;
-    let multiplier = 0.5;
+    const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
     if (activity === "sports")
-        multiplier = 0.75;
+        return config.sportsCost;
     if (activity === "gym")
-        multiplier = 0.5;
+        return config.gymCost;
     if (activity === "meditation")
-        multiplier = 0.25;
-    return Math.floor(user.currentEducation.degree.tuitionPerSem * multiplier);
+        return config.meditationCost;
+    return 0;
 }
 //# sourceMappingURL=educationService.js.map

@@ -279,14 +279,14 @@ async function handleButton(interaction) {
         let footerText = "";
         // Promotion
         if (xpGain > 0) {
-            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain });
+            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
             if (promoCheck.eligible && promoCheck.nextJob) {
                 // Determine if we show celebration or just footer
                 // Let's just note it for now, implementation plan says Celebration later
                 footerText = `🎉 Promotion Available: ${promoCheck.nextJob.title}`;
             }
             else if (promoCheck.nextJob) {
-                footerText = `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingXp} XP to go)`;
+                footerText = `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingXp} xp, ${promoCheck.missingShifts} shifts to go)`;
             }
         }
         // Demotion
@@ -303,7 +303,7 @@ async function handleButton(interaction) {
         const eventRows = [];
         if (xpGain > 0) {
             // Re-check promotion to get the object
-            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain });
+            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
             if (promoCheck.eligible && promoCheck.nextJob) {
                 resEmbed.addFields({ name: `${branding_1.Mascot.Emotes.JobPromotion} Promotion Available!`, value: `You have qualified for **${promoCheck.nextJob.title}**!` });
                 resEmbed.setColor("#F1C40F");
@@ -311,11 +311,10 @@ async function handleButton(interaction) {
                     .setCustomId(`promote_confirm_${promoCheck.nextJob.id}`)
                     .setLabel(`Check Eligibility: ${promoCheck.nextJob.title}`)
                     .setStyle(discord_js_1.ButtonStyle.Success)
-                    .setEmoji(branding_1.Mascot.Emotes.JobPromotion) // Use custom emoji for button too? Or keeps arrow? Button was "⬆️" before. User said NO DEFAULT EMOJIS.
-                ));
+                    .setEmoji(branding_1.Mascot.Emotes.JobPromotion)));
             }
             else if (promoCheck.nextJob) {
-                resEmbed.setFooter({ text: `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingXp} XP to go)` });
+                resEmbed.setFooter({ text: `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingXp} xp, ${promoCheck.missingShifts} shifts to go)` });
             }
         }
         else if (footerText) {
@@ -396,9 +395,8 @@ async function handleButton(interaction) {
             return interaction.followUp({ content: "Invalid job.", ephemeral: true });
         }
         // Cooldown check
-        const incomeConfig = await prisma_1.default.incomeConfig.findUnique({
-            where: { guildId_commandKey: { guildId: guild.id, commandKey: "work" } }
-        });
+        const config = await (0, guildConfigService_1.getGuildConfig)(guild.id);
+        const cooldownSeconds = config.jobCooldown || 3600;
         // Check Active Effects (Permanent Buffs)
         const activeEffects = await prisma_1.default.activeEffect.findMany({
             where: {
@@ -421,10 +419,9 @@ async function handleButton(interaction) {
         }
         const lastShift = userData.lastShift ? new Date(userData.lastShift).getTime() : 0;
         const now = Date.now();
-        let cooldownSeconds = incomeConfig ? incomeConfig.cooldown : 0; // Default 0 if not set
         // Apply Reductions
-        cooldownSeconds = Math.max(0, cooldownSeconds - cooldownRed);
-        const cooldownMs = cooldownSeconds * 1000;
+        const finalCooldown = Math.max(0, cooldownSeconds - cooldownRed);
+        const cooldownMs = finalCooldown * 1000;
         if (now - lastShift < cooldownMs) {
             const remaining = Math.ceil((cooldownMs - (now - lastShift)) / 60000);
             await interaction.deleteReply().catch(() => { });
@@ -443,9 +440,11 @@ async function handleButton(interaction) {
                         jobStress: { increment: 5 } // Even more stress
                     }
                 });
+                const config = await (0, guildConfigService_1.getGuildConfig)(guild.id);
+                const prefix = config?.prefix || "!";
                 const burnoutEmbed = new discord_js_1.EmbedBuilder()
                     .setTitle(`${branding_1.Mascot.Emotes.Alert} BURNOUT!`)
-                    .setDescription(`You are too stressed to work well! You collapsed from exhaustion.\n\n**Stress Level:** ${userData.jobStress}/100\n\nUse \`!relax\` to recover before working again.`)
+                    .setDescription(`You are too stressed to work well! You collapsed from exhaustion.\n\n**Stress Level:** ${userData.jobStress}/100\n\nUse \`${prefix}relax\` to recover before working again.`)
                     .setColor("#E74C3C")
                     .setThumbnail((0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Fail));
                 await interaction.deleteReply().catch(() => { });
@@ -585,7 +584,7 @@ async function handleButton(interaction) {
             });
             // Check Promotion
             // We use the UPDATED jobXp (add 10 to current)
-            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + 10 });
+            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + 10, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
             const config = await (0, guildConfigService_1.getGuildConfig)(guild.id);
             const winEmbed = new discord_js_1.EmbedBuilder()
                 .setAuthor({ name: `${user.username}`, iconURL: user.displayAvatarURL() })
@@ -606,7 +605,7 @@ async function handleButton(interaction) {
                     .setEmoji(branding_1.Mascot.Emotes.JobPromotion)));
             }
             else if (promoCheck.nextJob) {
-                winEmbed.setFooter({ text: `Next Job: ${promoCheck.nextJob.title} (Need ${promoCheck.missingXp} more XP)` });
+                winEmbed.setFooter({ text: `Next Job: ${promoCheck.nextJob.title} (Need ${promoCheck.missingXp} xp, ${promoCheck.missingShifts} shifts)` });
             }
             // Disable buttons on the original game embed
             await interaction.editReply({ components: [] });

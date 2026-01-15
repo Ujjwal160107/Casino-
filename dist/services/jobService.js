@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.JOBS = exports.JOB_ACTIONS = exports.WORK_EVENTS = void 0;
+exports.DEFAULT_LEVEL_MULTIPLIERS = exports.JOBS = exports.JOB_ACTIONS = exports.WORK_EVENTS = void 0;
 exports.getWorkEvent = getWorkEvent;
 exports.getJobAction = getJobAction;
 exports.getJobsBySector = getJobsBySector;
@@ -100,6 +100,15 @@ function getJobsBySector(sector) {
 function getJob(id) {
     return exports.JOBS.find(j => j.id === id);
 }
+// Default Multipliers to use when a Sectore Base Pay is set
+exports.DEFAULT_LEVEL_MULTIPLIERS = {
+    "Intern": 1.0,
+    "Freelance": 1.0,
+    "Junior": 2.0,
+    "Senior": 3.6, // Approx 5500/1500 ~ 3.66
+    "Lead": 5.3, // Approx 8000/1500 ~ 5.33
+    "Executive": 8.0 // Approx 12000/1500 = 8
+};
 // --- Dynamic Pay Implementation ---
 const guildConfigService_1 = require("./guildConfigService");
 /**
@@ -119,13 +128,21 @@ function getJobPaySync(job, config) {
             basePay = sectorPay;
         }
     }
-    // 2. Determine Level Multiplier (Level Config > Default 1.0)
+    // 2. Determine Level Multiplier
+    // Logic: 
+    // - If config has an override for this specific level (e.g. Intern = 1.2), use it.
+    // - ELSE if we are using a Custom Sector Base Pay, use the DEFAULT multiplier (e.g. Senior = 3.6x), 
+    //   otherwise everyone gets the base pay which is wrong.
+    // - ELSE (Using default job.pay, no sector override), use 1.0 because job.pay is already scaled.
     let levelMult = 1.0;
-    if (config.jobLevelMultipliers) {
-        const levels = config.jobLevelMultipliers;
-        if (levels[job.level]) {
-            levelMult = levels[job.level];
-        }
+    const levelMultipliers = config.jobLevelMultipliers || {};
+    if (levelMultipliers[job.level]) {
+        // Explicit config override found
+        levelMult = levelMultipliers[job.level];
+    }
+    else if (config.jobSectorBasePay && config.jobSectorBasePay[job.sector]) {
+        // We are using a custom base pay, so we MUST apply a default multiplier if no explicit one is set
+        levelMult = exports.DEFAULT_LEVEL_MULTIPLIERS[job.level] || 1.0;
     }
     // Final Calculation
     const finalPay = Math.round(basePay * levelMult);
@@ -142,19 +159,41 @@ async function getJobPay(job, guildId) {
 /**
  * Checks if a user is eligible for a promotion based on XP.
  */
-async function checkPromotion(user) {
+async function checkPromotion(user, guildId) {
     if (!user.jobId)
-        return { eligible: false, nextJob: null, missingXp: 0 };
+        return { eligible: false, nextJob: null, missingXp: 0, missingShifts: 0 };
     // Find a job that requires this current job as a prereq
     const nextJob = exports.JOBS.find(j => j.reqJobId === user.jobId);
     if (!nextJob)
-        return { eligible: false, nextJob: null, missingXp: 0 };
-    const reqXp = nextJob.reqXp || 0;
-    const missingXp = Math.max(0, reqXp - user.jobXp);
-    if (missingXp === 0) {
-        return { eligible: true, nextJob, missingXp: 0 };
+        return { eligible: false, nextJob: null, missingXp: 0, missingShifts: 0 };
+    let reqXp = nextJob.reqXp || 0;
+    let reqShifts = 0; // Default 0
+    // Dynamic Requirements
+    if (guildId) {
+        const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
+        if (config) {
+            // Check XP Req Override
+            if (config.jobXpReqs) {
+                const xpReqs = config.jobXpReqs;
+                if (xpReqs[nextJob.id] !== undefined) {
+                    reqXp = xpReqs[nextJob.id];
+                }
+            }
+            // Check Shifts Req
+            if (config.jobShiftReqs) {
+                const shiftReqs = config.jobShiftReqs;
+                if (shiftReqs[nextJob.id] !== undefined) {
+                    reqShifts = shiftReqs[nextJob.id];
+                }
+            }
+        }
     }
-    return { eligible: false, nextJob, missingXp };
+    const missingXp = Math.max(0, reqXp - user.jobXp);
+    const missingShifts = Math.max(0, reqShifts - (user.shiftsWorked || 0));
+    if (missingXp === 0 && missingShifts === 0) {
+        return { eligible: true, nextJob, missingXp: 0, missingShifts: 0 };
+    }
+    return { eligible: false, nextJob, missingXp, missingShifts };
 }
 /**
  * Checks if a user should be demoted due to low XP.
@@ -197,29 +236,46 @@ async function reduceJobStress(userId, guildId, activity) {
     });
     if (!user)
         throw new Error("User not found.");
-    // Calculate Dynamic Cost
-    let basePay = 1000; // Default if unemployed
-    if (user.jobId) {
-        const job = getJob(user.jobId);
-        if (job) {
-            basePay = await getJobPay(job, guildId);
+    // Dynamic Cost Calculation
+    let cost = 0;
+    const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
+    // Check Config first
+    if (config && config.jobRelaxControllers) {
+        const prices = config.jobRelaxControllers;
+        if (prices[activity]) {
+            cost = prices[activity];
         }
     }
-    let multiplier = 0.5;
-    let reduction = 20;
-    if (activity === "gym") {
-        multiplier = 0.75;
-        reduction = 30;
+    // Fallback if not configured
+    if (cost === 0) {
+        // Calculate Dynamic Cost based on Pay
+        let basePay = 1000; // Default if unemployed
+        if (user.jobId) {
+            const job = getJob(user.jobId);
+            if (job) {
+                basePay = await getJobPay(job, guildId);
+            }
+        }
+        let multiplier = 0.5;
+        if (activity === "gym") {
+            multiplier = 0.75;
+        }
+        else if (activity === "sports") {
+            multiplier = 0.5;
+        }
+        else if (activity === "meditation") {
+            multiplier = 0.25;
+        }
+        cost = Math.floor(basePay * multiplier);
     }
-    else if (activity === "sports") {
-        multiplier = 0.5;
+    // Define stress reduction amount based on activity
+    let reduction = 10;
+    if (activity === "gym")
         reduction = 20;
-    }
-    else if (activity === "meditation") {
-        multiplier = 0.25;
+    else if (activity === "sports")
         reduction = 15;
-    }
-    const cost = Math.floor(basePay * multiplier);
+    else if (activity === "meditation")
+        reduction = 10;
     if (user.wallet.balance < cost) {
         throw new Error(`You need **${cost}** coins to go to the ${activity}.`);
     }

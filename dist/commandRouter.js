@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.routeMessage = routeMessage;
 const help_1 = require("./commands/general/help");
 const casinoGuide_1 = require("./commands/general/casinoGuide");
-const guide_1 = require("./commands/general/guide");
+const tutorial_1 = require("./commands/general/tutorial");
 const setPrefix_1 = require("./commands/admin/setPrefix");
 const setIncome_1 = require("./commands/admin/setIncome");
 const setIncomeCooldown_1 = require("./commands/admin/setIncomeCooldown");
@@ -199,6 +199,11 @@ async function routeMessage(client, message, prefix) {
     switch (normalized) {
         case "addemoji":
             return (0, addEmoji_1.handleAddEmoji)(message, args);
+        case "ping":
+        case "latency": {
+            const { handlePing } = require("./commands/general/ping");
+            return handlePing(message);
+        }
         case "help":
             return (0, help_1.handleHelp)(message);
         case "casino":
@@ -207,7 +212,8 @@ async function routeMessage(client, message, prefix) {
         case "casino-guide":
             return (0, casinoGuide_1.handleCasinoGuide)(message);
         case "guide":
-            return (0, guide_1.handleGuide)(message);
+        case "tutorial":
+            return (0, tutorial_1.handleTutorial)(message);
         case "setincome":
         case "set-income":
             return (0, setIncome_1.handleSetIncome)(message, args);
@@ -256,8 +262,8 @@ async function routeMessage(client, message, prefix) {
         case "monthly":
             return (0, monthly_1.handleMonthly)(message);
         case "quests":
+        case "quest":
         case "dailyquest":
-        case "missions":
         case "missions":
         case "daily-quests":
         case "dailyquests":
@@ -337,6 +343,7 @@ async function routeMessage(client, message, prefix) {
         case "cock-fight":
             return (0, cockfight_1.handleCockFight)(message, args);
         case "chicken":
+        case "cock":
             const { handleChicken } = require("./commands/games/chicken");
             return handleChicken(message, args);
         case "feed":

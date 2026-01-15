@@ -19,8 +19,8 @@ async function handleAdminViewConfig(message, args) {
         const cfg = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
         // Formatting Helpers
         const formatPct = (val) => `${val ?? 0}%`;
-        const formatLimit = (val) => val ? val.toLocaleString() : "Unlimited";
-        const formatMoney = (val) => `${cfg.currencyEmoji} ${val.toLocaleString()}`;
+        const formatLimit = (val) => val ? val.toLocaleString('en-US') : "Unlimited";
+        const formatMoney = (val) => `${cfg.currencyEmoji} ${val.toLocaleString('en-US')}`;
         // Job Formatters
         const sectors = cfg.jobSectorBasePay || {};
         const levels = cfg.jobLevelMultipliers || {};

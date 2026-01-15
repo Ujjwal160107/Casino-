@@ -119,6 +119,8 @@ exports.Mascot = {
         Watermelonm: "<:watermelonm:1456569041094312119>",
         XpEmpty: "<:xp_empty:1456569044315537550>",
         XpFull: "<:xp_full:1456569047758929931>",
+        Shop: "<:market:1456568979815399475>",
+        Stonks: "<:graph_up:1456568970504048722>",
     },
     Images: {
         Main: path_1.default.join(process.cwd(), "src", "assets", "guide_banner.png")

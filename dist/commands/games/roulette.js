@@ -215,7 +215,7 @@ async function handleBet(message, args) {
         .setDescription(`**Result:** ${displayColor} **${spin}**\n` +
         `**Your Bet:** ${choiceRaw}\n` +
         `**${didWin ? "Won" : "Lost"}:** ${(0, format_1.fmtCurrency)(didWin ? payout : amount, emoji)}`)
-        .setFooter({ text: `${branding_1.Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet.balance - amount + payout).toLocaleString()}` });
+        .setFooter({ text: `${branding_1.Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet.balance - amount + payout).toLocaleString('en-US')}` });
     return message.reply({ content: `<@${message.author.id}>`, embeds: [resultEmbed] });
 }
 //# sourceMappingURL=roulette.js.map

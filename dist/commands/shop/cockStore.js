@@ -88,6 +88,7 @@ async function handleStoreUI(message) {
     const guildId = message.guildId;
     const config = await (0, guildConfigService_1.getGuildConfig)(guildId);
     const currencyEmoji = config.currencyEmoji || "🪙";
+    const prefix = config.prefix || "!";
     const EMOJI_CHICKEN = gameConfig_1.GameConfig.Emojis.Chicken;
     const EMOJI_SPEAR = gameConfig_1.GameConfig.Emojis.MenuSpear;
     const EMOJI_SHIELD = gameConfig_1.GameConfig.Emojis.MenuShield;
@@ -113,13 +114,13 @@ Use the menu below to browse different categories.
 
 **Categories:**
 ${EMOJI_SPEAR} **Spears** (Weapons) - Increase Strength
-${EMOJI_SHIELD} **Armor** (Shields) - Increase Defense
+${EMOJI_SHIELD} **Armour** (Shields) - Increase Defense
 ${EMOJI_BOOTS} **Boots** (Accessories) - Increase Agility
 
-*Use \`!cs buy <item name>\` to purchase.*`);
+*Use \`${prefix}cs buy <item name>\` to purchase.*`);
         }
         else {
-            const catName = category === "weapon" ? `Spears ${EMOJI_SPEAR}` : category === "armor" ? `Armor ${EMOJI_SHIELD}` : `Boots ${EMOJI_BOOTS}`;
+            const catName = category === "weapon" ? `Spears ${EMOJI_SPEAR}` : category === "armor" ? `Armour ${EMOJI_SHIELD}` : `Boots ${EMOJI_BOOTS}`;
             embed.setTitle(`${EMOJI_CHICKEN} Cock Store: ${catName}`);
             // Filter
             const items = gameConfig_1.GameConfig.PredefinedItems.filter(p => p.type === category);
@@ -134,13 +135,13 @@ ${EMOJI_BOOTS} **Boots** (Accessories) - Increase Agility
                 embed.setDescription(desc);
             }
         }
-        embed.setFooter({ text: "Use !cs buy <item name> to purchase!" });
+        embed.setFooter({ text: `Use ${prefix}cs buy <item name> to purchase!` });
         return embed;
     };
     const menu = new discord_js_1.StringSelectMenuBuilder()
         .setCustomId("cs_menu")
         .setPlaceholder("Select a Category")
-        .addOptions(new discord_js_1.StringSelectMenuOptionBuilder().setLabel("Spears (Weapons)").setValue("weapon").setEmoji(getEmojiId(EMOJI_SPEAR)), new discord_js_1.StringSelectMenuOptionBuilder().setLabel("Armor").setValue("armor").setEmoji(getEmojiId(EMOJI_SHIELD)), new discord_js_1.StringSelectMenuOptionBuilder().setLabel("Boots (Accessories)").setValue("accessory").setEmoji(getEmojiId(EMOJI_BOOTS)));
+        .addOptions(new discord_js_1.StringSelectMenuOptionBuilder().setLabel("Spears (Weapons)").setValue("weapon").setEmoji(getEmojiId(EMOJI_SPEAR)), new discord_js_1.StringSelectMenuOptionBuilder().setLabel("Armour").setValue("armor").setEmoji(getEmojiId(EMOJI_SHIELD)), new discord_js_1.StringSelectMenuOptionBuilder().setLabel("Boots (Accessories)").setValue("accessory").setEmoji(getEmojiId(EMOJI_BOOTS)));
     const row = new discord_js_1.ActionRowBuilder().addComponents(menu);
     const reply = await message.reply({ embeds: [generateEmbed("welcome")], components: [row], files: [file] });
     const collector = reply.createMessageComponentCollector({ componentType: discord_js_1.ComponentType.StringSelect, time: 60000 });
@@ -181,8 +182,16 @@ async function handleBuy(message, args) {
             await (0, shopService_1.createShopItem)(message.guildId, preDef.name, preDef.defaultPrice, preDef.description, undefined, "EQUIPMENT", undefined, false, "GAMES");
         }
         // -------------------------
+        // -------------------------
         await (0, shopService_1.buyItem)(message.guildId, message.author.id, preDef.name, message.member);
-        return message.reply(`${branding_1.Mascot.Emotes.Accept} You successfully bought **${preDef.name}**! Don't forget to \`!equip ${preDef.name}\`!`);
+        const config = await (0, guildConfigService_1.getGuildConfig)(message.guildId);
+        const prefix = config.prefix || "!";
+        const embed = new discord_js_1.EmbedBuilder()
+            .setTitle(`${branding_1.Mascot.Emotes.Accept} Purchase Successful`)
+            .setDescription(`You successfully bought **${preDef.name}**!\n\n**Tip:** Don't forget to equip it using:\n\`${prefix}equip ${preDef.name}\``)
+            .setColor("#00FF00")
+            .setThumbnail(message.author.displayAvatarURL());
+        return message.reply({ embeds: [embed] });
     }
     catch (e) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Purchase Failed", e.message || "Unknown error")] });

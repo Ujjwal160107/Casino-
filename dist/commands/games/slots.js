@@ -124,7 +124,7 @@ async function handleSlots(message, args) {
         (win
             ? `**JACKPOT!** You won **${(0, format_1.fmtCurrency)(payout, emoji)}**! (x${multiplier})`
             : `Better luck next time... You lost **${(0, format_1.fmtCurrency)(amount, emoji)}**.`))
-        .setFooter({ text: `${branding_1.Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet.balance - amount + payout).toLocaleString()}` });
+        .setFooter({ text: `${branding_1.Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet.balance - amount + payout).toLocaleString('en-US')}` });
     if (win) {
         const url = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Money);
         if (url)

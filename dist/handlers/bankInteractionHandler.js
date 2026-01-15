@@ -30,7 +30,7 @@ async function handleButton(interaction) {
                 .setTitle(`<:bankk:1445689134181126167> ${user.username}'s Financial Dashboard`)
                 .setColor("#FFD700")
                 .setDescription(`Welcome to the ${config.currencyName} Bank.`)
-                .addFields({ name: "<:MoneyBag:1446970451606896781> Net Worth", value: `${config.currencyEmoji} ${summary.netWorth.toLocaleString()}`, inline: true }, { name: "<a:credits:1445689337172721716> Credit Score", value: `${summary.creditScore}`, inline: true }, {
+                .addFields({ name: "<:MoneyBag:1446970451606896781> Net Worth", value: `${config.currencyEmoji} ${summary.netWorth.toLocaleString('en-US')}`, inline: true }, { name: "<a:credits:1445689337172721716> Credit Score", value: `${summary.creditScore}`, inline: true }, {
                 name: "<:OnLoan:1446971056865935381> Active Loans", value: summary.activeLoans.length > 0
                     ? `**${summary.activeLoans.length} Active**\nOldest due: <t:${Math.floor(summary.activeLoans[0].dueDate.getTime() / 1000)}:R>`
                     : "None", inline: true
@@ -127,7 +127,7 @@ async function handleButton(interaction) {
                 .setTitle(`<:bankk:1445689134181126167> ${user.username}'s Financial Dashboard`)
                 .setColor("#FFD700")
                 .setDescription(`Welcome to the ${config.currencyName} Bank.`)
-                .addFields({ name: "<:MoneyBag:1446970451606896781> Net Worth", value: `${config.currencyEmoji} ${summary.netWorth.toLocaleString()}`, inline: true }, { name: "<a:credits:1445689337172721716> Credit Score", value: `${summary.creditScore}`, inline: true }, {
+                .addFields({ name: "<:MoneyBag:1446970451606896781> Net Worth", value: `${config.currencyEmoji} ${summary.netWorth.toLocaleString('en-US')}`, inline: true }, { name: "<a:credits:1445689337172721716> Credit Score", value: `${summary.creditScore}`, inline: true }, {
                 name: "<:OnLoan:1446971056865935381> Active Loans", value: summary.activeLoans.length > 0
                     ? `**${summary.activeLoans.length} Active**`
                     : "None", inline: true

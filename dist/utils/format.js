@@ -2,11 +2,15 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseBetAmount = exports.parseSmartAmount = exports.parseDurationToDays = exports.parseDuration = exports.formatDuration = exports.fmtAmount = exports.fmtCurrency = void 0;
 const fmtCurrency = (amount, emoji = "🪙") => {
-    return `${emoji} ${amount.toLocaleString()}`;
+    if (amount >= 2147483647)
+        return `${emoji} ∞`;
+    return `${emoji} ${amount.toLocaleString('en-US')}`;
 };
 exports.fmtCurrency = fmtCurrency;
 const fmtAmount = (amount) => {
-    return amount.toLocaleString();
+    if (amount >= 2147483647)
+        return "∞";
+    return amount.toLocaleString('en-US');
 };
 exports.fmtAmount = fmtAmount;
 const formatDuration = (ms) => {

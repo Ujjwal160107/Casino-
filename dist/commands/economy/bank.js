@@ -42,7 +42,7 @@ async function execute(message, args) {
         .setColor(branding_1.Mascot.Colors.Base)
         .setThumbnail(user.displayAvatarURL())
         .setDescription(`Welcome to the ${config.currencyName} Bank. Manage your assets and liabilities here.`)
-        .addFields({ name: `${branding_1.Mascot.Emotes.Money} Net Worth`, value: `${config.currencyEmoji} ${summary.netWorth.toLocaleString()}`, inline: true }, { name: "<a:credits:1445689337172721716> Credit Score", value: `${summary.creditScore}`, inline: true }, {
+        .addFields({ name: `${branding_1.Mascot.Emotes.Money} Net Worth`, value: `${config.currencyEmoji} ${summary.netWorth.toLocaleString('en-US')}`, inline: true }, { name: "<a:credits:1445689337172721716> Credit Score", value: `${summary.creditScore}`, inline: true }, {
         name: `${config.currencyEmoji} Active Loans`, value: summary.activeLoans.length > 0
             ? `**${summary.activeLoans.length} Active**\n(Use \`${config.prefix}credit\` for details)`
             : "None", inline: true

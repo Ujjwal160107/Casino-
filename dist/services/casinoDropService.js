@@ -22,7 +22,7 @@ exports.CasinoDropService = {
             const thumbUrl = (0, branding_1.getEmoteUrl)(branding_1.Mascot.Emotes.Lootbox);
             const embed = new discord_js_1.EmbedBuilder()
                 .setTitle(`${branding_1.Mascot.Emotes.FortunaSparkle} Casino Drop!`)
-                .setDescription(`${branding_1.Mascot.Emotes.FortunaMoney} A money bag has been dropped! First to claim gets it!\n\n**Amount:** ${currencyEmoji} ${amount.toLocaleString()}`)
+                .setDescription(`${branding_1.Mascot.Emotes.FortunaMoney} A money bag has been dropped! First to claim gets it!\n\n**Amount:** ${currencyEmoji} ${amount.toLocaleString('en-US')}`)
                 .setColor("#FFD700")
                 .setFooter({ text: "Click the button below to claim!", iconURL: client.user?.displayAvatarURL() });
             if (thumbUrl)
@@ -77,7 +77,7 @@ exports.CasinoDropService = {
             await (0, walletService_1.depositToWallet)(user.wallet.id, amount, { source: "casino_drop", dropId }, true, interaction.guildId);
             const claimEmbed = new discord_js_1.EmbedBuilder()
                 .setColor("#00FF00")
-                .setDescription(`${branding_1.Mascot.Emotes.Success} **${interaction.user.username}** claimed the drop of **${config.currencyEmoji} ${amount.toLocaleString()}**!`);
+                .setDescription(`${branding_1.Mascot.Emotes.Success} **${interaction.user.username}** claimed the drop of **${config.currencyEmoji} ${amount.toLocaleString('en-US')}**!`);
             await interaction.followUp({ embeds: [claimEmbed] });
             // LOGGING
             if (interaction.guild) {
@@ -85,7 +85,7 @@ exports.CasinoDropService = {
                     guild: interaction.guild,
                     type: "ECONOMY",
                     title: "Casino Drop Claimed",
-                    description: `**User:** ${interaction.user.toString()}\n**Amount:** ${config.currencyEmoji} ${amount.toLocaleString()}\n**Channel:** ${interaction.channel?.toString()}`,
+                    description: `**User:** ${interaction.user.toString()}\n**Amount:** ${config.currencyEmoji} ${amount.toLocaleString('en-US')}\n**Channel:** ${interaction.channel?.toString()}`,
                     color: 0x00FF00,
                     thumbnail: interaction.user.displayAvatarURL()
                 });

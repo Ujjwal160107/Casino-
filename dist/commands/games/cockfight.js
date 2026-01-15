@@ -246,6 +246,7 @@ async function runCockFight(originalMsg, gameMsg, p1, p2, bet, chickenItemId) {
         .addFields({ name: `${p1.username}`, value: "No bets yet.", inline: true }, { name: `${p2.username}`, value: "No bets yet.", inline: true });
     const betRow = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId(`bet_p1`).setLabel(`Bet on ${p1.username}`).setStyle(discord_js_1.ButtonStyle.Primary), new discord_js_1.ButtonBuilder().setCustomId(`bet_p2`).setLabel(`Bet on ${p2.username}`).setStyle(discord_js_1.ButtonStyle.Primary));
     await gameMsg.edit({ embeds: [bettingEmbed], components: [betRow], files: [vsImage] });
+    let bettingClosed = false;
     const betCollector = gameMsg.createMessageComponentCollector({ componentType: discord_js_1.ComponentType.Button, time: betTimeMs });
     betCollector.on("collect", async (i) => {
         if (i.user.id === p1.id || i.user.id === p2.id) {
@@ -268,6 +269,10 @@ async function runCockFight(originalMsg, gameMsg, p1, p2, bet, chickenItemId) {
         await i.showModal(modal);
         try {
             const submit = await i.awaitModalSubmit({ time: 30000 });
+            if (bettingClosed) {
+                await submit.reply({ content: "Bets are closed!", ephemeral: true });
+                return;
+            }
             await submit.deferReply({ ephemeral: true });
             const amount = parseInt(submit.fields.getTextInputValue("amount"));
             if (isNaN(amount) || amount <= 0) {
@@ -284,7 +289,18 @@ async function runCockFight(originalMsg, gameMsg, p1, p2, bet, chickenItemId) {
                 await submit.editReply({ content: `Insufficient funds. Needed **${amount}** but you have **${bettorWallet?.balance ?? 0}**.` });
                 return;
             }
-            await prisma_1.default.wallet.update({ where: { userId: bettorDbId }, data: { balance: { decrement: amount } } });
+            // Re-check closed just in case
+            if (bettingClosed) {
+                await submit.editReply({ content: "Bets closed while you were typing!" });
+                return;
+            }
+            try {
+                await prisma_1.default.wallet.update({ where: { userId: bettorDbId }, data: { balance: { decrement: amount } } });
+            }
+            catch (err) {
+                await submit.editReply({ content: "Transaction failed. Please try again." });
+                return;
+            }
             sideBets.push({ userId: submit.user.id, username: submit.user.username, amount, target });
             pot += amount;
             await submit.editReply({ content: `Placed bet of **${amount}** on **${targetName}**!` });
@@ -296,14 +312,31 @@ async function runCockFight(originalMsg, gameMsg, p1, p2, bet, chickenItemId) {
                 p2List = p2List.slice(0, 990) + "... (more)";
             const p1Total = sideBets.filter(b => b.target === "p1").reduce((a, b) => a + b.amount, 0);
             const p2Total = sideBets.filter(b => b.target === "p2").reduce((a, b) => a + b.amount, 0);
-            bettingEmbed.setFields({ name: `${p1.username} (Total: ${p1Total})`, value: p1List, inline: true }, { name: `${p2.username} (Total: ${p2Total})`, value: p2List, inline: true });
-            bettingEmbed.setDescription(`**Main Pot:** ${pot}\nSide Bets Open...`);
-            await gameMsg.edit({ embeds: [bettingEmbed] });
+            // Avoid race condition on message edit if bets closed
+            if (!bettingClosed) {
+                bettingEmbed.setFields({ name: `${p1.username} (Total: ${p1Total})`, value: p1List, inline: true }, { name: `${p2.username} (Total: ${p2Total})`, value: p2List, inline: true });
+                bettingEmbed.setDescription(`**Main Pot:** ${pot}\nSide Bets Open...`);
+                await gameMsg.edit({ embeds: [bettingEmbed] }).catch(() => { });
+            }
         }
         catch (e) {
+            console.error("Side bet error:", e);
+            // If interaction timed out, we can't reply. 
+            // If it was a logic error after defer, we can editReply.
+            // Check if it's a timeout error
+            if (e.code === 'InteractionCollectorError') {
+                // User didn't submit in time.
+                // We can't reply to 'i' anymore if showModal was called? 
+                // Actually showModal answers 'i'. The timeout is on 'awaitModalSubmit'.
+                // There is no interaction to reply to for the ERROR strictly speaking, except 'i' which is done.
+                return;
+            }
+            // Try to notify if possible
+            // We don't have access to 'submit' variable here easily unless we scope it out, but it might be undefined if awaitModalSubmit failed.
         }
     });
     betCollector.on("end", async (collected, reason) => {
+        bettingClosed = true;
         const p1Id = await getUserId(p1.id, guildId);
         const p1Inv = await prisma_1.default.inventory.findUnique({ where: { userId_shopItemId: { userId: p1Id, shopItemId: chickenItemId } } });
         const p1Meta = p1Inv?.meta || {};

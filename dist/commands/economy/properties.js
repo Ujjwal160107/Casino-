@@ -12,8 +12,10 @@ const propertiesHandler = async (message, args) => {
     const userId = message.author.id;
     const guildConfig = await (0, guildConfigService_1.getGuildConfig)(guildId);
     const prefix = guildConfig.prefix || "!";
+    const currencyEmoji = guildConfig.currencyEmoji || "🪙";
     // Banner Image
-    const bannerPath = "C:/Users/ujjwa/.gemini/antigravity/brain/53146123-dc6c-4f9e-af36-1452d87996f0/uploaded_image_1767341302816.png";
+    // Banner Image
+    const bannerPath = "./assets/property_banner.png";
     const bannerFile = new discord_js_1.AttachmentBuilder(bannerPath, { name: 'property-banner.png' });
     // !properties (Shop)
     if (!subCommand) {
@@ -31,7 +33,7 @@ const propertiesHandler = async (message, args) => {
             properties.forEach(p => {
                 embed.addFields({
                     name: `${p.name} (${p.key})`,
-                    value: `${branding_1.Mascot.Emotes.Price} **Price:** ${(0, format_1.fmtCurrency)(p.price)}\n${branding_1.Mascot.Emotes.Graph} **Base Price:** ${(0, format_1.fmtCurrency)(p.basePrice)}\n${branding_1.Mascot.Emotes.MoneyBag} **Income:** ${(0, format_1.fmtCurrency)(p.incomePerCycle)}/${p.incomeCycleHours}h\n${branding_1.Mascot.Emotes.Trade} **Sold:** ${p.totalSold}`,
+                    value: `${branding_1.Mascot.Emotes.Price} **Price:** ${(0, format_1.fmtCurrency)(p.price, currencyEmoji)}\n${branding_1.Mascot.Emotes.Graph} **Base Price:** ${(0, format_1.fmtCurrency)(p.basePrice, currencyEmoji)}\n${branding_1.Mascot.Emotes.MoneyBag} **Income:** ${(0, format_1.fmtCurrency)(p.incomePerCycle, currencyEmoji)}/${p.incomeCycleHours}h\n${branding_1.Mascot.Emotes.Trade} **Sold:** ${p.totalSold}`,
                     inline: true
                 });
             });

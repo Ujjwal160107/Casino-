@@ -108,10 +108,15 @@ async function handleJobs(message) {
         else if (i.customId === "jobs_next") {
             currentPage = Math.min(SECTORS.length - 1, currentPage + 1);
         }
-        await i.update({
-            embeds: [generateEmbed(currentPage)],
-            components: [generateRow(currentPage)]
-        });
+        try {
+            await i.update({
+                embeds: [generateEmbed(currentPage)],
+                components: [generateRow(currentPage)]
+            });
+        }
+        catch (e) {
+            console.error("Failed to update jobs interaction:", e);
+        }
     });
     collector.on('end', () => {
         reply.edit({ components: [] }).catch(() => { });

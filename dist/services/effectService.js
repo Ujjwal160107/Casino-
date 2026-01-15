@@ -119,7 +119,7 @@ async function applyEffect(userId, guildId, effect, member) {
                 await logEffectAction(client, guildId, "MONEY", `Granted ${effect.amount} coins to <@${userId}>`);
             }
             return {
-                message: `💰 Received ${effect.amount.toLocaleString()} coins!`,
+                message: `💰 Received ${effect.amount.toLocaleString('en-US')} coins!`,
                 type: "MONEY"
             };
         case "LEVEL_BOOST":

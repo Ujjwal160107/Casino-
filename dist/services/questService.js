@@ -120,6 +120,7 @@ async function updateQuestProgress(userId, type, amount = 1) {
         });
     }
 }
+const guildConfigService_1 = require("./guildConfigService");
 async function claimQuestReward(userId) {
     const today = new Date().toISOString().split("T")[0];
     const quest = await prisma_1.default.dailyQuest.findUnique({
@@ -131,6 +132,10 @@ async function claimQuestReward(userId) {
         return { success: false, message: "Quests not completed yet." };
     if (quest.rewardClaimed)
         return { success: false, message: "Reward already claimed." };
+    const config = await (0, guildConfigService_1.getGuildConfig)(quest.guildId);
+    // Use dynamic config or fallback to defaults (although getGuildConfig should handle defaults, strict typing might miss new fields if client update failed)
+    const pay = config.questPay ?? 2500;
+    const xpReward = config.questXp ?? 100;
     await prisma_1.default.$transaction([
         prisma_1.default.dailyQuest.update({
             where: { id: quest.id },
@@ -138,14 +143,14 @@ async function claimQuestReward(userId) {
         }),
         prisma_1.default.wallet.upsert({
             where: { userId },
-            update: { balance: { increment: exports.QUEST_REWARD.money } },
-            create: { userId, balance: exports.QUEST_REWARD.money }
+            update: { balance: { increment: pay } },
+            create: { userId, balance: pay }
         }),
         prisma_1.default.user.update({
             where: { id: userId },
-            data: { xp: { increment: exports.QUEST_REWARD.xp } }
+            data: { xp: { increment: xpReward } }
         })
     ]);
-    return { success: true, reward: exports.QUEST_REWARD };
+    return { success: true, reward: { money: pay, xp: xpReward } };
 }
 //# sourceMappingURL=questService.js.map

@@ -17,12 +17,18 @@ async function handleAddMoney(message, args) {
     if (!message.member || !(await (0, permissionUtils_1.canExecuteAdminCommand)(message, message.member))) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Access Denied", "You need Administrator or Bot Commander permissions.")] });
     }
+    // Cap at 32-bit signed integer max to prevent DB crashes
+    const MAX_INT = 2147483647;
     if (args.length < 2) {
         return message.reply({ embeds: [(0, embed_1.errorEmbed)(message.author, "Invalid Usage", "Usage: `!add-money @user/@role <amount> [wallet/bank]`")] });
     }
     const mention = args[0];
     const amountStr = args[1];
-    const amount = (0, format_1.parseSmartAmount)(amountStr);
+    let amount = (0, format_1.parseSmartAmount)(amountStr);
+    // Cap amount to prevent DB crashes and handle "Infinity" request
+    if (amount === Infinity || amount > MAX_INT) {
+        amount = MAX_INT;
+    }
     const typeArg = args[2]?.toLowerCase();
     const targetType = typeArg === "bank" ? "bank" : "wallet";
     if (isNaN(amount) || amount <= 0) {
@@ -119,8 +125,9 @@ async function handleAddMoney(message, args) {
             description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Amount:** +${(0, format_1.fmtCurrency)(amount, emoji)}\n**New Bank Balance:** ${(0, format_1.fmtCurrency)(updatedBank.balance, emoji)}`,
             color: 0x00FF00
         });
+        const displayAmount = amount === MAX_INT ? "Infinity" : (0, format_1.fmtCurrency)(amount, emoji);
         return message.reply({
-            embeds: [(0, embed_1.successEmbed)(message.author, "Money Added", `Added **${(0, format_1.fmtCurrency)(amount, emoji)}** to ${mention}'s **Bank**.\nNew Balance: **${(0, format_1.fmtCurrency)(updatedBank.balance, emoji)}**`)]
+            embeds: [(0, embed_1.successEmbed)(message.author, "Money Added", `Added **${displayAmount}** to ${mention}'s **Bank**.\nNew Balance: **${(0, format_1.fmtCurrency)(updatedBank.balance, emoji)}**`)]
         });
     }
     else {
@@ -155,8 +162,9 @@ async function handleAddMoney(message, args) {
                 description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Amount:** +${(0, format_1.fmtCurrency)(amount, emoji)}\n**New Wallet Balance:** ${(0, format_1.fmtCurrency)(updatedWallet.balance, emoji)}`,
                 color: 0x00FF00
             });
+            const displayAmount = amount === MAX_INT ? "Infinity" : (0, format_1.fmtCurrency)(amount, emoji);
             return message.reply({
-                embeds: [(0, embed_1.successEmbed)(message.author, "Money Added", `Added **${(0, format_1.fmtCurrency)(amount, emoji)}** to ${mention}'s **Wallet**.\nNew Balance: **${(0, format_1.fmtCurrency)(updatedWallet.balance, emoji)}**`)]
+                embeds: [(0, embed_1.successEmbed)(message.author, "Money Added", `Added **${displayAmount}** to ${mention}'s **Wallet**.\nNew Balance: **${(0, format_1.fmtCurrency)(updatedWallet.balance, emoji)}**`)]
             });
         }
     }

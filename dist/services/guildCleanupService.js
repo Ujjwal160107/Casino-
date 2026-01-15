@@ -54,6 +54,15 @@ exports.guildCleanupService = {
             const userIds = users.map(u => u.id);
             if (userIds.length > 0) {
                 // Delete related data for these users
+                // Fix: Transactions must be deleted before Wallets due to relation
+                const wallets = await prisma_1.default.wallet.findMany({
+                    where: { userId: { in: userIds } },
+                    select: { id: true }
+                });
+                const walletIds = wallets.map(w => w.id);
+                if (walletIds.length > 0) {
+                    await prisma_1.default.transaction.deleteMany({ where: { walletId: { in: walletIds } } });
+                }
                 await prisma_1.default.wallet.deleteMany({ where: { userId: { in: userIds } } });
                 await prisma_1.default.bank.deleteMany({ where: { userId: { in: userIds } } });
                 // Transactions handling is tricky if we don't have direct guildId relation, 
@@ -79,6 +88,17 @@ exports.guildCleanupService = {
                 await prisma_1.default.portfolio.deleteMany({ where: { userId: { in: userIds } } });
                 await prisma_1.default.dailyQuest.deleteMany({ where: { userId: { in: userIds } } });
                 await prisma_1.default.workLog.deleteMany({ where: { userId: { in: userIds } } });
+                // Additional Cleanup to prevent foreign key errors
+                await prisma_1.default.marketListing.deleteMany({ where: { sellerId: { in: userIds } } });
+                await prisma_1.default.roleIncomeClaim.deleteMany({ where: { userId: { in: userIds } } });
+                await prisma_1.default.marriage.deleteMany({
+                    where: {
+                        OR: [
+                            { spouse1Id: { in: userIds } },
+                            { spouse2Id: { in: userIds } }
+                        ]
+                    }
+                });
                 // Finally delete users
                 await prisma_1.default.user.deleteMany({ where: { guildId } });
             }
@@ -90,6 +110,8 @@ exports.guildCleanupService = {
             await prisma_1.default.property.deleteMany({ where: { guildId } });
             await prisma_1.default.stock.deleteMany({ where: { guildId } }); // If stocks are guild specific
             await prisma_1.default.degree.deleteMany({ where: { guildId } });
+            await prisma_1.default.casinoDropConfig.deleteMany({ where: { guildId } });
+            await prisma_1.default.commandPermission.deleteMany({ where: { guildId } });
             // 3. Delete Guild Config
             await prisma_1.default.guildConfig.delete({ where: { guildId } });
             console.log(`[GuildCleanup] Permanently deleted guild ${guildId}.`);
