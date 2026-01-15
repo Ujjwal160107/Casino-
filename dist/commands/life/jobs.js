@@ -63,7 +63,7 @@ async function handleJobs(message) {
             }
             embed.addFields({
                 name: `${job.title} (\`${job.id}\`)`,
-                value: `💰 **${(0, format_1.fmtCurrency)((0, jobService_1.getJobPaySync)(job, config), config?.currencyEmoji)}** / shift\n📚 ${reqText}`,
+                value: `**${(0, format_1.fmtCurrency)((0, jobService_1.getJobPaySync)(job, config), config?.currencyEmoji)}** / shift ${reqText}`,
                 inline: false
             });
         }
@@ -78,7 +78,7 @@ async function handleJobs(message) {
         // Row 1: Tech, Med, Biz, Legal
         // Row 2: Service, Trade, Freelance
         const row1 = new discord_js_1.ActionRowBuilder()
-            .addComponents(new discord_js_1.ButtonBuilder().setCustomId("sector_tech").setLabel("Tech").setEmoji(branding_1.Mascot.Emotes.JobTech).setStyle(discord_js_1.ButtonStyle.Primary), new discord_js_1.ButtonBuilder().setCustomId("sector_medical").setLabel("Medical").setEmoji(branding_1.Mascot.Emotes.JobMedical).setStyle(discord_js_1.ButtonStyle.Success), new discord_js_1.ButtonBuilder().setCustomId("sector_business").setLabel("Business").setEmoji(branding_1.Mascot.Emotes.JobBusiness).setStyle(discord_js_1.ButtonStyle.Secondary), new discord_js_1.ButtonBuilder().setCustomId("sector_legal").setLabel("Legal").setEmoji(branding_1.Mascot.Emotes.JobLegal).setStyle(discord_js_1.ButtonStyle.Secondary));
+            .addComponents(new discord_js_1.ButtonBuilder().setCustomId("sector_tech").setLabel("Tech").setEmoji(branding_1.Mascot.Emotes.JobTech).setStyle(discord_js_1.ButtonStyle.Secondary), new discord_js_1.ButtonBuilder().setCustomId("sector_medical").setLabel("Medical").setEmoji(branding_1.Mascot.Emotes.JobMedical).setStyle(discord_js_1.ButtonStyle.Secondary), new discord_js_1.ButtonBuilder().setCustomId("sector_business").setLabel("Business").setEmoji(branding_1.Mascot.Emotes.JobBusiness).setStyle(discord_js_1.ButtonStyle.Secondary), new discord_js_1.ButtonBuilder().setCustomId("sector_legal").setLabel("Legal").setEmoji(branding_1.Mascot.Emotes.JobLegal).setStyle(discord_js_1.ButtonStyle.Secondary));
         const row2 = new discord_js_1.ActionRowBuilder()
             .addComponents(new discord_js_1.ButtonBuilder().setCustomId("sector_service").setLabel("Service").setEmoji(branding_1.Mascot.Emotes.JobService).setStyle(discord_js_1.ButtonStyle.Secondary), new discord_js_1.ButtonBuilder().setCustomId("sector_trade").setLabel("Trades").setEmoji(branding_1.Mascot.Emotes.JobTrade).setStyle(discord_js_1.ButtonStyle.Secondary), new discord_js_1.ButtonBuilder().setCustomId("sector_freelance").setLabel("Freelance").setEmoji(branding_1.Mascot.Emotes.JobWorking).setStyle(discord_js_1.ButtonStyle.Secondary));
         return [row1, row2];

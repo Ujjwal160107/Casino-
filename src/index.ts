@@ -38,21 +38,40 @@ import { initScheduler } from "./scheduler"; const slashCommands = new Map<strin
     const cfg = await getGuildConfig(message.guild.id);
     const prefix = cfg?.prefix ?? "!";
 
-    // Check for bot mention
-    if (message.mentions.has(client.user!) && !message.mentions.everyone) {
-      const rawContent = message.content.replace(/<@!?[0-9]+>/g, "").trim();
-      if (!rawContent) {
-        const supportLink = "https://discord.gg/7bZm4gwcwt";
-        return message.reply(`**Need Help?**\nJoin our support server: ${supportLink}\nUse \`${prefix}help\` or \`${prefix}guide\` to get started!`);
+    let isCommand = false;
+    let contentToProcess = "";
+
+    // 1. Check for standard prefix
+    if (message.content.startsWith(prefix)) {
+      isCommand = true;
+      contentToProcess = message.content.slice(prefix.length).trim();
+    }
+    // 2. Check for Mention Prefix
+    else if (message.mentions.has(client.user!) && !message.mentions.everyone) {
+      // Regex to match mention at the START of the string: ^<@!?ID>
+      const mentionRegex = new RegExp(`^<@!?${client.user!.id}>`);
+      if (mentionRegex.test(message.content)) {
+        const rawContent = message.content.replace(mentionRegex, "").trim();
+
+        if (!rawContent) {
+          // Just a mention -> Help message
+          const supportLink = "https://discord.gg/7bZm4gwcwt";
+          return message.reply(`**Need Help?**\nJoin our support server: ${supportLink}\nUse \`${prefix}help\` or \`${prefix}guide\` to get started!`);
+        } else {
+          // Mention + Command -> Execute
+          isCommand = true;
+          contentToProcess = rawContent;
+        }
       }
     }
 
-    if (!message.content.startsWith(prefix)) return;
-    const contentWithoutPrefix = message.content.slice(prefix.length).trim();
-    if (!contentWithoutPrefix) return;
+    if (!isCommand || !contentToProcess) return;
+
     const originalContent = message.content;
     try {
-      (message as any).content = "!" + contentWithoutPrefix;
+      // Shim the content to look like a standard !command for routeMessage
+      // routeMessage internally uses .slice(1), so we prepend a mock 1-char prefix.
+      (message as any).content = "!" + contentToProcess;
       await routeMessage(client, message, prefix);
     } finally {
       (message as any).content = originalContent;
