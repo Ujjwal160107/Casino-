@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
+import { redis } from "@/lib/redis";
+
 export async function getGeneralSettings(guildId: string) {
     try {
         const config = await prisma.guildConfig.findUnique({
@@ -61,6 +63,9 @@ export async function updateGeneralSettings(guildId: string, data: {
                 chatMoneyEnabled: data.chatMoneyEnabled,
             }
         });
+
+        // Invalidate Bot Cache
+        await redis.del(`guild_config:${guildId}`);
 
         revalidatePath(`/dashboard/${guildId}`);
         return { success: true };
