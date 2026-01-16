@@ -68,6 +68,63 @@ async function handleButton(interaction: ButtonInteraction) {
             await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Claim Failed**: ${err.message}` });
         }
     }
+    else if (customId.startsWith("edu_stress_")) {
+        const activity = customId.replace("edu_stress_", "") as "sports" | "gym" | "meditation";
+
+        // Check if stress is already 0
+        const userData = await prisma.user.findUnique({
+            where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
+            include: { currentEducation: true }
+        });
+
+        if (userData?.currentEducation && userData.currentEducation.stress <= 0) {
+            return interaction.reply({
+                content: `${Mascot.Emotes.Think} You are currently stress free! Why not try studying instead?`,
+                ephemeral: true
+            });
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+            const cost = await getStressCost(user.id, guild.id, activity);
+            const config = await getGuildConfig(guild.id);
+
+            const embed = new EmbedBuilder()
+                .setTitle(`Confirm ${activity.charAt(0).toUpperCase() + activity.slice(1)} (Education)`)
+                .setDescription(`Do you want to spend **${fmtCurrency(cost, config.currencyEmoji)}** to reduce your **Education Stress**?`)
+                .setColor("#3498DB");
+
+            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder().setCustomId(`confirm_edu_stress_${activity}`).setLabel("Confirm").setStyle(ButtonStyle.Success).setEmoji(Mascot.Emotes.Accept),
+                new ButtonBuilder().setCustomId("cancel_stress").setLabel("Cancel").setStyle(ButtonStyle.Danger).setEmoji(Mascot.Emotes.Decline)
+            );
+
+            await interaction.editReply({ embeds: [embed], components: [row] });
+        } catch (err: any) {
+            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Error**: ${err.message}` });
+        }
+    }
+    else if (customId.startsWith("confirm_edu_stress_")) {
+        const activity = customId.replace("confirm_edu_stress_", "") as "sports" | "gym" | "meditation";
+        await interaction.deferUpdate();
+
+        try {
+            const config = await getGuildConfig(guild.id);
+            const res = await reduceStress(user.id, guild.id, activity);
+
+            const embed = new EmbedBuilder()
+                .setTitle("Stress Relieved (Education)")
+                .setDescription(`**${activity.charAt(0).toUpperCase() + activity.slice(1)}** relieved your stress!\nStress: **${res.newStress}/100** (-${res.newStress < 0 ? 0 : 15})\nPaid: **${fmtCurrency(res.cost, config.currencyEmoji)}**`) // Note: generic calc for display, real val used logic
+                // Actually the service returns the new stress and msg.
+                .setDescription(res.msg)
+                .setColor("#2ECC71");
+
+            await interaction.editReply({ embeds: [embed], components: [] });
+        } catch (err: any) {
+            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Activity Failed**: ${err.message}`, components: [] });
+        }
+    }
     else if (customId.startsWith("stress_")) {
         const activity = customId.replace("stress_", "") as "sports" | "gym" | "meditation";
 
