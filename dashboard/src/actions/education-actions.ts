@@ -56,6 +56,15 @@ export async function updateEducationConfig(guildId: string, data: {
                 eduSportsCost: data.eduSportsCost
             }
         });
+
+        // Invalidate Bot Cache
+        try {
+            const { redis } = require("@/lib/redis");
+            await redis.del(`guild_config:${guildId}`);
+        } catch (e) {
+            console.warn("Failed to invalidate redis cache:", e);
+        }
+
         revalidatePath(`/dashboard/${guildId}/education`);
         return { success: true };
     } catch (error) {
