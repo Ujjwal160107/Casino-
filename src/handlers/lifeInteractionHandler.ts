@@ -486,9 +486,9 @@ async function handleButton(interaction: ButtonInteraction) {
         const cooldownMs = finalCooldown * 1000;
 
         if (now - lastShift < cooldownMs) {
-            const remaining = Math.ceil((cooldownMs - (now - lastShift)) / 60000);
+            const canWorkAt = Math.floor((lastShift + cooldownMs) / 1000);
             await interaction.deleteReply().catch(() => { });
-            return interaction.followUp({ content: `${Mascot.Emotes.Angry} You are tired! You can work again in **${remaining} minutes**.`, ephemeral: true });
+            return interaction.followUp({ content: `${Mascot.Emotes.Angry} You are tired! You can work again <t:${canWorkAt}:R>.`, ephemeral: true });
         }
 
         // --- STRESS CHECK ---
