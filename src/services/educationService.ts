@@ -418,10 +418,11 @@ export async function reduceStress(userId: string, guildId: string, activity: "s
     const edu = user.currentEducation;
     const config = await getGuildConfig(guildId);
 
-    let cost = 500;
-    if (activity === "sports") cost = config.sportsCost;
-    if (activity === "gym") cost = config.gymCost;
-    if (activity === "meditation") cost = config.meditationCost;
+    // Education Stress Reduction costs (Configurable)
+    let cost = 50;
+    if (activity === "sports") cost = config.eduSportsCost ?? 75;
+    if (activity === "gym") cost = config.eduGymCost ?? 50;
+    if (activity === "meditation") cost = config.eduMeditationCost ?? 25;
 
     if (user.wallet!.balance < cost) {
         throw new Error(`You need **${cost}** coins to go to the ${activity}.`);
@@ -458,8 +459,9 @@ export async function reduceStress(userId: string, guildId: string, activity: "s
 
 export async function getStressCost(userId: string, guildId: string, activity: "sports" | "gym" | "meditation" = "gym") {
     const config = await getGuildConfig(guildId);
-    if (activity === "sports") return config.sportsCost;
-    if (activity === "gym") return config.gymCost;
-    if (activity === "meditation") return config.meditationCost;
+    if (activity === "sports") return config.eduSportsCost ?? 75;
+    if (activity === "gym") return config.eduGymCost ?? 50;
+    if (activity === "meditation") return config.eduMeditationCost ?? 25;
+
     return 0;
 }

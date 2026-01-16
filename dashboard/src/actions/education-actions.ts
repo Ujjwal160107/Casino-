@@ -13,9 +13,16 @@ export async function getEducationSettings(guildId: string) {
     return {
         config: {
             studyCooldown: config?.studyCooldown ?? 300,
+
+            // Job Stress Costs (Legacy support, maybe display them?)
             gymCost: config?.gymCost ?? 500,
             meditationCost: config?.meditationCost ?? 250,
-            sportsCost: config?.sportsCost ?? 750
+            sportsCost: config?.sportsCost ?? 750,
+
+            // Education Stress Costs (New)
+            eduGymCost: config?.eduGymCost ?? 50,
+            eduMeditationCost: config?.eduMeditationCost ?? 25,
+            eduSportsCost: config?.eduSportsCost ?? 75
         },
         degrees: degrees.map(d => ({
             id: d.id,
@@ -30,11 +37,24 @@ export async function updateEducationConfig(guildId: string, data: {
     gymCost: number;
     meditationCost: number;
     sportsCost: number;
+    eduGymCost: number;
+    eduMeditationCost: number;
+    eduSportsCost: number;
 }) {
     try {
         await prisma.guildConfig.update({
             where: { guildId },
-            data: { ...data }
+            data: {
+                studyCooldown: data.studyCooldown,
+                // Job Costs
+                gymCost: data.gymCost,
+                meditationCost: data.meditationCost,
+                sportsCost: data.sportsCost,
+                // Edu Costs
+                eduGymCost: data.eduGymCost,
+                eduMeditationCost: data.eduMeditationCost,
+                eduSportsCost: data.eduSportsCost
+            }
         });
         revalidatePath(`/dashboard/${guildId}/education`);
         return { success: true };

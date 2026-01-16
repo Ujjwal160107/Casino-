@@ -512,7 +512,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
         // Cooldown check
         const config = await getGuildConfig(guild.id);
-        const cooldownSeconds = config.jobCooldown || 3600;
+        const cooldownSeconds = config.jobCooldown ?? 3600;
 
         // Check Active Effects (Permanent Buffs)
         const activeEffects = await prisma.activeEffect.findMany({

@@ -325,6 +325,11 @@ model GuildConfig {
   meditationCost Int @default(250)
   sportsCost     Int @default(750)
 
+  // Education Stress Relief Costs
+  eduGymCost        Int @default(50)
+  eduMeditationCost Int @default(25)
+  eduSportsCost     Int @default(75)
+
   // Banking System Configs
   loanInterestRate Int      @default(5)
   fdInterestRate   Int      @default(10)

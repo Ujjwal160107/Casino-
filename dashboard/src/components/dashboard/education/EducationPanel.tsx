@@ -16,6 +16,9 @@ interface EducationPanelProps {
         gymCost: number;
         meditationCost: number;
         sportsCost: number;
+        eduGymCost: number;
+        eduMeditationCost: number;
+        eduSportsCost: number;
     };
     degrees: {
         id: string;
@@ -125,7 +128,66 @@ export function EducationPanel({ guildId, config, degrees }: EducationPanelProps
                 </div>
             </div>
 
-            {/* Degrees Config */}
+            {/* Job Stress Relief (Reference) */}
+            <div className="mt-8 mb-4 border-t border-white/5 pt-4">
+                <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-4">Job Stress Relief Costs (Reference)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 opacity-60 pointer-events-none grayscale">
+                    <div className="space-y-2">
+                        <label className="text-xs text-zinc-500 font-bold uppercase flex items-center gap-2"><Dumbbell size={12} /> Job Gym</label>
+                        <input type="number" readOnly value={formData.gymCost} className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-zinc-400" />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs text-zinc-500 font-bold uppercase flex items-center gap-2"><Activity size={12} /> Job Sports</label>
+                        <input type="number" readOnly value={formData.sportsCost} className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-zinc-400" />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs text-zinc-500 font-bold uppercase flex items-center gap-2"><Brain size={12} /> Job Meditation</label>
+                        <input type="number" readOnly value={formData.meditationCost} className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-zinc-400" />
+                    </div>
+                </div>
+            </div>
+
+            {/* Education Stress Relief (Config) */}
+            <div className="mt-4">
+                <h4 className="text-sm font-bold text-blue-400 uppercase tracking-wider mb-4">Student Stress Relief Costs (Configurable)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                        <label className="text-xs text-blue-300/70 font-bold uppercase flex items-center gap-2">
+                            <Dumbbell size={12} /> Student Gym Cost
+                        </label>
+                        <input
+                            type="number"
+                            value={formData.eduGymCost}
+                            onChange={(e) => handleConfigChange("eduGymCost", parseInt(e.target.value) || 0)}
+                            className="w-full bg-blue-900/10 border border-blue-500/20 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-xs text-blue-300/70 font-bold uppercase flex items-center gap-2">
+                            <Activity size={12} /> Student Sports Cost
+                        </label>
+                        <input
+                            type="number"
+                            value={formData.eduSportsCost}
+                            onChange={(e) => handleConfigChange("eduSportsCost", parseInt(e.target.value) || 0)}
+                            className="w-full bg-blue-900/10 border border-blue-500/20 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-xs text-blue-300/70 font-bold uppercase flex items-center gap-2">
+                            <Brain size={12} /> Student Meditation Cost
+                        </label>
+                        <input
+                            type="number"
+                            value={formData.eduMeditationCost}
+                            onChange={(e) => handleConfigChange("eduMeditationCost", parseInt(e.target.value) || 0)}
+                            className="w-full bg-blue-900/10 border border-blue-500/20 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                        />
+                    </div>
+                </div>
+            </div>
             <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
                 <h3 className="text-lg font-bold text-white uppercase tracking-wider flex items-center gap-2 mb-6">
                     <GraduationCap size={18} className="text-yellow-400" />
