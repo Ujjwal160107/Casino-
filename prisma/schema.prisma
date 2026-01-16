@@ -312,6 +312,12 @@ model GuildConfig {
   robCooldown    Int      @default(300)
   robImmuneRoles String[] @default([])
 
+  // Marriage Config
+  marriageEnabled   Boolean @default(true)
+  marriageCost      Int     @default(0)
+  divorceCost       Int     @default(0)
+  marriageCooldown  Int     @default(0) 
+
   jailFine       Int      @default(1000)
   jailTime       Int      @default(600) // Seconds
   

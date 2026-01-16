@@ -6,6 +6,7 @@ import { Mascot, getEmoteUrl } from "../../config/branding";
 import { marry, divorce, getMarriage, isMarried, checkHasRing, consumeRing, depositToJoint, withdrawFromJoint } from "../../services/life/marriageService";
 import { logToChannel } from "../../utils/discordLogger";
 import { fmtCurrency } from "../../utils/format";
+import { getGuildConfig } from "../../services/guildConfigService";
 
 export async function handleMarry(message: Message, args: string[]) {
     if (message.mentions.users.size === 0) {
@@ -17,8 +18,13 @@ export async function handleMarry(message: Message, args: string[]) {
         return message.reply({ embeds: [errorEmbed(message.author, "Invalid User", "You cannot marry a bot or yourself!")] });
     }
 
-    // Double check if users exist in DB (usually handled, but good to ensure)
+    // Double    // Check if users exist in DB (usually handled, but good to ensure)
     // ... (Assuming user existence checks are done or Prisma will throw/create)
+
+    const config = await getGuildConfig(message.guildId!);
+    if (!config.marriageEnabled) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Marriage Disabled", "The marriage system is currently disabled in this server.")] });
+    }
 
     // Check if already married
     // FIX: Pass guildId
@@ -53,7 +59,7 @@ export async function handleMarry(message: Message, args: string[]) {
     const proposalEmbed = new EmbedBuilder()
         .setColor("#ff69b4") // Pink/Romance color
         .setTitle(`💍 Marriage Proposal`)
-        .setDescription(`${target}, **${message.author.username}** has proposed to you! \n\nDo you accept their hand in marriage?`)
+        .setDescription(`${target}, **${message.author.username}** has proposed to you! \n\nDo you accept their hand in marriage?` + (config.marriageCost > 0 ? `\n\n**Cost:** ${fmtCurrency(config.marriageCost, config.currencyEmoji)} (Paid by ${message.author.username})` : ""))
         .setImage("attachment://marriage_proposal.png")
         .setFooter({ text: "You have 60 seconds to answer." });
 
@@ -88,10 +94,25 @@ export async function handleMarry(message: Message, args: string[]) {
                     return;
                 }
 
-                // Check if author is already married (race condition check)
                 if (await isMarried(message.author.id, message.guildId!)) {
                     await i.update({ content: null, embeds: [errorEmbed(target, "Proposal Failed", "The proposer is already married!")], components: [] });
                     return;
+                }
+
+                // Check Proposer Balance
+                const config = await getGuildConfig(message.guildId!); // Re-fetch? Or use from closure? Closure is fine but async nature...
+                if (config.marriageCost > 0) {
+                    const proposerWallet = await prisma.wallet.findUnique({ where: { userId: (await prisma.user.findUnique({ where: { discordId_guildId: { discordId: message.author.id, guildId: message.guildId! } } }))?.id } });
+                    if (!proposerWallet || proposerWallet.balance < config.marriageCost) {
+                        await i.update({ content: null, embeds: [errorEmbed(target, "Proposal Failed", `${message.author.username} cannot afford the marriage fee of ${fmtCurrency(config.marriageCost, config.currencyEmoji)}!`)], components: [] });
+                        return;
+                    }
+
+                    // Deduct Cost
+                    await prisma.wallet.update({
+                        where: { id: proposerWallet.id },
+                        data: { balance: { decrement: config.marriageCost } }
+                    });
                 }
 
                 await consumeRing(message.author.id, message.guildId!);
@@ -164,8 +185,10 @@ export async function handleDivorce(message: Message) {
                 .setStyle(ButtonStyle.Secondary)
         );
 
+    const config = await getGuildConfig(message.guildId!);
+
     const confirmEmbed = errorEmbed(message.author, "Divorce Request", `**${message.author.username}** wants to divorce you. Do you accept?`);
-    confirmEmbed.setDescription(`<@${spouseId}>, **${message.author.username}** has requested a divorce.\n\nDo you agree to end this marriage?`);
+    confirmEmbed.setDescription(`<@${spouseId}>, **${message.author.username}** has requested a divorce.\n\nDo you agree to end this marriage?` + (config.divorceCost > 0 ? `\n\n**Cost:** ${fmtCurrency(config.divorceCost, config.currencyEmoji)} (Paid by ${message.author.username})` : ""));
 
     const msg = await message.reply({ content: `<@${spouseId}>`, embeds: [confirmEmbed], components: [row] });
 
@@ -178,6 +201,21 @@ export async function handleDivorce(message: Message) {
         }
 
         if (i.customId === 'confirm_divorce') {
+            // Check Cost for Initiator (message.author)
+            const config = await getGuildConfig(message.guildId!);
+            if (config.divorceCost > 0) {
+                const initiatorWallet = await prisma.wallet.findUnique({ where: { userId: (await prisma.user.findUnique({ where: { discordId_guildId: { discordId: message.author.id, guildId: message.guildId! } } }))?.id } });
+                if (!initiatorWallet || initiatorWallet.balance < config.divorceCost) {
+                    await i.reply({ content: `${message.author.username} cannot afford the divorce fee of ${fmtCurrency(config.divorceCost, config.currencyEmoji)}!`, ephemeral: true });
+                    return;
+                }
+                // Deduct
+                await prisma.wallet.update({
+                    where: { id: initiatorWallet.id },
+                    data: { balance: { decrement: config.divorceCost } }
+                });
+            }
+
             await divorce(message.author.id, message.guildId!);
 
             await logToChannel(message.client, {
