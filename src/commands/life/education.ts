@@ -7,6 +7,7 @@ import { errorEmbed } from "../../utils/embed";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 
 import { getUser } from "../../services/userService";
+import { ensureUserAndWallet } from "../../services/walletService";
 
 export async function handleEducation(message: Message, args: string[]) {
     try {
@@ -16,10 +17,15 @@ export async function handleEducation(message: Message, args: string[]) {
         const config = await getGuildConfig(guildId);
         const prefix = config?.prefix || "!";
 
-        const user = await getUser(userId, guildId);
+        let user = await getUser(userId, guildId);
 
         if (!user) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Profile Not Found", `You need to start your journey first. Use \`${prefix}start\` to create a profile!`)] });
+            await ensureUserAndWallet(userId, guildId, message.author.username);
+            user = await getUser(userId, guildId);
+
+            if (!user) {
+                return message.reply({ embeds: [errorEmbed(message.author, "Profile Creation Error", "Failed to automatically create your profile. Please try again.")] });
+            }
         }
 
         // User Avatar as Thumbnail
