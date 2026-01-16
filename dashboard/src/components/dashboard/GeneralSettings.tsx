@@ -13,6 +13,8 @@ interface GeneralSettingsProps {
         currencyName: string;
         currencyEmoji: string;
         chatMoneyEnabled: boolean;
+        walletLimit: number | null;
+        bankLimit: number | null;
     };
 }
 
@@ -128,6 +130,42 @@ export function GeneralSettings({ guildId, initialSettings }: GeneralSettingsPro
                         placeholder="🪙"
                         maxLength={64}
                     />
+                </div>
+
+                {/* Wallet Limit */}
+                <div className="space-y-2">
+                    <label className="text-xs uppercase tracking-wider font-bold text-zinc-500">Wallet Limit</label>
+                    <input
+                        type="number"
+                        name="walletLimit"
+                        value={settings.walletLimit ?? ""}
+                        onChange={(e) => {
+                            const val = e.target.value === "" ? null : parseInt(e.target.value);
+                            setSettings(prev => ({ ...prev, walletLimit: val }));
+                        }}
+                        className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/50 transition-all font-mono"
+                        placeholder="No Limit"
+                        min={0}
+                    />
+                    <p className="text-[10px] text-zinc-600">Max cash in wallet (Empty for infinite).</p>
+                </div>
+
+                {/* Bank Limit */}
+                <div className="space-y-2">
+                    <label className="text-xs uppercase tracking-wider font-bold text-zinc-500">Bank Limit</label>
+                    <input
+                        type="number"
+                        name="bankLimit"
+                        value={settings.bankLimit ?? ""}
+                        onChange={(e) => {
+                            const val = e.target.value === "" ? null : parseInt(e.target.value);
+                            setSettings(prev => ({ ...prev, bankLimit: val }));
+                        }}
+                        className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/50 transition-all font-mono"
+                        placeholder="No Limit"
+                        min={0}
+                    />
+                    <p className="text-[10px] text-zinc-600">Max cash in bank (Empty for infinite).</p>
                 </div>
 
                 {/* Chat Money Toggle */}

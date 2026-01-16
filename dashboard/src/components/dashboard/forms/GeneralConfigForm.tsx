@@ -13,14 +13,21 @@ interface GeneralConfigFormProps {
         startMoney: number;
         currencyName: string;
         currencyEmoji: string;
+        currencyEmoji: string;
         chatMoneyEnabled: boolean;
+        walletLimit: number | null;
+        bankLimit: number | null;
     };
 }
 
 export function GeneralConfigForm({ guildId, initialData }: GeneralConfigFormProps) {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
-    const [formData, setFormData] = useState(initialData);
+    const [formData, setFormData] = useState({
+        ...initialData,
+        walletLimit: initialData.walletLimit ?? null,
+        bankLimit: initialData.bankLimit ?? null
+    });
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
@@ -136,6 +143,34 @@ export function GeneralConfigForm({ guildId, initialData }: GeneralConfigFormPro
                             </div>
                         </div>
                         <p className="text-xs text-zinc-500">Supports Unicode emojis or Discord custom emoji IDs.</p>
+                    </div>
+                </div>
+
+                {/* Wallet & Bank Limits */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-zinc-400">Wallet Limit</label>
+                        <input
+                            type="number"
+                            min={0}
+                            placeholder="No Limit"
+                            value={formData.walletLimit ?? ""}
+                            onChange={(e) => setFormData({ ...formData, walletLimit: e.target.value ? parseInt(e.target.value) : null })}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+                        />
+                        <p className="text-xs text-zinc-500">Max cash in wallet.</p>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-zinc-400">Bank Limit</label>
+                        <input
+                            type="number"
+                            min={0}
+                            placeholder="No Limit"
+                            value={formData.bankLimit ?? ""}
+                            onChange={(e) => setFormData({ ...formData, bankLimit: e.target.value ? parseInt(e.target.value) : null })}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+                        />
+                        <p className="text-xs text-zinc-500">Max cash in bank.</p>
                     </div>
                 </div>
 

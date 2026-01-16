@@ -1,13 +1,23 @@
-export default function MarriagePage() {
+import { getMarriageConfig } from "@/actions/marriage-actions";
+import { MarriagePanel } from "@/components/dashboard/marriage/MarriagePanel";
+
+interface PageProps {
+    params: {
+        guildId: string;
+    };
+}
+
+export default async function MarriagePage({ params }: PageProps) {
+    const config = await getMarriageConfig(params.guildId);
+
     return (
-        <div>
-            <h1 className="text-3xl font-bold text-white mb-6 font-serif">Marriage Management</h1>
-            <div className="p-12 border border-white/5 bg-zinc-900 rounded-xl text-center">
-                <p className="text-zinc-400">Configure marriage benefits, tax breaks, and divorce fees.</p>
-                <div className="mt-4 inline-block px-4 py-2 bg-yellow-500/10 text-yellow-500 rounded-lg text-sm font-semibold border border-yellow-500/20">
-                    Coming Soon
-                </div>
+        <div className="space-y-6">
+            <div>
+                <h1 className="text-3xl font-bold text-white font-serif">Marriage Settings</h1>
+                <p className="text-zinc-400">Configure costs and rules for the marriage system.</p>
             </div>
+
+            <MarriagePanel guildId={params.guildId} initialConfig={config} />
         </div>
     );
 }

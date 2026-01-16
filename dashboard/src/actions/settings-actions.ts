@@ -15,6 +15,8 @@ export async function getGeneralSettings(guildId: string) {
                 currencyName: true,
                 currencyEmoji: true,
                 chatMoneyEnabled: true,
+                walletLimit: true,
+                bankLimit: true,
             }
         });
 
@@ -24,7 +26,9 @@ export async function getGeneralSettings(guildId: string) {
             startMoney: 1000,
             currencyName: "Coins",
             currencyEmoji: "🪙",
-            chatMoneyEnabled: false
+            chatMoneyEnabled: false,
+            walletLimit: null,
+            bankLimit: null
         };
     } catch (error) {
         console.error("Failed to fetch general settings:", error);
@@ -38,6 +42,8 @@ export async function updateGeneralSettings(guildId: string, data: {
     currencyName: string;
     currencyEmoji: string;
     chatMoneyEnabled: boolean;
+    walletLimit: number | null;
+    bankLimit: number | null;
 }) {
     try {
         // Basic validation
@@ -55,6 +61,8 @@ export async function updateGeneralSettings(guildId: string, data: {
                 currencyName: data.currencyName,
                 currencyEmoji: data.currencyEmoji,
                 chatMoneyEnabled: data.chatMoneyEnabled,
+                walletLimit: data.walletLimit,
+                bankLimit: data.bankLimit,
             },
             create: {
                 guildId,
@@ -63,6 +71,8 @@ export async function updateGeneralSettings(guildId: string, data: {
                 currencyName: data.currencyName,
                 currencyEmoji: data.currencyEmoji,
                 chatMoneyEnabled: data.chatMoneyEnabled,
+                walletLimit: data.walletLimit,
+                bankLimit: data.bankLimit,
             }
         });
 
