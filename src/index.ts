@@ -13,7 +13,7 @@ import { initScheduler } from "./scheduler"; const slashCommands = new Map<strin
     if (interaction.isChatInputCommand()) { const ci = interaction as ChatInputCommandInteraction; const module = slashCommands.get(ci.commandName); if (!module) { return ci.reply({ content: "Unknown command.", ephemeral: true }); } return await module.execute(ci); } const id = (interaction as any).customId || ""; if (id.startsWith("bank_") || id.startsWith("loan_") || id.startsWith("invest_") || id.startsWith("repay_")) { return await handleBankInteraction(interaction); } if (id.startsWith("market_") || id.startsWith("sell_")) { return await handleMarketInteraction(interaction); } if (id.startsWith("inv_")) {
       return await handleInventoryInteraction(interaction as any);
     }
-    if (id.startsWith("enroll_confirm_") || id.startsWith("claim_scholarship_") || id.startsWith("stress_") || id.startsWith("confirm_stress_") || id === "cancel_stress" || id.startsWith("dropout_") || id.startsWith("work_") || id.startsWith("promote_confirm_")) {
+    if (id.startsWith("enroll_confirm_") || id.startsWith("claim_scholarship_") || id.startsWith("stress_") || id.startsWith("confirm_stress_") || id === "cancel_stress" || id.startsWith("dropout_") || id.startsWith("work_") || id.startsWith("promote_confirm_") || id.startsWith("edu_stress_") || id.startsWith("confirm_edu_stress_")) {
       const { handleLifeInteraction } = require("./handlers/lifeInteractionHandler");
       return await handleLifeInteraction(interaction);
     }
