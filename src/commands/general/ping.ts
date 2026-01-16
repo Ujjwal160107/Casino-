@@ -7,7 +7,8 @@ export async function handlePing(message: Message) {
     const msg = await message.reply("Calculating latency...");
 
     const apiLatency = msg.createdTimestamp - message.createdTimestamp;
-    const wsLatency = message.client.ws.ping;
+    let wsLatency: number | string = message.client.ws.ping;
+    if (wsLatency === -1) wsLatency = "Catching up...";
 
     // Database Latency
     const dbStart = Date.now();

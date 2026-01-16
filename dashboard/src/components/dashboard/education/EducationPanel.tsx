@@ -89,63 +89,10 @@ export function EducationPanel({ guildId, config, degrees }: EducationPanelProps
                             onChange={(val) => handleConfigChange("studyCooldown", val)}
                         />
                     </div>
-
-                    <div className="space-y-2">
-                        <label className="text-xs text-zinc-500 font-bold uppercase flex items-center gap-2">
-                            <Dumbbell size={12} /> Gym Cost
-                        </label>
-                        <input
-                            type="number"
-                            value={formData.gymCost}
-                            onChange={(e) => handleConfigChange("gymCost", parseInt(e.target.value) || 0)}
-                            className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors"
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-xs text-zinc-500 font-bold uppercase flex items-center gap-2">
-                            <Brain size={12} /> Meditation Cost
-                        </label>
-                        <input
-                            type="number"
-                            value={formData.meditationCost}
-                            onChange={(e) => handleConfigChange("meditationCost", parseInt(e.target.value) || 0)}
-                            className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors"
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-xs text-zinc-500 font-bold uppercase flex items-center gap-2">
-                            <Activity size={12} /> Sports Cost
-                        </label>
-                        <input
-                            type="number"
-                            value={formData.sportsCost}
-                            onChange={(e) => handleConfigChange("sportsCost", parseInt(e.target.value) || 0)}
-                            className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors"
-                        />
-                    </div>
                 </div>
             </div>
 
-            {/* Job Stress Relief (Reference) */}
-            <div className="mt-8 mb-4 border-t border-white/5 pt-4">
-                <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-4">Job Stress Relief Costs (Reference)</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 opacity-60 pointer-events-none grayscale">
-                    <div className="space-y-2">
-                        <label className="text-xs text-zinc-500 font-bold uppercase flex items-center gap-2"><Dumbbell size={12} /> Job Gym</label>
-                        <input type="number" readOnly value={formData.gymCost} className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-zinc-400" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-xs text-zinc-500 font-bold uppercase flex items-center gap-2"><Activity size={12} /> Job Sports</label>
-                        <input type="number" readOnly value={formData.sportsCost} className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-zinc-400" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-xs text-zinc-500 font-bold uppercase flex items-center gap-2"><Brain size={12} /> Job Meditation</label>
-                        <input type="number" readOnly value={formData.meditationCost} className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-zinc-400" />
-                    </div>
-                </div>
-            </div>
+
 
             {/* Education Stress Relief (Config) */}
             <div className="mt-4">
