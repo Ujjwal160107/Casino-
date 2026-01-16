@@ -65,7 +65,7 @@ export async function handleEducation(message: Message, args: string[]) {
                 .setColor(edu.stress > 80 ? "#FF0000" : "#3498DB")
                 .addFields(
                     { name: "Intelligence", value: `${intProgress} **${edu.currentGpa.toFixed(1)} / 10**\nRequired: 6.0`, inline: true },
-                    { name: "Stress", value: `${edu.stress}%`, inline: true },
+                    { name: "Stress", value: `${edu.stress}/100`, inline: true },
                     { name: "Actions", value: `\`${prefix}study\` - Gain Intelligence (+0.5)\n\`${prefix}exam\` - Take Final Exam (Req: 6 Intelligence)` }, { name: `${Mascot.Emotes.MoneyBag} Scholarship Guide`, value: scholarshipGuide }
                 );
 
