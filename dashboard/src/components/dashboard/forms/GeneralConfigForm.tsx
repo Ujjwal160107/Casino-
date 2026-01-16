@@ -13,7 +13,6 @@ interface GeneralConfigFormProps {
         startMoney: number;
         currencyName: string;
         currencyEmoji: string;
-        currencyEmoji: string;
         chatMoneyEnabled: boolean;
         walletLimit: number | null;
         bankLimit: number | null;
