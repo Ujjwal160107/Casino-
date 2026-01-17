@@ -2,13 +2,14 @@ import { getMarriageConfig } from "@/actions/marriage-actions";
 import { MarriagePanel } from "@/components/dashboard/marriage/MarriagePanel";
 
 interface PageProps {
-    params: {
+    params: Promise<{
         guildId: string;
-    };
+    }>;
 }
 
 export default async function MarriagePage({ params }: PageProps) {
-    const config = await getMarriageConfig(params.guildId);
+    const { guildId } = await params;
+    const config = await getMarriageConfig(guildId);
 
     return (
         <div className="space-y-6">
@@ -17,7 +18,7 @@ export default async function MarriagePage({ params }: PageProps) {
                 <p className="text-zinc-400">Configure costs and rules for the marriage system.</p>
             </div>
 
-            <MarriagePanel guildId={params.guildId} initialConfig={config} />
+            <MarriagePanel guildId={guildId} initialConfig={config} />
         </div>
     );
 }
