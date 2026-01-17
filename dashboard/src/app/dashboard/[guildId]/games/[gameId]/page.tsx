@@ -33,7 +33,6 @@ export default async function GameConfigPage({ params }: PageProps) {
     }
 
     return (
-    return (
         <div className="space-y-8">
             <div>
                 <h1 className="text-3xl font-bold text-white mb-2">{gameName}</h1>
@@ -50,6 +49,5 @@ export default async function GameConfigPage({ params }: PageProps) {
                 globalLimits={{ min: data.globalmin, max: data.globalmax || 100000 }}
             />
         </div>
-    );
     );
 }
