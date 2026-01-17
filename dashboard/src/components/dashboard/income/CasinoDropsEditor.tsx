@@ -25,23 +25,26 @@ interface DropConfig {
 interface CasinoDropsEditorProps {
     guildId: string;
     initialData: DropConfig[];
+    initialExpiration: number;
     channels: Channel[];
 }
 
-export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDropsEditorProps) {
+export function CasinoDropsEditor({ guildId, initialData, initialExpiration, channels }: CasinoDropsEditorProps) {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [drops, setDrops] = useState<DropConfig[]>(initialData.length > 0 ? initialData : []);
+    const [expiration, setExpiration] = useState(initialExpiration);
 
     // Sync state when initialData updates (after save/refresh)
     useEffect(() => {
         setDrops(initialData);
-    }, [initialData]);
+        setExpiration(initialExpiration);
+    }, [initialData, initialExpiration]);
 
     const handleSave = async () => {
         setIsLoading(true);
         try {
-            const result = await updateCasinoDrops(guildId, drops);
+            const result = await updateCasinoDrops(guildId, drops, expiration);
             if (result.success) {
                 toast.success("Requests updated successfully!");
                 router.refresh();
@@ -93,6 +96,26 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                 >
                     <Plus size={14} /> Add Drop
                 </button>
+            </div>
+
+            {/* Global Settings */}
+            <div className="mb-6 p-4 bg-black/20 border border-white/5 rounded-lg flex items-center gap-4">
+                <div className="flex bg-purple-500/10 p-2 rounded-lg text-purple-400">
+                    <Clock size={20} />
+                </div>
+                <div className="flex-1">
+                    <h4 className="text-sm font-bold text-white">Global Drop Expiration</h4>
+                    <p className="text-xs text-zinc-500">How long users have to claim a drop (seconds).</p>
+                </div>
+                <div className="w-32">
+                    <input
+                        type="number"
+                        min={5}
+                        value={expiration}
+                        onChange={(e) => setExpiration(parseInt(e.target.value) || 60)}
+                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50 text-center font-mono"
+                    />
+                </div>
             </div>
 
             <div className="space-y-4">

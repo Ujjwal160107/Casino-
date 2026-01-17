@@ -46,7 +46,7 @@ export async function updateGeneralSettings(guildId: string, data: {
     chatMoneyEnabled: boolean;
     walletLimit: number | null;
     bankLimit: number | null;
-    dropExpiration: number;
+    dropExpiration?: number;
 }) {
     try {
         // Basic validation
@@ -77,7 +77,7 @@ export async function updateGeneralSettings(guildId: string, data: {
                 chatMoneyEnabled: data.chatMoneyEnabled,
                 walletLimit: data.walletLimit,
                 bankLimit: data.bankLimit,
-                dropExpiration: data.dropExpiration,
+                dropExpiration: data.dropExpiration ?? 60,
             }
         });
 

@@ -19,7 +19,10 @@ interface IncomePanelProps {
         };
         rob: any;
         quests: any;
-        drops: any[];
+        drops: {
+            configs: any[];
+            expiration: number;
+        };
         roles: any[];
         channels: any[];
     };
@@ -169,7 +172,8 @@ export function IncomePanel({ guildId, data }: IncomePanelProps) {
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <CasinoDropsEditor
                             guildId={guildId}
-                            initialData={data.drops || []}
+                            initialData={data.drops.configs || []}
+                            initialExpiration={data.drops.expiration}
                             channels={data.channels || []}
                         />
                     </div>

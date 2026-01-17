@@ -76,8 +76,7 @@ export function AdminPanel({ guildId, data }: AdminPanelProps) {
                                 currencyEmoji: data.config.currencyEmoji || "🪙",
                                 chatMoneyEnabled: data.config.chatMoneyEnabled ?? false,
                                 walletLimit: data.config.walletLimit ?? null,
-                                bankLimit: data.config.bankLimit ?? null,
-                                dropExpiration: data.config.dropExpiration ?? 60
+                                bankLimit: data.config.bankLimit ?? null
                             }}
                         />
                     )}

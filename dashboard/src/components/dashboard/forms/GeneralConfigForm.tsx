@@ -16,7 +16,6 @@ interface GeneralConfigFormProps {
         chatMoneyEnabled: boolean;
         walletLimit: number | null;
         bankLimit: number | null;
-        dropExpiration: number;
     };
 }
 
@@ -174,18 +173,6 @@ export function GeneralConfigForm({ guildId, initialData }: GeneralConfigFormPro
                     </div>
                 </div>
 
-                {/* Drop Settings */}
-                <div className="space-y-2">
-                    <label className="text-sm font-medium text-zinc-400">Global Drop Expiration (Seconds)</label>
-                    <input
-                        type="number"
-                        min={10}
-                        value={formData.dropExpiration}
-                        onChange={(e) => setFormData({ ...formData, dropExpiration: parseInt(e.target.value) || 60 })}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all mb-4"
-                    />
-                    <p className="text-xs text-zinc-500">How long users have to claim a drop before it expires.</p>
-                </div>
 
                 {/* Chat Money Toggle */}
                 <div className="p-4 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between">

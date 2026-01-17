@@ -58,15 +58,18 @@ export async function getIncomeSettings(guildId: string) {
             questPay: config?.questPay ?? 2500,
             questXp: config?.questXp ?? 100
         },
-        drops: casinoDrops.map(d => ({
-            id: d.id,
-            type: d.type,
-            channelId: d.channelId,
-            minAmount: d.minAmount,
-            maxAmount: d.maxAmount,
-            scheduleTime: d.scheduleTime,
-            interval: d.interval,
-        })),
+        drops: {
+            configs: casinoDrops.map(d => ({
+                id: d.id,
+                type: d.type,
+                channelId: d.channelId,
+                minAmount: d.minAmount,
+                maxAmount: d.maxAmount,
+                scheduleTime: d.scheduleTime,
+                interval: d.interval,
+            })),
+            expiration: config?.dropExpiration ?? 60
+        },
         roles: roles.map(r => ({ id: r.id, name: r.name, color: r.color })),
         channels: channels.map(c => ({ id: c.id, name: c.name }))
     };
@@ -208,9 +211,15 @@ export async function updateQuestSettings(guildId: string, data: {
     }
 }
 
-export async function updateCasinoDrops(guildId: string, drops: any[]) {
+export async function updateCasinoDrops(guildId: string, drops: any[], dropExpiration: number) {
     try {
         await prisma.$transaction(async (tx) => {
+            // Update Global Expiration
+            await tx.guildConfig.update({
+                where: { guildId },
+                data: { dropExpiration }
+            });
+
             await tx.casinoDropConfig.deleteMany({ where: { guildId } });
             if (drops.length > 0) {
                 await tx.casinoDropConfig.createMany({
