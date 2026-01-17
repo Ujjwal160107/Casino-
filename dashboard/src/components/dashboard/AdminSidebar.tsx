@@ -78,6 +78,17 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
             ]
         },
         {
+            title: "Games Configuration",
+            items: [
+                { label: "Blackjack", href: `/dashboard/${guild.id}/games/blackjack`, icon: Dices },
+                { label: "Roulette", href: `/dashboard/${guild.id}/games/roulette`, icon: Dices },
+                { label: "Slots", href: `/dashboard/${guild.id}/games/slots`, icon: Dices },
+                { label: "Coinflip", href: `/dashboard/${guild.id}/games/coinflip`, icon: Dices },
+                { label: "Cockfight", href: `/dashboard/${guild.id}/games/cockfight`, icon: Dices },
+                { label: "Russian Roulette", href: `/dashboard/${guild.id}/games/russianRoulette`, icon: Dices },
+            ]
+        },
+        {
             title: "Moderation",
             items: [
                 { label: "Logs & Warnings", href: `/dashboard/${guild.id}/moderation`, icon: ShieldAlert },
