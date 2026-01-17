@@ -167,6 +167,20 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                                     />
                                 </div>
 
+                                {/* Expiration */}
+                                <div className="space-y-1">
+                                    <label className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-1">
+                                        <Clock size={10} /> Expires (Sec)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min={5}
+                                        value={drop.expiration || 60}
+                                        onChange={(e) => updateDrop(index, "expiration", parseInt(e.target.value) || 60)}
+                                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                    />
+                                </div>
+
                                 {/* Dynamic Fields based on Type */}
                                 {drop.type === "INTERVAL" && (
                                     <div className="space-y-1 col-span-2 md:col-span-1">
