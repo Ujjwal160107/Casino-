@@ -16,8 +16,8 @@ interface GeneralConfigFormProps {
         chatMoneyEnabled: boolean;
         walletLimit: number | null;
         bankLimit: number | null;
-        minBet?: number;
-        maxBet?: number;
+        minBet?: number | null;
+        maxBet?: number | null;
     };
 }
 
