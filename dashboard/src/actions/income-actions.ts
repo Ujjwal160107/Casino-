@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getGuildRoles as fetchGuildRoles, getGuildChannels } from "@/lib/discord";
+import { redis } from "@/lib/redis";
 
 export async function getIncomeSettings(guildId: string) {
     const config = await prisma.guildConfig.findUnique({ where: { guildId } });
@@ -270,6 +271,7 @@ export async function triggerManualDrop(dropId: string) {
 
         const guildConfig = await prisma.guildConfig.findUnique({ where: { guildId: drop.guildId } });
         const currencyEmoji = guildConfig?.currencyEmoji || "🪙";
+        const dropExpiration = guildConfig?.dropExpiration || 60;
 
         // Calculate amount
         const amount = Math.floor(Math.random() * (drop.maxAmount - drop.minAmount + 1)) + drop.minAmount;
@@ -281,13 +283,15 @@ export async function triggerManualDrop(dropId: string) {
             title: `${EMOTES.FortunaSparkle} Casino Drop!`,
             description: `${EMOTES.FortunaMoney} A money bag has been dropped! First to claim gets it!\n\n**Amount:** ${currencyEmoji} ${amount.toLocaleString('en-US')}`,
             color: 0xFFD700,
-            footer: { text: "Click the button below to claim!" },
+            footer: { text: "Click the button below to claim!", iconURL: undefined },
             ...(thumbUrl && { thumbnail: { url: thumbUrl } })
         };
 
         const emojiMatch = EMOTES.MoneyBag.match(/:(\d+)>/);
         const emojiId = emojiMatch ? emojiMatch[1] : "💸";
         const emojiName = "MoneyBag"; // Fallback name
+
+        const expiresAt = Date.now() + (dropExpiration * 1000);
 
         // Discord Button Component
         const components = [{
@@ -296,7 +300,7 @@ export async function triggerManualDrop(dropId: string) {
                 type: 2, // Button
                 style: 3, // Success (Green)
                 label: "Claim Drop",
-                custom_id: `casino_drop_claim_${amount}_${dropId}`,
+                custom_id: `casino_drop_claim_${amount}_${dropId}_${expiresAt}`,
                 emoji: { id: emojiId, name: emojiName }
             }]
         }];
