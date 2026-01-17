@@ -81,6 +81,7 @@ model User {
   properties  OwnedProperty[]
 
   // Marriage Relations
+  lastDivorcedAt DateTime?
   marriagesAsSpouse1 Marriage[] @relation("Spouse1")
   marriagesAsSpouse2 Marriage[] @relation("Spouse2")
   

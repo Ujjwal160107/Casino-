@@ -35,6 +35,23 @@ export async function handleMarry(message: Message, args: string[]) {
         return message.reply({ embeds: [errorEmbed(message.author, "Taken", `${target.username} is already married!`)] });
     }
 
+    // Check Cooldown
+    // Fetch requester with lastDivorcedAt
+    const dbUser = await prisma.user.findUnique({
+        where: { discordId_guildId: { discordId: message.author.id, guildId: message.guildId! } }
+    });
+
+    if (config.marriageCooldown > 0 && dbUser?.lastDivorcedAt) {
+        const cooldownMs = config.marriageCooldown * 1000;
+        const timeSinceDivorce = Date.now() - new Date(dbUser.lastDivorcedAt).getTime();
+
+        if (timeSinceDivorce < cooldownMs) {
+            const remaining = cooldownMs - timeSinceDivorce;
+            const expiresAt = Math.floor((Date.now() + remaining) / 1000);
+            return message.reply({ embeds: [errorEmbed(message.author, "Marriage Cooldown", `You verified a divorce recently! You can remarry <t:${expiresAt}:R>.`)] });
+        }
+    }
+
     // Check for Ring
     // FIX: Pass guildId
     const hasRing = await checkHasRing(message.author.id, message.guildId!);
@@ -217,6 +234,21 @@ export async function handleDivorce(message: Message) {
             }
 
             await divorce(message.author.id, message.guildId!);
+
+            // Set lastDivorcedAt for BOTH (if they were married, they both got divorced)
+            // But usually only the initiator or both? Let's punish both? Or just reset cooldown?
+            // "Marriage Cooldown" usually implies a wait after a divorce.
+            const now = new Date();
+            await prisma.user.updateMany({
+                where: {
+                    guildId: message.guildId!,
+                    OR: [
+                        { discordId: message.author.id },
+                        { discordId: spouseId }
+                    ]
+                },
+                data: { lastDivorcedAt: now }
+            });
 
             await logToChannel(message.client, {
                 guild: message.guild!,
