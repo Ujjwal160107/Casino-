@@ -34,6 +34,12 @@ export const CasinoDropService = {
             const dropExpiration = config.dropExpiration || 60;
             const expiresAt = Date.now() + (dropExpiration * 1000);
 
+            console.log(`[Drop Debug] Spawning Drop:
+            - Config Expiration: ${dropExpiration}s
+            - Current Time: ${Date.now()}
+            - Expires At: ${expiresAt}
+            `);
+
             const claimButton = new ButtonBuilder()
                 .setCustomId(`casino_drop_claim_${amount}_${dropId || "manual"}_${expiresAt}`)
                 .setLabel("Claim Drop")
@@ -67,6 +73,14 @@ export const CasinoDropService = {
         const amount = parseInt(parts[3]);
         const dropId = parts[4];
         const expiresAt = parts[5] ? parseInt(parts[5]) : null;
+
+        console.log(`[Drop Debug] Claim Attempt:
+        - Amount: ${amount}
+        - DropID: ${dropId}
+        - ExpiresAt (Param): ${expiresAt}
+        - Current Time: ${Date.now()}
+        - Is Expired: ${expiresAt && Date.now() > expiresAt}
+        `);
 
         // Check Expiration
         if (expiresAt && Date.now() > expiresAt) {
