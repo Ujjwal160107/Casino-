@@ -16,6 +16,8 @@ interface GeneralConfigFormProps {
         chatMoneyEnabled: boolean;
         walletLimit: number | null;
         bankLimit: number | null;
+        minBet?: number;
+        maxBet?: number;
     };
 }
 
@@ -25,7 +27,9 @@ export function GeneralConfigForm({ guildId, initialData }: GeneralConfigFormPro
     const [formData, setFormData] = useState({
         ...initialData,
         walletLimit: initialData.walletLimit ?? null,
-        bankLimit: initialData.bankLimit ?? null
+        bankLimit: initialData.bankLimit ?? null,
+        minBet: initialData.minBet ?? 100,
+        maxBet: initialData.maxBet ?? 100000
     });
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
     const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -170,6 +174,32 @@ export function GeneralConfigForm({ guildId, initialData }: GeneralConfigFormPro
                             className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
                         />
                         <p className="text-xs text-zinc-500">Max cash in bank.</p>
+                    </div>
+                </div>
+
+                {/* Global Bet Limits */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-zinc-400">Global Min Bet</label>
+                        <input
+                            type="number"
+                            min={0}
+                            value={formData.minBet || 0}
+                            onChange={(e) => setFormData({ ...formData, minBet: parseInt(e.target.value) || 0 })}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+                        />
+                        <p className="text-xs text-zinc-500">Default minimum bet for all games.</p>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-zinc-400">Global Max Bet</label>
+                        <input
+                            type="number"
+                            min={0}
+                            value={formData.maxBet || 0}
+                            onChange={(e) => setFormData({ ...formData, maxBet: parseInt(e.target.value) || 0 })}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+                        />
+                        <p className="text-xs text-zinc-500">Default maximum bet for all games.</p>
                     </div>
                 </div>
 

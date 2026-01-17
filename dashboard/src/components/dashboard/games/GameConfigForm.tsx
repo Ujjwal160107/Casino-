@@ -16,6 +16,7 @@ interface GameConfigFormProps {
         cooldown: number;
         rouletteSpinTime?: number;
         cockfightBetTime?: number;
+        enabled: boolean;
     };
     globalLimits: {
         min: number;
@@ -45,13 +46,33 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
     return (
         <div className="space-y-6">
             <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="p-3 rounded-lg bg-yellow-500/10 text-yellow-500">
-                        <Dices size={24} />
+                <div className="flex items-center justify-between gap-3 mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="p-3 rounded-lg bg-yellow-500/10 text-yellow-500">
+                            <Dices size={24} />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-white">{gameName} Configuration</h2>
+                            <p className="text-sm text-zinc-400">Manage betting limits and cooldowns for {gameName}.</p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 className="text-xl font-bold text-white">{gameName} Configuration</h2>
-                        <p className="text-sm text-zinc-400">Manage betting limits and cooldowns for {gameName}.</p>
+
+                    {/* Enable Toggle */}
+                    <div className="flex items-center gap-3">
+                        <span className={`text-sm font-medium ${settings.enabled ? "text-green-400" : "text-red-400"}`}>
+                            {settings.enabled ? "Enabled" : "Disabled"}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setSettings({ ...settings, enabled: !settings.enabled })}
+                            className={`relative w-12 h-7 rounded-full transition-colors duration-200 focus:outline-none ${settings.enabled ? "bg-green-500" : "bg-zinc-700"
+                                }`}
+                        >
+                            <span
+                                className={`absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform duration-200 ${settings.enabled ? "translate-x-5" : "translate-x-0"
+                                    }`}
+                            />
+                        </button>
                     </div>
                 </div>
 

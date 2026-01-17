@@ -10,6 +10,7 @@ export interface GameSettings {
     // Specifics
     rouletteSpinTime?: number;
     cockfightBetTime?: number;
+    enabled: boolean;
 }
 
 export async function getGameSettings(guildId: string, gameKey: string) {
@@ -22,7 +23,8 @@ export async function getGameSettings(guildId: string, gameKey: string) {
                 minBet: true, // Globals as fallback/reference
                 maxBet: true,
                 rouletteSpinTime: true,
-                cockfightBetTime: true
+                cockfightBetTime: true,
+                disabledCommands: true
             }
         });
 
@@ -31,13 +33,19 @@ export async function getGameSettings(guildId: string, gameKey: string) {
         const limits = (config.gameBetLimits as any) || {};
         const cooldowns = (config.gameCooldowns as any) || {};
 
+        // Check if game command is in disabledCommands
+        // Map gameKey to command name (e.g., 'blackjack' -> 'blackjack')
+        // Usually 1:1, but worth verifying.
+        const isDisabled = config.disabledCommands.includes(gameKey);
+
         // Default or specific
         let settings: GameSettings = {
             minBet: limits[gameKey]?.min ?? config.minBet,
             maxBet: limits[gameKey]?.max ?? config.maxBet ?? 100000,
             cooldown: cooldowns[gameKey] ?? 0,
             rouletteSpinTime: gameKey === "roulette" ? config.rouletteSpinTime : undefined,
-            cockfightBetTime: gameKey === "cockfight" ? config.cockfightBetTime : undefined
+            cockfightBetTime: gameKey === "cockfight" ? config.cockfightBetTime : undefined,
+            enabled: !isDisabled
         };
 
         return { settings, globalmax: config.maxBet, globalmin: config.minBet };
@@ -51,13 +59,25 @@ export async function updateGameSettings(guildId: string, gameKey: string, setti
     try {
         const config = await prisma.guildConfig.findUnique({
             where: { guildId },
-            select: { gameBetLimits: true, gameCooldowns: true }
+            select: { gameBetLimits: true, gameCooldowns: true, disabledCommands: true }
         });
 
         if (!config) return { success: false, error: "Config not found" };
 
         const currentLimits = (config.gameBetLimits as any) || {};
         const currentCooldowns = (config.gameCooldowns as any) || {};
+        let disabledCommands = config.disabledCommands || [];
+
+        // Handle Enabled/Disabled
+        if (settings.enabled) {
+            // Remove from disabledCommands
+            disabledCommands = disabledCommands.filter(cmd => cmd !== gameKey);
+        } else {
+            // Add to disabledCommands if not present
+            if (!disabledCommands.includes(gameKey)) {
+                disabledCommands.push(gameKey);
+            }
+        }
 
         // Update specific game
         currentLimits[gameKey] = {
@@ -69,7 +89,8 @@ export async function updateGameSettings(guildId: string, gameKey: string, setti
 
         const updateData: any = {
             gameBetLimits: currentLimits,
-            gameCooldowns: currentCooldowns
+            gameCooldowns: currentCooldowns,
+            disabledCommands: disabledCommands
         };
 
         if (gameKey === "roulette" && settings.rouletteSpinTime !== undefined) {
