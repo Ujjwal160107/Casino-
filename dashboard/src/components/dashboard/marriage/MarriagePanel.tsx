@@ -106,11 +106,10 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
                             name="marriageCost"
                             value={config.marriageCost}
                             onChange={handleChange}
-                            className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/50 transition-all font-mono pl-10"
+                            className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/50 transition-all font-mono"
                             min={0}
                             disabled={!config.marriageEnabled}
                         />
-                        <span className="absolute left-4 top-3 text-zinc-500">{config.currencyEmoji}</span>
                     </div>
                     <p className="text-[10px] text-zinc-600">Fee to propose/marry.</p>
                 </div>
@@ -126,11 +125,10 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
                             name="divorceCost"
                             value={config.divorceCost}
                             onChange={handleChange}
-                            className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all font-mono pl-10"
+                            className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all font-mono"
                             min={0}
                             disabled={!config.marriageEnabled}
                         />
-                        <span className="absolute left-4 top-3 text-zinc-500">{config.currencyEmoji}</span>
                     </div>
                     <p className="text-[10px] text-zinc-600">Fee to dissolve a marriage.</p>
                 </div>
