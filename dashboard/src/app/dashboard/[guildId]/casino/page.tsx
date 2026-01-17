@@ -1,6 +1,5 @@
 import { getGameSettings } from "@/actions/game-actions";
 import { GamesPanel } from "@/components/dashboard/games/GamesPanel";
-import { Dices, Crown, LayoutGrid, Coins, Sword, Skull } from "lucide-react";
 
 interface PageProps {
     params: Promise<{
@@ -9,12 +8,12 @@ interface PageProps {
 }
 
 const GAMES = [
-    { key: "blackjack", name: "Blackjack", icon: Crown },
-    { key: "roulette", name: "Roulette", icon: Dices },
-    { key: "slots", name: "Slots", icon: LayoutGrid },
-    { key: "coinflip", name: "Coinflip", icon: Coins },
-    { key: "cockfight", name: "Cockfight", icon: Sword },
-    { key: "russianRoulette", name: "Russian Roulette", icon: Skull },
+    { key: "blackjack", name: "Blackjack" },
+    { key: "roulette", name: "Roulette" },
+    { key: "slots", name: "Slots" },
+    { key: "coinflip", name: "Coinflip" },
+    { key: "cockfight", name: "Cockfight" },
+    { key: "russianRoulette", name: "Russian Roulette" },
 ];
 
 export default async function CasinoPage({ params }: PageProps) {

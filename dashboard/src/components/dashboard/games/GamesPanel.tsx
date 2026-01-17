@@ -9,7 +9,6 @@ import { Dices, Crown, LayoutGrid, Coins, Sword, Skull } from "lucide-react";
 interface GameData {
     key: string;
     name: string;
-    icon: any;
     settings: any;
 }
 
@@ -22,6 +21,15 @@ interface GamesPanelProps {
     };
 }
 
+const ICONS: Record<string, any> = {
+    blackjack: Crown,
+    roulette: Dices,
+    slots: LayoutGrid,
+    coinflip: Coins,
+    cockfight: Sword,
+    russianRoulette: Skull
+};
+
 export function GamesPanel({ guildId, games, globalLimits }: GamesPanelProps) {
     const [selectedGame, setSelectedGame] = useState(games[0].key);
 
@@ -32,7 +40,7 @@ export function GamesPanel({ guildId, games, globalLimits }: GamesPanelProps) {
             {/* Tabs */}
             <div className="flex flex-wrap gap-2 pb-4 border-b border-white/5">
                 {games.map((game) => {
-                    const Icon = game.icon;
+                    const Icon = ICONS[game.key] || Dices;
                     const isSelected = selectedGame === game.key;
 
                     return (
