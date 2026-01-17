@@ -48,7 +48,32 @@ export const CasinoDropService = {
 
             const row = new ActionRowBuilder<ButtonBuilder>().addComponents(claimButton);
 
-            await channel.send({ embeds: [embed], components: [row] });
+            const message = await channel.send({ embeds: [embed], components: [row] });
+
+            // Auto-expire visual update
+            if (dropExpiration < 3600) { // Only set timeout for drops < 1 hour to verify memory/restart safety? Or just always?
+                // User didn't specify limit, but usually good practice. Let's do it always for now, assuming standard usage.
+                setTimeout(async () => {
+                    try {
+                        const expiredEmbed = new EmbedBuilder(embed.toJSON())
+                            .setTitle("❌ Drop Expired")
+                            .setColor(0x2f3136) // Dark Grey/Black
+                            .setDescription(`This drop has expired. Too slow!`);
+
+                        const expiredButton = new ButtonBuilder()
+                            .setCustomId("expired")
+                            .setLabel("Expired")
+                            .setStyle(ButtonStyle.Secondary)
+                            .setDisabled(true);
+
+                        const expiredRow = new ActionRowBuilder<ButtonBuilder>().addComponents(expiredButton);
+
+                        await message.edit({ embeds: [expiredEmbed], components: [expiredRow] }).catch(() => { });
+                    } catch (e) {
+                        // Ignore if message deleted
+                    }
+                }, dropExpiration * 1000);
+            }
 
             // Update last drop time if it's a config-based drop
             if (dropId && dropId !== "manual") {
@@ -85,6 +110,13 @@ export const CasinoDropService = {
         // Check Expiration
         if (expiresAt && Date.now() > expiresAt) {
             try {
+                // Fetch the original embed to keep style or replace? 
+                // Replacing is cleaner for "Expired" state.
+                const expiredEmbed = new EmbedBuilder()
+                    .setTitle("❌ Drop Expired")
+                    .setColor(0x2f3136)
+                    .setDescription(`This drop has expired. Too slow!`);
+
                 const expiredButton = new ButtonBuilder()
                     .setCustomId("expired")
                     .setLabel("Drop Expired")
@@ -92,7 +124,9 @@ export const CasinoDropService = {
                     .setDisabled(true);
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(expiredButton);
-                await interaction.update({ components: [row] });
+
+                // Update BOTH components and embed
+                await interaction.update({ embeds: [expiredEmbed], components: [row] });
                 await interaction.followUp({ content: "Too slow! This drop has expired.", ephemeral: true });
                 return;
             } catch (e) {
