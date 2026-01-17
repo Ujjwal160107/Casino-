@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { redis } from "@/lib/redis";
 
 export interface GameSettings {
     minBet: number;
@@ -105,6 +106,9 @@ export async function updateGameSettings(guildId: string, gameKey: string, setti
             where: { guildId },
             data: updateData
         });
+
+        // Invalidate Bot Cache
+        await redis.del(`guild_config:${guildId}`);
 
         revalidatePath(`/dashboard/${guildId}/games/${gameKey}`);
         return { success: true };
