@@ -173,7 +173,6 @@ export function IncomePanel({ guildId, data }: IncomePanelProps) {
                         <CasinoDropsEditor
                             guildId={guildId}
                             initialData={data.drops.configs || []}
-                            initialExpiration={data.drops.expiration}
                             channels={data.channels || []}
                         />
                     </div>

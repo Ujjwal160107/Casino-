@@ -68,8 +68,9 @@ export async function getIncomeSettings(guildId: string) {
                 maxAmount: d.maxAmount,
                 scheduleTime: d.scheduleTime,
                 interval: d.interval,
+                expiration: d.expiration
             })),
-            expiration: config?.dropExpiration ?? 60
+            expiration: 60 // Deprecated fallthrough
         },
         roles: roles.map(r => ({ id: r.id, name: r.name, color: r.color })),
         channels: channels.map(c => ({ id: c.id, name: c.name }))
@@ -212,15 +213,9 @@ export async function updateQuestSettings(guildId: string, data: {
     }
 }
 
-export async function updateCasinoDrops(guildId: string, drops: any[], dropExpiration: number) {
+export async function updateCasinoDrops(guildId: string, drops: any[]) {
     try {
         await prisma.$transaction(async (tx) => {
-            // Update Global Expiration
-            await tx.guildConfig.update({
-                where: { guildId },
-                data: { dropExpiration }
-            });
-
             await tx.casinoDropConfig.deleteMany({ where: { guildId } });
             if (drops.length > 0) {
                 await tx.casinoDropConfig.createMany({
@@ -232,7 +227,8 @@ export async function updateCasinoDrops(guildId: string, drops: any[], dropExpir
                         maxAmount: d.maxAmount,
                         scheduleTime: d.scheduleTime,
                         interval: d.interval,
-                        currency: "Coins"
+                        currency: "Coins",
+                        expiration: d.expiration
                     }))
                 });
             }
@@ -271,7 +267,7 @@ export async function triggerManualDrop(dropId: string) {
 
         const guildConfig = await prisma.guildConfig.findUnique({ where: { guildId: drop.guildId } });
         const currencyEmoji = guildConfig?.currencyEmoji || "🪙";
-        const dropExpiration = guildConfig?.dropExpiration || 60;
+        const dropExpiration = drop.expiration || 60;
 
         // Calculate amount
         const amount = Math.floor(Math.random() * (drop.maxAmount - drop.minAmount + 1)) + drop.minAmount;

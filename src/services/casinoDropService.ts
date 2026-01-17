@@ -9,7 +9,7 @@ import { logToChannel } from "../utils/discordLogger";
 
 export const CasinoDropService = {
     // Spawn a drop in a specific channel
-    spawnDrop: async (client: Client, guildId: string, channelId: string, amount: number, dropId?: string) => {
+    spawnDrop: async (client: Client, guildId: string, channelId: string, amount: number, dropId?: string, expiration?: number) => {
         try {
             const channel = await client.channels.fetch(channelId) as TextChannel;
             if (!channel) return;
@@ -30,8 +30,8 @@ export const CasinoDropService = {
             const emojiMatch = Mascot.Emotes.MoneyBag.match(/:(\d+)>/);
             const emojiId = emojiMatch ? emojiMatch[1] : "💸";
 
-            // NEW: Fetch drop expiration from config (default 60s if not set)
-            const dropExpiration = config.dropExpiration || 60;
+            // Fallback to 60s if not provided (deprecating global config.dropExpiration use in favor of per-drop or default)
+            const dropExpiration = expiration || config.dropExpiration || 60;
             const expiresAt = Date.now() + (dropExpiration * 1000);
 
             console.log(`[Drop Debug] Spawning Drop:
@@ -204,7 +204,7 @@ export const CasinoDropService = {
                     // Calculate amount
                     const amount = Math.floor(Math.random() * (config.maxAmount - config.minAmount + 1)) + config.minAmount;
 
-                    await CasinoDropService.spawnDrop(client, config.guildId, config.channelId, amount, config.id);
+                    await CasinoDropService.spawnDrop(client, config.guildId, config.channelId, amount, config.id, config.expiration);
 
                     // Post-drop updates
                     let nextInterval = config.interval;
@@ -247,7 +247,7 @@ export const CasinoDropService = {
 
             if (newCount >= config.messageCount) {
                 const amount = Math.floor(Math.random() * (config.maxAmount - config.minAmount + 1)) + config.minAmount;
-                await CasinoDropService.spawnDrop(client, guildId, channelId, amount, config.id);
+                await CasinoDropService.spawnDrop(client, guildId, channelId, amount, config.id, config.expiration);
 
                 await prisma.casinoDropConfig.update({
                     where: { id: config.id },

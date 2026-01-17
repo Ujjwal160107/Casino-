@@ -680,6 +680,7 @@ model CasinoDropConfig {
   minAmount    Int
   maxAmount    Int
   currency     String  @default("Coins")
+  expiration   Int     @default(60) // Seconds before drop expires
   
   // State
   lastDropAt   DateTime?
