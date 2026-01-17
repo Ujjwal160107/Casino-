@@ -3,10 +3,10 @@ import { GameConfigForm } from "@/components/dashboard/games/GameConfigForm";
 import { redirect, notFound } from "next/navigation";
 
 interface PageProps {
-    params: {
+    params: Promise<{
         guildId: string;
         gameId: string;
-    }
+    }>
 }
 
 const GAME_NAMES: Record<string, string> = {
@@ -19,7 +19,7 @@ const GAME_NAMES: Record<string, string> = {
 };
 
 export default async function GameConfigPage({ params }: PageProps) {
-    const { guildId, gameId } = params;
+    const { guildId, gameId } = await params;
     const gameName = GAME_NAMES[gameId];
 
     if (!gameName) {
