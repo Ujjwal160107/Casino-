@@ -311,6 +311,7 @@ model GuildConfig {
   robFinePct     Int      @default(20)
   robCooldown    Int      @default(300)
   robImmuneRoles String[] @default([])
+  dropExpiration Int      @default(60) // Seconds before a drop expires
 
   // Marriage Config
   marriageEnabled   Boolean @default(true)

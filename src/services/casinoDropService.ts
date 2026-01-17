@@ -30,8 +30,12 @@ export const CasinoDropService = {
             const emojiMatch = Mascot.Emotes.MoneyBag.match(/:(\d+)>/);
             const emojiId = emojiMatch ? emojiMatch[1] : "💸";
 
+            // NEW: Fetch drop expiration from config (default 60s if not set)
+            const dropExpiration = config.dropExpiration || 60;
+            const expiresAt = Date.now() + (dropExpiration * 1000);
+
             const claimButton = new ButtonBuilder()
-                .setCustomId(`casino_drop_claim_${amount}_${dropId || "manual"}`)
+                .setCustomId(`casino_drop_claim_${amount}_${dropId || "manual"}_${expiresAt}`)
                 .setLabel("Claim Drop")
                 .setStyle(ButtonStyle.Success)
                 .setEmoji(emojiId);
@@ -59,8 +63,28 @@ export const CasinoDropService = {
         if (!customId.startsWith("casino_drop_claim_")) return;
 
         const parts = customId.split("_");
+        // Format: casino_drop_claim_AMOUNT_DROPID_EXPIRESAT
         const amount = parseInt(parts[3]);
-        const dropId = parts[4] || "manual";
+        const dropId = parts[4];
+        const expiresAt = parts[5] ? parseInt(parts[5]) : null;
+
+        // Check Expiration
+        if (expiresAt && Date.now() > expiresAt) {
+            try {
+                const expiredButton = new ButtonBuilder()
+                    .setCustomId("expired")
+                    .setLabel("Drop Expired")
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(true);
+
+                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(expiredButton);
+                await interaction.update({ components: [row] });
+                await interaction.followUp({ content: "Too slow! This drop has expired.", ephemeral: true });
+                return;
+            } catch (e) {
+                return; // Already replied?
+            }
+        }
 
         // Immediate lock to prevent double claiming (race condition mitigation)
         try {

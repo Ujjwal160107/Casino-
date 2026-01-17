@@ -2,7 +2,7 @@ import prisma from "../utils/prisma";
 import { GuildConfig } from "@prisma/client";
 import { redisService } from "./redisService";
 
-const CACHE_TTL = 600; // 10 minutes
+const CACHE_TTL = 60; // 1 minute (Reduced for better sync)
 
 export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
   const key = `guild_config:${guildId}`;

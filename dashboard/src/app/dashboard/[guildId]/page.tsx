@@ -1,6 +1,7 @@
 import { getGuild } from "@/lib/discord";
 import { getGeneralSettings } from "@/actions/settings-actions";
-import { GeneralSettings } from "@/components/dashboard/GeneralSettings";
+import { GeneralConfigForm } from "@/components/dashboard/forms/GeneralConfigForm";
+
 
 interface PageProps {
     params: Promise<{
@@ -26,7 +27,7 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
 
             {/* General Settings Config */}
             <div className="mb-8">
-                <GeneralSettings guildId={guildId} initialSettings={settings} />
+                <GeneralConfigForm guildId={guildId} initialData={settings} />
             </div>
         </div>
     );

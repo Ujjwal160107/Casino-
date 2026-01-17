@@ -60,9 +60,10 @@ export async function updateMarriageConfig(guildId: string, data: {
 
         // Invalidate Bot Cache
         try {
+            console.log(`[Dashboard] Invalidating marriage config cache for ${guildId}`);
             await redis.del(`guild_config:${guildId}`);
         } catch (e) {
-            console.warn("Failed to invalidate redis cache:", e);
+            console.warn("[Dashboard] Failed to invalidate redis cache:", e);
         }
 
         revalidatePath(`/dashboard/${guildId}/marriage`);
