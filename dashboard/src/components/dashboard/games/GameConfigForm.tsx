@@ -16,6 +16,9 @@ interface GameConfigFormProps {
         cooldown: number;
         rouletteSpinTime?: number;
         cockfightBetTime?: number;
+        chickenHealCost?: number;
+        chickenTrainBaseCost?: number;
+        chickenTrainMultiplier?: number;
         enabled: boolean;
     };
     globalLimits: {
@@ -163,6 +166,56 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                                 Duration of the betting phase before the fight starts.
                             </p>
                         </div>
+                    )}
+
+                    {gameKey === "cockfight" && (
+                        <>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                                    Chicken Heal Cost
+                                </label>
+                                <input
+                                    type="number"
+                                    value={settings.chickenHealCost || 0}
+                                    onChange={(e) => setSettings({ ...settings, chickenHealCost: parseInt(e.target.value) || 0 })}
+                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                />
+                                <p className="text-xs text-zinc-500">
+                                    Cost to heal an injured chicken.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                                    Training Base Cost
+                                </label>
+                                <input
+                                    type="number"
+                                    value={settings.chickenTrainBaseCost || 0}
+                                    onChange={(e) => setSettings({ ...settings, chickenTrainBaseCost: parseInt(e.target.value) || 0 })}
+                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                />
+                                <p className="text-xs text-zinc-500">
+                                    Base cost for training a chicken.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                                    Training Multiplier
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.1"
+                                    value={settings.chickenTrainMultiplier || 0}
+                                    onChange={(e) => setSettings({ ...settings, chickenTrainMultiplier: parseFloat(e.target.value) || 0 })}
+                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                />
+                                <p className="text-xs text-zinc-500">
+                                    Cost multiplier per training level (e.g., 0.5).
+                                </p>
+                            </div>
+                        </>
                     )}
                 </div>
 

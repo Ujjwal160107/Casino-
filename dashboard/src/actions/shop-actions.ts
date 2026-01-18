@@ -6,7 +6,10 @@ import { revalidatePath } from "next/cache";
 export async function getShopItems(guildId: string) {
     try {
         const items = await prisma.shopItem.findMany({
-            where: { guildId },
+            where: {
+                guildId,
+                category: { notIn: ["JOBS", "EDUCATION"] }
+            },
             orderBy: { createdAt: "desc" }
         });
         return items;

@@ -11,6 +11,10 @@ export interface GameSettings {
     // Specifics
     rouletteSpinTime?: number;
     cockfightBetTime?: number;
+    // Cockfight Specifics
+    chickenHealCost?: number;
+    chickenTrainBaseCost?: number;
+    chickenTrainMultiplier?: number;
     enabled: boolean;
 }
 
@@ -25,6 +29,9 @@ export async function getGameSettings(guildId: string, gameKey: string) {
                 maxBet: true,
                 rouletteSpinTime: true,
                 cockfightBetTime: true,
+                chickenHealCost: true,
+                chickenTrainBaseCost: true,
+                chickenTrainMultiplier: true,
                 disabledCommands: true
             }
         });
@@ -46,6 +53,9 @@ export async function getGameSettings(guildId: string, gameKey: string) {
             cooldown: cooldowns[gameKey] ?? 0,
             rouletteSpinTime: gameKey === "roulette" ? config.rouletteSpinTime : undefined,
             cockfightBetTime: gameKey === "cockfight" ? config.cockfightBetTime : undefined,
+            chickenHealCost: gameKey === "cockfight" ? config.chickenHealCost : undefined,
+            chickenTrainBaseCost: gameKey === "cockfight" ? config.chickenTrainBaseCost : undefined,
+            chickenTrainMultiplier: gameKey === "cockfight" ? config.chickenTrainMultiplier : undefined,
             enabled: !isDisabled
         };
 
@@ -98,8 +108,11 @@ export async function updateGameSettings(guildId: string, gameKey: string, setti
             updateData.rouletteSpinTime = settings.rouletteSpinTime;
         }
 
-        if (gameKey === "cockfight" && settings.cockfightBetTime !== undefined) {
-            updateData.cockfightBetTime = settings.cockfightBetTime;
+        if (gameKey === "cockfight") {
+            if (settings.cockfightBetTime !== undefined) updateData.cockfightBetTime = settings.cockfightBetTime;
+            if (settings.chickenHealCost !== undefined) updateData.chickenHealCost = settings.chickenHealCost;
+            if (settings.chickenTrainBaseCost !== undefined) updateData.chickenTrainBaseCost = settings.chickenTrainBaseCost;
+            if (settings.chickenTrainMultiplier !== undefined) updateData.chickenTrainMultiplier = settings.chickenTrainMultiplier;
         }
 
         await prisma.guildConfig.update({
