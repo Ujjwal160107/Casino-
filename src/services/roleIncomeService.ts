@@ -41,8 +41,8 @@ export async function claimRoleIncome(discordId: string, guildId: string, roleId
     const user = await prisma.user.findUnique({ where: { discordId_guildId: { discordId, guildId } } });
     if (!user) throw new Error("User profile not found.");
 
-    // Only fetch COLLECTIBLE incomes
-    const eligibleIncomes = await prisma.roleIncome.findMany({
+    // Fetch all potential incomes for the user's roles
+    const allIncomes = await prisma.roleIncome.findMany({
         where: {
             guildId,
             roleId: { in: roleIds },
@@ -50,57 +50,77 @@ export async function claimRoleIncome(discordId: string, guildId: string, roleId
         }
     });
 
-    if (eligibleIncomes.length === 0) {
-        return { totalClaimed: 0, details: [], message: "No collectible role income available for your roles." };
+    if (allIncomes.length === 0) {
+        return { totalClaimed: 0, details: [], status: [], message: "No collectible role income configured for your roles." };
     }
 
+    // Fetch existing claims
+    const claims = await prisma.roleIncomeClaim.findMany({
+        where: {
+            userId: user.id,
+            roleIncomeId: { in: allIncomes.map(i => i.id) }
+        }
+    });
+
     const results = [];
+    const status = []; // To hold next claim info for all roles
     let totalPayout = 0;
+    const now = new Date();
 
-    for (const income of eligibleIncomes) {
-        const claim = await prisma.roleIncomeClaim.findUnique({
-            where: {
-                userId_roleIncomeId: {
-                    userId: user.id,
-                    roleIncomeId: income.id
-                }
-            }
-        });
+    for (const income of allIncomes) {
+        const claim = claims.find(c => c.roleIncomeId === income.id);
+        let canClaim = true;
+        let nextClaimAt = now;
 
-        const now = new Date();
         if (claim) {
-            const nextClaim = new Date(claim.claimedAt.getTime() + income.cooldown * 1000);
-            if (now < nextClaim) {
-                continue;
+            const cooldownEnds = new Date(claim.claimedAt.getTime() + income.cooldown * 1000);
+            if (now < cooldownEnds) {
+                canClaim = false;
+                nextClaimAt = cooldownEnds;
             }
         }
 
-        await prisma.$transaction([
-            prisma.bank.update({
-                where: { userId: user.id },
-                data: { balance: { increment: income.amount } }
-            }),
-            prisma.roleIncomeClaim.upsert({
-                where: {
-                    userId_roleIncomeId: {
-                        userId: user.id,
-                        roleIncomeId: income.id
-                    }
-                },
-                update: { claimedAt: now },
-                create: {
-                    userId: user.id,
-                    roleIncomeId: income.id,
-                    claimedAt: now
-                }
-            })
-        ]);
+        status.push({
+            roleId: income.roleId,
+            amount: income.amount,
+            nextClaimAt,
+            canClaim
+        });
 
-        totalPayout += income.amount;
-        results.push({ roleId: income.roleId, amount: income.amount });
+        if (canClaim) {
+            await prisma.$transaction([
+                prisma.bank.update({
+                    where: { userId: user.id },
+                    data: { balance: { increment: income.amount } }
+                }),
+                prisma.roleIncomeClaim.upsert({
+                    where: {
+                        userId_roleIncomeId: {
+                            userId: user.id,
+                            roleIncomeId: income.id
+                        }
+                    },
+                    update: { claimedAt: now },
+                    create: {
+                        userId: user.id,
+                        roleIncomeId: income.id,
+                        claimedAt: now
+                    }
+                })
+            ]);
+
+            totalPayout += income.amount;
+            results.push({ roleId: income.roleId, amount: income.amount });
+            // Update status for this just-claimed item to show next cooldown
+            const updatedStatus = status.find(s => s.roleId === income.roleId);
+            if (updatedStatus) {
+                updatedStatus.canClaim = false;
+                updatedStatus.nextClaimAt = new Date(now.getTime() + income.cooldown * 1000);
+            }
+        }
     }
 
-    return { totalClaimed: totalPayout, details: results };
+    return { totalClaimed: totalPayout, details: results, status };
 }
 
 /**
