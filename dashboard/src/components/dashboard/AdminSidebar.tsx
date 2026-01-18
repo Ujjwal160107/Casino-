@@ -83,6 +83,7 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
             title: "Shop & Misc",
             items: [
                 { label: "Role Income", href: `/dashboard/${guild.id}/shop-misc/role-income`, icon: Coins },
+                { label: "Shop Items", href: `/dashboard/${guild.id}/shop-misc/shop`, icon: ShoppingBag },
             ]
         },
     ];
