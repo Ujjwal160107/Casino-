@@ -323,7 +323,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                     }
                                                 }}
                                                 disabled={formData.requirements?.roles?.length >= 2}
-                                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10 disabled:cursor-not-allowed"
+                                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10 disabled:cursor-not-allowed bg-[#1e1f22] text-zinc-200"
                                             >
                                                 <option value="">Add Role...</option>
                                                 {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
