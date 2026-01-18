@@ -221,6 +221,16 @@ export async function buyItem(guildId: string, userId: string, itemName: string,
       }
     });
 
+    // Apply "On Buy" effects
+    const buyEffects = ((item.effects as any) || []).filter((e: any) => e.trigger === "BUY");
+    if (buyEffects.length > 0) {
+      try {
+        await applyItemEffects(userId, guildId, buyEffects, member);
+      } catch (err) {
+        console.error("Failed to apply on-buy effects:", err);
+      }
+    }
+
     return item;
   });
 }
@@ -263,8 +273,9 @@ export async function useItem(userId: string, guildId: string, itemName: string,
   }
 
   // Apply effects
-  const effects = (item.effects as any) as ItemEffect[] || [];
-  const results = await applyItemEffects(userId, guildId, effects, member);
+  const allEffects = (item.effects as any) as ItemEffect[] || [];
+  const effectsToApply = allEffects.filter(e => !e.trigger || e.trigger === "USE");
+  const results = await applyItemEffects(userId, guildId, effectsToApply, member);
 
   // Decrease or remove from inventory if consumable
   if (item.consumable) {

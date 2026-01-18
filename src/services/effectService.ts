@@ -27,6 +27,7 @@ export interface ItemEffect {
     amount?: number;
     levels?: number;
     value?: number;
+    trigger?: "BUY" | "USE";
 }
 
 export interface ItemEffectResult {
