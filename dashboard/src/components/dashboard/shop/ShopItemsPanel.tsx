@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { ShopItemEditor } from "@/components/dashboard/shop/ShopItemEditor";
-import { Plus, Edit2, Package, Shield, Zap } from "lucide-react";
+import { Plus, Edit2, Package, Shield, Zap, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { deleteShopItem } from "@/actions/shop-actions";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 interface ShopItemsPanelProps {
     guildId: string;
@@ -13,8 +16,20 @@ interface ShopItemsPanelProps {
 }
 
 export function ShopItemsPanel({ guildId, items, roles, currencyEmoji }: ShopItemsPanelProps) {
+    const router = useRouter();
     const [editingItem, setEditingItem] = useState<any>(null);
     const [isCreating, setIsCreating] = useState(false);
+
+    const handleDelete = async (itemId: string) => {
+        if (!confirm("Are you sure you want to delete this item?")) return;
+        const res = await deleteShopItem(itemId, guildId);
+        if (res.success) {
+            toast.success("Item deleted");
+            router.refresh();
+        } else {
+            toast.error("Failed to delete item");
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -53,19 +68,37 @@ export function ShopItemsPanel({ guildId, items, roles, currencyEmoji }: ShopIte
                                 <div className={`w-3 h-3 rounded-full ${item.stock === 0 ? "bg-red-500" : "bg-green-500"}`} />
                                 <h3 className="font-bold text-white text-lg font-serif">{item.name}</h3>
                             </div>
-                            <button
-                                onClick={() => setEditingItem(item)}
-                                className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors"
-                            >
-                                <Edit2 size={16} />
-                            </button>
+                            <div className="flex gap-1">
+                                <button
+                                    onClick={() => setEditingItem(item)}
+                                    className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors"
+                                    title="Edit Limit"
+                                >
+                                    <Edit2 size={16} />
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(item.id)}
+                                    className="p-2 bg-white/5 hover:bg-red-500/20 rounded-lg text-zinc-400 hover:text-red-400 transition-colors"
+                                    title="Delete Item"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
                         </div>
 
                         <p className="text-sm text-zinc-500 line-clamp-2 mb-4 h-10">{item.description}</p>
 
                         <div className="grid grid-cols-2 gap-2 text-xs text-zinc-400 mb-4">
                             <div className="flex items-center gap-1.5">
-                                <span className="text-yellow-500 font-bold">{currencyEmoji} {item.price}</span>
+                                {/* Only show emoji if it's not a complex discord string, otherwise just PRICE label? 
+                                    User said: "remove the money placeholder". 
+                                    If we just show the Price Number, it's cleaner. 
+                                    Or verify if currencyEmoji is safe. 
+                                    Safest: Show Price + Emoji. 
+                                    But if User wants placeholder gone from editor, done.
+                                    Here I will keep it but maybe wrap it safely. 
+                                */}
+                                <span className="text-yellow-500 font-bold">{item.price} Coins</span>
                             </div>
                             <div className="flex items-center gap-1.5 justify-end">
                                 <span>Stock: {item.stock === -1 ? "∞" : item.stock}</span>

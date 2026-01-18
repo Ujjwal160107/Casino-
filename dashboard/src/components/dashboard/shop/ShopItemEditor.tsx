@@ -27,6 +27,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
         showInInventory: true,
         sellable: true,
         requirements: { roles: [], balance: 0 },
+        // Expanded structure for actions to include metadata (duration, etc)
         onBuyActions: []
     });
     // Dummy state for the footer toggle shown in screenshot
@@ -85,8 +86,10 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
     };
 
     const handleDelete = async () => {
-        if (!confirm("Delete this item?")) return;
+        if (!confirm("Delete this item? This cannot be undone.")) return;
+        setIsSaving(true);
         const res = await deleteShopItem(item.id, guildId);
+        setIsSaving(false);
         if (res.success) {
             toast.success("Item deleted.");
             router.refresh();
@@ -97,11 +100,6 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
     };
 
     // Role Requirements Adapter (Visual only -> Logic)
-    // We treat 'requirements.roles' as the single list of roles.
-    // If the list is empty, we show no "Role Requirement" row? 
-    // Or we show one row that is empty? 
-    // Screenshot implies "Add Requirement" adds a row. 
-    // For simplicity with current backend: We'll show the Role Validation Row if there are roles, or if user clicks Add.
     const hasRoleReq = formData.requirements?.roles?.length > 0;
     const [showRoleReqUI, setShowRoleReqUI] = useState(hasRoleReq);
 
@@ -112,19 +110,8 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                 animate={{ scale: 1, opacity: 1 }}
                 className="bg-[#313338] rounded-md w-full max-w-3xl overflow-hidden flex flex-col shadow-2xl relative"
             >
-                {/* Header */}
-                {/* Header in screenshot is implicit, but we keep our clean one */}
-                {/* Actually, screenshot 1 shows no header inside the modal content, just inputs. 
-                    But usually there's a title. I'll keep the title small/clean. */}
-                {/* <div className="px-6 py-4 border-b border-black/10">
-                    <h2 className="text-lg font-bold text-zinc-200 uppercase tracking-widest">
-                        {item ? "Edit Item" : "Create Item"}
-                    </h2>
-                </div> */}
-
                 {/* Content Area */}
                 <div className="p-6 overflow-y-auto custom-scrollbar space-y-6 max-h-[75vh]">
-
                     {/* NAME */}
                     <div className="space-y-2">
                         <label className="text-[11px] font-bold text-zinc-400 uppercase">NAME</label>
@@ -209,7 +196,6 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                         </div>
                         <div className="flex items-center gap-3">
                             <span className="text-[10px] font-bold text-zinc-400 uppercase">UNLIMITED</span>
-                            {/* Custom Toggle */}
                             <button
                                 onClick={() => handleChange("stock", formData.stock === -1 ? 0 : -1)}
                                 className={`w-11 h-6 rounded-full relative transition-colors ${formData.stock === -1 ? "bg-[#5865f2]" : "bg-[#80848e]"}`}
@@ -235,7 +221,6 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                             <label className="text-[11px] font-bold text-zinc-400 uppercase">INVENTORY ITEM</label>
                             <p className="text-xs text-zinc-500">If item is placed into the users inventory when bought.</p>
                         </div>
-                        {/* Custom Toggle */}
                         <button
                             onClick={() => handleChange("showInInventory", !formData.showInInventory)}
                             className={`w-11 h-6 rounded-full relative transition-colors ${formData.showInInventory ? "bg-[#5865f2]" : "bg-[#80848e]"}`}
@@ -250,7 +235,6 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                             <label className="text-[11px] font-bold text-zinc-400 uppercase">USABLE</label>
                             <p className="text-xs text-zinc-500">If the item is able to be used or not (a collectable).</p>
                         </div>
-                        {/* Custom Toggle */}
                         <button
                             onClick={() => handleChange("usable", !formData.usable)}
                             className={`w-11 h-6 rounded-full relative transition-colors ${formData.usable ? "bg-[#5865f2]" : "bg-[#80848e]"}`}
@@ -265,7 +249,6 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                             <label className="text-[11px] font-bold text-zinc-400 uppercase">SELLABLE</label>
                             <p className="text-xs text-zinc-500">If the item is able to be sold to other users.</p>
                         </div>
-                        {/* Custom Toggle */}
                         <button
                             onClick={() => handleChange("sellable", !formData.sellable)}
                             className={`w-11 h-6 rounded-full relative transition-colors ${formData.sellable !== false ? "bg-[#5865f2]" : "bg-[#80848e]"}`}
@@ -295,9 +278,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                         <div className="flex justify-between items-center mb-2">
                             <div className="flex items-center gap-2">
                                 <label className="text-[11px] font-bold text-zinc-400 uppercase">REQUIREMENTS [{showRoleReqUI ? "0" : "1"} REMAINING]</label>
-                                <div className="flex items-center gap-1 text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 rounded border border-yellow-500/20">
-                                    <Crown size={10} fill="currentColor" /> Premium
-                                </div>
+                                {/* Premium Badge Removed as requested */}
                             </div>
                             <button
                                 onClick={() => setShowRoleReqUI(true)}
@@ -341,7 +322,6 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-bold text-zinc-500 uppercase">ROLES</label>
                                         <div className="bg-[#1e1f22] rounded min-h-[36px] p-1 flex flex-wrap gap-1 relative group">
-                                            {/* Simulate a select or dropdown trigger */}
                                             <select
                                                 onChange={e => {
                                                     const val = e.target.value;
@@ -359,15 +339,14 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                             {formData.requirements?.roles?.map((roleId: string) => {
                                                 const role = roles.find(r => r.id === roleId);
                                                 return role ? (
-                                                    <span key={role.id} className="bg-[#2b2d31] text-zinc-300 text-[11px] px-2 py-0.5 rounded flex items-center gap-1">
+                                                    <span key={role.id} className="bg-[#2b2d31] text-zinc-300 text-[11px] px-2 py-0.5 rounded flex items-center gap-1 z-20 relative">
                                                         {role.name}
                                                         <button
                                                             onClick={(e) => {
-                                                                e.stopPropagation(); // prevent select open
-                                                                e.preventDefault(); // prevent default?
+                                                                e.stopPropagation();
                                                                 handleReqChange("roles", formData.requirements.roles.filter((id: string) => id !== roleId));
                                                             }}
-                                                            className="hover:text-red-400 bg-black/20 rounded-full p-0.5 z-20 relative pointer-events-auto"
+                                                            className="hover:text-red-400 bg-black/20 rounded-full p-0.5"
                                                         >
                                                             <X size={10} />
                                                         </button>
@@ -392,9 +371,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                         <div className="flex justify-between items-center mb-2">
                             <div className="flex items-center gap-2">
                                 <label className="text-[11px] font-bold text-zinc-400 uppercase">ACTIONS [{5 - (formData.onBuyActions?.length || 0)} REMAINING]</label>
-                                <div className="flex items-center gap-1 text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 rounded border border-yellow-500/20">
-                                    <Crown size={10} fill="currentColor" /> Premium
-                                </div>
+                                {/* Premium Badge Removed */}
                             </div>
                             <button
                                 onClick={addAction}
@@ -410,7 +387,6 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                 <div className="space-y-4">
                                     {formData.onBuyActions.map((action: any, idx: number) => (
                                         <div key={idx} className="grid grid-cols-[150px_160px_1fr] gap-4 items-start relative pb-4 border-b border-black/10 last:border-0 last:pb-0">
-                                            {/* Remove Button for Action */}
                                             <button onClick={() => removeAction(idx)} className="absolute -right-2 -top-2 text-zinc-600 hover:text-red-400">
                                                 <X size={14} />
                                             </button>
@@ -427,6 +403,8 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                         <option value="MSG">Send Message</option>
                                                         <option value="ADD_ROLE">Add Role</option>
                                                         <option value="REMOVE_ROLE">Remove Role</option>
+                                                        <option value="ADD_TEMP_ROLE">Add Temp Role</option>
+                                                        {/* Future features can be added here */}
                                                     </select>
                                                     <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" size={14} />
                                                 </div>
@@ -449,12 +427,12 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                 </div>
                                             </div>
 
-                                            {/* Value / Message */}
+                                            {/* Value / Message / Role / Duration */}
                                             <div className="space-y-1">
                                                 <label className="text-[10px] font-bold text-zinc-500 uppercase">
                                                     {action.type === "MSG" ? "MESSAGE" : "ROLE"}
                                                 </label>
-                                                <div className="bg-[#1e1f22] rounded p-1 relative">
+                                                <div className="bg-[#1e1f22] rounded p-1 relative space-y-2">
                                                     {action.type === "MSG" ? (
                                                         <>
                                                             <textarea
@@ -480,6 +458,19 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" size={14} />
                                                         </div>
                                                     )}
+
+                                                    {/* TEMP ROLE DURATION INPUT */}
+                                                    {action.type === "ADD_TEMP_ROLE" && (
+                                                        <div className="border-t border-zinc-700/30 pt-1 mt-1">
+                                                            <input
+                                                                type="number"
+                                                                value={action.duration || ""}
+                                                                onChange={e => updateAction(idx, "duration", parseInt(e.target.value))}
+                                                                className="w-full bg-transparent text-zinc-300 text-xs p-1 focus:outline-none"
+                                                                placeholder="Duration in seconds (e.g. 3600)"
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -490,8 +481,6 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                             )}
                         </div>
                     </div>
-
-
                 </div>
 
                 {/* Footer */}
@@ -506,14 +495,22 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                         </button>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 items-center">
+                        {item && (
+                            <button
+                                onClick={handleDelete}
+                                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 p-2 rounded mr-2 transition-colors"
+                                title="Delete Item"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        )}
                         <button onClick={onClose} className="hover:underline text-zinc-300 font-medium px-4">Cancel</button>
                         <button
                             onClick={handleSave}
                             disabled={isSaving}
                             className="bg-[#248046] hover:bg-[#1a6334] text-white px-6 py-2 rounded-[3px] font-medium transition-colors disabled:opacity-50 text-sm"
                         >
-                            {/* Matches screenshot 'Create' but maintains Save logic */}
                             {isSaving ? "Saving..." : (item ? "Save" : "Create")}
                         </button>
                     </div>
