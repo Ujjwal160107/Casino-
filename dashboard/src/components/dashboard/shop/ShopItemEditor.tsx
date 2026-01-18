@@ -309,6 +309,8 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                             handleReqChange("netWorth", 1000);
                                         } else if (type === "ITEM") {
                                             handleReqChange("items", [...(formData.requirements?.items || []), ""]);
+                                        } else if (type === "ROLE") {
+                                            handleReqChange("roles", [...(formData.requirements?.roles || []), ""]);
                                         }
                                         // Role is handled via specific role selector usually, but here we trigger a mode? 
                                         // Actually easier to just have a "Add Role" entry that shows the role selector?
@@ -353,11 +355,31 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                 {formData.requirements?.roles?.map((roleId: string, idx: number) => (
                                     <div key={`req-role-${idx}`} className="grid grid-cols-[120px_1fr_auto] gap-4 items-center bg-[#1e1f22] p-2 rounded">
                                         <div className="text-[10px] font-bold text-zinc-500 uppercase">ROLE REQ</div>
-                                        <div className="text-sm text-zinc-300">
-                                            {roles.find(r => r.id === roleId)?.name || "Unknown Role"}
-                                        </div>
+                                        {roleId ? (
+                                            <div className="text-sm text-zinc-300">
+                                                {roles.find(r => r.id === roleId)?.name || "Unknown Role"}
+                                            </div>
+                                        ) : (
+                                            <select
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val) {
+                                                        const newRoles = [...formData.requirements.roles];
+                                                        newRoles[idx] = val;
+                                                        handleReqChange("roles", newRoles);
+                                                    }
+                                                }}
+                                                className="bg-transparent text-sm text-zinc-200 focus:outline-none border border-white/10 rounded px-2 py-1"
+                                            >
+                                                <option value="">Select Role...</option>
+                                                {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                            </select>
+                                        )}
                                         <button
-                                            onClick={() => handleReqChange("roles", formData.requirements.roles.filter((r: string) => r !== roleId))}
+                                            onClick={() => {
+                                                const newRoles = formData.requirements.roles.filter((_: string, i: number) => i !== idx);
+                                                handleReqChange("roles", newRoles);
+                                            }}
                                             className="text-zinc-500 hover:text-red-400"
                                         >
                                             <X size={14} />
