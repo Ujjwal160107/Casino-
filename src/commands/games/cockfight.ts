@@ -602,10 +602,35 @@ async function runCockFight(
         }
         deathChance = Math.min(deathChance, 0.50); // Cap at 50%
 
-        const isDead = Math.random() < deathChance;
+        const isDeadRoll = Math.random() < deathChance;
+        let survivedByEffect = false;
+        let usedDeathSave = false;
 
-        if (!isDead) {
-            // INJURED STATE (95%)
+        if (isDeadRoll) {
+            // Check for Death Save
+            const activeDeathSave = await prisma.activeEffect.findFirst({
+                where: {
+                    userId: lId,
+                    guildId: guildId,
+                    effectType: "DEATH_SAVE",
+                    OR: [
+                        { expiresAt: { gt: new Date() } },
+                        { expiresAt: null }
+                    ]
+                }
+            });
+
+            if (activeDeathSave) {
+                await prisma.activeEffect.delete({ where: { id: activeDeathSave.id } });
+                survivedByEffect = true;
+                usedDeathSave = true;
+            }
+        }
+
+        const actuallyDead = isDeadRoll && !survivedByEffect;
+
+        if (!actuallyDead) {
+            // INJURED STATE (95% or Saved by Effect)
             const loserMeta = winnerIsP1 ? p2Meta : p1Meta;
             const newLoserMeta = JSON.parse(JSON.stringify(loserMeta));
 
@@ -632,9 +657,14 @@ async function runCockFight(
 
         await prisma.$transaction(payoutOps);
 
-        const deathMessage = !isDead
-            ? `<:clinic:1453972244610154507> **INJURED!** ${loserUser.username}'s chicken survives but is hospitalized for 2 hours.\n<:alert_sign:1451625691664875610> **Equipment Broken!**`
-            : `${EMOJI_RIP} **CRITICAL FAILURE!** ${loserUser.username}'s chicken has died (Permadeath).`;
+        let deathMessage = "";
+        if (actuallyDead) {
+            deathMessage = `${EMOJI_RIP} **CRITICAL FAILURE!** ${loserUser.username}'s chicken has died (Permadeath).`;
+        } else if (usedDeathSave) {
+            deathMessage = `🛡️ **SAVED!** ${loserUser.username}'s chicken was saved from death by a **Death Save** effect!\n<:clinic:1453972244610154507> It is now injured for 2 hours (Equipment Broken).`;
+        } else {
+            deathMessage = `<:clinic:1453972244610154507> **INJURED!** ${loserUser.username}'s chicken survives but is hospitalized for 2 hours.\n<:alert_sign:1451625691664875610> **Equipment Broken!**`;
+        }
 
         const EMOJI_XP = "<:xpfull:1451636569982111765>";
         const EMOJI_XP_EMPTY = "<:xpempty:1451642829427314822>";

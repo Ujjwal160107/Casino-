@@ -369,7 +369,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                         handleReqChange("roles", newRoles);
                                                     }
                                                 }}
-                                                className="bg-transparent text-sm text-zinc-200 focus:outline-none border border-white/10 rounded px-2 py-1"
+                                                className="bg-[#1e1f22] text-sm text-zinc-200 focus:outline-none border border-white/10 rounded px-2 py-1"
                                             >
                                                 <option value="">Select Role...</option>
                                                 {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
