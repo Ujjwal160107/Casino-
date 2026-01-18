@@ -18,10 +18,12 @@ interface GeneralConfigFormProps {
         bankLimit: number | null;
         minBet?: number | null;
         maxBet?: number | null;
+        logChannelId?: string | null;
     };
+    channels?: { id: string; name: string }[];
 }
 
-export function GeneralConfigForm({ guildId, initialData }: GeneralConfigFormProps) {
+export function GeneralConfigForm({ guildId, initialData, channels = [] }: GeneralConfigFormProps) {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -29,7 +31,8 @@ export function GeneralConfigForm({ guildId, initialData }: GeneralConfigFormPro
         walletLimit: initialData.walletLimit ?? null,
         bankLimit: initialData.bankLimit ?? null,
         minBet: initialData.minBet ?? 100,
-        maxBet: initialData.maxBet ?? 100000
+        maxBet: initialData.maxBet ?? 100000,
+        logChannelId: initialData.logChannelId ?? ""
     });
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
     const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -204,24 +207,58 @@ export function GeneralConfigForm({ guildId, initialData }: GeneralConfigFormPro
                 </div>
 
 
-                {/* Chat Money Toggle */}
-                <div className="p-4 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between">
-                    <div>
-                        <h3 className="text-white font-medium">Chat Money</h3>
-                        <p className="text-sm text-zinc-400 mt-1">Earn currency by chatting in active channels.</p>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, chatMoneyEnabled: !formData.chatMoneyEnabled })}
-                        className={`relative w-12 h-7 rounded-full transition-colors duration-200 focus:outline-none ${formData.chatMoneyEnabled ? "bg-yellow-500" : "bg-zinc-700"
-                            }`}
+            </div>
+
+            {/* Log Channel */}
+            <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-400">Casino Log Channel</label>
+                <div className="relative">
+                    <select
+                        value={formData.logChannelId || ""}
+                        onChange={(e) => setFormData({ ...formData, logChannelId: e.target.value })}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all appearance-none"
                     >
-                        <span
-                            className={`absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform duration-200 ${formData.chatMoneyEnabled ? "translate-x-5" : "translate-x-0"
-                                }`}
-                        />
-                    </button>
+                        <option value="">Select a channel...</option>
+                        {channels.map((channel) => (
+                            <option key={channel.id} value={channel.id}>
+                                #{channel.name}
+                            </option>
+                        ))}
+                    </select>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </div>
                 </div>
+
+                <div className="mt-2">
+                    <p className="text-xs text-zinc-500 mb-1">Or paste Channel ID if not listed:</p>
+                    <input
+                        type="text"
+                        placeholder="Channel ID"
+                        value={formData.logChannelId || ""}
+                        onChange={(e) => setFormData({ ...formData, logChannelId: e.target.value })}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-sm text-zinc-400 focus:text-white focus:outline-none focus:border-white/20 transition-all"
+                    />
+                </div>
+            </div>
+
+            {/* Chat Money Toggle */}
+            <div className="p-4 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between">
+                <div>
+                    <h3 className="text-white font-medium">Chat Money</h3>
+                    <p className="text-sm text-zinc-400 mt-1">Earn currency by chatting in active channels.</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, chatMoneyEnabled: !formData.chatMoneyEnabled })}
+                    className={`relative w-12 h-7 rounded-full transition-colors duration-200 focus:outline-none ${formData.chatMoneyEnabled ? "bg-yellow-500" : "bg-zinc-700"
+                        }`}
+                >
+                    <span
+                        className={`absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform duration-200 ${formData.chatMoneyEnabled ? "translate-x-5" : "translate-x-0"
+                            }`}
+                    />
+                </button>
             </div>
 
             {/* Danger Zone */}
@@ -289,18 +326,20 @@ export function GeneralConfigForm({ guildId, initialData }: GeneralConfigFormPro
             </AnimatePresence>
 
             {/* Status Message */}
-            {message && (
-                <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`p-3 rounded-lg text-sm border ${message.type === "success"
-                        ? "bg-green-500/10 border-green-500/20 text-green-400"
-                        : "bg-red-500/10 border-red-500/20 text-red-400"
-                        }`}
-                >
-                    {message.text}
-                </motion.div>
-            )}
+            {
+                message && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`p-3 rounded-lg text-sm border ${message.type === "success"
+                            ? "bg-green-500/10 border-green-500/20 text-green-400"
+                            : "bg-red-500/10 border-red-500/20 text-red-400"
+                            }`}
+                    >
+                        {message.text}
+                    </motion.div>
+                )
+            }
 
             <button
                 type="submit"
@@ -310,6 +349,6 @@ export function GeneralConfigForm({ guildId, initialData }: GeneralConfigFormPro
                 {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                 Save Changes
             </button>
-        </form>
+        </form >
     );
 }

@@ -1,4 +1,4 @@
-import { getGuild } from "@/lib/discord";
+import { getGuild, getGuildChannels } from "@/lib/discord";
 import { getGeneralSettings } from "@/actions/settings-actions";
 import { GeneralConfigForm } from "@/components/dashboard/forms/GeneralConfigForm";
 
@@ -11,9 +11,10 @@ interface PageProps {
 
 export default async function DashboardOverviewPage({ params }: PageProps) {
     const { guildId } = await params;
-    const [guild, settings] = await Promise.all([
+    const [guild, settings, channels] = await Promise.all([
         getGuild(guildId),
-        getGeneralSettings(guildId)
+        getGeneralSettings(guildId),
+        getGuildChannels(guildId)
     ]);
 
     return (
@@ -27,7 +28,7 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
 
             {/* General Settings Config */}
             <div className="mb-8">
-                <GeneralConfigForm guildId={guildId} initialData={settings} />
+                <GeneralConfigForm guildId={guildId} initialData={settings} channels={channels} />
             </div>
         </div>
     );
