@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { upsertShopItem, deleteShopItem } from "@/actions/shop-actions";
-import { Save, Trash2, Plus, X, Crown, ChevronDown, Check } from "lucide-react";
+import { Save, Trash2, Plus, X, Crown, ChevronDown, Check, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,21 @@ interface ShopItemEditorProps {
     roles: { id: string; name: string; color: number }[];
     onClose: () => void;
 }
+
+const EFFECT_TYPES = [
+    { label: "Send Message", value: "CUSTOM_MESSAGE" },
+    { label: "Add Role (Perm)", value: "ROLE_PERMANENT" },
+    { label: "Add Role (Temp)", value: "ROLE_TEMPORARY" },
+    { label: "Give Money", value: "MONEY" },
+    { label: "XP Multiplier", value: "XP_MULTIPLIER" },
+    { label: "Level Boost", value: "LEVEL_BOOST" },
+    { label: "Stat Boost (Chicken)", value: "STAT_BOOST" },
+    { label: "Stress Reduction", value: "STRESS_REDUCE" },
+    { label: "Death Save", value: "DEATH_SAVE" },
+    { label: "Exam Boost", value: "EXAM_BOOST" },
+    { label: "Pay Multiplier", value: "PAY_MULTIPLIER" },
+    { label: "Cooldown Reduction", value: "COOLDOWN_REDUCTION" },
+];
 
 export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditorProps) {
     const router = useRouter();
@@ -27,12 +42,23 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
         showInInventory: true,
         sellable: true,
         requirements: { roles: [], balance: 0 },
-        // Expanded structure for actions to include metadata (duration, etc)
-        onBuyActions: []
+        // We will map 'effects' to this UI. 
+        // Note: The backend schema has 'effects' (JSON) and 'onBuyActions' (JSON). 
+        // 'effects' is used by effectService.ts. 'onBuyActions' is legacy or simple trigger.
+        // We will write to 'effects' for all these functional items.
+        effects: []
     });
-    // Dummy state for the footer toggle shown in screenshot
-    const [updateInventory, setUpdateInventory] = useState(false);
+
+    // Initial migration/shim if item has old 'onBuyActions' but no 'effects' and we want to edit them
+    useEffect(() => {
+        if (item?.onBuyActions?.length > 0 && (!item.effects || item.effects.length === 0)) {
+            // Simple mapping for migration if needed, but strictly we are editing 'effects' now.
+            // setFormData(prev => ({ ...prev, effects: item.onBuyActions.map(...) }))
+        }
+    }, [item]);
+
     const [isSaving, setIsSaving] = useState(false);
+    const [updateInventory, setUpdateInventory] = useState(false);
 
     // Helpers
     const handleChange = (field: string, value: any) => {
@@ -46,23 +72,23 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
         }));
     };
 
-    const addAction = () => {
+    const addEffect = () => {
         setFormData((prev: any) => ({
             ...prev,
-            onBuyActions: [...(prev.onBuyActions || []), { type: "MSG", value: "" }]
+            effects: [...(prev.effects || []), { type: "CUSTOM_MESSAGE", message: "" }]
         }));
     };
 
-    const updateAction = (idx: number, field: string, value: any) => {
-        const newActions = [...(formData.onBuyActions || [])];
-        newActions[idx] = { ...newActions[idx], [field]: value };
-        setFormData((prev: any) => ({ ...prev, onBuyActions: newActions }));
+    const updateEffect = (idx: number, field: string, value: any) => {
+        const newEffects = [...(formData.effects || [])];
+        newEffects[idx] = { ...newEffects[idx], [field]: value };
+        setFormData((prev: any) => ({ ...prev, effects: newEffects }));
     };
 
-    const removeAction = (idx: number) => {
+    const removeEffect = (idx: number) => {
         setFormData((prev: any) => ({
             ...prev,
-            onBuyActions: prev.onBuyActions.filter((_: any, i: number) => i !== idx)
+            effects: prev.effects.filter((_: any, i: number) => i !== idx)
         }));
     };
 
@@ -73,7 +99,16 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
         }
 
         setIsSaving(true);
-        const res = await upsertShopItem(guildId, { ...formData, id: item?.id || "new" });
+        // Ensure legacy fields are synced or cleared if moving to effects system?
+        // For safely, we send both if the backend logic relies on 'effects' for functional items.
+        const payload = {
+            ...formData,
+            id: item?.id || "new",
+            // If item has effects, it likely should be CONSUMABLE or ROLE type for logic to trigger?
+            // The user didn't ask to change types explicitly, but 'effects' usually imply use/buy logic.
+        };
+
+        const res = await upsertShopItem(guildId, payload);
         setIsSaving(false);
 
         if (res.success) {
@@ -99,7 +134,6 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
         }
     };
 
-    // Role Requirements Adapter (Visual only -> Logic)
     const hasRoleReq = formData.requirements?.roles?.length > 0;
     const [showRoleReqUI, setShowRoleReqUI] = useState(hasRoleReq);
 
@@ -188,87 +222,60 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
 
                     <div className="w-full h-px bg-zinc-700/30 my-2"></div>
 
-                    {/* STOCK */}
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <label className="text-[11px] font-bold text-zinc-400 uppercase">STOCK REMAINING</label>
-                            <p className="text-xs text-zinc-500">Set the amount of stock available.</p>
+                    {/* TOGGLES ROW */}
+                    <div className="space-y-4">
+                        {/* STOCK */}
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <label className="text-[11px] font-bold text-zinc-400 uppercase">STOCK REMAINING</label>
+                                <p className="text-xs text-zinc-500">Set the amount of stock available.</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="text-[10px] font-bold text-zinc-400 uppercase">UNLIMITED</span>
+                                <button
+                                    onClick={() => handleChange("stock", formData.stock === -1 ? 0 : -1)}
+                                    className={`w-11 h-6 rounded-full relative transition-colors ${formData.stock === -1 ? "bg-[#5865f2]" : "bg-[#80848e]"}`}
+                                >
+                                    <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${formData.stock === -1 ? "translate-x-5" : ""}`} />
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <span className="text-[10px] font-bold text-zinc-400 uppercase">UNLIMITED</span>
+                        {formData.stock !== -1 && (
+                            <div className="bg-[#1e1f22] rounded-[4px] p-1 mt-2">
+                                <input
+                                    type="number"
+                                    value={formData.stock}
+                                    onChange={e => handleChange("stock", parseInt(e.target.value))}
+                                    className="w-full bg-transparent border-none text-zinc-200 text-sm p-2.5 focus:outline-none placeholder:text-zinc-600 font-mono"
+                                />
+                            </div>
+                        )}
+
+                        {/* OTHER TOGGLES */}
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <label className="text-[11px] font-bold text-zinc-400 uppercase">INVENTORY ITEM</label>
+                                <p className="text-xs text-zinc-500">Show in user's inventory.</p>
+                            </div>
                             <button
-                                onClick={() => handleChange("stock", formData.stock === -1 ? 0 : -1)}
-                                className={`w-11 h-6 rounded-full relative transition-colors ${formData.stock === -1 ? "bg-[#5865f2]" : "bg-[#80848e]"}`}
+                                onClick={() => handleChange("showInInventory", !formData.showInInventory)}
+                                className={`w-11 h-6 rounded-full relative transition-colors ${formData.showInInventory ? "bg-[#5865f2]" : "bg-[#80848e]"}`}
                             >
-                                <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${formData.stock === -1 ? "translate-x-5" : ""}`} />
+                                <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${formData.showInInventory ? "translate-x-5" : ""}`} />
                             </button>
                         </div>
-                    </div>
-                    {formData.stock !== -1 && (
-                        <div className="bg-[#1e1f22] rounded-[4px] p-1 mt-2">
-                            <input
-                                type="number"
-                                value={formData.stock}
-                                onChange={e => handleChange("stock", parseInt(e.target.value))}
-                                className="w-full bg-transparent border-none text-zinc-200 text-sm p-2.5 focus:outline-none placeholder:text-zinc-600 font-mono"
-                            />
-                        </div>
-                    )}
 
-                    {/* INVENTORY ITEM TOGGLE */}
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <label className="text-[11px] font-bold text-zinc-400 uppercase">INVENTORY ITEM</label>
-                            <p className="text-xs text-zinc-500">If item is placed into the users inventory when bought.</p>
-                        </div>
-                        <button
-                            onClick={() => handleChange("showInInventory", !formData.showInInventory)}
-                            className={`w-11 h-6 rounded-full relative transition-colors ${formData.showInInventory ? "bg-[#5865f2]" : "bg-[#80848e]"}`}
-                        >
-                            <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${formData.showInInventory ? "translate-x-5" : ""}`} />
-                        </button>
-                    </div>
-
-                    {/* USABLE TOGGLE */}
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <label className="text-[11px] font-bold text-zinc-400 uppercase">USABLE</label>
-                            <p className="text-xs text-zinc-500">If the item is able to be used or not (a collectable).</p>
-                        </div>
-                        <button
-                            onClick={() => handleChange("usable", !formData.usable)}
-                            className={`w-11 h-6 rounded-full relative transition-colors ${formData.usable ? "bg-[#5865f2]" : "bg-[#80848e]"}`}
-                        >
-                            <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${formData.usable ? "translate-x-5" : ""}`} />
-                        </button>
-                    </div>
-
-                    {/* SELLABLE TOGGLE */}
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <label className="text-[11px] font-bold text-zinc-400 uppercase">SELLABLE</label>
-                            <p className="text-xs text-zinc-500">If the item is able to be sold to other users.</p>
-                        </div>
-                        <button
-                            onClick={() => handleChange("sellable", !formData.sellable)}
-                            className={`w-11 h-6 rounded-full relative transition-colors ${formData.sellable !== false ? "bg-[#5865f2]" : "bg-[#80848e]"}`}
-                        >
-                            <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${formData.sellable !== false ? "translate-x-5" : ""}`} />
-                        </button>
-                    </div>
-
-                    {/* EXPIRY */}
-                    <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-zinc-400 uppercase">EXPIRY DATE</label>
-                        <p className="text-xs text-zinc-500">Set a date & time if this item should be automatically deleted.</p>
-                        <div className="bg-[#1e1f22] rounded-[4px] p-1">
-                            <input
-                                type="number"
-                                value={formData.expiresIn || ""}
-                                onChange={e => handleChange("expiresIn", e.target.value ? parseInt(e.target.value) : null)}
-                                className="w-full bg-transparent border-none text-zinc-200 text-sm p-2.5 focus:outline-none placeholder:text-zinc-600"
-                                placeholder="Seconds (Example: 86400)"
-                            />
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <label className="text-[11px] font-bold text-zinc-400 uppercase">USABLE</label>
+                                <p className="text-xs text-zinc-500">Can be used via /use command.</p>
+                            </div>
+                            <button
+                                onClick={() => handleChange("usable", !formData.usable)}
+                                className={`w-11 h-6 rounded-full relative transition-colors ${formData.usable ? "bg-[#5865f2]" : "bg-[#80848e]"}`}
+                            >
+                                <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${formData.usable ? "translate-x-5" : ""}`} />
+                            </button>
                         </div>
                     </div>
 
@@ -277,8 +284,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                     <div className="mt-8">
                         <div className="flex justify-between items-center mb-2">
                             <div className="flex items-center gap-2">
-                                <label className="text-[11px] font-bold text-zinc-400 uppercase">REQUIREMENTS [{showRoleReqUI ? "0" : "1"} REMAINING]</label>
-                                {/* Premium Badge Removed as requested */}
+                                <label className="text-[11px] font-bold text-zinc-400 uppercase">REQUIREMENTS</label>
                             </div>
                             <button
                                 onClick={() => setShowRoleReqUI(true)}
@@ -287,34 +293,15 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                 Add Requirement
                             </button>
                         </div>
-                        <p className="text-xs text-zinc-500 mb-3">Requirements can be validated when members buy or use this item.</p>
 
                         <div className="bg-[#2b2d31] p-3 rounded-md border border-black/20 space-y-3">
                             {showRoleReqUI ? (
-                                <div className="grid grid-cols-[150px_160px_1fr] gap-4 items-start">
+                                <div className="grid grid-cols-[150px_1fr] gap-4 items-start">
                                     {/* Requirement Type */}
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-bold text-zinc-500 uppercase">REQUIREMENT</label>
                                         <div className="relative bg-[#1e1f22] rounded p-2">
-                                            <span className="text-zinc-200 text-xs">Role</span>
-                                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500" size={14} />
-                                        </div>
-                                    </div>
-
-                                    {/* Validate On */}
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold text-zinc-500 uppercase">VALIDATE ON</label>
-                                        <div className="space-y-1 mt-1">
-                                            <label className="flex items-center gap-2 cursor-pointer">
-                                                <div className="w-4 h-4 bg-[#5865f2] rounded flex items-center justify-center">
-                                                    <Check size={12} className="text-white" />
-                                                </div>
-                                                <span className="text-zinc-300 text-xs">/item buy</span>
-                                            </label>
-                                            <label className="flex items-center gap-2 opacity-50 cursor-not-allowed">
-                                                <div className="w-4 h-4 border border-zinc-600 rounded"></div>
-                                                <span className="text-zinc-500 text-xs">/item use</span>
-                                            </label>
+                                            <span className="text-zinc-200 text-xs text-left block w-full">Role</span>
                                         </div>
                                     </div>
 
@@ -366,118 +353,132 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                     </div>
 
 
-                    {/* ACTIONS BOX */}
+                    {/* ACTIONS/EFFECTS BOX */}
                     <div className="mt-8">
                         <div className="flex justify-between items-center mb-2">
                             <div className="flex items-center gap-2">
-                                <label className="text-[11px] font-bold text-zinc-400 uppercase">ACTIONS [{5 - (formData.onBuyActions?.length || 0)} REMAINING]</label>
-                                {/* Premium Badge Removed */}
+                                <label className="text-[11px] font-bold text-zinc-400 uppercase">EFFECTS & ACTIONS</label>
                             </div>
                             <button
-                                onClick={addAction}
+                                onClick={addEffect}
                                 className="bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs font-medium px-3 py-1.5 rounded transition-colors"
                             >
-                                Add Action
+                                Add Effect
                             </button>
                         </div>
-                        <p className="text-xs text-zinc-500 mb-3">Actions can be triggered when members buy or use this item.</p>
+                        <p className="text-xs text-zinc-500 mb-3">Effects are triggered when the item is Used (activatable items) or Bought (instant items).</p>
 
                         <div className="bg-[#2b2d31] p-3 rounded-md border border-black/20 space-y-3">
-                            {formData.onBuyActions?.length > 0 ? (
+                            {formData.effects?.length > 0 ? (
                                 <div className="space-y-4">
-                                    {formData.onBuyActions.map((action: any, idx: number) => (
-                                        <div key={idx} className="grid grid-cols-[150px_160px_1fr] gap-4 items-start relative pb-4 border-b border-black/10 last:border-0 last:pb-0">
-                                            <button onClick={() => removeAction(idx)} className="absolute -right-2 -top-2 text-zinc-600 hover:text-red-400">
+                                    {formData.effects.map((effect: any, idx: number) => (
+                                        <div key={idx} className="grid grid-cols-[180px_1fr] gap-4 items-start relative pb-4 border-b border-black/10 last:border-0 last:pb-0">
+                                            <button onClick={() => removeEffect(idx)} className="absolute -right-2 -top-2 text-zinc-600 hover:text-red-400">
                                                 <X size={14} />
                                             </button>
 
-                                            {/* Action Type */}
+                                            {/* Effect Type */}
                                             <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-zinc-500 uppercase">ACTION</label>
+                                                <label className="text-[10px] font-bold text-zinc-500 uppercase">EFFECT TYPE</label>
                                                 <div className="relative bg-[#1e1f22] rounded p-2">
                                                     <select
-                                                        value={action.type}
-                                                        onChange={e => updateAction(idx, "type", e.target.value)}
-                                                        className="w-full bg-transparent text-zinc-200 text-xs appearance-none focus:outline-none"
+                                                        value={effect.type}
+                                                        onChange={e => updateEffect(idx, "type", e.target.value)}
+                                                        className="w-full bg-[#1e1f22] text-zinc-200 text-xs appearance-none focus:outline-none"
                                                     >
-                                                        <option value="MSG">Send Message</option>
-                                                        <option value="ADD_ROLE">Add Role</option>
-                                                        <option value="REMOVE_ROLE">Remove Role</option>
-                                                        <option value="ADD_TEMP_ROLE">Add Temp Role</option>
-                                                        {/* Future features can be added here */}
+                                                        {EFFECT_TYPES.map(t => (
+                                                            <option key={t.value} value={t.value}>{t.label}</option>
+                                                        ))}
                                                     </select>
                                                     <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" size={14} />
                                                 </div>
                                             </div>
 
-                                            {/* Execute On */}
+                                            {/* Dynamic Inputs based on type */}
                                             <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-zinc-500 uppercase">EXECUTE ON</label>
-                                                <div className="space-y-1 mt-1">
-                                                    <label className="flex items-center gap-2 cursor-pointer">
-                                                        <div className="w-4 h-4 bg-[#5865f2] rounded flex items-center justify-center">
-                                                            <Check size={12} className="text-white" />
-                                                        </div>
-                                                        <span className="text-zinc-300 text-xs">/item buy</span>
-                                                    </label>
-                                                    <label className="flex items-center gap-2 opacity-50 cursor-not-allowed">
-                                                        <div className="w-4 h-4 border border-zinc-600 rounded"></div>
-                                                        <span className="text-zinc-500 text-xs">/item use</span>
-                                                    </label>
-                                                </div>
-                                            </div>
+                                                <label className="text-[10px] font-bold text-zinc-500 uppercase">CONFIGURATION</label>
+                                                <div className="bg-[#1e1f22] rounded p-2 space-y-2">
 
-                                            {/* Value / Message / Role / Duration */}
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-zinc-500 uppercase">
-                                                    {action.type === "MSG" ? "MESSAGE" : "ROLE"}
-                                                </label>
-                                                <div className="bg-[#1e1f22] rounded p-1 relative space-y-2">
-                                                    {action.type === "MSG" ? (
-                                                        <>
-                                                            <textarea
-                                                                value={action.value}
-                                                                onChange={e => updateAction(idx, "value", e.target.value)}
-                                                                className="w-full bg-transparent border-none text-zinc-200 text-xs p-2 focus:outline-none placeholder:text-zinc-600 resize-none min-h-[80px]"
-                                                                placeholder="Enter message..."
-                                                            />
-                                                            <div className="absolute bottom-1 right-2 text-[10px] text-zinc-500 font-mono">
-                                                                {action.value.length}/1000
-                                                            </div>
-                                                        </>
-                                                    ) : (
+                                                    {/* ROLE SELECTOR */}
+                                                    {(effect.type === "ROLE_PERMANENT" || effect.type === "ROLE_TEMPORARY") && (
                                                         <div className="relative">
                                                             <select
-                                                                value={action.value}
-                                                                onChange={e => updateAction(idx, "value", e.target.value)}
-                                                                className="w-full bg-transparent text-zinc-200 text-xs p-2 appearance-none focus:outline-none"
+                                                                value={effect.roleId || ""}
+                                                                onChange={e => updateEffect(idx, "roleId", e.target.value)}
+                                                                className="w-full bg-[#1e1f22] text-zinc-200 text-xs p-1 focus:outline-none"
                                                             >
                                                                 <option value="">Select Role...</option>
                                                                 {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                                             </select>
-                                                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" size={14} />
                                                         </div>
                                                     )}
 
-                                                    {/* TEMP ROLE DURATION INPUT */}
-                                                    {action.type === "ADD_TEMP_ROLE" && (
-                                                        <div className="border-t border-zinc-700/30 pt-1 mt-1">
+                                                    {/* DURATION INPUT */}
+                                                    {["ROLE_TEMPORARY", "XP_MULTIPLIER", "DEATH_SAVE", "EXAM_BOOST", "PAY_MULTIPLIER", "COOLDOWN_REDUCTION"].includes(effect.type) && (
+                                                        <input
+                                                            type="number"
+                                                            value={effect.duration || ""}
+                                                            onChange={e => updateEffect(idx, "duration", parseInt(e.target.value))}
+                                                            className="w-full bg-transparent text-zinc-300 text-xs p-1 focus:outline-none border-b border-zinc-700/50"
+                                                            placeholder="Duration (seconds)"
+                                                        />
+                                                    )}
+
+                                                    {/* MULTIPLIER / VALUE / AMOUNT */}
+                                                    {["XP_MULTIPLIER", "PAY_MULTIPLIER", "LEVEL_BOOST", "MONEY", "STRESS_REDUCE", "EXAM_BOOST", "COOLDOWN_REDUCTION"].includes(effect.type) && (
+                                                        <input
+                                                            type="number"
+                                                            step="0.1"
+                                                            value={effect.value || effect.amount || effect.multiplier || ""}
+                                                            onChange={e => {
+                                                                const val = parseFloat(e.target.value);
+                                                                if (effect.type === "MONEY" || effect.type === "STRESS_REDUCE") updateEffect(idx, "amount", val);
+                                                                else if (effect.type === "LEVEL_BOOST") updateEffect(idx, "levels", val);
+                                                                else if (effect.type === "XP_MULTIPLIER") updateEffect(idx, "multiplier", val);
+                                                                else updateEffect(idx, "value", val);
+                                                            }}
+                                                            className="w-full bg-transparent text-zinc-300 text-xs p-1 focus:outline-none border-b border-zinc-700/50"
+                                                            placeholder="Amount / Multiplier"
+                                                        />
+                                                    )}
+
+                                                    {/* STAT BOOST SPECIFIC */}
+                                                    {effect.type === "STAT_BOOST" && (
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="text"
+                                                                value={effect.stat || ""}
+                                                                onChange={e => updateEffect(idx, "stat", e.target.value)}
+                                                                className="w-1/2 bg-transparent text-zinc-300 text-xs p-1 focus:outline-none border-b border-zinc-700/50"
+                                                                placeholder="Stat Name (e.g. strength)"
+                                                            />
                                                             <input
                                                                 type="number"
-                                                                value={action.duration || ""}
-                                                                onChange={e => updateAction(idx, "duration", parseInt(e.target.value))}
-                                                                className="w-full bg-transparent text-zinc-300 text-xs p-1 focus:outline-none"
-                                                                placeholder="Duration in seconds (e.g. 3600)"
+                                                                value={effect.amount || ""}
+                                                                onChange={e => updateEffect(idx, "amount", parseInt(e.target.value))}
+                                                                className="w-1/2 bg-transparent text-zinc-300 text-xs p-1 focus:outline-none border-b border-zinc-700/50"
+                                                                placeholder="Amount"
                                                             />
                                                         </div>
                                                     )}
+
+                                                    {/* CUSTOM MESSAGE */}
+                                                    {effect.type === "CUSTOM_MESSAGE" && (
+                                                        <textarea
+                                                            value={effect.message || ""}
+                                                            onChange={e => updateEffect(idx, "message", e.target.value)}
+                                                            className="w-full bg-transparent border-none text-zinc-200 text-xs p-1 focus:outline-none placeholder:text-zinc-600 resize-none min-h-[60px]"
+                                                            placeholder="Message content..."
+                                                        />
+                                                    )}
+
                                                 </div>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <div className="text-center py-4 text-xs text-zinc-600 italic">No actions configured.</div>
+                                <div className="text-center py-4 text-xs text-zinc-600 italic">No effects configured.</div>
                             )}
                         </div>
                     </div>
@@ -486,7 +487,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                 {/* Footer */}
                 <div className="bg-[#1e1f22] px-6 py-4 flex justify-between items-center text-xs mt-auto border-t border-black/10">
                     <div className="flex items-center gap-3">
-                        <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide">UPDATE INVENTORY ITEMS</span>
+                        <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide">UPDATE INVENTORY</span>
                         <button
                             onClick={() => setUpdateInventory(!updateInventory)}
                             className={`w-9 h-5 rounded-full relative transition-colors ${updateInventory ? "bg-[#5865f2]" : "bg-[#80848e]"}`}
@@ -500,7 +501,6 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                             <button
                                 onClick={handleDelete}
                                 className="bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 p-2 rounded mr-2 transition-colors"
-                                title="Delete Item"
                             >
                                 <Trash2 size={16} />
                             </button>
