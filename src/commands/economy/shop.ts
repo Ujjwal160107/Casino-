@@ -7,6 +7,7 @@ import {
   Colors,
   ComponentType,
   GuildMember,
+  TextChannel,
   ButtonInteraction,
   CacheType
 } from "discord.js";
@@ -94,10 +95,19 @@ export async function handleShop(message: Message, args: string[]) {
           color: 0x00FF00
         });
 
-        const effectMsg = results?.map(r => r.message).join("\n") || "";
-        const finalDesc = `You bought **${item.name}**!${effectMsg ? `\n\n${effectMsg}` : ""}`;
+        await message.reply({ embeds: [successEmbed(message.author, "Purchase Successful", `You bought **${item.name}**!`)] });
 
-        return message.reply({ embeds: [successEmbed(message.author, "Purchase Successful", finalDesc)] });
+        if (results && results.length > 0) {
+          const effectMsg = results.map(r => r.message).join("\n");
+          const effectEmbed = new EmbedBuilder()
+            .setColor(Colors.Gold)
+            .setDescription(effectMsg);
+
+          if ('send' in message.channel) {
+            await (message.channel as TextChannel).send({ embeds: [effectEmbed] });
+          }
+        }
+        return;
       } catch (err) {
         return message.reply({ embeds: [errorEmbed(message.author, "Failed", (err as Error).message)] });
       }
@@ -167,8 +177,16 @@ export async function handleShop(message: Message, args: string[]) {
             color: 0x00FF00
           });
 
-          const effectMsg = results?.map((r: any) => r.message).join("\n") || "";
-          await interaction.editReply({ content: `${Mascot.Emotes.Accept} Purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**!${effectMsg ? `\n\n${effectMsg}` : ""}` });
+          await interaction.editReply({ content: `${Mascot.Emotes.Accept} Purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**!` });
+
+          if (results && results.length > 0) {
+            const effectMsg = results.map((r: any) => r.message).join("\n");
+            const effectEmbed = new EmbedBuilder()
+              .setColor(Colors.Gold)
+              .setDescription(effectMsg);
+
+            await interaction.followUp({ embeds: [effectEmbed], ephemeral: true });
+          }
         } catch (err) {
           if (interaction.deferred || interaction.replied) {
             await interaction.editReply({ content: `${Mascot.Emotes.Fail} Error: ${(err as Error).message}` });

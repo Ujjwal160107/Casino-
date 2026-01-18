@@ -116,10 +116,18 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         }
       }
 
-      const effectMsg = results?.map((r: any) => r.message).join("\n") || "";
-      const finalDesc = `You bought **${item.name}**!${effectMsg ? `\n\n${effectMsg}` : ""}`;
+      await interaction.editReply({ embeds: [successEmbed(interaction.user, "Purchase Successful", `You bought **${item.name}**!`)] });
 
-      return interaction.editReply({ embeds: [successEmbed(interaction.user, "Purchase Successful", finalDesc)] });
+      if (results && results.length > 0) {
+        const effectMsg = results.map((r: any) => r.message).join("\n");
+        const effectEmbed = new EmbedBuilder()
+          .setColor(Colors.Gold)
+          //.setTitle("Effects Applied")
+          .setDescription(effectMsg);
+
+        await interaction.followUp({ embeds: [effectEmbed] });
+      }
+      return;
     } catch (err) {
       return interaction.editReply({ embeds: [errorEmbed(interaction.user, "Failed", (err as Error).message)] });
     }
@@ -199,12 +207,19 @@ export async function execute(interaction: ChatInputCommandInteraction) {
               }
             }
 
-            const effectMsg = results?.map((r: any) => r.message).join("\n") || "";
-
             await btnInteraction.reply({
-              content: `${Mascot.Emotes.Accept} Successfully purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**.${effectMsg ? `\n\n${effectMsg}` : ""}`,
+              content: `${Mascot.Emotes.Accept} Successfully purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**.`,
               ephemeral: true
             });
+
+            if (results && results.length > 0) {
+              const effectMsg = results.map((r: any) => r.message).join("\n");
+              const effectEmbed = new EmbedBuilder()
+                .setColor(Colors.Gold)
+                .setDescription(effectMsg);
+
+              await btnInteraction.followUp({ embeds: [effectEmbed], ephemeral: true });
+            }
           } catch (err) {
             await btnInteraction.reply({ content: `${Mascot.Emotes.Fail} Purchase failed: ${(err as Error).message}`, ephemeral: true });
           }
