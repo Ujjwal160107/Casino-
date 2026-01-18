@@ -1,6 +1,6 @@
 import prisma from "../utils/prisma";
 import { GuildMember } from "discord.js";
-import { applyItemEffects, ItemEffect } from "./effectService";
+import { applyItemEffects, ItemEffect, ItemEffectResult } from "./effectService";
 import { logToChannel } from "../utils/discordLogger";
 import { Colors } from "discord.js";
 
@@ -223,15 +223,17 @@ export async function buyItem(guildId: string, userId: string, itemName: string,
 
     // Apply "On Buy" effects
     const buyEffects = ((item.effects as any) || []).filter((e: any) => e.trigger === "BUY");
+    let results: ItemEffectResult[] = [];
+
     if (buyEffects.length > 0) {
       try {
-        await applyItemEffects(userId, guildId, buyEffects, member);
+        results = await applyItemEffects(userId, guildId, buyEffects, member);
       } catch (err) {
         console.error("Failed to apply on-buy effects:", err);
       }
     }
 
-    return item;
+    return { item, results };
   });
 }
 

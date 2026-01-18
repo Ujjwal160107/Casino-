@@ -79,7 +79,7 @@ export async function handleShop(message: Message, args: string[]) {
       try {
         await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
         if (!message.member) return; // Should be in guild
-        const item = await buyItem(message.guildId!, message.author.id, itemName, message.member);
+        const { item, results } = await buyItem(message.guildId!, message.author.id, itemName, message.member);
 
         if (item.roleId && message.guild) {
           const role = message.guild.roles.cache.get(item.roleId);
@@ -94,7 +94,10 @@ export async function handleShop(message: Message, args: string[]) {
           color: 0x00FF00
         });
 
-        return message.reply({ embeds: [successEmbed(message.author, "Purchase Successful", `You bought **${item.name}**!`)] });
+        const effectMsg = results?.map(r => r.message).join("\n") || "";
+        const finalDesc = `You bought **${item.name}**!${effectMsg ? `\n\n${effectMsg}` : ""}`;
+
+        return message.reply({ embeds: [successEmbed(message.author, "Purchase Successful", finalDesc)] });
       } catch (err) {
         return message.reply({ embeds: [errorEmbed(message.author, "Failed", (err as Error).message)] });
       }
@@ -146,7 +149,7 @@ export async function handleShop(message: Message, args: string[]) {
         try {
           await interaction.deferReply({ ephemeral: true });
           await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
-          const bought = await buyItem(interaction.guildId!, interaction.user.id, item.name, interaction.member as GuildMember);
+          const { item: bought, results } = await buyItem(interaction.guildId!, interaction.user.id, item.name, interaction.member as GuildMember);
 
           if (bought.roleId && interaction.guild) {
             const role = interaction.guild.roles.cache.get(bought.roleId);
@@ -164,7 +167,8 @@ export async function handleShop(message: Message, args: string[]) {
             color: 0x00FF00
           });
 
-          await interaction.editReply({ content: `${Mascot.Emotes.Accept} Purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**!` });
+          const effectMsg = results?.map((r: any) => r.message).join("\n") || "";
+          await interaction.editReply({ content: `${Mascot.Emotes.Accept} Purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**!${effectMsg ? `\n\n${effectMsg}` : ""}` });
         } catch (err) {
           if (interaction.deferred || interaction.replied) {
             await interaction.editReply({ content: `${Mascot.Emotes.Fail} Error: ${(err as Error).message}` });
