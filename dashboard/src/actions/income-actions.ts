@@ -179,7 +179,7 @@ export async function updateRoleIncomes(guildId: string, incomes: {
         const collectibleCount = incomes.filter(i => i.incomeType === "COLLECTIBLE").length;
         const automaticCount = incomes.filter(i => i.incomeType === "AUTOMATIC").length;
 
-        if (collectibleCount > 2) return { success: false, error: "Max 2 Collectible Role Incomes allowed." };
+        if (collectibleCount > 20) return { success: false, error: "Max 20 Collectible Role Incomes allowed." };
         if (automaticCount > 10) return { success: false, error: "Max 10 Automatic Role Incomes allowed." };
 
         await prisma.$transaction(async (tx) => {

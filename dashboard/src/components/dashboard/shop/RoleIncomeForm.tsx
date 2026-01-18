@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateRoleIncomes } from "@/actions/income-actions";
-import { Loader2, Plus, Save, Trash2, Clock, Coins, ShieldCheck } from "lucide-react";
+import { Loader2, Plus, Save, Trash2, Clock, Coins, ShieldCheck, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { DurationInput } from "@/components/dashboard/ui/DurationInput";
 
 interface RoleIncome {
     roleId: string;
@@ -29,7 +30,7 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles }: RoleIncomeFor
     const automatics = incomes.filter(i => i.incomeType === "AUTOMATIC");
 
     const addIncome = (type: "COLLECTIBLE" | "AUTOMATIC") => {
-        if (type === "COLLECTIBLE" && collectibles.length >= 2) return;
+        if (type === "COLLECTIBLE" && collectibles.length >= 20) return;
         if (type === "AUTOMATIC" && automatics.length >= 10) return;
 
         setIncomes([
@@ -44,11 +45,6 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles }: RoleIncomeFor
     };
 
     const removeIncome = (index: number, listType: "COLLECTIBLE" | "AUTOMATIC") => {
-        // We need to find the actual index in the main 'incomes' array
-        // This is a bit tricky since we filter for display.
-        // Easier way: logic to filter OUT the item being removed.
-        // Since we don't have unique IDs for new items, let's just reconstruct.
-
         let newIncomes = [...incomes];
         let count = 0;
         const targetIndex = newIncomes.findIndex(item => {
@@ -99,11 +95,11 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles }: RoleIncomeFor
         setIsLoading(false);
     };
 
-    const renderSection = (title: string, description: string, type: "COLLECTIBLE" | "AUTOMATIC", items: RoleIncome[], limit: number, icon: any) => (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
+    const renderSection = (title: string, description: string, type: "COLLECTIBLE" | "AUTOMATIC", items: RoleIncome[], limit: number, icon: any, colorClass: string) => (
+        <div className={`border rounded-xl p-6 space-y-4 ${type === 'AUTOMATIC' ? 'bg-purple-500/5 border-purple-500/20' : 'bg-white/5 border-white/10'}`}>
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500">
+                    <div className={`p-2 rounded-lg ${colorClass}`}>
                         {icon}
                     </div>
                     <div>
@@ -124,55 +120,58 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles }: RoleIncomeFor
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: "auto" }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="grid grid-cols-12 gap-3 items-end bg-black/20 p-4 rounded-lg border border-white/5"
+                            className="bg-black/20 p-4 rounded-lg border border-white/5"
                         >
-                            <div className="col-span-12 md:col-span-5 space-y-1">
-                                <label className="text-xs text-zinc-500">Role</label>
-                                <select
-                                    value={income.roleId}
-                                    onChange={(e) => updateIncome(idx, "roleId", e.target.value, type)}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50"
-                                >
-                                    {roles.map(r => (
-                                        <option key={r.id} value={r.id} style={{ color: r.color ? `#${r.color.toString(16)}` : 'white' }}>
-                                            {r.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="col-span-5 md:col-span-3 space-y-1">
-                                <label className="text-xs text-zinc-500">Amount</label>
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        value={income.amount}
-                                        onChange={(e) => updateIncome(idx, "amount", parseInt(e.target.value) || 0, type)}
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50"
-                                    />
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">🪙</span>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 items-start">
+                                {/* Role Selection */}
+                                <div className="lg:col-span-4 space-y-1">
+                                    <label className="text-xs text-zinc-500">Role</label>
+                                    <select
+                                        value={income.roleId}
+                                        onChange={(e) => updateIncome(idx, "roleId", e.target.value, type)}
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50"
+                                    >
+                                        {roles.map(r => (
+                                            <option key={r.id} value={r.id} style={{ color: r.color ? `#${r.color.toString(16)}` : 'white' }}>
+                                                {r.name}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
-                            </div>
-                            <div className="col-span-5 md:col-span-3 space-y-1">
-                                <label className="text-xs text-zinc-500">Cooldown (Sec)</label>
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        min={0}
+
+                                {/* Amount */}
+                                <div className="lg:col-span-3 space-y-1">
+                                    <label className="text-xs text-zinc-500">Amount</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={income.amount}
+                                            onChange={(e) => updateIncome(idx, "amount", parseInt(e.target.value) || 0, type)}
+                                            className="w-full bg-black/40 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50"
+                                        />
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">🪙</span>
+                                    </div>
+                                </div>
+
+                                {/* Duration Input */}
+                                <div className="lg:col-span-4 space-y-1">
+                                    <DurationInput
+                                        label="Cooldown / Interval"
                                         value={income.cooldown}
-                                        onChange={(e) => updateIncome(idx, "cooldown", parseInt(e.target.value) || 0, type)}
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50"
+                                        onChange={(val) => updateIncome(idx, "cooldown", val, type)}
                                     />
-                                    <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                                 </div>
-                            </div>
-                            <div className="col-span-2 md:col-span-1 flex justify-end pb-1">
-                                <button
-                                    onClick={() => removeIncome(idx, type)}
-                                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
+
+                                {/* Delete Button */}
+                                <div className="lg:col-span-1 flex justify-end pt-6">
+                                    <button
+                                        onClick={() => removeIncome(idx, type)}
+                                        className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     ))}
@@ -197,7 +196,7 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles }: RoleIncomeFor
     );
 
     return (
-        <div className="space-y-8 max-w-4xl">
+        <div className="space-y-8 max-w-5xl">
             {/* Status Message */}
             <AnimatePresence>
                 {message && (
@@ -216,35 +215,41 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles }: RoleIncomeFor
                 )}
             </AnimatePresence>
 
-            <div className="grid grid-cols-1 gap-8">
+            <div className="space-y-8">
+                {/* Collectible Section */}
                 {renderSection(
                     "Collectible Incomes",
                     "Users must manually run /collect to claim these rewards.",
                     "COLLECTIBLE",
                     collectibles,
-                    2,
-                    <Coins size={20} />
+                    20,
+                    <Coins size={20} />,
+                    "bg-yellow-500/10 text-yellow-500"
                 )}
 
+                {/* Automatic Section */}
                 {renderSection(
                     "Automatic Incomes",
-                    "Rewards are automatically deposited into user banks every 24 hours.",
+                    "Rewards are automatically deposited into user banks at the specified interval.",
                     "AUTOMATIC",
                     automatics,
                     10,
-                    <Clock size={20} />
+                    <Zap size={20} />,
+                    "bg-purple-500/10 text-purple-500"
                 )}
             </div>
 
-            <div className="flex justify-end pt-4">
-                <button
-                    onClick={handleSubmit}
-                    disabled={isLoading}
-                    className="flex items-center gap-2 bg-yellow-500 text-black px-8 py-3 rounded-xl font-bold hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-500/20 disabled:opacity-50"
-                >
-                    {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-                    Save Changes
-                </button>
+            <div className="flex justify-end pt-4 sticky bottom-6">
+                <div className="bg-zinc-900/90 backdrop-blur-sm p-2 rounded-xl border border-white/10 shadow-2xl">
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isLoading}
+                        className="flex items-center gap-2 bg-yellow-500 text-black px-8 py-3 rounded-lg font-bold hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-500/20 disabled:opacity-50"
+                    >
+                        {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                        Save Changes
+                    </button>
+                </div>
             </div>
         </div>
     );
