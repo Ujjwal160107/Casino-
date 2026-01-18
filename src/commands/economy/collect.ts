@@ -10,7 +10,7 @@ import { sendPaginatedEmbed } from "../../utils/pagination";
 export async function handleCollectRoleIncome(message: Message, args: string[]) {
     if (!message.guild || !message.member) return;
 
-    await ensureBankForUser(message.author.id, message.guild.id);
+    await ensureBankForUser(message.author.id, message.guild.id, message.author.username);
     const config = await getGuildConfig(message.guild.id);
     const roleIds = message.member.roles.cache.map(r => r.id);
 

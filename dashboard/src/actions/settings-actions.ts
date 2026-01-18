@@ -159,3 +159,83 @@ export async function resetEconomy(guildId: string) {
         return { success: false, error: "Failed to reset economy system." };
     }
 }
+
+export async function getBankSettings(guildId: string) {
+    try {
+        const config = await prisma.guildConfig.findUnique({
+            where: { guildId },
+            select: {
+                loanInterestRate: true,
+                fdInterestRate: true,
+                rdInterestRate: true,
+                stockRefreshRate: true,
+                loanMaxAmount: true, // Legacy/Simple limit
+
+                // Credit System
+                creditConfig: true,
+                creditScoreReward: true,
+                creditScorePenalty: true,
+                maxCreditScore: true,
+                minCreditScore: true,
+                maxActiveLoans: true,
+
+                bankLimit: true, // Already in general, but relevant here too
+            }
+        });
+
+        return config || {
+            loanInterestRate: 5,
+            fdInterestRate: 10,
+            rdInterestRate: 8,
+            stockRefreshRate: 600,
+            loanMaxAmount: null,
+            creditConfig: [],
+            creditScoreReward: 10,
+            creditScorePenalty: 20,
+            maxCreditScore: 2000,
+            minCreditScore: 0,
+            maxActiveLoans: 1,
+            bankLimit: 1000000
+        };
+    } catch (error) {
+        console.error("Failed to fetch bank settings:", error);
+        throw new Error("Failed to fetch bank settings");
+    }
+}
+
+export async function updateBankSettings(guildId: string, data: any) {
+    try {
+        // Validate JSON for creditConfig if needed, but Prisma handles Json type as any
+        // We essentially trust the UI or add Zod validation here if strictly needed.
+
+        await prisma.guildConfig.upsert({
+            where: { guildId },
+            create: {
+                guildId,
+                ...data
+            },
+            update: {
+                loanInterestRate: data.loanInterestRate,
+                fdInterestRate: data.fdInterestRate,
+                rdInterestRate: data.rdInterestRate,
+                stockRefreshRate: data.stockRefreshRate,
+                loanMaxAmount: data.loanMaxAmount,
+                creditConfig: data.creditConfig,
+                creditScoreReward: data.creditScoreReward,
+                creditScorePenalty: data.creditScorePenalty,
+                maxCreditScore: data.maxCreditScore,
+                minCreditScore: data.minCreditScore,
+                maxActiveLoans: data.maxActiveLoans,
+                bankLimit: data.bankLimit
+            }
+        });
+
+        await redis.del(`guild_config:${guildId}`);
+        revalidatePath(`/dashboard/${guildId}/general-economy/bank`);
+
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to update bank settings:", error);
+        return { success: false, error: "Failed to update bank settings" };
+    }
+}

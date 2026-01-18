@@ -59,6 +59,7 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
             title: "General Economy",
             items: [
                 { label: "Income", href: `/dashboard/${guild.id}/general-economy/income`, icon: Coins },
+                { label: "Bank", href: `/dashboard/${guild.id}/general-economy/bank`, icon: Briefcase },
                 { label: "Configuration", href: `/dashboard/${guild.id}/general-economy/config`, icon: Settings },
             ]
         },
