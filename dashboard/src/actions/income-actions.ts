@@ -155,6 +155,74 @@ export async function updateRewardAmounts(guildId: string, data: {
     }
 }
 
+export async function getRoleIncomes(guildId: string) {
+    try {
+        const incomes = await prisma.roleIncome.findMany({
+            where: { guildId },
+            orderBy: { amount: 'desc' }
+        });
+        return incomes;
+    } catch (error) {
+        console.error("Failed to fetch role incomes:", error);
+        return [];
+    }
+}
+
+export async function updateRoleIncomes(guildId: string, incomes: {
+    roleId: string;
+    amount: number;
+    cooldown: number;
+    incomeType: "COLLECTIBLE" | "AUTOMATIC";
+}[]) {
+    try {
+        // Validate limits
+        const collectibleCount = incomes.filter(i => i.incomeType === "COLLECTIBLE").length;
+        const automaticCount = incomes.filter(i => i.incomeType === "AUTOMATIC").length;
+
+        if (collectibleCount > 2) return { success: false, error: "Max 2 Collectible Role Incomes allowed." };
+        if (automaticCount > 10) return { success: false, error: "Max 10 Automatic Role Incomes allowed." };
+
+        await prisma.$transaction(async (tx) => {
+            const currentIncomes = await tx.roleIncome.findMany({ where: { guildId } });
+            const currentRoleIds = currentIncomes.map(i => i.roleId);
+            const newRoleIds = incomes.map(i => i.roleId);
+
+            // Delete removed
+            const toDelete = currentRoleIds.filter(id => !newRoleIds.includes(id));
+            if (toDelete.length > 0) {
+                await tx.roleIncome.deleteMany({
+                    where: { guildId, roleId: { in: toDelete } }
+                });
+            }
+
+            // Upsert new ones
+            for (const income of incomes) {
+                await tx.roleIncome.upsert({
+                    where: { guildId_roleId: { guildId, roleId: income.roleId } },
+                    update: {
+                        amount: income.amount,
+                        cooldown: income.cooldown,
+                        incomeType: income.incomeType
+                    },
+                    create: {
+                        guildId,
+                        roleId: income.roleId,
+                        amount: income.amount,
+                        cooldown: income.cooldown,
+                        incomeType: income.incomeType
+                    }
+                });
+            }
+        });
+
+        revalidatePath(`/dashboard/${guildId}/general-economy/income`);
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to update role incomes:", error);
+        return { success: false, error: error.message || "Failed to update role incomes" };
+    }
+}
+
 export async function updateRobSettings(guildId: string, data: {
     robSuccessPct: number;
     robFinePct: number;

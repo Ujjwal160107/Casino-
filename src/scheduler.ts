@@ -6,6 +6,7 @@ import { removeTemporaryRoles } from "./services/effectService";
 import { Client } from "discord.js";
 
 import { updateMarket } from "./services/stockService";
+import { processAutomaticRoleIncomes } from "./services/roleIncomeService";
 
 export function initScheduler(client: Client) {
     // ... existing
@@ -38,6 +39,9 @@ export function initScheduler(client: Client) {
 
             // Casino Drops
             await CasinoDropService.processDrops(client).catch(e => console.error("Casino drop error:", e));
+
+            // Automatic Role Income
+            await processAutomaticRoleIncomes(client).catch(e => console.error("Auto Role Income error:", e));
         } catch (err) {
             console.error("Scheduler error:", err);
         }

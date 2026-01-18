@@ -78,11 +78,11 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
             ]
         },
         {
-            title: "Moderation",
+            title: "Shop & Misc",
             items: [
-                { label: "Logs & Warnings", href: `/dashboard/${guild.id}/moderation`, icon: ShieldAlert },
+                { label: "Role Income", href: `/dashboard/${guild.id}/shop-misc/role-income`, icon: Coins },
             ]
-        }
+        },
     ];
 
     const iconUrl = guild.icon

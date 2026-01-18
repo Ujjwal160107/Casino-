@@ -146,6 +146,7 @@ model RoleIncome {
   roleId    String
   amount    Int 
   cooldown  Int       @default(86400) // Default 24 hours
+  incomeType String   @default("COLLECTIBLE") // COLLECTIBLE, AUTOMATIC
   createdAt DateTime  @default(now())
 
   claims    RoleIncomeClaim[]
