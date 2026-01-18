@@ -106,7 +106,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     try {
       await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
-      const item = await buyItem(interaction.guildId!, interaction.user.id, itemName);
+      const { item, results } = await buyItem(interaction.guildId!, interaction.user.id, itemName);
 
       if (item.roleId && interaction.guild) {
         const role = interaction.guild.roles.cache.get(item.roleId);
@@ -115,7 +115,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           try { await member.roles.add(role); } catch { }
         }
       }
-      return interaction.editReply({ embeds: [successEmbed(interaction.user, "Purchase Successful", `You bought **${item.name}**!`)] });
+
+      const effectMsg = results?.map((r: any) => r.message).join("\n") || "";
+      const finalDesc = `You bought **${item.name}**!${effectMsg ? `\n\n${effectMsg}` : ""}`;
+
+      return interaction.editReply({ embeds: [successEmbed(interaction.user, "Purchase Successful", finalDesc)] });
     } catch (err) {
       return interaction.editReply({ embeds: [errorEmbed(interaction.user, "Failed", (err as Error).message)] });
     }
@@ -185,7 +189,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
           try {
             await ensureUserAndWallet(btnInteraction.user.id, btnInteraction.guildId!, btnInteraction.user.tag);
-            const bought = await buyItem(btnInteraction.guildId!, btnInteraction.user.id, item.name);
+            const { item: bought, results } = await buyItem(btnInteraction.guildId!, btnInteraction.user.id, item.name);
 
             if (bought.roleId && btnInteraction.guild) {
               const role = btnInteraction.guild.roles.cache.get(bought.roleId);
@@ -195,8 +199,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
               }
             }
 
+            const effectMsg = results?.map((r: any) => r.message).join("\n") || "";
+
             await btnInteraction.reply({
-              content: `${Mascot.Emotes.Accept} Successfully purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**.`,
+              content: `${Mascot.Emotes.Accept} Successfully purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**.${effectMsg ? `\n\n${effectMsg}` : ""}`,
               ephemeral: true
             });
           } catch (err) {
