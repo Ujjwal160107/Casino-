@@ -188,11 +188,28 @@ export async function updateRoleIncomes(guildId: string, incomes: {
             const newRoleIds = incomes.map(i => i.roleId);
 
             // Delete removed
-            const toDelete = currentRoleIds.filter(id => !newRoleIds.includes(id));
-            if (toDelete.length > 0) {
-                await tx.roleIncome.deleteMany({
-                    where: { guildId, roleId: { in: toDelete } }
+            const toDeleteRoleIds = currentRoleIds.filter(id => !newRoleIds.includes(id));
+
+            if (toDeleteRoleIds.length > 0) {
+                // Find IDs of incomes to delete
+                const incomesToDelete = await tx.roleIncome.findMany({
+                    where: { guildId, roleId: { in: toDeleteRoleIds } },
+                    select: { id: true }
                 });
+
+                const idsToDelete = incomesToDelete.map(i => i.id);
+
+                if (idsToDelete.length > 0) {
+                    // 1. Delete dependent claims
+                    await tx.roleIncomeClaim.deleteMany({
+                        where: { roleIncomeId: { in: idsToDelete } }
+                    });
+
+                    // 2. Delete the incomes
+                    await tx.roleIncome.deleteMany({
+                        where: { id: { in: idsToDelete } }
+                    });
+                }
             }
 
             // Upsert new ones
