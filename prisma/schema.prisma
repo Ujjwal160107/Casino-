@@ -199,6 +199,14 @@ model ShopItem {
   consumable   Boolean  @default(false)
   maxUses      Int?     // For consumables, null = unlimited uses
   
+  // New Configs
+  requirements Json?    @default("{}") // { roles: string[], items: string[], balance: number }
+  onBuyActions Json?    @default("[]") // [{ type: "MSG" | "ADD_ROLE" | "REMOVE_ROLE", value: string }]
+  expiresIn    Int?     // Seconds
+  showInInventory Boolean @default(true)
+  usable       Boolean  @default(false)
+  image        String?
+  
   // Relations
   inventory    Inventory[]
   marketListings MarketListing[]

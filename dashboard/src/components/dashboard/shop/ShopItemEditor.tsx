@@ -155,12 +155,12 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                     <div className="col-span-4 space-y-2">
                                         <label className="label">Price</label>
                                         <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-yellow-500 font-bold">$</span>
                                             <input
                                                 type="number"
                                                 value={formData.price}
                                                 onChange={e => handleChange("price", parseInt(e.target.value))}
-                                                className="input-field pl-8 py-3 font-mono"
+                                                className="input-field py-3 font-mono"
+                                                placeholder="0"
                                             />
                                         </div>
                                     </div>
@@ -351,8 +351,8 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                             handleReqChange("roles", isSelected ? current.filter((id: string) => id !== role.id) : [...current, role.id]);
                                                         }}
                                                         className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-all flex items-center gap-2 ${isSelected
-                                                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                                                                : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:border-zinc-500 hover:text-zinc-300"
+                                                            ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                                                            : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:border-zinc-500 hover:text-zinc-300"
                                                             }`}
                                                     >
                                                         {role.name}
@@ -491,7 +491,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                     @apply block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5;
                 }
                 .input-field {
-                    @apply w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/50 transition-all placeholder:text-zinc-700;
+                    @apply w-full bg-black/50 border border-white/20 hover:border-white/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/50 transition-all placeholder:text-zinc-700;
                 }
                 .section-header {
                     @apply text-lg font-bold text-white font-serif tracking-tight border-b border-white/5 pb-2;

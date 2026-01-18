@@ -23,8 +23,12 @@ export async function handleRelax(message: Message) {
     }
 
     const config = await getGuildConfig(message.guild.id);
-    // Calculate Dynamic Prices
+    // Calculate Dynamic Prices or Use Config
     const { getJob, getJobPay } = require("../../services/jobService"); // Dynamic import
+
+    // Parse dashboard config
+    const relaxConfig = (config.jobRelaxControllers as Record<string, number>) || {};
+
     let basePay = 1000;
     if (user.jobId) {
         const job = getJob(user.jobId);
@@ -32,9 +36,9 @@ export async function handleRelax(message: Message) {
     }
 
     const costs = {
-        gym: Math.floor(basePay * 0.75),
-        sports: Math.floor(basePay * 0.50),
-        meditation: Math.floor(basePay * 0.25)
+        gym: relaxConfig.gym || Math.floor(basePay * 0.75),
+        sports: relaxConfig.sports || Math.floor(basePay * 0.50),
+        meditation: relaxConfig.meditation || Math.floor(basePay * 0.25)
     };
 
     const embed = new EmbedBuilder()

@@ -1,0 +1,35 @@
+const fs = require('fs');
+const path = require('path');
+
+const srcDir = path.join(__dirname, '../assets');
+const destDir = path.join(__dirname, '../../dist/assets');
+
+function copyDir(src, dest) {
+    if (!fs.existsSync(dest)) {
+        fs.mkdirSync(dest, { recursive: true });
+    }
+    const entries = fs.readdirSync(src, { withFileTypes: true });
+
+    for (const entry of entries) {
+        const srcPath = path.join(src, entry.name);
+        const destPath = path.join(dest, entry.name);
+
+        if (entry.isDirectory()) {
+            copyDir(srcPath, destPath);
+        } else {
+            fs.copyFileSync(srcPath, destPath);
+        }
+    }
+}
+
+try {
+    if (fs.existsSync(srcDir)) {
+        copyDir(srcDir, destDir);
+        console.log('Assets copied successfully to dist/assets');
+    } else {
+        console.warn('Warning: Source assets directory not found at', srcDir);
+    }
+} catch (err) {
+    console.error('Error copying assets:', err);
+    process.exit(1);
+}

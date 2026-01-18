@@ -1,4 +1,5 @@
 import { Message, EmbedBuilder } from "discord.js";
+import path from "path";
 import prisma from "../../utils/prisma";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 import { fmtCurrency } from "../../utils/format";
@@ -165,8 +166,8 @@ export async function handleJobStore(message: Message, args: string[]) {
         .setImage("attachment://banner.jpg");
 
     // Add Banner
-    // We need to attach the file in the message payload
-    const bannerPath = "c:/Users/ujjwa/.gemini/antigravity/brain/b09fee48-db5b-441f-9d18-9b3b53e8ecac/uploaded_image_1767158240821.jpg";
+    // Add Banner
+    const bannerPath = path.join(__dirname, "../../assets/casino_banner.png");
 
     // Group by category
     const consumables = items.filter(i => i.itemType === "JOB_CONSUMABLE");
