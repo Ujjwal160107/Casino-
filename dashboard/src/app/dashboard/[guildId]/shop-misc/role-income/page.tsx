@@ -1,4 +1,5 @@
 import { getRoleIncomes } from "@/actions/income-actions";
+import { getGeneralSettings } from "@/actions/settings-actions";
 import { getGuildRoles } from "@/lib/discord";
 import { RoleIncomeForm } from "@/components/dashboard/shop/RoleIncomeForm";
 
@@ -11,9 +12,10 @@ interface PageProps {
 export default async function RoleIncomePage({ params }: PageProps) {
     const { guildId } = await params;
 
-    const [incomes, roles] = await Promise.all([
+    const [incomes, roles, config] = await Promise.all([
         getRoleIncomes(guildId),
-        getGuildRoles(guildId)
+        getGuildRoles(guildId),
+        getGeneralSettings(guildId)
     ]);
 
     // Map Prisma result to form shape (ensure incomeType is present)
@@ -35,6 +37,7 @@ export default async function RoleIncomePage({ params }: PageProps) {
                 guildId={guildId}
                 initialIncomes={formattedIncomes}
                 roles={roles.map(r => ({ id: r.id, name: r.name, color: r.color }))}
+                currencyEmoji={config.currencyEmoji}
             />
         </div>
     );

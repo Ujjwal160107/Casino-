@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateRoleIncomes } from "@/actions/income-actions";
-import { Loader2, Plus, Save, Trash2, Clock, Coins, ShieldCheck, Zap } from "lucide-react";
+import { Loader2, Plus, Save, Trash2, Clock, Coins, ShieldCheck, Zap, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DurationInput } from "@/components/dashboard/ui/DurationInput";
 
@@ -18,13 +18,15 @@ interface RoleIncomeFormProps {
     guildId: string;
     initialIncomes: RoleIncome[];
     roles: { id: string; name: string; color: number }[];
+    currencyEmoji?: string;
 }
 
-export function RoleIncomeForm({ guildId, initialIncomes, roles }: RoleIncomeFormProps) {
+export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji = "🪙" }: RoleIncomeFormProps) {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [incomes, setIncomes] = useState<RoleIncome[]>(initialIncomes);
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+    const [activeTab, setActiveTab] = useState<"collectible" | "automatic">("collectible");
 
     const collectibles = incomes.filter(i => i.incomeType === "COLLECTIBLE");
     const automatics = incomes.filter(i => i.incomeType === "AUTOMATIC");
@@ -95,17 +97,12 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles }: RoleIncomeFor
         setIsLoading(false);
     };
 
-    const renderSection = (title: string, description: string, type: "COLLECTIBLE" | "AUTOMATIC", items: RoleIncome[], limit: number, icon: any, colorClass: string) => (
-        <div className={`border rounded-xl p-6 space-y-4 ${type === 'AUTOMATIC' ? 'bg-purple-500/5 border-purple-500/20' : 'bg-white/5 border-white/10'}`}>
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${colorClass}`}>
-                        {icon}
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-white">{title}</h3>
-                        <p className="text-sm text-zinc-400">{description}</p>
-                    </div>
+    const renderSection = (title: string, description: string, type: "COLLECTIBLE" | "AUTOMATIC", items: RoleIncome[], limit: number) => (
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex items-center justify-between bg-black/20 p-4 rounded-xl border border-white/5">
+                <div>
+                    <h3 className="text-lg font-bold text-white">{title}</h3>
+                    <p className="text-sm text-zinc-400">{description}</p>
                 </div>
                 <div className="text-sm font-mono text-zinc-500 bg-black/20 px-3 py-1 rounded-full border border-white/5">
                     {items.length} / {limit} Slots
@@ -150,7 +147,7 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles }: RoleIncomeFor
                                             onChange={(e) => updateIncome(idx, "amount", parseInt(e.target.value) || 0, type)}
                                             className="w-full bg-black/40 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50"
                                         />
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">🪙</span>
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-emoji">{currencyEmoji}</span>
                                     </div>
                                 </div>
 
@@ -178,7 +175,10 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles }: RoleIncomeFor
                 </AnimatePresence>
 
                 {items.length === 0 && (
-                    <div className="text-center py-8 text-zinc-500 text-sm border border-dashed border-white/10 rounded-lg">
+                    <div className="text-center py-12 text-zinc-500 text-sm border border-dashed border-white/10 rounded-lg bg-white/5">
+                        <div className="flex justify-center mb-2">
+                            {type === "COLLECTIBLE" ? <Coins size={32} className="opacity-20" /> : <Zap size={32} className="opacity-20" />}
+                        </div>
                         No active role incomes.
                     </div>
                 )}
@@ -196,7 +196,7 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles }: RoleIncomeFor
     );
 
     return (
-        <div className="space-y-8 max-w-5xl">
+        <div className="space-y-6 max-w-6xl">
             {/* Status Message */}
             <AnimatePresence>
                 {message && (
@@ -215,28 +215,47 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles }: RoleIncomeFor
                 )}
             </AnimatePresence>
 
-            <div className="space-y-8">
-                {/* Collectible Section */}
-                {renderSection(
-                    "Collectible Incomes",
-                    "Users must manually run /collect to claim these rewards.",
-                    "COLLECTIBLE",
-                    collectibles,
-                    20,
-                    <Coins size={20} />,
-                    "bg-yellow-500/10 text-yellow-500"
-                )}
+            <div>
+                {/* Tabs */}
+                <div className="flex flex-wrap gap-2 border-b border-white/5 pb-1">
+                    <button
+                        onClick={() => setActiveTab("collectible")}
+                        className={`px-4 py-2 rounded-t-lg font-bold text-sm flex items-center gap-2 transition-colors ${activeTab === "collectible"
+                                ? "bg-yellow-500 text-black"
+                                : "text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10"
+                            }`}
+                    >
+                        <Coins size={16} /> Collectibles
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("automatic")}
+                        className={`px-4 py-2 rounded-t-lg font-bold text-sm flex items-center gap-2 transition-colors ${activeTab === "automatic"
+                                ? "bg-purple-500 text-white"
+                                : "text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10"
+                            }`}
+                    >
+                        <Zap size={16} /> Automatic
+                    </button>
+                </div>
 
-                {/* Automatic Section */}
-                {renderSection(
-                    "Automatic Incomes",
-                    "Rewards are automatically deposited into user banks at the specified interval.",
-                    "AUTOMATIC",
-                    automatics,
-                    10,
-                    <Zap size={20} />,
-                    "bg-purple-500/10 text-purple-500"
-                )}
+                {/* Content Area */}
+                <div className="mt-6 min-h-[400px]">
+                    {activeTab === "collectible" && renderSection(
+                        "Collectible Configuration",
+                        "Users must manually run /collect to claim these rewards.",
+                        "COLLECTIBLE",
+                        collectibles,
+                        20
+                    )}
+
+                    {activeTab === "automatic" && renderSection(
+                        "Automatic Configuration",
+                        "Rewards are automatically deposited into user banks at the specified interval.",
+                        "AUTOMATIC",
+                        automatics,
+                        10
+                    )}
+                </div>
             </div>
 
             <div className="flex justify-end pt-4 sticky bottom-6">
@@ -253,25 +272,4 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles }: RoleIncomeFor
             </div>
         </div>
     );
-}
-
-function AlertTriangle(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-            <path d="M12 9v4" />
-            <path d="M12 17h.01" />
-        </svg>
-    )
 }
