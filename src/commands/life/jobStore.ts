@@ -188,7 +188,7 @@ export async function handleJobStore(message: Message, args: string[]) {
     }
 
     message.reply({
-        embeds: [embed],
-        files: [{ attachment: bannerPath, name: "banner.jpg" }]
+        embeds: [embed]
+        // files: [{ attachment: bannerPath, name: "banner.jpg" }]
     });
 }

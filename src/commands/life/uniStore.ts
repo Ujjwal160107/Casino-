@@ -91,15 +91,11 @@ export async function handleUniStore(message: Message) {
         }
     });
 
-    const BANNER_PATH = "C:/Users/ujjwa/.gemini/antigravity/brain/d08913d6-3c78-40f8-b60e-374730098e01/uploaded_image_1767081757339.jpg";
-    const banner = new AttachmentBuilder(BANNER_PATH, { name: 'uni_store.jpg' });
-
     const embed = new EmbedBuilder()
         .setTitle(`📚 University Bookstore`)
         .setDescription(`Welcome, student! Here you can buy supplies to help with your degree.\nYour Balance: **${fmtCurrency((await prisma.user.findUnique({ where: { discordId_guildId: { discordId: message.author.id, guildId } }, include: { wallet: true } }))?.wallet?.balance || 0, config.currencyEmoji)}**`)
         .setColor(Mascot.Colors.Base as any)
-        .setThumbnail(getEmoteUrl(Mascot.Emotes.MoneyBag) || message.guild.iconURL() || "")
-        .setImage("attachment://uni_store.jpg");
+        .setThumbnail(getEmoteUrl(Mascot.Emotes.MoneyBag) || message.guild.iconURL() || "");
 
     const thumbUrl = getEmoteUrl(Mascot.Emotes.Graduate) || getEmoteUrl(Mascot.Emotes.Think); // Use relevant emote
     if (thumbUrl) embed.setThumbnail(thumbUrl);
@@ -115,7 +111,7 @@ export async function handleUniStore(message: Message) {
 
     embed.setFooter({ text: "Use these items to pass your exams!" });
 
-    message.reply({ embeds: [embed], files: [banner] });
+    message.reply({ embeds: [embed] });
 }
 
 export async function handleBuyUniItem(message: Message, args: string[]) {
