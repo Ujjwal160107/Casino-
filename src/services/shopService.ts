@@ -95,11 +95,69 @@ export async function buyItem(guildId: string, userId: string, itemName: string,
   return prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({
       where: { discordId_guildId: { discordId: userId, guildId } },
-      include: { wallet: true }
+      include: { wallet: true, bank: true }
     });
 
     if (!user || !user.wallet || user.wallet.balance < item.price) {
       throw new Error(`You need ${item.price} coins to buy this.`);
+    }
+
+    // --- REQUIREMENTS CHECK ---
+    const reqs = (item.requirements as any) || {};
+
+    // 1. Minimum Balance
+    if (reqs.balance && user.wallet.balance < reqs.balance) {
+      throw new Error(`You need a wallet balance of ${reqs.balance} to buy this.`);
+    }
+
+    // 2. Minimum Net Worth (Wallet + Bank)
+    if (reqs.netWorth) {
+      const netWorth = user.wallet.balance + (user.bank?.balance || 0);
+      if (netWorth < reqs.netWorth) {
+        throw new Error(`You need a net worth of ${reqs.netWorth} to buy this.`);
+      }
+    }
+
+    // 3. Required Roles (Allow List)
+    if (reqs.roles && reqs.roles.length > 0) {
+      if (!member) throw new Error("Could not verify role requirements.");
+      const hasRole = reqs.roles.some((roleId: string) => member.roles.cache.has(roleId));
+      if (!hasRole) {
+        throw new Error(`You don't have the required role to buy this.`);
+      }
+    }
+
+    // 4. Deny Roles (Block List)
+    if (reqs.denyRoles && reqs.denyRoles.length > 0) {
+      if (member) {
+        const hasDenyRole = reqs.denyRoles.some((roleId: string) => member.roles.cache.has(roleId));
+        if (hasDenyRole) {
+          throw new Error(`You cannot buy this item with your current roles.`);
+        }
+      }
+    }
+
+    // 5. Required Items
+    if (reqs.items && reqs.items.length > 0) {
+      // Need to check inventory
+      // Use filtered check to avoid fetching everything?
+      // Or just fetch specific items?
+      // Let's simplify and fetch user's inventory count for these items.
+      // reqs.items is array of NAMES or IDs? The editor saves NAMES (string input). 
+      // Logic: Find ShopItem by name -> Check Inventory.
+      // This is expensive if loop.
+      // Alternative: Fetch all user inventory and check names.
+      const userInv = await tx.inventory.findMany({
+        where: { userId: user.id },
+        include: { shopItem: true }
+      });
+
+      for (const reqItemName of reqs.items) {
+        const hasItem = userInv.some(i => i.shopItem.name.toLowerCase() === reqItemName.toLowerCase() && i.amount > 0);
+        if (!hasItem) {
+          throw new Error(`You need the item "**${reqItemName}**" to buy this.`);
+        }
+      }
     }
 
     let metaData: any = {};

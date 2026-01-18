@@ -78,7 +78,8 @@ export async function handleShop(message: Message, args: string[]) {
 
       try {
         await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
-        const item = await buyItem(message.guildId!, message.author.id, itemName);
+        if (!message.member) return; // Should be in guild
+        const item = await buyItem(message.guildId!, message.author.id, itemName, message.member);
 
         if (item.roleId && message.guild) {
           const role = message.guild.roles.cache.get(item.roleId);
@@ -145,7 +146,7 @@ export async function handleShop(message: Message, args: string[]) {
         try {
           await interaction.deferReply({ ephemeral: true });
           await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
-          const bought = await buyItem(interaction.guildId!, interaction.user.id, item.name);
+          const bought = await buyItem(interaction.guildId!, interaction.user.id, item.name, interaction.member as GuildMember);
 
           if (bought.roleId && interaction.guild) {
             const role = interaction.guild.roles.cache.get(bought.roleId);
