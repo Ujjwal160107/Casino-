@@ -284,18 +284,19 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                     <div className="mt-8">
                         <div className="flex justify-between items-center mb-2">
                             <div className="flex items-center gap-2">
-                                <label className="text-[11px] font-bold text-zinc-400 uppercase">REQUIREMENTS</label>
+                                <label className="text-[11px] font-bold text-zinc-400 uppercase">REQUIREMENTS [{Math.max(0, 2 - (formData.requirements?.roles?.length || 0))} REMAINING]</label>
                             </div>
                             <button
                                 onClick={() => setShowRoleReqUI(true)}
-                                className="bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs font-medium px-3 py-1.5 rounded transition-colors"
+                                disabled={formData.requirements?.roles?.length >= 2}
+                                className="bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs font-medium px-3 py-1.5 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Add Requirement
                             </button>
                         </div>
 
                         <div className="bg-[#2b2d31] p-3 rounded-md border border-black/20 space-y-3">
-                            {showRoleReqUI ? (
+                            {showRoleReqUI || formData.requirements?.roles?.length > 0 ? (
                                 <div className="grid grid-cols-[150px_1fr] gap-4 items-start">
                                     {/* Requirement Type */}
                                     <div className="space-y-1">
@@ -314,10 +315,15 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                     const val = e.target.value;
                                                     if (val) {
                                                         const current = formData.requirements?.roles || [];
+                                                        if (current.length >= 2) {
+                                                            toast.error("Max 2 role requirements allowed.");
+                                                            return;
+                                                        }
                                                         if (!current.includes(val)) handleReqChange("roles", [...current, val]);
                                                     }
                                                 }}
-                                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                                                disabled={formData.requirements?.roles?.length >= 2}
+                                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10 disabled:cursor-not-allowed"
                                             >
                                                 <option value="">Add Role...</option>
                                                 {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
@@ -340,9 +346,11 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                     </span>
                                                 ) : null;
                                             })}
-                                            <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center ml-1">
-                                                <Plus size={14} className="text-zinc-500" />
-                                            </div>
+                                            {(!formData.requirements?.roles || formData.requirements.roles.length < 2) && (
+                                                <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center ml-1">
+                                                    <Plus size={14} className="text-zinc-500" />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -357,11 +365,18 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                     <div className="mt-8">
                         <div className="flex justify-between items-center mb-2">
                             <div className="flex items-center gap-2">
-                                <label className="text-[11px] font-bold text-zinc-400 uppercase">EFFECTS & ACTIONS</label>
+                                <label className="text-[11px] font-bold text-zinc-400 uppercase">EFFECTS & ACTIONS [{Math.max(0, 5 - (formData.effects?.length || 0))} REMAINING]</label>
                             </div>
                             <button
-                                onClick={addEffect}
-                                className="bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs font-medium px-3 py-1.5 rounded transition-colors"
+                                onClick={() => {
+                                    if ((formData.effects?.length || 0) >= 5) {
+                                        toast.error("Max 5 effects allowed.");
+                                        return;
+                                    }
+                                    addEffect();
+                                }}
+                                disabled={(formData.effects?.length || 0) >= 5}
+                                className="bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs font-medium px-3 py-1.5 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Add Effect
                             </button>
