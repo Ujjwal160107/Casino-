@@ -41,6 +41,7 @@ export async function upsertShopItem(guildId: string, data: any) {
             // Defaults or mappings for legacy fields if needed
             itemType: data.itemType || "COLLECTIBLE",
             category: data.category || "GENERAL",
+            effects: data.effects || [],
         };
 
         if (data.id && data.id !== "new") {
