@@ -145,9 +145,8 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                                             min={0}
                                             value={income.amount}
                                             onChange={(e) => updateIncome(idx, "amount", parseInt(e.target.value) || 0, type)}
-                                            className="w-full bg-black/40 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50"
+                                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50"
                                         />
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-emoji">{currencyEmoji}</span>
                                     </div>
                                 </div>
 
@@ -205,8 +204,8 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         className={`p-4 rounded-lg border flex items-center gap-2 ${message.type === "success"
-                                ? "bg-green-500/10 border-green-500/20 text-green-400"
-                                : "bg-red-500/10 border-red-500/20 text-red-400"
+                            ? "bg-green-500/10 border-green-500/20 text-green-400"
+                            : "bg-red-500/10 border-red-500/20 text-red-400"
                             }`}
                     >
                         {message.type === "success" ? <ShieldCheck size={18} /> : <AlertTriangle size={18} />}
@@ -221,8 +220,8 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                     <button
                         onClick={() => setActiveTab("collectible")}
                         className={`px-4 py-2 rounded-t-lg font-bold text-sm flex items-center gap-2 transition-colors ${activeTab === "collectible"
-                                ? "bg-yellow-500 text-black"
-                                : "text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10"
+                            ? "bg-yellow-500 text-black"
+                            : "text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10"
                             }`}
                     >
                         <Coins size={16} /> Collectibles
@@ -230,8 +229,8 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                     <button
                         onClick={() => setActiveTab("automatic")}
                         className={`px-4 py-2 rounded-t-lg font-bold text-sm flex items-center gap-2 transition-colors ${activeTab === "automatic"
-                                ? "bg-purple-500 text-white"
-                                : "text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10"
+                            ? "bg-purple-500 text-white"
+                            : "text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10"
                             }`}
                     >
                         <Zap size={16} /> Automatic
