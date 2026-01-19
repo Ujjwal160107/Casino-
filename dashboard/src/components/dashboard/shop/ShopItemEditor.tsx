@@ -99,38 +99,48 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
         }
 
         setIsSaving(true);
-        // Ensure legacy fields are synced or cleared if moving to effects system?
-        // For safely, we send both if the backend logic relies on 'effects' for functional items.
-        const payload = {
-            ...formData,
-            id: item?.id || "new",
-            // If item has effects, it likely should be CONSUMABLE or ROLE type for logic to trigger?
-            // The user didn't ask to change types explicitly, but 'effects' usually imply use/buy logic.
-        };
+        try {
+            // Ensure triggers are set (default to BUY if missing, matching UI)
+            const effectsToSave = (formData.effects || []).map((e: any) => ({
+                ...e,
+                trigger: e.trigger || "BUY"
+            }));
 
-        const res = await upsertShopItem(guildId, payload);
-        setIsSaving(false);
+            const payload = {
+                ...formData,
+                id: item?.id || "new",
+                price: parseFloat(formData.price),
+                stock: parseInt(formData.stock),
+                effects: effectsToSave
+            };
 
-        if (res.success) {
-            toast.success("Item saved!");
-            router.refresh();
-            onClose();
-        } else {
-            toast.error(res.error || "Failed to save.");
+            const res = await upsertShopItem(guildId, payload);
+            if (res.success) {
+                toast.success("Item saved!");
+                router.refresh();
+                onClose();
+            } else {
+                toast.error(res.error || "Failed to save.");
+            }
+        } catch (error) {
+            console.error("Failed to save item:", error);
+            toast.error("Failed to save item.");
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleDelete = async () => {
-        if (!confirm("Delete this item? This cannot be undone.")) return;
+        if (!item || !confirm("Delete this item? This cannot be undone.")) return;
         setIsSaving(true);
-        const res = await deleteShopItem(item.id, guildId);
+        const res = await deleteShopItem(item.id, guildId); // item is safe here because of check
         setIsSaving(false);
         if (res.success) {
             toast.success("Item deleted.");
             router.refresh();
             onClose();
         } else {
-            toast.error("Failed to delete.");
+            toast.error(res.error || "Failed to delete.");
         }
     };
 
