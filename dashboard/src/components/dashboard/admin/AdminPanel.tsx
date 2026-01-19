@@ -8,7 +8,8 @@ import { GranularPermissions } from "./GranularPermissions";
 import { CasinoChannels } from "./CasinoChannels";
 import { StockMarketConfig } from "./StockMarketConfig";
 import { ChatMoneyConfig } from "./ChatMoneyConfig";
-import { Settings, Ban, Lock, Hash, TrendingUp, MessageSquare } from "lucide-react";
+import { FactoryResetZone } from "./FactoryResetZone";
+import { Settings, Ban, Lock, Hash, TrendingUp, MessageSquare, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface AdminPanelProps {
@@ -27,6 +28,7 @@ const TABS = [
     { id: "perms", label: "Permissions", icon: Lock },
     { id: "channels", label: "Channels", icon: Hash },
     { id: "stocks", label: "Stocks", icon: TrendingUp },
+    { id: "danger", label: "Danger Zone", icon: AlertTriangle },
 ];
 
 export function AdminPanel({ guildId, data }: AdminPanelProps) {
@@ -120,6 +122,10 @@ export function AdminPanel({ guildId, data }: AdminPanelProps) {
                             stocks={data.stocks}
                             refreshRate={data.config.stockRefreshRate || 600}
                         />
+                    )}
+
+                    {activeTab === "danger" && (
+                        <FactoryResetZone guildId={guildId} />
                     )}
                 </motion.div>
             </AnimatePresence>

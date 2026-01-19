@@ -162,3 +162,14 @@ export async function updateChatMoneyConfig(guildId: string, data: {
         return { success: false, error: "Failed to update chat money settings" };
     }
 }
+
+export async function factoryResetGuild(guildId: string) {
+    const { performFactoryReset } = await import("@/lib/cleanup");
+    const result = await performFactoryReset(guildId);
+
+    if (result.success) {
+        revalidatePath(`/dashboard/${guildId}`);
+    }
+
+    return result;
+}
