@@ -238,27 +238,41 @@ export async function buyItem(guildId: string, userId: string, itemName: string,
 }
 
 export async function useItem(userId: string, guildId: string, itemName: string, member?: GuildMember) {
-  const item = await getShopItemByName(guildId, itemName);
-  if (!item) throw new Error("Item not found.");
-
-  if (!item.consumable && !item.effects) {
-    throw new Error("This item cannot be used.");
-  }
-
+  // 1. Check Inventory FIRST to ensure we find the item the user actually has.
+  //    This fixes issues where shop items might be hidden/renamed but user still owns them.
   const user = await prisma.user.findUnique({
     where: { discordId_guildId: { discordId: userId, guildId } }
   });
 
   if (!user) throw new Error("User not found.");
 
-  const inventoryItem = await prisma.inventory.findUnique({
-    where: { userId_shopItemId: { userId: user.id, shopItemId: item.id } },
+  // We find the inventory item by finding ANY item in their inventory that matches the name
+  // This is a bit tricky because we store shopItemId, not name in inventory.
+  // So we fetch their inventory and filter in JS (safest) or search shopItems first?
+  // Search shopItems first is standard, but if "item not found" is the error, maybe `getShopItemByName` failing?
+  // Let's try to find the item in their inventory directly if possible.
+
+  const inventoryItems = await prisma.inventory.findMany({
+    where: { userId: user.id },
     include: { shopItem: true }
   });
 
-  if (!inventoryItem || inventoryItem.amount <= 0) {
+  const targetInvItem = inventoryItems.find(
+    i => i.shopItem.name.toLowerCase() === itemName.toLowerCase() && i.amount > 0
+  );
+
+  if (!targetInvItem) {
     throw new Error("You don't own this item.");
   }
+
+  const item = targetInvItem.shopItem;
+
+  if (!item.consumable && (!item.effects || (Array.isArray(item.effects) && item.effects.length === 0))) {
+    throw new Error("This item cannot be used.");
+  }
+
+  // Reload inventory item to get a focused object for updates (though targetInvItem is valid)
+  const inventoryItem = targetInvItem;
 
   if (member && member.client) {
     const guild = await member.client.guilds.fetch(guildId).catch(() => null);

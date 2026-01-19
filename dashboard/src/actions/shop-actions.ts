@@ -33,6 +33,7 @@ export async function upsertShopItem(guildId: string, data: any) {
             price: data.price,
             stock: data.stock ?? -1,
             image: data.image || null,
+            emoji: data.emoji || null,
             expiresIn: data.expiresIn || null,
             usable: data.usable ?? false,
             showInInventory: data.showInInventory ?? true,

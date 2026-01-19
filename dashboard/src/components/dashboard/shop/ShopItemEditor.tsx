@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 
+import { DurationInput } from "@/components/dashboard/ui/DurationInput";
+
 interface ShopItemEditorProps {
     guildId: string;
     item?: any;
@@ -37,6 +39,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
         price: 0,
         stock: -1,
         image: "",
+        emoji: "",
         expiresIn: null,
         usable: false,
         showInInventory: true,
@@ -157,17 +160,35 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                 {/* Content Area */}
                 <div className="p-6 overflow-y-auto custom-scrollbar space-y-6 max-h-[75vh]">
                     {/* NAME */}
-                    <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-zinc-400 uppercase">NAME</label>
-                        <p className="text-xs text-zinc-500">Give this item a name (between 3 and 100 characters).</p>
-                        <div className="bg-[#1e1f22] rounded-[4px] p-1">
-                            <input
-                                type="text"
-                                value={formData.name}
-                                onChange={e => handleChange("name", e.target.value)}
-                                className="w-full bg-transparent border-none text-zinc-200 text-sm p-2.5 focus:outline-none placeholder:text-zinc-600 font-medium"
-                                placeholder="My Cool Item"
-                            />
+                    <div className="grid grid-cols-[1fr_auto] gap-4">
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-zinc-400 uppercase">NAME</label>
+                            <p className="text-xs text-zinc-500">Give this item a name (between 3 and 100 characters).</p>
+                            <div className="bg-[#1e1f22] rounded-[4px] p-1">
+                                <input
+                                    type="text"
+                                    value={formData.name}
+                                    onChange={e => handleChange("name", e.target.value)}
+                                    className="w-full bg-transparent border-none text-zinc-200 text-sm p-2.5 focus:outline-none placeholder:text-zinc-600 font-medium"
+                                    placeholder="My Cool Item"
+                                />
+                            </div>
+                        </div>
+
+                        {/* EMOJI */}
+                        <div className="space-y-2 w-[100px]">
+                            <label className="text-[11px] font-bold text-zinc-400 uppercase">EMOJI</label>
+                            <p className="text-xs text-zinc-500">Display.</p>
+                            <div className="bg-[#1e1f22] rounded-[4px] p-1">
+                                <input
+                                    type="text"
+                                    value={formData.emoji || ""}
+                                    onChange={e => handleChange("emoji", e.target.value)}
+                                    className="w-full bg-transparent border-none text-zinc-200 text-sm p-2.5 focus:outline-none placeholder:text-zinc-600 text-center"
+                                    placeholder="🪙"
+                                    maxLength={4}
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -617,13 +638,13 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
 
                                                     {/* DURATION INPUT */}
                                                     {["ROLE_TEMPORARY", "XP_MULTIPLIER", "DEATH_SAVE", "EXAM_BOOST", "PAY_MULTIPLIER", "COOLDOWN_REDUCTION"].includes(effect.type) && (
-                                                        <input
-                                                            type="number"
-                                                            value={effect.duration || ""}
-                                                            onChange={e => updateEffect(idx, "duration", parseInt(e.target.value))}
-                                                            className="w-full bg-transparent text-zinc-300 text-xs p-1 focus:outline-none border-b border-zinc-700/50"
-                                                            placeholder="Duration (seconds)"
-                                                        />
+                                                        <div className="pt-1">
+                                                            <DurationInput
+                                                                value={effect.duration || 0}
+                                                                onChange={val => updateEffect(idx, "duration", val)}
+                                                                disabled={false}
+                                                            />
+                                                        </div>
                                                     )}
 
                                                     {/* MULTIPLIER / VALUE / AMOUNT */}

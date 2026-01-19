@@ -206,7 +206,8 @@ model ShopItem {
   showInInventory Boolean @default(true)
   usable       Boolean  @default(false)
   image        String?
-  
+  emoji        String?
+
   // Relations
   inventory    Inventory[]
   marketListings MarketListing[]

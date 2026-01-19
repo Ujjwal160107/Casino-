@@ -41,8 +41,10 @@ async function renderStorePage(interaction: ChatInputCommandInteraction, items: 
       const shopCmdId = interaction.commandId;
       const buyAction = `</shop buy:${shopCmdId}>`;
 
+      const displayEmoji = (item as any).emoji || emoji;
+
       // Row Text Format: Item Name - $Price </shop buy>
-      return `**${item.name}** — **${fmtCurrency(item.price, emoji)}** ${buyAction}\n*${item.description || "No description"}*${stockText}`;
+      return `**${displayEmoji} ${item.name}** — **${fmtCurrency(item.price, emoji)}** ${buyAction}\n*${item.description || "No description"}*${stockText}`;
     }).join("\n\n");
 
     embed.setDescription(description);
