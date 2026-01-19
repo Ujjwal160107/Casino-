@@ -28,7 +28,7 @@ export async function upsertShopItem(guildId: string, data: any) {
 
         const payload = {
             guildId,
-            name: data.name,
+            name: data.name.trim(),
             description: data.description || "No description",
             price: data.price,
             stock: data.stock ?? -1,

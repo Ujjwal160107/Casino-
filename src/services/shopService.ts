@@ -257,9 +257,14 @@ export async function useItem(userId: string, guildId: string, itemName: string,
     include: { shopItem: true }
   });
 
-  const targetInvItem = inventoryItems.find(
-    i => i.shopItem.name.toLowerCase() === itemName.toLowerCase() && i.amount > 0
-  );
+  // Normalize helper: trim, lowercase, collapse spaces
+  const normalize = (str: string) => str.trim().toLowerCase().replace(/\s+/g, " ");
+  const targetName = normalize(itemName);
+
+  const targetInvItem = inventoryItems.find(i => {
+    const dbName = normalize(i.shopItem.name);
+    return dbName === targetName && i.amount > 0;
+  });
 
   if (!targetInvItem) {
     throw new Error("You don't own this item.");
