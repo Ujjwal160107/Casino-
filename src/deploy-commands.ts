@@ -30,35 +30,41 @@ const rest = new REST().setToken(process.env.DISCORD_TOKEN!);
     try {
         console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
-        // Determine if we are deploying globally or to a specific guild
-        // For development, guild-specific is faster.
         const CLIENT_ID = process.env.CLIENT_ID;
-        const GUILD_ID = process.env.GUILD_ID; // Optional in .env
+        const GUILD_ID = process.env.GUILD_ID;
 
         if (!CLIENT_ID) {
             throw new Error("CLIENT_ID is missing in .env");
         }
 
-        let route;
         if (GUILD_ID) {
             console.log(`Deploying to Guild: ${GUILD_ID}`);
-            route = Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID);
+
+            // 1. Deploy to Guild
+            const data: any = await rest.put(
+                Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+                { body: commands }
+            );
+            console.log(`Successfully reloaded ${data.length} guild application (/) commands.`);
+
+            // 2. Clear Global Commands to prevent duplicates
+            // This is critical because if a command exists in both Global and Guild, checking it might show duplicates in some clients
+            // or cause confusion.
+            console.log("Ensuring Global commands are empty to prevent duplicates...");
+            await rest.put(Routes.applicationCommands(CLIENT_ID), { body: [] });
+            console.log("Global commands cleared.");
+
         } else {
             console.log("Deploying Globally (this may take up to an hour to cache)");
-            route = Routes.applicationCommands(CLIENT_ID);
+
+            // 1. Deploy Global
+            const data: any = await rest.put(
+                Routes.applicationCommands(CLIENT_ID),
+                { body: commands }
+            );
+            console.log(`Successfully reloaded ${data.length} global application (/) commands.`);
         }
 
-        const data: any = await rest.put(route, { body: commands });
-        console.log(`Successfully reloaded ${data.length} application (/) commands.`);
-
-        // Anti-Duplicate Logic: If deploying to Guild, ensure Global is empty (or check if user wants this)
-        // For this "Fix", we assume if GUILD_ID is present, we only want Guild commands.
-        // However, clearing Global takes up to an hour. We'll just define the route.
-        if (GUILD_ID) {
-            console.log("Cleaning up potential duplicate Global commands...");
-            await rest.put(Routes.applicationCommands(CLIENT_ID), { body: [] });
-            console.log("Global commands cleared to prevent duplicates.");
-        }
     } catch (error) {
         console.error(error);
     }
