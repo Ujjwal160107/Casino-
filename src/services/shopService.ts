@@ -92,7 +92,7 @@ export async function buyItem(guildId: string, userId: string, itemName: string,
   if (!item) throw new Error("Item not found.");
   if (item.stock !== -1 && item.stock <= 0) throw new Error("Out of stock.");
 
-  return prisma.$transaction(async (tx) => {
+  const res = await prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({
       where: { discordId_guildId: { discordId: userId, guildId } },
       include: { wallet: true, bank: true }
@@ -221,20 +221,29 @@ export async function buyItem(guildId: string, userId: string, itemName: string,
       }
     });
 
-    // Apply "On Buy" effects
+    // Extract "On Buy" effects to return them, DO NOT apply them inside transaction to wait for Discord API
     const buyEffects = ((item.effects as any) || []).filter((e: any) => e.trigger === "BUY");
-    let results: ItemEffectResult[] = [];
 
-    if (buyEffects.length > 0) {
-      try {
-        results = await applyItemEffects(userId, guildId, buyEffects, member);
-      } catch (err) {
-        console.error("Failed to apply on-buy effects:", err);
-      }
-    }
-
-    return { item, results };
+    return { item, buyEffects };
   });
+
+  // Apply Effects AFTER transaction creates the purchase
+  // This prevents transaction timeouts if Discord API is slow (e.g. giving roles)
+  let results: ItemEffectResult[] = [];
+  if (res.buyEffects.length > 0) {
+    try {
+      results = await applyItemEffects(userId, guildId, res.buyEffects, member);
+    } catch (err) {
+      console.error("Failed to apply on-buy effects:", err);
+      // We don't throw here because the purchase was successful
+      results.push({
+        message: `${Mascot.Emotes.Fail} Item bought, but some effects failed to apply.`,
+        type: "ERROR"
+      });
+    }
+  }
+
+  return { item: res.item, results };
 }
 
 export async function useItem(userId: string, guildId: string, itemName: string, member?: GuildMember) {

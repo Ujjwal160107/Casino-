@@ -25,7 +25,7 @@ export async function handleWithdrawBank(message: Message, args: string[]) {
   }
 
   try {
-    await withdrawFromBank(user.wallet!.id, user.id, amount);
+    await withdrawFromBank(user.wallet!.id, user.id, amount, message.guildId!);
     const updated = await getBankByUserId(user.id);
 
     await logToChannel(message.client, {

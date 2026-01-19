@@ -52,6 +52,13 @@ export async function handleReward(message: Message, type: RewardType) {
 
     const amount = config[rewardConfig.amountField as keyof typeof config] as number;
 
+    // Check Wallet Limit
+    if (config.walletLimit && user.wallet!.balance + amount > config.walletLimit) {
+        return message.reply({
+            embeds: [errorEmbed(author, "Wallet Full", `You cannot claim this reward because your wallet is full.\nLimit: **${fmtCurrency(config.walletLimit, config.currencyEmoji)}**`)]
+        });
+    }
+
     let retries = 3;
     while (retries > 0) {
         try {

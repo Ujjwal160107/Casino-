@@ -301,7 +301,10 @@ async function handleButton(interaction: ButtonInteraction) {
         await interaction.deferUpdate();
 
         const config = await getGuildConfig(guild.id);
-        const userData = await prisma.user.findUnique({ where: { discordId_guildId: { discordId: user.id, guildId: guild.id } } });
+        const userData = await prisma.user.findUnique({
+            where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
+            include: { wallet: true }
+        });
 
         if (!userData || !userData.jobId) return;
 
@@ -323,6 +326,13 @@ async function handleButton(interaction: ButtonInteraction) {
 
         if (success) {
             earnings = Math.floor(basePay * (money || 0));
+
+            // Check Wallet Limit for Event
+            if (config.walletLimit && userData.wallet && userData.wallet.balance + earnings > config.walletLimit) {
+                earnings = 0;
+                msg += `\n(⚠️ Wallet Limit Reached! Earned 0 coins.)`;
+            }
+
             xpGain = xp || 0;
             stressGain = stress || 0;
         } else {
@@ -498,20 +508,24 @@ async function handleButton(interaction: ButtonInteraction) {
         const { getJob, getJobPay, checkPromotion, checkDemotion, getWorkEvent } = require("../services/jobService");
         const { getWorkGame } = require("../services/minigameService");
 
-        const userData = await prisma.user.findUnique({ where: { discordId_guildId: { discordId: user.id, guildId: guild.id } } });
+        const userData = await prisma.user.findUnique({
+            where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
+            include: { wallet: true }
+        });
         if (!userData || !userData.jobId) {
             await interaction.deleteReply().catch(() => { });
             return interaction.followUp({ content: "You don't have a job!", ephemeral: true });
         }
 
-        const job = getJob(userData.jobId);
-        if (!job) {
-            await interaction.deleteReply().catch(() => { });
-            return interaction.followUp({ content: "Invalid job.", ephemeral: true });
-        }
-
         // Cooldown check
         const config = await getGuildConfig(guild.id);
+
+        // Check Wallet Limit Check BEFORE shift starts
+        if (config.walletLimit && userData.wallet && userData.wallet.balance >= config.walletLimit) {
+            await interaction.deleteReply().catch(() => { });
+            return interaction.followUp({ content: `${Mascot.Emotes.Fail} Your wallet is full! Deposit money to the bank before working.`, ephemeral: true });
+        }
+
         const cooldownSeconds = config.jobCooldown ?? 3600;
 
         // Check Active Effects (Permanent Buffs)
@@ -724,6 +738,17 @@ async function handleButton(interaction: ButtonInteraction) {
             const streakBonus = Math.floor(amount * (streakBonusPct / 100));
             amount += streakBonus;
 
+            // Check Wallet Limit (Double check before payout)
+            let walletFull = false;
+            // userData.wallet is available from the earlier fetch (if we passed it down, but we are in the same scope?
+            // Yes, userData is defined at line 501 in the `work_shift` block.
+            // Wait, loop back: `userData` at line 501 includes wallet now due to my previous edit?
+            // YES.
+            if (config.walletLimit && userData.wallet && userData.wallet.balance + amount > config.walletLimit) {
+                amount = 0;
+                walletFull = true;
+            }
+
             // Update User
             await prisma.user.update({
                 where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
@@ -742,10 +767,16 @@ async function handleButton(interaction: ButtonInteraction) {
             const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + 10, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
 
             const config = await getGuildConfig(guild.id);
+
+            let earningsText = `${fmtCurrency(amount, config?.currencyEmoji)}\n(Base Pay + ${streakBonusPct}% Streak Bonus)`;
+            if (walletFull) {
+                earningsText = `~~${fmtCurrency(amount, config?.currencyEmoji)}~~ 0\n(⚠️ Wallet Limit Reached)`;
+            }
+
             const winEmbed = new EmbedBuilder()
                 .setAuthor({ name: `${user.username}`, iconURL: user.displayAvatarURL() })
                 .setTitle(`${Mascot.Emotes.JobWorking} Shift Complete`)
-                .setDescription(`Great work! You finished your shift as a **${job.title}**.\n\n**Earnings:** ${fmtCurrency(amount, config?.currencyEmoji)}\n(Base Pay + ${streakBonusPct}% Streak Bonus)\n\n**XP Gained:** +10\n**Stress:** +5`)
+                .setDescription(`Great work! You finished your shift as a **${job.title}**.\n\n**Earnings:** ${earningsText}\n\n**XP Gained:** +10\n**Stress:** +5`)
                 .setColor("#2ECC71");
 
             if (newStreak > 1) {
