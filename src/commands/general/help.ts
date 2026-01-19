@@ -191,7 +191,7 @@ export async function handleHelp(message: Message) {
     .setColor(Mascot.Colors.Base as any)
     .setThumbnail(thumbnail)
     .addFields(
-      { name: "🔗 Quick Links", value: "[Dashboard](https://example.com) • [Docs](https://docs.example.com) • [Support Server](https://discord.gg/7bZm4gwcwt)" }
+      { name: "🔗 Quick Links", value: "[Dashboard](https://fortunabot.dev/) • [Docs](https://docs.example.com) • [Support Server](https://discord.gg/7bZm4gwcwt)" }
     );
 
   const initialComponents = generateComponents("none", 1, 1);

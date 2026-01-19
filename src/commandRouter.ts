@@ -4,6 +4,7 @@ import { checkJailStatus } from "./services/jailService";
 import { handleHelp } from "./commands/general/help";
 import { handleCasinoGuide } from "./commands/general/casinoGuide";
 import { handleTutorial } from "./commands/general/tutorial";
+import { handleDashboard } from "./commands/general/dashboard";
 import { handleSetPrefix } from "./commands/admin/setPrefix";
 import { handleSetIncome } from "./commands/admin/setIncome";
 import { handleSetIncomeCooldown } from "./commands/admin/setIncomeCooldown";
@@ -213,6 +214,8 @@ export async function routeMessage(client: Client, message: Message, prefix: str
 
     case "help":
       return handleHelp(message);
+    case "dashboard":
+      return handleDashboard(message);
     case "casino":
     case "games":
     case "casinoguide":
@@ -665,8 +668,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleCommandStatus(message, args);
     }
     case "adminpanel":
-    case "admin-panel":
-    case "dashboard": {
+    case "admin-panel": {
       return handleAdminDashboard(message);
     }
     case "reset-admin-settings":

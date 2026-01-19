@@ -8,7 +8,7 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction: ChatInputCommandInteraction) {
   const embed = new EmbedBuilder()
     .setTitle("📖 Casino Bot Commands")
-    .setDescription("All commands are now available as top-level slash commands!")
+    .setDescription("All commands are now available as top-level slash commands!\n\n🌐 **Dashboard:** [fortunabot.dev](https://fortunabot.dev/)")
     .setColor(Colors.Gold)
     .addFields(
       { name: "💰 Economy", value: "`/balance` `/deposit` `/withdraw` `/transfer` `/shop` `/buy` `/inventory` `/use` `/bank` `/credit` `/profile`" },
