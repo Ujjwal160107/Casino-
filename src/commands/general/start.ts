@@ -22,7 +22,7 @@ export async function handleStart(message: Message) {
 
     const embed = new EmbedBuilder()
         .setTitle(`${Mascot.Emotes.Success} Welcome to ${Mascot.Name}!`)
-        .setDescription(`Your profile has been created successfully!\n\n**Starting Balance:** ${config.currencyEmoji} ${config.startMoney}\n\nUse \`!guide\` or \`!tutorial\` to learn how to play.`)
+        .setDescription(`Your profile has been created successfully!\n\n**Starting Balance:** ${config.currencyEmoji} ${config.startMoney}\n\nUse \`${config.prefix}guide\` or \`${config.prefix}tutorial\` to learn how to play.`)
         .setColor(Mascot.Colors.Success as any)
         .setThumbnail(message.author.displayAvatarURL());
 

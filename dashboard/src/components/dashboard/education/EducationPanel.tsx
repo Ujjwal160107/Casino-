@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { updateEducationConfig, updateDegreeTuition } from "@/actions/education-actions";
 import { Loader2, Save, GraduationCap, Clock, Dumbbell, Brain, Activity, Coins } from "lucide-react";
 import { toast } from "sonner";
@@ -33,6 +33,11 @@ export function EducationPanel({ guildId, config, degrees }: EducationPanelProps
     const [formData, setFormData] = useState(config);
     const [degreeData, setDegreeData] = useState(degrees);
     const [hasChanges, setHasChanges] = useState(false);
+
+    useEffect(() => {
+        setFormData(config);
+        setDegreeData(degrees);
+    }, [config, degrees]);
 
     const handleConfigChange = (key: keyof typeof config, value: number) => {
         setFormData(prev => ({ ...prev, [key]: value }));
