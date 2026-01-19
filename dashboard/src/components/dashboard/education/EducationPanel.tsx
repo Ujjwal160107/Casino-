@@ -54,19 +54,7 @@ export function EducationPanel({ guildId, config, degrees }: EducationPanelProps
     const handleSave = async () => {
         setIsLoading(true);
         try {
-            // Update Global Config
-            const configPromise = updateEducationConfig(guildId, formData);
-
-            // Update Degrees (Parallel)
-            const degreePromises = degreeData.map(d => {
-                const original = degrees.find(od => od.id === d.id);
-                if (original?.tuitionPerSem !== d.tuitionPerSem) {
-                    return updateDegreeTuition(guildId, d.id, d.tuitionPerSem);
-                }
-                return Promise.resolve({ success: true });
-            });
-
-            await Promise.all([configPromise, ...degreePromises]);
+            await updateEducationConfig(guildId, formData, degreeData);
 
             toast.success("Education settings updated!");
             setHasChanges(false);

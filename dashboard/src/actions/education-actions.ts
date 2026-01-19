@@ -48,7 +48,7 @@ export async function updateEducationConfig(guildId: string, data: {
     eduGymCost: number;
     eduMeditationCost: number;
     eduSportsCost: number;
-}) {
+}, degrees?: { id: string, tuitionPerSem: number }[]) {
     try {
         await prisma.guildConfig.update({
             where: { guildId },
@@ -64,6 +64,15 @@ export async function updateEducationConfig(guildId: string, data: {
                 eduSportsCost: data.eduSportsCost
             }
         });
+
+        if (degrees && degrees.length > 0) {
+            for (const degree of degrees) {
+                await prisma.degree.update({
+                    where: { id: degree.id },
+                    data: { tuitionPerSem: degree.tuitionPerSem }
+                });
+            }
+        }
 
         // Invalidate Bot Cache
         try {
