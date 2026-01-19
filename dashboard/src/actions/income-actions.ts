@@ -1,9 +1,9 @@
-"use server";
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getGuildRoles as fetchGuildRoles, getGuildChannels } from "@/lib/discord";
 import { redis } from "@/lib/redis";
+import { invalidateGuildConfig } from "@/lib/cache";
 
 export async function getIncomeSettings(guildId: string) {
     const config = await prisma.guildConfig.findUnique({ where: { guildId } });
@@ -112,6 +112,7 @@ export async function updateIncomeCommand(guildId: string, commandKey: string, d
         }
 
         // Handle Enabled/Disabled Toggle
+        let configUpdated = false;
         if (enabled !== undefined) {
             const config = await prisma.guildConfig.findUnique({ where: { guildId } });
             let disabled = config?.disabledCommands || [];
@@ -128,6 +129,11 @@ export async function updateIncomeCommand(guildId: string, commandKey: string, d
                 where: { guildId },
                 data: { disabledCommands: disabled }
             });
+            configUpdated = true;
+        }
+
+        if (configUpdated || jailTime !== undefined || jailFine !== undefined) {
+            await invalidateGuildConfig(guildId);
         }
 
         revalidatePath(`/dashboard/${guildId}/general-economy/income`);
@@ -148,6 +154,7 @@ export async function updateRewardAmounts(guildId: string, data: {
             where: { guildId },
             data: { ...data }
         });
+        await invalidateGuildConfig(guildId);
         revalidatePath(`/dashboard/${guildId}/general-economy/income`);
         return { success: true };
     } catch (error) {
@@ -232,6 +239,10 @@ export async function updateRoleIncomes(guildId: string, incomes: {
             }
         });
 
+        // Role incomes might not be in guildConfig, but good to ensure everything is fresh
+        // The bot fetches role incomes directly from DB usually, depending on implementation
+        // If there's a cached 'roleIncome' key, we'd invalidate it here.
+
         revalidatePath(`/dashboard/${guildId}/general-economy/income`);
         return { success: true };
     } catch (error: any) {
@@ -272,6 +283,8 @@ export async function updateRobSettings(guildId: string, data: {
                 data: { disabledCommands: disabled }
             });
         }
+
+        await invalidateGuildConfig(guildId);
 
         revalidatePath(`/dashboard/${guildId}/general-economy/income`);
         return { success: true };

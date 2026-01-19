@@ -1,7 +1,9 @@
 "use server";
 
+
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { invalidateGuildConfig } from "@/lib/cache";
 
 export async function getAdminData(guildId: string) {
     try {
@@ -29,6 +31,7 @@ export async function updateDisabledCommands(guildId: string, disabledCommands: 
             update: { disabledCommands },
             create: { guildId, disabledCommands }
         });
+        await invalidateGuildConfig(guildId);
         revalidatePath(`/dashboard/${guildId}/general-economy/config`);
         return { success: true };
     } catch (error) {
@@ -43,6 +46,7 @@ export async function updateCasinoChannels(guildId: string, casinoChannels: stri
             update: { casinoChannels },
             create: { guildId, casinoChannels }
         });
+        await invalidateGuildConfig(guildId);
         revalidatePath(`/dashboard/${guildId}/general-economy/config`);
         return { success: true };
     } catch (error) {
@@ -57,6 +61,9 @@ export async function addPermission(guildId: string, command: string, targetType
             update: { action },
             create: { guildId, command, targetType, targetId, action }
         });
+        // Permissions are checked live against DB usually, but some caching might exist.
+        // If permissionService uses guildConfig (it does for disabledCommands/channels), we invalidate that.
+        // Ideally permissions themselves might need invalidation if cached.
         revalidatePath(`/dashboard/${guildId}/general-economy/config`);
         return { success: true };
     } catch (error) {
@@ -85,6 +92,8 @@ export async function createStock(guildId: string, symbol: string, name: string,
                 volatility
             }
         });
+        // Stocks are fetched via DB in stockService currently, or bulk updated.
+        // If we add stock caching later, we need to invalidate here.
         revalidatePath(`/dashboard/${guildId}/general-economy/config`);
         return { success: true };
     } catch (error) {
@@ -121,6 +130,7 @@ export async function updateStockRefreshRate(guildId: string, seconds: number) {
             where: { guildId },
             data: { stockRefreshRate: seconds }
         });
+        await invalidateGuildConfig(guildId);
         revalidatePath(`/dashboard/${guildId}/general-economy/config`);
         return { success: true };
     } catch (error) {
@@ -144,6 +154,7 @@ export async function updateChatMoneyConfig(guildId: string, data: {
                 chatMoneyChannels: data.channels,
             }
         });
+        await invalidateGuildConfig(guildId);
         revalidatePath(`/dashboard/${guildId}/general-economy/config`);
         return { success: true };
     } catch (error) {

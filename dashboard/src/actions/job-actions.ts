@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { redis } from "@/lib/redis";
+import { invalidateGuildConfig } from "@/lib/cache";
 
 export interface JobSettingsData {
     jobCooldown: number;
@@ -105,9 +105,7 @@ export async function updateJobSettings(guildId: string, data: JobSettingsData) 
         });
 
         // Invalidate Bot Cache
-        console.log(`[Dashboard] Invalidating cache for guild: ${guildId}`);
-        await redis.del(`guild_config:${guildId}`);
-        console.log(`[Dashboard] Cache invalidated.`);
+        await invalidateGuildConfig(guildId);
 
         revalidatePath(`/dashboard/${guildId}/life-economy/job`);
         return { success: true };

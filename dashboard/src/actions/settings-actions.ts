@@ -2,8 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-
-import { redis } from "@/lib/redis";
+import { invalidateGuildConfig } from "@/lib/cache";
 
 export async function getGeneralSettings(guildId: string) {
     try {
@@ -97,9 +96,7 @@ export async function updateGeneralSettings(guildId: string, data: {
         });
 
         // Invalidate Bot Cache
-        console.log(`[Dashboard] Invalidating cache for guild: ${guildId}`);
-        await redis.del(`guild_config:${guildId}`);
-        console.log(`[Dashboard] Cache invalidated.`);
+        await invalidateGuildConfig(guildId);
 
         revalidatePath(`/dashboard/${guildId}`);
         return { success: true };
@@ -230,7 +227,7 @@ export async function updateBankSettings(guildId: string, data: any) {
             }
         });
 
-        await redis.del(`guild_config:${guildId}`);
+        await invalidateGuildConfig(guildId);
         revalidatePath(`/dashboard/${guildId}/general-economy/bank`);
 
         return { success: true };
