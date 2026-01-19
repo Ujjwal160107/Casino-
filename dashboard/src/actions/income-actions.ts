@@ -302,6 +302,11 @@ export async function updateCasinoDrops(guildId: string, drops: any[]) {
     try {
         await prisma.$transaction(async (tx) => {
             await tx.casinoDropConfig.deleteMany({ where: { guildId } });
+
+            if (drops.length > 5) {
+                throw new Error("Max 5 drops allowed per server.");
+            }
+
             if (drops.length > 0) {
                 await tx.casinoDropConfig.createMany({
                     data: drops.map(d => ({

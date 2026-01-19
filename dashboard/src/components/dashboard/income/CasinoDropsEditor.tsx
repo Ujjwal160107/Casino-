@@ -91,9 +91,11 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                 </div>
                 <button
                     onClick={addDrop}
-                    className="bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-white/5"
+                    disabled={drops.length >= 5}
+                    className="bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-white/5"
+                    title={drops.length >= 5 ? "Max 5 drops allowed" : "Add new drop"}
                 >
-                    <Plus size={14} /> Add Drop
+                    <Plus size={14} /> {drops.length >= 5 ? "Limit Reached" : "Add Drop"}
                 </button>
             </div>
 
