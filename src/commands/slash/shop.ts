@@ -129,7 +129,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             .setColor(Colors.Gold)
             .setDescription(msgEffect.message);
 
-          await interaction.followUp({ embeds: [msgEmbed] });
+          if (interaction.channel && 'send' in interaction.channel) {
+            await (interaction.channel as any).send({ embeds: [msgEmbed] });
+          }
         }
 
         // 2. Other Effects
@@ -239,7 +241,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                   .setColor(Colors.Gold)
                   .setDescription(msgEffect.message);
 
-                await btnInteraction.followUp({ embeds: [msgEmbed], ephemeral: true });
+                if (btnInteraction.channel && 'send' in btnInteraction.channel) {
+                  await (btnInteraction.channel as any).send({ embeds: [msgEmbed] });
+                }
               }
 
               // 2. Other Effects

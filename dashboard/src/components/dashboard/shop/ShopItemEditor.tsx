@@ -75,7 +75,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
     const addEffect = () => {
         setFormData((prev: any) => ({
             ...prev,
-            effects: [...(prev.effects || []), { type: "CUSTOM_MESSAGE", message: "" }]
+            effects: [...(prev.effects || []), { type: "CUSTOM_MESSAGE", message: "", trigger: "BUY" }]
         }));
     };
 
@@ -553,6 +553,22 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                 <X size={14} />
                                             </button>
 
+                                            {/* TRIGGER SELECTION */}
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-zinc-500 uppercase">TRIGGER</label>
+                                                <div className="relative bg-[#1e1f22] rounded p-2">
+                                                    <select
+                                                        value={effect.trigger || "BUY"}
+                                                        onChange={e => updateEffect(idx, "trigger", e.target.value)}
+                                                        className="w-full bg-[#1e1f22] text-zinc-200 text-xs appearance-none focus:outline-none"
+                                                    >
+                                                        <option value="BUY">On Purchase</option>
+                                                        <option value="USE">On Use</option>
+                                                    </select>
+                                                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" size={14} />
+                                                </div>
+                                            </div>
+
                                             {/* Effect Type */}
                                             <div className="space-y-1">
                                                 <label className="text-[10px] font-bold text-zinc-500 uppercase">EFFECT TYPE</label>
@@ -692,12 +708,12 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                     </div>
                 </div>
 
-            </motion.div>
+            </motion.div >
             <style jsx global>{`
                 .custom-scrollbar::-webkit-scrollbar { width: 8px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: #2b2d31; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #1a1b1e; rounded: 4px; }
             `}</style>
-        </div>
+        </div >
     );
 }
