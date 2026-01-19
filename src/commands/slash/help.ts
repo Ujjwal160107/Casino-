@@ -1,1 +1,21 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";import { infoEmbed } from "../../utils/embed";export const data = new SlashCommandBuilder()  .setName("help")  .setDescription("Shows all available commands for this casino bot.");export async function execute(interaction: ChatInputCommandInteraction) {  const isAdmin = interaction.memberPermissions?.has("Administrator") ?? false;  const description = `**💰 Economy Commands**/bal — Show wallet & bank  /dep <amount|all> — Deposit money  /with <amount|all> — Withdraw money  /transfer <amount> <user> — Transfer money  /work /beg /crime /slut — Earn coins**🎲 Games**/bet — Roulette  ${isAdmin ? `**🛠 Admin Commands**!addmoney @user <amount>  !setstartmoney <amount>  !setincomecooldown <cmd> <seconds>  !setcurrency <name>  !reseteconomy confirm  !adminviewconfig  ` : ""}`;  return interaction.reply({    embeds: [infoEmbed(interaction.user, "Casino Bot — Slash Help", description)],    ephemeral: true  });}
+
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, Colors } from "discord.js";
+
+export const data = new SlashCommandBuilder()
+  .setName("help")
+  .setDescription("List all available commands");
+
+export async function execute(interaction: ChatInputCommandInteraction) {
+  const embed = new EmbedBuilder()
+    .setTitle("📖 Casino Bot Commands")
+    .setDescription("All commands are now available as top-level slash commands!")
+    .setColor(Colors.Gold)
+    .addFields(
+      { name: "💰 Economy", value: "`/balance` - Check balance\n`/deposit` - Deposit to bank\n`/withdraw` - Withdraw from bank\n`/transfer` - Send money\n`/shop` - View shop\n`/buy` - Buy items\n`/inventory` - View items" },
+      { name: "🎲 Games", value: "`/blackjack` - Play Blackjack\n`/slots` - Play Slots\n`/roulette` - Play Roulette\n`/coinflip` - Flip a coin\n`/cockfight` - Challenge user\n`/russianroulette` - Play Russian Roulette" },
+      { name: "🧬 Life", value: "`/work` - Work shift\n`/jobs` - Browse jobs\n`/crime` - Commit crime\n`/education` - View education\n`/degrees` - View degrees" },
+      { name: "🛠 Admin", value: "`/add-money` - Add funds\n`/set-income` - Config income\n`/setup` - Config server" }
+    );
+
+  return interaction.reply({ embeds: [embed], ephemeral: true });
+}
