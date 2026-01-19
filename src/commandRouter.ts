@@ -679,6 +679,11 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "resetaccess": {
       return handleResetAdminSettings(message);
     }
+    case "factory-reset":
+    case "factoryreset": {
+      const { handleFactoryReset } = require("./commands/admin/factoryReset");
+      return handleFactoryReset(message);
+    }
     case "use": {
       return handleUse(message, args);
     }

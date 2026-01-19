@@ -1,4 +1,5 @@
 import prisma from "../utils/prisma";
+import { redisService } from "./redisService";
 
 export const guildCleanupService = {
     /**
@@ -64,14 +65,6 @@ export const guildCleanupService = {
 
                 await prisma.wallet.deleteMany({ where: { userId: { in: userIds } } });
                 await prisma.bank.deleteMany({ where: { userId: { in: userIds } } });
-                // Transactions handling is tricky if we don't have direct guildId relation, 
-                // but since we delete wallet, we might want to delete transactions too.
-                // However, transaction has walletId. We can delete by walletId match? 
-                // Currently Transaction only links to Wallet. 
-                // If we delete Wallet, transactions might remain orphaned unless we clean them.
-                // Assuming we want to clean everything.
-                // Since Wallet is deleted, we can't easily find transactions unless we fetch them first.
-                // But for now, let's focus on main user data.
 
                 await prisma.bet.deleteMany({ where: { userId: { in: userIds } } });
                 await prisma.inventory.deleteMany({ where: { userId: { in: userIds } } });
@@ -116,9 +109,13 @@ export const guildCleanupService = {
             await prisma.degree.deleteMany({ where: { guildId } });
             await prisma.casinoDropConfig.deleteMany({ where: { guildId } });
             await prisma.commandPermission.deleteMany({ where: { guildId } });
+            await prisma.audit.deleteMany({ where: { guildId } });
 
             // 3. Delete Guild Config
             await prisma.guildConfig.delete({ where: { guildId } });
+
+            // 4. Invalidate Cache
+            await redisService.del(`guild_config:${guildId}`);
 
             console.log(`[GuildCleanup] Permanently deleted guild ${guildId}.`);
         } catch (error) {
