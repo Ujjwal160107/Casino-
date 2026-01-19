@@ -31,7 +31,7 @@ const PROBABILITIES = [
   { chance: 0.150, multiplier: 2, symbols: [CHERRY, BANANA] }
 ];
 
-function getSpinResult(): { reels: string[], win: boolean, multiplier: number, payout: number } {
+export function getSpinResult(): { reels: string[], win: boolean, multiplier: number, payout: number } {
   const roll = Math.random();
   let cumulative = 0;
 

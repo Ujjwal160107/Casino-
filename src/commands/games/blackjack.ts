@@ -12,7 +12,7 @@ import { Mascot, getEmoteUrl } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { updateQuestProgress } from "../../services/questService";
 
-type Card = { suit: string; rank: string; value: number };
+export type Card = { suit: string; rank: string; value: number };
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
 
@@ -79,11 +79,11 @@ const EMOJI_MAP: Record<string, Record<string, string>> = {
     }
 };
 
-function getCardEmoji(card: Card): string {
+export function getCardEmoji(card: Card): string {
     return EMOJI_MAP[card.suit]?.[card.rank] || `\`${card.rank}${card.suit}\``;
 }
 
-function createDeck(): Card[] {
+export function createDeck(): Card[] {
     const deck: Card[] = [];
     for (const suit of SUITS) {
         for (const rank of RANKS) {
@@ -96,7 +96,7 @@ function createDeck(): Card[] {
     return deck.sort(() => Math.random() - 0.5);
 }
 
-function calculateScore(hand: Card[]): number {
+export function calculateScore(hand: Card[]): number {
     let score = hand.reduce((sum, card) => sum + card.value, 0);
     let aces = hand.filter(card => card.rank === "A").length;
     while (score > 21 && aces > 0) {
@@ -106,7 +106,7 @@ function calculateScore(hand: Card[]): number {
     return score;
 }
 
-function formatHand(hand: Card[], hideFirst = false): string {
+export function formatHand(hand: Card[], hideFirst = false): string {
     if (hideFirst) {
         return `**??**   ${hand.slice(1).map(c => getCardEmoji(c)).join("  ")}`;
     }
