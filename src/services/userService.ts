@@ -69,3 +69,22 @@ export async function invalidateUserCache(userId: string, guildId: string) {
     const key = `user:${guildId}:${userId}`;
     await redisService.del(key);
 }
+
+export async function createUser(discordId: string, guildId: string, username: string) {
+    const config = await prisma.guildConfig.findUnique({ where: { guildId } });
+    const startMoney = config?.startMoney || 1000;
+
+    return await prisma.user.create({
+        data: {
+            discordId,
+            guildId,
+            username,
+            wallet: {
+                create: {
+                    balance: startMoney
+                }
+            }
+        },
+        include: { wallet: true }
+    });
+}

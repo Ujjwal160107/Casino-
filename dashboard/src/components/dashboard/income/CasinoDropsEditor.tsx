@@ -79,6 +79,14 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
         setDrops(newDrops);
     };
 
+    const activeManualInput = (index: number) => {
+        const drop = drops[index];
+        // If current ID is not in channel list, treat as manual
+        // Or if it's strictly "manual" (handled by temporary state? No, simplier)
+        // If the ID exists in channels, we show dropdown. If not, likely manual.
+        return !channels.some(c => c.id === drop.channelId);
+    };
+
     return (
         <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
@@ -135,16 +143,34 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                                 {/* Channel Selector */}
                                 <div className="space-y-1">
                                     <label className="text-[10px] text-zinc-500 uppercase font-bold">Channel</label>
-                                    <select
-                                        value={drop.channelId}
-                                        onChange={(e) => updateDrop(index, "channelId", e.target.value)}
-                                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50"
-                                    >
-                                        <option value="" disabled>Select Channel</option>
-                                        {channels.map(c => (
-                                            <option key={c.id} value={c.id}>#{c.name}</option>
-                                        ))}
-                                    </select>
+                                    <div className="flex flex-col gap-1">
+                                        <select
+                                            value={channels.some(c => c.id === drop.channelId) ? drop.channelId : "manual"}
+                                            onChange={(e) => {
+                                                if (e.target.value === "manual") {
+                                                    updateDrop(index, "channelId", "");
+                                                } else {
+                                                    updateDrop(index, "channelId", e.target.value);
+                                                }
+                                            }}
+                                            className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                        >
+                                            <option value="" disabled>Select Channel</option>
+                                            {channels.map(c => (
+                                                <option key={c.id} value={c.id}>#{c.name}</option>
+                                            ))}
+                                            <option value="manual">Enter ID Manually...</option>
+                                        </select>
+                                        {(activeManualInput(index) || !channels.some(c => c.id === drop.channelId) && drop.channelId !== "") && (
+                                            <input
+                                                type="text"
+                                                placeholder="Channel ID"
+                                                value={drop.channelId}
+                                                onChange={(e) => updateDrop(index, "channelId", e.target.value)}
+                                                className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-purple-500/50"
+                                            />
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Min/Max Amount */}
