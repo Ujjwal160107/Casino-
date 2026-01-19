@@ -3,6 +3,7 @@ import { GuildMember } from "discord.js";
 import { applyItemEffects, ItemEffect, ItemEffectResult } from "./effectService";
 import { logToChannel } from "../utils/discordLogger";
 import { Colors } from "discord.js";
+import { Mascot } from "../config/branding";
 
 export async function resetShop(guildId: string, category: string = "GENERAL") {
   return prisma.shopItem.deleteMany({

@@ -517,6 +517,12 @@ async function handleButton(interaction: ButtonInteraction) {
             return interaction.followUp({ content: "You don't have a job!", ephemeral: true });
         }
 
+        const job = getJob(userData.jobId);
+        if (!job) {
+            await interaction.deleteReply().catch(() => { });
+            return interaction.followUp({ content: "Invalid job.", ephemeral: true });
+        }
+
         // Cooldown check
         const config = await getGuildConfig(guild.id);
 
@@ -576,7 +582,6 @@ async function handleButton(interaction: ButtonInteraction) {
                     }
                 });
 
-                const config = await getGuildConfig(guild.id);
                 const prefix = config?.prefix || "!";
 
                 const burnoutEmbed = new EmbedBuilder()
@@ -765,8 +770,6 @@ async function handleButton(interaction: ButtonInteraction) {
             // Check Promotion
             // We use the UPDATED jobXp (add 10 to current)
             const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + 10, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
-
-            const config = await getGuildConfig(guild.id);
 
             let earningsText = `${fmtCurrency(amount, config?.currencyEmoji)}\n(Base Pay + ${streakBonusPct}% Streak Bonus)`;
             if (walletFull) {
