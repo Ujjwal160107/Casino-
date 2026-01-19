@@ -119,13 +119,29 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       await interaction.editReply({ embeds: [successEmbed(interaction.user, "Purchase Successful", `You bought **${item.name}**!`)] });
 
       if (results && results.length > 0) {
-        const effectMsg = results.map((r: any) => r.message).join("\n");
-        const effectEmbed = new EmbedBuilder()
-          .setColor(Colors.Gold)
-          //.setTitle("Effects Applied")
-          .setDescription(effectMsg);
+        // SPLIT EFFECTS
+        const customMessages = results.filter((r: any) => r.type === "CUSTOM_MESSAGE");
+        const otherEffects = results.filter((r: any) => r.type !== "CUSTOM_MESSAGE");
 
-        await interaction.followUp({ embeds: [effectEmbed] });
+        // 1. Custom Messages
+        for (const msgEffect of customMessages) {
+          const msgEmbed = new EmbedBuilder()
+            .setColor(Colors.Gold)
+            .setDescription(msgEffect.message);
+
+          await interaction.followUp({ embeds: [msgEmbed] });
+        }
+
+        // 2. Other Effects
+        if (otherEffects.length > 0) {
+          const effectMsg = otherEffects.map((r: any) => r.message).join("\n");
+          const effectEmbed = new EmbedBuilder()
+            .setColor(Colors.Gold)
+            //.setTitle("Effects Applied")
+            .setDescription(effectMsg);
+
+          await interaction.followUp({ embeds: [effectEmbed] });
+        }
       }
       return;
     } catch (err) {
@@ -213,12 +229,28 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             });
 
             if (results && results.length > 0) {
-              const effectMsg = results.map((r: any) => r.message).join("\n");
-              const effectEmbed = new EmbedBuilder()
-                .setColor(Colors.Gold)
-                .setDescription(effectMsg);
+              // SPLIT EFFECTS
+              const customMessages = results.filter((r: any) => r.type === "CUSTOM_MESSAGE");
+              const otherEffects = results.filter((r: any) => r.type !== "CUSTOM_MESSAGE");
 
-              await btnInteraction.followUp({ embeds: [effectEmbed], ephemeral: true });
+              // 1. Custom Messages
+              for (const msgEffect of customMessages) {
+                const msgEmbed = new EmbedBuilder()
+                  .setColor(Colors.Gold)
+                  .setDescription(msgEffect.message);
+
+                await btnInteraction.followUp({ embeds: [msgEmbed], ephemeral: true });
+              }
+
+              // 2. Other Effects
+              if (otherEffects.length > 0) {
+                const effectMsg = otherEffects.map((r: any) => r.message).join("\n");
+                const effectEmbed = new EmbedBuilder()
+                  .setColor(Colors.Gold)
+                  .setDescription(effectMsg);
+
+                await btnInteraction.followUp({ embeds: [effectEmbed], ephemeral: true });
+              }
             }
           } catch (err) {
             await btnInteraction.reply({ content: `${Mascot.Emotes.Fail} Purchase failed: ${(err as Error).message}`, ephemeral: true });

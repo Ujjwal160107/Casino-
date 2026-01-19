@@ -98,13 +98,31 @@ export async function handleShop(message: Message, args: string[]) {
         await message.reply({ embeds: [successEmbed(message.author, "Purchase Successful", `You bought **${item.name}**!`)] });
 
         if (results && results.length > 0) {
-          const effectMsg = results.map(r => r.message).join("\n");
-          const effectEmbed = new EmbedBuilder()
-            .setColor(Colors.Gold)
-            .setDescription(effectMsg);
+          // SPLIT EFFECTS: Separate Custom Messages from other effects
+          const customMessages = results.filter(r => r.type === "CUSTOM_MESSAGE");
+          const otherEffects = results.filter(r => r.type !== "CUSTOM_MESSAGE");
 
-          if ('send' in message.channel) {
-            await (message.channel as TextChannel).send({ embeds: [effectEmbed] });
+          // 1. Send each Custom Message in its own embed
+          for (const msgEffect of customMessages) {
+            const msgEmbed = new EmbedBuilder()
+              .setColor(Colors.Gold)
+              .setDescription(msgEffect.message);
+
+            if ('send' in message.channel) {
+              await (message.channel as TextChannel).send({ embeds: [msgEmbed] });
+            }
+          }
+
+          // 2. Aggregate other effects into one summary embed
+          if (otherEffects.length > 0) {
+            const effectMsg = otherEffects.map(r => r.message).join("\n");
+            const effectEmbed = new EmbedBuilder()
+              .setColor(Colors.Gold)
+              .setDescription(effectMsg);
+
+            if ('send' in message.channel) {
+              await (message.channel as TextChannel).send({ embeds: [effectEmbed] });
+            }
           }
         }
         return;
@@ -180,12 +198,28 @@ export async function handleShop(message: Message, args: string[]) {
           await interaction.editReply({ content: `${Mascot.Emotes.Accept} Purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**!` });
 
           if (results && results.length > 0) {
-            const effectMsg = results.map((r: any) => r.message).join("\n");
-            const effectEmbed = new EmbedBuilder()
-              .setColor(Colors.Gold)
-              .setDescription(effectMsg);
+            // SPLIT EFFECTS: Separate Custom Messages from other effects
+            const customMessages = results.filter((r: any) => r.type === "CUSTOM_MESSAGE");
+            const otherEffects = results.filter((r: any) => r.type !== "CUSTOM_MESSAGE");
 
-            await interaction.followUp({ embeds: [effectEmbed], ephemeral: true });
+            // 1. Send each Custom Message in its own embed
+            for (const msgEffect of customMessages) {
+              const msgEmbed = new EmbedBuilder()
+                .setColor(Colors.Gold)
+                .setDescription(msgEffect.message);
+
+              await interaction.followUp({ embeds: [msgEmbed], ephemeral: true });
+            }
+
+            // 2. Aggregate other effects into one summary embed
+            if (otherEffects.length > 0) {
+              const effectMsg = otherEffects.map((r: any) => r.message).join("\n");
+              const effectEmbed = new EmbedBuilder()
+                .setColor(Colors.Gold)
+                .setDescription(effectMsg);
+
+              await interaction.followUp({ embeds: [effectEmbed], ephemeral: true });
+            }
           }
         } catch (err) {
           if (interaction.deferred || interaction.replied) {
