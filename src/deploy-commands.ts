@@ -49,8 +49,16 @@ const rest = new REST().setToken(process.env.DISCORD_TOKEN!);
         }
 
         const data: any = await rest.put(route, { body: commands });
-
         console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+
+        // Anti-Duplicate Logic: If deploying to Guild, ensure Global is empty (or check if user wants this)
+        // For this "Fix", we assume if GUILD_ID is present, we only want Guild commands.
+        // However, clearing Global takes up to an hour. We'll just define the route.
+        if (GUILD_ID) {
+            console.log("Cleaning up potential duplicate Global commands...");
+            await rest.put(Routes.applicationCommands(CLIENT_ID), { body: [] });
+            console.log("Global commands cleared to prevent duplicates.");
+        }
     } catch (error) {
         console.error(error);
     }

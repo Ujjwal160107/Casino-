@@ -11,10 +11,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     .setDescription("All commands are now available as top-level slash commands!")
     .setColor(Colors.Gold)
     .addFields(
-      { name: "💰 Economy", value: "`/balance` - Check balance\n`/deposit` - Deposit to bank\n`/withdraw` - Withdraw from bank\n`/transfer` - Send money\n`/shop` - View shop\n`/buy` - Buy items\n`/inventory` - View items" },
-      { name: "🎲 Games", value: "`/blackjack` - Play Blackjack\n`/slots` - Play Slots\n`/roulette` - Play Roulette\n`/coinflip` - Flip a coin\n`/cockfight` - Challenge user\n`/russianroulette` - Play Russian Roulette" },
-      { name: "🧬 Life", value: "`/work` - Work shift\n`/jobs` - Browse jobs\n`/crime` - Commit crime\n`/education` - View education\n`/degrees` - View degrees" },
-      { name: "🛠 Admin", value: "`/add-money` - Add funds\n`/set-income` - Config income\n`/setup` - Config server" }
+      { name: "💰 Economy", value: "`/balance` `/deposit` `/withdraw` `/transfer` `/shop` `/buy` `/inventory` `/use` `/bank` `/credit` `/profile`" },
+      { name: "🏠 Properties", value: "`/properties` `/buy-property` `/my-properties` `/collect-rent`" },
+      { name: "💍 Social", value: "`/marry` `/divorce` `/family`" },
+      { name: "📈 Stocks", value: "`/stocks` `/buy-stock` `/sell-stock` `/my-stocks`" },
+      { name: "🎲 Games", value: "`/blackjack` `/slots` `/roulette` `/coinflip` `/cockfight` `/russianroulette`" },
+      { name: "🧬 Life", value: "`/work` `/jobs` `/crime` `/black-market` `/education` `/degrees`" },
+      { name: "🛠 Admin", value: "`/add-money` `/set-income` `/setup`" }
     );
 
   return interaction.reply({ embeds: [embed], ephemeral: true });
