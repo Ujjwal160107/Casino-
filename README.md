@@ -61,6 +61,10 @@ DISCORD_TOKEN="your_discord_bot_token"
 CLIENT_ID="your_discord_client_id"
 ```
 
+## 📚 Documentation
+
+For a complete guide on how to use the bot, including a user manual, admin guide, and privacy policy, please read [DOCUMENTATION.md](DOCUMENTATION.md).
+
 ## Command Usage
 
 ### General

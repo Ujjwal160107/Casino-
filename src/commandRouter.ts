@@ -893,7 +893,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const VALID_COMMANDS = [
         "balance", "bank", "deposit", "withdraw", "transfer", "collect",
         "work", "crime", "beg", "slut", "rob", "shop", "inventory", "profile",
-        "leaderboard", "rank", "bet", "blackjack", "coinflip", "slots",
+        "leaderboard",  "bet", "blackjack", "coinflip", "slots",
         "add-money", "remove-money", "set-start-money", "reset-economy", "set-currency",
         "min-bet", "viewconfig", "shop-add", "manage-item",
         "casino-ban", "casino-unban", "banlist", "black-market",
