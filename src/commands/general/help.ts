@@ -100,7 +100,7 @@ export async function handleHelp(message: Message) {
     { name: "help", aliases: [], description: "Show this menu." },
     { name: "guide", aliases: [], description: "New player guide." },
     { name: "profile", aliases: ["p", "userinfo"], description: "View user profile." },
-    { name: "rank", aliases: ["level"], description: "View experience level." },
+
   ];
 
   const categories: CategoryData[] = [
@@ -191,7 +191,7 @@ export async function handleHelp(message: Message) {
     .setColor(Mascot.Colors.Base as any)
     .setThumbnail(thumbnail)
     .addFields(
-      { name: "🔗 Quick Links", value: "[Dashboard](https://fortunabot.dev/) • [Docs](https://docs.example.com) • [Support Server](https://discord.gg/7bZm4gwcwt)" }
+      { name: "🔗 Quick Links", value: "[Dashboard](https://fortunabot.dev/) • [Docs](https://docs.example.com) • [Support Server](https://discord.gg/Y5P44UCH2Y)" }
     );
 
   const initialComponents = generateComponents("none", 1, 1);

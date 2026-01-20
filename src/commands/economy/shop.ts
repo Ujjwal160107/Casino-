@@ -99,8 +99,8 @@ export async function handleShop(message: Message, args: string[]) {
 
         if (results && results.length > 0) {
           // SPLIT EFFECTS: Separate Custom Messages from other effects
-          const customMessages = results.filter(r => r.type === "CUSTOM_MESSAGE");
-          const otherEffects = results.filter(r => r.type !== "CUSTOM_MESSAGE");
+          const customMessages = results.filter(r => (r.type as string) === "CUSTOM_MESSAGE");
+          const otherEffects = results.filter(r => (r.type as string) !== "CUSTOM_MESSAGE");
 
           // 1. Send each Custom Message in its own embed
           for (const msgEffect of customMessages) {

@@ -55,7 +55,7 @@ import { initScheduler } from "./scheduler"; const slashCommands = new Map<strin
 
         if (!rawContent) {
           // Just a mention -> Help message
-          const supportLink = "https://discord.gg/7bZm4gwcwt";
+          const supportLink = "https://discord.gg/Y5P44UCH2Y";
           return message.reply(`**Need Help?**\nJoin our support server: ${supportLink}\nUse \`${prefix}help\` or \`${prefix}guide\` to get started!`);
         } else {
           // Mention + Command -> Execute

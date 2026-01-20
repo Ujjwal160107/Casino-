@@ -328,11 +328,8 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleProfile(message, args);
     case "leaderboard":
       return handleLeaderboard(message, args);
-    case "rank":
-    case "level":
-    case "lvl":
-      const { rank } = require("./commands/general/rank");
-      return rank(client, message, args);
+      // Rank command removed
+      return;
     case "lb-wallet":
       return handleLeaderboard(message, ["cash"]);
     case "roulette-guide":
