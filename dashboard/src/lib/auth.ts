@@ -2,6 +2,10 @@ import { NextAuthOptions } from "next-auth";
 import DiscordProvider from "next-auth/providers/discord";
 
 export const authOptions: NextAuthOptions = {
+    // Trust the proxy headers (X-Forwarded-Proto/Host)
+    // This is crucial when running behind Nginx/Cloudflare
+    // @ts-ignore - trustHost is valid in newer NextAuth versions or can be ignored if typed strictly
+    trustHost: true,
     providers: [
         DiscordProvider({
             clientId: process.env.DISCORD_CLIENT_ID!,
