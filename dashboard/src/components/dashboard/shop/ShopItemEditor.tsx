@@ -620,17 +620,27 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                 <label className="text-[10px] font-bold text-zinc-500 uppercase">CONFIGURATION</label>
                                                 <div className="bg-[#1e1f22] rounded p-2 space-y-2">
 
-                                                    {/* ROLE SELECTOR */}
                                                     {(effect.type === "ROLE_PERMANENT" || effect.type === "ROLE_TEMPORARY") && (
-                                                        <div className="relative">
-                                                            <select
-                                                                value={effect.roleId || ""}
-                                                                onChange={e => updateEffect(idx, "roleId", e.target.value)}
-                                                                className="w-full bg-[#1e1f22] text-zinc-200 text-xs p-1 focus:outline-none"
-                                                            >
-                                                                <option value="">Select Role...</option>
-                                                                {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                                                            </select>
+                                                        <div className="space-y-2">
+                                                            <div className="relative">
+                                                                <select
+                                                                    value={effect.roleId && roles.some(r => r.id === effect.roleId) ? effect.roleId : ""}
+                                                                    onChange={e => updateEffect(idx, "roleId", e.target.value)}
+                                                                    className="w-full bg-[#1e1f22] text-zinc-200 text-xs p-1 focus:outline-none"
+                                                                >
+                                                                    <option value="">Select Role...</option>
+                                                                    {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                                                </select>
+                                                            </div>
+                                                            <div className="relative">
+                                                                <input
+                                                                    type="text"
+                                                                    value={effect.roleId || ""}
+                                                                    onChange={e => updateEffect(idx, "roleId", e.target.value)}
+                                                                    placeholder="Or Enter Role ID Manually"
+                                                                    className="w-full bg-transparent text-zinc-400 text-[10px] p-1 focus:outline-none border-b border-zinc-700/50 font-mono"
+                                                                />
+                                                            </div>
                                                         </div>
                                                     )}
 
