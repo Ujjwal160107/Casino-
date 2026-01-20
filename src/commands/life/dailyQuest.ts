@@ -62,7 +62,7 @@ export async function handleDailyQuest(message: Message, args: string[]) {
     if (quest.completed && !quest.rewardClaimed) {
         embed.addFields({
             name: "🎉 All Quests Completed!",
-            value: `Claim your reward:\n${Mascot.Emotes.MoneyBag || "💰"} **${fmtCurrency(QUEST_REWARD.money, config.currencyEmoji)}**\n${Mascot.Emotes.Sparks || "✨"} **${QUEST_REWARD.xp} XP**`
+            value: `Claim your reward:\n${Mascot.Emotes.MoneyBag || "💰"} **${fmtCurrency(QUEST_REWARD.money, config.currencyEmoji)}**`
         });
 
         const claimRow = new ActionRowBuilder<ButtonBuilder>()
@@ -95,7 +95,7 @@ export async function handleDailyQuest(message: Message, args: string[]) {
             if (i.customId === "claim_daily_quest") {
                 const result = await claimQuestReward(userId);
                 if (result.success) {
-                    const successEmbedObj = successEmbed(message.author, "Reward Claimed!", `You received **${fmtCurrency(result.reward!.money, config.currencyEmoji)}** and **${result.reward!.xp} XP**!`);
+                    const successEmbedObj = successEmbed(message.author, "Reward Claimed!", `You received **${fmtCurrency(result.reward!.money, config.currencyEmoji)}**!`);
                     successEmbedObj.setImage("attachment://daily_quest.jpg");
 
                     await i.update({
