@@ -97,149 +97,148 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                                 onChange={(e) => setSettings({ ...settings, maxBet: parseInt(e.target.value) || 0 })}
                                 className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                             />
+                            <button
+                                type="button"
+                                onClick={() => setSettings({ ...settings, maxBet: globalLimits.max })}
+                                className="absolute right-3 top-2.5 text-[10px] text-zinc-500 font-mono hover:text-yellow-500 bg-white/5 px-2 py-0.5 rounded cursor-pointer transition-colors"
+                            >
+                                Reset to Global: {globalLimits.max}
+                            </button>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setSettings({ ...settings, maxBet: globalLimits.max })}
-                            className="absolute right-3 top-2.5 text-[10px] text-zinc-500 font-mono hover:text-yellow-500 bg-white/5 px-2 py-0.5 rounded cursor-pointer transition-colors"
-                        >
-                            Reset to Global: {globalLimits.max}
-                        </button>
+                        <p className="text-xs text-zinc-500">
+                            Maximum amount a user can bet in one game.
+                        </p>
                     </div>
-                    <p className="text-xs text-zinc-500">
-                        Maximum amount a user can bet in one game.
-                    </p>
-                </div>
 
-                {/* Min Bet */}
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
-                        Min Bet (Coins)
-                    </label>
-                    <input
-                        type="number"
-                        value={settings.minBet}
-                        onChange={(e) => setSettings({ ...settings, minBet: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
-                    />
-                    <p className="text-xs text-zinc-500">
-                        Minimum amount required to play. Global Min: {globalLimits.min}
-                    </p>
-                </div>
-
-                {/* Cooldown */}
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
-                        <Clock size={14} /> Cooldown (Seconds)
-                    </label>
-                    <input
-                        type="number"
-                        value={settings.cooldown}
-                        onChange={(e) => setSettings({ ...settings, cooldown: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
-                    />
-                    <p className="text-xs text-zinc-500">
-                        Time a user must wait between games.
-                    </p>
-                </div>
-
-                {/* Specifics */}
-                {gameKey === "roulette" && (
+                    {/* Min Bet */}
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
-                            Spin Time (Seconds)
+                            Min Bet (Coins)
                         </label>
                         <input
                             type="number"
-                            value={settings.rouletteSpinTime || 0}
-                            onChange={(e) => setSettings({ ...settings, rouletteSpinTime: parseInt(e.target.value) || 0 })}
+                            value={settings.minBet}
+                            onChange={(e) => setSettings({ ...settings, minBet: parseInt(e.target.value) || 0 })}
                             className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-500">
-                            Duration of the roulette spin animation.
+                            Minimum amount required to play. Global Min: {globalLimits.min}
                         </p>
                     </div>
-                )}
 
-                {gameKey === "cockfight" && (
+                    {/* Cooldown */}
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
-                            Betting Time (Seconds)
+                            <Clock size={14} /> Cooldown (Seconds)
                         </label>
                         <input
                             type="number"
-                            value={settings.cockfightBetTime || 0}
-                            onChange={(e) => setSettings({ ...settings, cockfightBetTime: parseInt(e.target.value) || 0 })}
+                            value={settings.cooldown}
+                            onChange={(e) => setSettings({ ...settings, cooldown: parseInt(e.target.value) || 0 })}
                             className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-500">
-                            Duration of the betting phase before the fight starts.
+                            Time a user must wait between games.
                         </p>
                     </div>
-                )}
 
-                {gameKey === "cockfight" && (
-                    <>
+                    {/* Specifics */}
+                    {gameKey === "roulette" && (
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
-                                Chicken Heal Cost
+                                Spin Time (Seconds)
                             </label>
                             <input
                                 type="number"
-                                value={settings.chickenHealCost || 0}
-                                onChange={(e) => setSettings({ ...settings, chickenHealCost: parseInt(e.target.value) || 0 })}
+                                value={settings.rouletteSpinTime || 0}
+                                onChange={(e) => setSettings({ ...settings, rouletteSpinTime: parseInt(e.target.value) || 0 })}
                                 className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                             />
                             <p className="text-xs text-zinc-500">
-                                Cost to heal an injured chicken.
+                                Duration of the roulette spin animation.
                             </p>
                         </div>
+                    )}
 
+                    {gameKey === "cockfight" && (
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
-                                Training Base Cost
+                                Betting Time (Seconds)
                             </label>
                             <input
                                 type="number"
-                                value={settings.chickenTrainBaseCost || 0}
-                                onChange={(e) => setSettings({ ...settings, chickenTrainBaseCost: parseInt(e.target.value) || 0 })}
+                                value={settings.cockfightBetTime || 0}
+                                onChange={(e) => setSettings({ ...settings, cockfightBetTime: parseInt(e.target.value) || 0 })}
                                 className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                             />
                             <p className="text-xs text-zinc-500">
-                                Base cost for training a chicken.
+                                Duration of the betting phase before the fight starts.
                             </p>
                         </div>
+                    )}
 
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
-                                Training Multiplier
-                            </label>
-                            <input
-                                type="number"
-                                step="0.1"
-                                value={settings.chickenTrainMultiplier || 0}
-                                onChange={(e) => setSettings({ ...settings, chickenTrainMultiplier: parseFloat(e.target.value) || 0 })}
-                                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
-                            />
-                            <p className="text-xs text-zinc-500">
-                                Cost multiplier per training level (e.g., 0.5).
-                            </p>
-                        </div>
-                    </>
-                )}
+                    {gameKey === "cockfight" && (
+                        <>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                                    Chicken Heal Cost
+                                </label>
+                                <input
+                                    type="number"
+                                    value={settings.chickenHealCost || 0}
+                                    onChange={(e) => setSettings({ ...settings, chickenHealCost: parseInt(e.target.value) || 0 })}
+                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                />
+                                <p className="text-xs text-zinc-500">
+                                    Cost to heal an injured chicken.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                                    Training Base Cost
+                                </label>
+                                <input
+                                    type="number"
+                                    value={settings.chickenTrainBaseCost || 0}
+                                    onChange={(e) => setSettings({ ...settings, chickenTrainBaseCost: parseInt(e.target.value) || 0 })}
+                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                />
+                                <p className="text-xs text-zinc-500">
+                                    Base cost for training a chicken.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                                    Training Multiplier
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.1"
+                                    value={settings.chickenTrainMultiplier || 0}
+                                    onChange={(e) => setSettings({ ...settings, chickenTrainMultiplier: parseFloat(e.target.value) || 0 })}
+                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                />
+                                <p className="text-xs text-zinc-500">
+                                    Cost multiplier per training level (e.g., 0.5).
+                                </p>
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                <div className="flex justify-end pt-6 mt-6 border-t border-white/5">
+                    <button
+                        onClick={handleSave}
+                        disabled={isLoading}
+                        className="bg-yellow-500 text-black px-6 py-2.5 rounded-lg hover:bg-yellow-400 font-bold flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg shadow-yellow-500/20"
+                    >
+                        {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                        Save Settings
+                    </button>
+                </div>
             </div>
-
-            <div className="flex justify-end pt-6 mt-6 border-t border-white/5">
-                <button
-                    onClick={handleSave}
-                    disabled={isLoading}
-                    className="bg-yellow-500 text-black px-6 py-2.5 rounded-lg hover:bg-yellow-400 font-bold flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg shadow-yellow-500/20"
-                >
-                    {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                    Save Settings
-                </button>
-            </div>
-        </div>
         </div >
     );
 }
