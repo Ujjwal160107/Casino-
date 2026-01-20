@@ -6,14 +6,17 @@ import { Mascot } from "../config/branding";
 export type EffectType =
     | "ROLE_PERMANENT"
     | "ROLE_TEMPORARY"
-
     | "STAT_BOOST"
     | "DEATH_SAVE"
     | "STRESS_REDUCE"
     | "EXAM_BOOST"
     | "PAY_MULTIPLIER"
     | "COOLDOWN_REDUCTION"
-    | "STRESS_REDUCTION";
+    | "STRESS_REDUCTION"
+    | "XP_MULTIPLIER"
+    | "LEVEL_BOOST"
+    | "MONEY"
+    | "CUSTOM_MESSAGE";
 
 export interface ItemEffect {
     type: EffectType;
@@ -272,6 +275,47 @@ async function applyEffect(
                 message: `🤓 **Cheat Sheet Active!** You have +${examBoostValue} effective Intelligence for the next ${formatDuration(examBoostDuration)} (or until exam).`,
                 type: "EXAM_BOOST"
             };
+
+        case "XP_MULTIPLIER": {
+            const xpUser = await getUser(userId, guildId);
+            const duration = effect.duration || 3600;
+            const exp = new Date(Date.now() + duration * 1000);
+
+            await prisma.activeEffect.create({
+                data: {
+                    userId: xpUser.id,
+                    guildId,
+                    effectType: "XP_MULTIPLIER",
+                    value: effect.multiplier || 1.5,
+                    expiresAt: exp
+                }
+            });
+
+            if (client) await logEffectAction(client, guildId, "XP_MULTIPLIER", `Activated XP Multiplier (${effect.multiplier}x) for <@${userId}>`);
+
+            return {
+                message: `⚡ **XP Boost Active!** earning ${effect.multiplier}x XP for ${formatDuration(duration)}.`,
+                type: "XP_MULTIPLIER"
+            };
+        }
+
+        case "LEVEL_BOOST": {
+            const lbUser = await getUser(userId, guildId);
+            const levels = effect.levels || 1;
+
+            // Increment level directly
+            await prisma.user.update({
+                where: { id: lbUser.id },
+                data: { level: { increment: levels } }
+            });
+
+            if (client) await logEffectAction(client, guildId, "LEVEL_BOOST", `Granted +${levels} levels to <@${userId}>`);
+
+            return {
+                message: `📈 **Leveled Up!** You gained +${levels} levels!`,
+                type: "LEVEL_BOOST"
+            };
+        }
 
         default:
             throw new Error(`Unknown effect type: ${effect.type}`);

@@ -27,6 +27,10 @@ model User {
 
   creditScore Int @default(500)
   
+  // XP System
+  xp          Int       @default(0)
+  level       Int       @default(0)
+
   // User preferences
   // Removed profileTheme 
 

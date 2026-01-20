@@ -14,7 +14,8 @@ interface QuestTask {
 }
 
 export const QUEST_REWARD = {
-    money: 50000
+    money: 50000,
+    xp: 5000
 };
 
 export async function getDailyQuest(userId: string, guildId: string) {
@@ -139,6 +140,7 @@ export async function updateQuestProgress(userId: string, type: QuestType, amoun
 }
 
 import { getGuildConfig } from "./guildConfigService";
+import { LevelService } from "./levelService";
 
 export async function claimQuestReward(userId: string) {
     const today = new Date().toISOString().split("T")[0];
@@ -166,5 +168,8 @@ export async function claimQuestReward(userId: string) {
         })
     ]);
 
-    return { success: true, reward: { money: pay } };
+    const xpAmount = 5000; // Base XP reward
+    await LevelService.addXp(userId, quest.guildId, xpAmount);
+
+    return { success: true, reward: { money: pay, xp: xpAmount } };
 }
