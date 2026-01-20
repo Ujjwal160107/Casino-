@@ -172,17 +172,7 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
                                 <p className="text-white font-medium">{job.title}</p>
                                 <p className="text-xs text-zinc-500 font-mono">{job.id}</p>
                             </div>
-                            <div className="w-24">
-                                <label className="text-[10px] uppercase text-zinc-500 font-bold">XP Req</label>
-                                <input
-                                    type="number"
-                                    min={0}
-                                    value={formData.jobXpReqs[job.id] ?? 0}
-                                    onChange={(e) => handleNestedChange("jobXpReqs", job.id, e.target.value)}
-                                    className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-white text-sm"
-                                    placeholder="Def"
-                                />
-                            </div>
+
                             <div className="w-24">
                                 <label className="text-[10px] uppercase text-zinc-500 font-bold">Shifts Req</label>
                                 <input
