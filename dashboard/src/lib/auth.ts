@@ -4,8 +4,19 @@ import DiscordProvider from "next-auth/providers/discord";
 export const authOptions: NextAuthOptions = {
     // Trust the proxy headers (X-Forwarded-Proto/Host)
     // This is crucial when running behind Nginx/Cloudflare
-    // @ts-ignore - trustHost is valid in newer NextAuth versions or can be ignored if typed strictly
+    // @ts-ignore
     trustHost: true,
+    cookies: {
+        sessionToken: {
+            name: process.env.NEXTAUTH_URL?.startsWith("https") ? `__Secure-next-auth.session-token` : `next-auth.session-token`,
+            options: {
+                httpOnly: true,
+                sameSite: "lax",
+                path: "/",
+                secure: process.env.NEXTAUTH_URL?.startsWith("https"),
+            },
+        },
+    },
     providers: [
         DiscordProvider({
             clientId: process.env.DISCORD_CLIENT_ID!,
@@ -27,7 +38,7 @@ export const authOptions: NextAuthOptions = {
         async session({ session, token }) {
             session.accessToken = token.accessToken;
             if (session.user) {
-                session.user.id = token.id;
+                session.user.id = token.id as string;
             }
             return session;
         },

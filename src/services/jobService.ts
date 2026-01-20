@@ -220,13 +220,7 @@ export async function checkPromotion(user: any, guildId?: string): Promise<{ eli
     if (guildId) {
         const config = await getGuildConfig(guildId);
         if (config) {
-            // Check XP Req Override
-            if (config.jobXpReqs) {
-                const xpReqs = config.jobXpReqs as Record<string, number>;
-                if (xpReqs[nextJob.id] !== undefined) {
-                    reqXp = xpReqs[nextJob.id];
-                }
-            }
+
             // Check Shifts Req
             if (config.jobShiftReqs) {
                 const shiftReqs = config.jobShiftReqs as Record<string, number>;

@@ -94,7 +94,7 @@ export async function getProfileEmbed(targetUser: DiscordUser, guildId: string):
     .setColor(Mascot.Colors.Base as any)
     .setTitle(`${Mascot.Emotes.Success} User Profile: ${targetUser.username}`)
     .setThumbnail(targetUser.displayAvatarURL())
-    .setDescription(`**Level ${userDb.level}** • **${userDb.xp} XP**\nCredit Score: **${userDb.creditScore}**`)
+    .setDescription(`Credit Score: **${userDb.creditScore}**`)
     .addFields(
       {
         name: `${Mascot.Emotes.MoneyBag} Wealth`,

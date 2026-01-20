@@ -6,10 +6,7 @@ import { Mascot } from "../config/branding";
 export type EffectType =
     | "ROLE_PERMANENT"
     | "ROLE_TEMPORARY"
-    | "XP_MULTIPLIER"
-    | "CUSTOM_MESSAGE"
-    | "MONEY"
-    | "LEVEL_BOOST"
+
     | "STAT_BOOST"
     | "DEATH_SAVE"
     | "STRESS_REDUCE"
@@ -107,32 +104,7 @@ async function applyEffect(
                 type: "ROLE_TEMPORARY"
             };
 
-        case "XP_MULTIPLIER":
-            if (!effect.multiplier || !effect.duration) {
-                throw new Error("Missing multiplier or duration");
-            }
 
-            const user = await getUser(userId, guildId);
-            const xpExpiresAt = new Date(Date.now() + effect.duration * 1000);
-
-            await prisma.activeEffect.create({
-                data: {
-                    userId: user.id,
-                    guildId,
-                    effectType: "XP_MULTIPLIER",
-                    value: effect.multiplier,
-                    expiresAt: xpExpiresAt,
-                }
-            });
-
-            if (client) {
-                await logEffectAction(client, guildId, "XP_MULTIPLIER", `Activated ${effect.multiplier}x XP Multiplier for <@${userId}> for ${formatDuration(effect.duration)}`);
-            }
-
-            return {
-                message: `⚡ ${effect.multiplier}x XP Multiplier activated for ${formatDuration(effect.duration)}!`,
-                type: "XP_MULTIPLIER"
-            };
 
         case "CUSTOM_MESSAGE":
             return {
@@ -174,28 +146,7 @@ async function applyEffect(
                 type: "MONEY"
             };
 
-        case "LEVEL_BOOST":
-            if (!effect.levels) throw new Error("Missing levels");
 
-            const boostedUser = await prisma.user.findUnique({
-                where: { discordId_guildId: { discordId: userId, guildId } }
-            });
-
-            if (!boostedUser) throw new Error("User not found");
-
-            await prisma.user.update({
-                where: { id: boostedUser.id },
-                data: { level: { increment: effect.levels } }
-            });
-
-            if (client) {
-                await logEffectAction(client, guildId, "LEVEL_BOOST", `Boosted <@${userId}> by ${effect.levels} levels`);
-            }
-
-            return {
-                message: `📈 Level boost! +${effect.levels} levels!`,
-                type: "LEVEL_BOOST"
-            };
 
         case "STAT_BOOST":
             const statName = (effect as any).stat;
@@ -366,30 +317,7 @@ export async function getActiveEffects(userId: string, guildId: string) {
     });
 }
 
-export async function getXPMultiplier(userId: string, guildId: string): Promise<number> {
-    try {
-        const user = await getUser(userId, guildId);
-        await cleanExpiredEffects(user.id);
 
-        const xpEffects = await prisma.activeEffect.findMany({
-            where: {
-                userId: user.id,
-                guildId,
-                effectType: "XP_MULTIPLIER",
-                OR: [
-                    { expiresAt: { gt: new Date() } },
-                    { expiresAt: null }
-                ]
-            }
-        });
-
-        if (xpEffects.length === 0) return 1;
-
-        return xpEffects.reduce((total, effect) => total * effect.value, 1);
-    } catch {
-        return 1;
-    }
-}
 
 export async function cleanExpiredEffects(userId?: string) {
     const where: any = {

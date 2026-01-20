@@ -8,7 +8,6 @@ import { toast } from "sonner";
 
 interface QuestConfig {
     questPay: number;
-    questXp: number;
 }
 
 interface QuestEditorProps {
@@ -62,17 +61,7 @@ export function QuestEditor({ guildId, initialData }: QuestEditorProps) {
                     />
                     <p className="text-[10px] text-zinc-600">Fixed currency reward.</p>
                 </div>
-                <div className="space-y-2">
-                    <label className="text-xs text-zinc-500 font-bold uppercase">XP Reward</label>
-                    <input
-                        type="number"
-                        min={0}
-                        value={formData.questXp}
-                        onChange={(e) => setFormData({ ...formData, questXp: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-purple-500/50 transition-colors"
-                    />
-                    <p className="text-[10px] text-zinc-600">XP gained upon completion.</p>
-                </div>
+
             </div>
 
             <div className="flex justify-end pt-6 mt-6 border-t border-white/5">

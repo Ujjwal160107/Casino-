@@ -275,7 +275,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                 <div className="mt-6 pt-6 border-t border-red-500/10 flex items-center justify-between">
                     <div>
                         <p className="text-white font-medium">Reset Economy</p>
-                        <p className="text-xs text-zinc-500 mt-1">Deletes all wallets, banks, items, and resets XP/levels for everyone.</p>
+                        <p className="text-xs text-zinc-500 mt-1">Deletes all wallets, banks, items, and resets user statistics for everyone.</p>
                     </div>
                     <button
                         type="button"

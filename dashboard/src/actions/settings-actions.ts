@@ -139,8 +139,7 @@ export async function resetEconomy(guildId: string) {
             prisma.user.updateMany({
                 where: { guildId },
                 data: {
-                    xp: 0,
-                    level: 0,
+
                     creditScore: 500,
                     jobId: null,
                     jobXp: 0,

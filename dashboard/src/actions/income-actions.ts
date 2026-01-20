@@ -58,7 +58,6 @@ export async function getIncomeSettings(guildId: string) {
         },
         quests: {
             questPay: config?.questPay ?? 2500,
-            questXp: config?.questXp ?? 100
         },
         drops: {
             configs: casinoDrops.map(d => ({
@@ -297,7 +296,6 @@ export async function updateRobSettings(guildId: string, data: {
 
 export async function updateQuestSettings(guildId: string, data: {
     questPay: number;
-    questXp: number;
 }) {
     try {
         await prisma.guildConfig.update({

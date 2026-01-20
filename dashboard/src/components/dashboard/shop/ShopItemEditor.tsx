@@ -21,8 +21,6 @@ const EFFECT_TYPES = [
     { label: "Add Role (Perm)", value: "ROLE_PERMANENT" },
     { label: "Add Role (Temp)", value: "ROLE_TEMPORARY" },
     { label: "Give Money", value: "MONEY" },
-    { label: "XP Multiplier", value: "XP_MULTIPLIER" },
-    { label: "Level Boost", value: "LEVEL_BOOST" },
     { label: "Stat Boost (Chicken)", value: "STAT_BOOST" },
     { label: "Stress Reduction", value: "STRESS_REDUCE" },
     { label: "Death Save", value: "DEATH_SAVE" },

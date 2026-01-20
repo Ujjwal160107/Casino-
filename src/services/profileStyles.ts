@@ -58,20 +58,8 @@ export async function drawRankCard(ctx: Context, width: number, height: number, 
     ctx.font = "bold 34px sans-serif";
     ctx.fillText(data.username, 220, 80);
 
-    ctx.font = "20px sans-serif";
-    ctx.fillText(`Rank #${data.rank}  Level ${data.level}`, 220, 115);
 
-    // XP Bar
-    ctx.fillStyle = "rgba(0,0,0,0.5)";
-    ctx.fillRect(220, 150, 500, 20);
 
-    const fillWidth = 500 * Math.min(Math.max(data.currentXp / data.requiredXp, 0), 1);
-    ctx.fillStyle = primaryColor;
-    ctx.fillRect(220, 150, fillWidth, 20);
-
-    ctx.fillStyle = textColor;
-    ctx.textAlign = "right";
-    ctx.font = "20px sans-serif";
-    ctx.fillText(`${data.currentXp} / ${data.requiredXp} XP`, 720, 115);
+    // Removed Level/Rank/XP Bar
     ctx.textAlign = "left";
 }

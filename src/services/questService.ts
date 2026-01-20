@@ -14,8 +14,7 @@ interface QuestTask {
 }
 
 export const QUEST_REWARD = {
-    money: 50000,
-    xp: 500
+    money: 50000
 };
 
 export async function getDailyQuest(userId: string, guildId: string) {
@@ -152,9 +151,8 @@ export async function claimQuestReward(userId: string) {
     if (quest.rewardClaimed) return { success: false, message: "Reward already claimed." };
 
     const config = await getGuildConfig(quest.guildId);
-    // Use dynamic config or fallback to defaults (although getGuildConfig should handle defaults, strict typing might miss new fields if client update failed)
+    // Use dynamic config or fallback to defaults
     const pay = (config as any).questPay ?? 2500;
-    const xpReward = (config as any).questXp ?? 100;
 
     await prisma.$transaction([
         prisma.dailyQuest.update({
@@ -165,12 +163,8 @@ export async function claimQuestReward(userId: string) {
             where: { userId },
             update: { balance: { increment: pay } },
             create: { userId, balance: pay }
-        }),
-        prisma.user.update({
-            where: { id: userId },
-            data: { xp: { increment: xpReward } }
         })
     ]);
 
-    return { success: true, reward: { money: pay, xp: xpReward } };
+    return { success: true, reward: { money: pay } };
 }
