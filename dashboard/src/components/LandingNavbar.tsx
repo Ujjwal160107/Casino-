@@ -45,7 +45,12 @@ export function LandingNavbar() {
                         </Link>
 
                         {/* Action Buttons */}
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-6">
+                            <div className="hidden md:flex items-center gap-6">
+                                <Link href="/docs" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Documentation</Link>
+                                <Link href="/policy" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Privacy</Link>
+                            </div>
+                            <div className="h-4 w-[1px] bg-white/10 hidden md:block"></div>
                             <button
                                 onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
                                 className="px-6 py-2 rounded-full border border-white/10 text-zinc-300 font-medium text-sm hover:bg-white/5 hover:text-white hover:border-white/20 transition-all cursor-pointer"
