@@ -7,8 +7,6 @@ import { invalidateGuildConfig } from "@/lib/cache";
 export interface JobSettingsData {
     jobCooldown: number;
     jobSectorBasePay: Record<string, number>;
-    jobRelaxControllers: Record<string, number>;
-    jobXpReqs: Record<string, number>;
     jobShiftReqs: Record<string, number>;
     defaultSectorPay: Record<string, number>; // New field for UI defaults
 }
@@ -32,8 +30,6 @@ export async function getJobSettings(guildId: string) {
             select: {
                 jobCooldown: true,
                 jobSectorBasePay: true,
-                jobRelaxControllers: true,
-                jobXpReqs: true,
                 jobShiftReqs: true,
             }
         });
@@ -44,8 +40,6 @@ export async function getJobSettings(guildId: string) {
         return {
             jobCooldown: config.jobCooldown ?? 3600,
             jobSectorBasePay: (config.jobSectorBasePay as Record<string, number>) || {},
-            jobRelaxControllers: (config.jobRelaxControllers as Record<string, number>) || {},
-            jobXpReqs: (config.jobXpReqs as Record<string, number>) || {},
             jobShiftReqs: (config.jobShiftReqs as Record<string, number>) || {},
             defaultSectorPay: DEFAULT_SECTOR_PAY
         };
@@ -67,17 +61,7 @@ export async function updateJobSettings(guildId: string, data: JobSettingsData) 
             if (!isNaN(num) && num >= 0) cleanBasePay[k] = num;
         }
 
-        const cleanRelax: Record<string, number> = {};
-        for (const [k, v] of Object.entries(data.jobRelaxControllers)) {
-            const num = parseInt(String(v));
-            if (!isNaN(num) && num >= 0) cleanRelax[k] = num;
-        }
 
-        const cleanXp: Record<string, number> = {};
-        for (const [k, v] of Object.entries(data.jobXpReqs)) {
-            const num = parseInt(String(v));
-            if (!isNaN(num) && num >= 0) cleanXp[k] = num;
-        }
 
         const cleanShifts: Record<string, number> = {};
         for (const [k, v] of Object.entries(data.jobShiftReqs)) {
@@ -91,15 +75,11 @@ export async function updateJobSettings(guildId: string, data: JobSettingsData) 
                 guildId,
                 jobCooldown: parseInt(String(data.jobCooldown)),
                 jobSectorBasePay: cleanBasePay,
-                jobRelaxControllers: cleanRelax,
-                jobXpReqs: cleanXp,
                 jobShiftReqs: cleanShifts
             },
             update: {
                 jobCooldown: parseInt(String(data.jobCooldown)),
                 jobSectorBasePay: cleanBasePay,
-                jobRelaxControllers: cleanRelax,
-                jobXpReqs: cleanXp,
                 jobShiftReqs: cleanShifts
             }
         });
