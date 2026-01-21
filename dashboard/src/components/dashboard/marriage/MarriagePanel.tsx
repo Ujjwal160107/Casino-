@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Save, AlertCircle, CheckCircle2, Heart, HeartCrack, Clock, Coins } from "lucide-react";
 import { updateMarriageConfig } from "@/actions/marriage-actions";
+import { DurationInput } from "@/components/dashboard/ui/DurationInput";
 
 interface MarriagePanelProps {
     guildId: string;
@@ -27,6 +28,10 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
             ...prev,
             [name]: type === "checkbox" ? checked : (parseInt(value) || 0)
         }));
+    };
+
+    const handleDurationChange = (val: number) => {
+        setConfig(prev => ({ ...prev, marriageCooldown: val }));
     };
 
     const handleSave = async () => {
@@ -136,17 +141,16 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
                 {/* Cooldown */}
                 <div className="space-y-2">
                     <label className="text-xs uppercase tracking-wider font-bold text-zinc-500 flex items-center gap-1">
-                        <Clock size={12} /> Remarry Cooldown (Sec)
+                        <Clock size={12} /> Remarry Cooldown
                     </label>
-                    <input
-                        type="number"
-                        name="marriageCooldown"
-                        value={config.marriageCooldown}
-                        onChange={handleChange}
-                        className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono"
-                        min={0}
-                        disabled={!config.marriageEnabled}
-                    />
+                    <div className="bg-zinc-950 border border-white/10 rounded-xl px-4 py-2">
+                        <DurationInput
+                            value={config.marriageCooldown}
+                            onChange={handleDurationChange}
+                            disabled={!config.marriageEnabled}
+                            label=""
+                        />
+                    </div>
                     <p className="text-[10px] text-zinc-600">Wait time after divorce before remarriage.</p>
                 </div>
             </div>
