@@ -96,3 +96,25 @@ label,
 [role="button"] {
   cursor: pointer;
 }
+
+/* Custom Scrollbar for Webkit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  /* zinc-700: Dark Grey */
+  border: 2px solid hsl(var(--background));
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+  /* zinc-600: Slightly lighter grey */
+}
