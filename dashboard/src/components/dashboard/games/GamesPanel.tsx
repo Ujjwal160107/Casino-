@@ -13,11 +13,12 @@ import { DurationInput } from "../ui/DurationInput";
 
 interface GlobalCooldownInputProps {
     guildId: string;
+    initialValue: number;
 }
 
-function GlobalCooldownInput({ guildId }: GlobalCooldownInputProps) {
+function GlobalCooldownInput({ guildId, initialValue }: GlobalCooldownInputProps) {
     const [loading, setLoading] = useState(false);
-    const [cooldown, setCooldown] = useState(0);
+    const [cooldown, setCooldown] = useState(initialValue);
 
     const handleUpdate = async () => {
         setLoading(true);
@@ -25,7 +26,7 @@ function GlobalCooldownInput({ guildId }: GlobalCooldownInputProps) {
             const result = await updateGlobalGameCooldown(guildId, cooldown);
             if (result.success) {
                 toast.success("Global cooldown updated for all games!");
-                setCooldown(0);
+                // Do NOT reset cooldown to 0
             } else {
                 toast.error(result.error || "Failed to update.");
             }
@@ -86,6 +87,11 @@ export function GamesPanel({ guildId, games, globalLimits }: GamesPanelProps) {
 
     const activeGame = games.find(g => g.key === selectedGame) || games[0];
 
+    // Calculate if all games have the same cooldown to show as "Global"
+    const firstCooldown = games[0]?.settings.cooldown || 0;
+    const allSame = games.every(g => g.settings.cooldown === firstCooldown);
+    const initialGlobalCooldown = allSame ? firstCooldown : 0;
+
     return (
         <div className="space-y-6">
             {/* Global Settings */}
@@ -99,7 +105,7 @@ export function GamesPanel({ guildId, games, globalLimits }: GamesPanelProps) {
                         <p className="text-sm text-zinc-400">Set a unified cooldown timer for all casino games at once.</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <GlobalCooldownInput guildId={guildId} />
+                        <GlobalCooldownInput guildId={guildId} initialValue={initialGlobalCooldown} />
                     </div>
                 </div>
             </div>
