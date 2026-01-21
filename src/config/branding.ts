@@ -124,6 +124,11 @@ export const Mascot = {
         Base: "#9B59B6", // Purple-ish to match her hair?
         Success: "#2ECC71", // Green
         Fail: "#E74C3C" // Red
+    },
+    Links: {
+        Dashboard: "https://fortunabot.dev/",
+        Support: "https://discord.gg/Y5P44UCH2Y",
+        Docs: "https://fortunabot.dev/docs"
     }
 };
 
