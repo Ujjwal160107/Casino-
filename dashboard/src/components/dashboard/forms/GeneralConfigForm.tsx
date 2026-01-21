@@ -7,6 +7,7 @@ import { Loader2, Save, Trash2, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { DurationInput } from "../ui/DurationInput";
+import { updateGlobalGameCooldown } from "@/actions/game-actions";
 
 interface GeneralConfigFormProps {
     guildId: string;
@@ -82,7 +83,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
     // Global Cooldown Logic (Standalone)
     const [globalCooldown, setGlobalCooldown] = useState("");
     const [cooldownLoading, setCooldownLoading] = useState(false);
-    import { updateGlobalGameCooldown } from "@/actions/game-actions";
+
 
     const handleSetGlobalCooldown = async () => {
         const val = parseInt(globalCooldown);

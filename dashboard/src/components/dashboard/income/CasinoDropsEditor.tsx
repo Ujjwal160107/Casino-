@@ -8,8 +8,10 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { DurationInput } from "@/components/dashboard/ui/DurationInput";
-id: string;
-name: string;
+
+interface Channel {
+    id: string;
+    name: string;
 }
 
 interface DropConfig {
@@ -197,6 +199,7 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                                 </div>
 
                                 {/* Expiration */}
+                                <div className="space-y-1">
                                     <label className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-1">
                                         <Clock size={10} /> Expires
                                     </label>
