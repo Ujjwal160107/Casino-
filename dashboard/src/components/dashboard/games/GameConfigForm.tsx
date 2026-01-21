@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { updateGameSettings } from "@/actions/game-actions";
 import { Loader2, Save, Dices, Clock, AlertCircle } from "lucide-react";
+import { DurationInput } from "../ui/DurationInput";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
@@ -128,16 +129,14 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
 
                     {/* Cooldown */}
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
-                            <Clock size={14} /> Cooldown (Seconds)
+                        <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2 mb-2">
+                            <Clock size={14} /> Cooldown
                         </label>
-                        <input
-                            type="number"
+                        <DurationInput
                             value={settings.cooldown}
-                            onChange={(e) => setSettings({ ...settings, cooldown: parseInt(e.target.value) || 0 })}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                            onChange={(val) => setSettings({ ...settings, cooldown: val })}
                         />
-                        <p className="text-xs text-zinc-500">
+                        <p className="text-xs text-zinc-500 mt-2">
                             Time a user must wait between games.
                         </p>
                     </div>

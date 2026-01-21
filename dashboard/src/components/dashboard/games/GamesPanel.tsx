@@ -9,27 +9,23 @@ import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dices, Crown, LayoutGrid, Coins, Sword, Skull } from "lucide-react";
 
+import { DurationInput } from "../ui/DurationInput";
+
 interface GlobalCooldownInputProps {
     guildId: string;
 }
 
 function GlobalCooldownInput({ guildId }: GlobalCooldownInputProps) {
     const [loading, setLoading] = useState(false);
-    const [cooldown, setCooldown] = useState("");
+    const [cooldown, setCooldown] = useState(0);
 
     const handleUpdate = async () => {
-        const val = parseInt(cooldown);
-        if (isNaN(val) || val < 0) {
-            toast.error("Please enter a valid cooldown (0 or more).");
-            return;
-        }
-
         setLoading(true);
         try {
-            const result = await updateGlobalGameCooldown(guildId, val);
+            const result = await updateGlobalGameCooldown(guildId, cooldown);
             if (result.success) {
                 toast.success("Global cooldown updated for all games!");
-                setCooldown("");
+                setCooldown(0);
             } else {
                 toast.error(result.error || "Failed to update.");
             }
@@ -41,21 +37,18 @@ function GlobalCooldownInput({ guildId }: GlobalCooldownInputProps) {
     };
 
     return (
-        <div className="flex items-center gap-2">
-            <div className="relative">
-                <input
-                    type="number"
-                    placeholder="Seconds (e.g. 10)"
+        <div className="flex items-center gap-4">
+            <div className="w-[320px]">
+                <DurationInput
                     value={cooldown}
-                    onChange={(e) => setCooldown(e.target.value)}
-                    disabled={loading}
-                    className="bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white w-40 focus:ring-2 focus:ring-violet-500 outline-none placeholder:text-zinc-600"
+                    onChange={setCooldown}
+                    label=""
                 />
             </div>
             <button
                 onClick={handleUpdate}
-                disabled={loading || !cooldown}
-                className="bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2"
+                disabled={loading}
+                className="bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 h-full mt-1"
             >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 Set All

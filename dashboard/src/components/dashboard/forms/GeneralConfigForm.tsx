@@ -236,18 +236,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                     </div>
                 </div>
 
-                {/* Drop Expiration */}
-                <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                    <h3 className="text-sm font-bold text-white mb-2">Money Settings</h3>
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Drop Expiration</label>
-                        <DurationInput
-                            value={formData.dropExpiration || 60}
-                            onChange={(val) => setFormData({ ...formData, dropExpiration: val })}
-                        />
-                        <p className="text-xs text-zinc-500">How long money drops last before disappearing.</p>
-                    </div>
-                </div>
+
 
             </div>
 
