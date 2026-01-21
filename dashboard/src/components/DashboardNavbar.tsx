@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import { LogOut, Settings, LayoutDashboard } from "lucide-react";
 import { useState } from "react";
 
@@ -14,8 +15,11 @@ interface DashboardNavbarProps {
 }
 
 export function DashboardNavbar({ user }: DashboardNavbarProps) {
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
     return (
         <motion.header
+            // ... (keep existing header props)
             initial={{ y: -100 }}
             animate={{ y: 0 }}
             transition={{ type: "spring", stiffness: 100, damping: 20 }}
@@ -46,31 +50,63 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
 
                     {/* User Profile */}
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-                            <div className="text-right hidden sm:block">
-                                <p className="text-sm font-semibold text-zinc-200">{user?.name || "Player"}</p>
-                                <p className="text-xs text-yellow-500/80 uppercase tracking-wider">Admin</p>
+                        <div className="flex items-center gap-3 pl-4 border-l border-white/10 relative">
+
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                    className="flex items-center gap-3 focus:outline-none group"
+                                >
+                                    <div className="text-right hidden sm:block">
+                                        <p className="text-sm font-semibold text-zinc-200 group-hover:text-white transition-colors">{user?.name || "Player"}</p>
+                                        <p className="text-xs text-yellow-500/80 uppercase tracking-wider">Admin</p>
+                                    </div>
+                                    <div className="relative w-11 h-11 rounded-full p-0.5 bg-zinc-900 border border-zinc-700 group-hover:border-yellow-500/50 transition-colors">
+                                        {user?.image ? (
+                                            <Image
+                                                src={user.image}
+                                                width={44}
+                                                height={44}
+                                                alt="Profile"
+                                                className="rounded-full w-full h-full object-cover border-2 border-zinc-900"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full rounded-full bg-zinc-800 flex items-center justify-center border-2 border-zinc-900">
+                                                <span className="text-lg font-bold text-zinc-400">
+                                                    {user?.name?.charAt(0) || "?"}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </button>
+
+                                {/* Dropdown Menu */}
+                                {isDropdownOpen && (
+                                    <div className="absolute right-0 top-full mt-2 w-56 bg-zinc-900 border border-white/10 rounded-xl shadow-xl overflow-hidden backdrop-blur-md">
+                                        <div className="p-4 border-b border-white/5 bg-zinc-950/30">
+                                            <p className="text-sm font-bold text-white truncate">{user?.name}</p>
+                                            <p className="text-xs text-zinc-500">Logged in via Discord</p>
+                                        </div>
+                                        <div className="p-1">
+                                            <button
+                                                onClick={() => signOut({ callbackUrl: "/" })}
+                                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-colors text-left"
+                                            >
+                                                <LogOut size={16} />
+                                                Sign Out
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="relative group cursor-pointer">
-                                <div className="relative w-11 h-11 rounded-full p-0.5 bg-zinc-900 border border-zinc-700 hover:border-zinc-500 transition-colors">
-                                    {user?.image ? (
-                                        <Image
-                                            src={user.image}
-                                            width={44}
-                                            height={44}
-                                            alt="Profile"
-                                            className="rounded-full w-full h-full object-cover border-2 border-zinc-900"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full rounded-full bg-zinc-800 flex items-center justify-center border-2 border-zinc-900">
-                                            <span className="text-lg font-bold text-zinc-400">
-                                                {user?.name?.charAt(0) || "?"}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                            {/* Click outside listener (simplified) */}
+                            {isDropdownOpen && (
+                                <div
+                                    className="fixed inset-0 z-[-1]"
+                                    onClick={() => setIsDropdownOpen(false)}
+                                />
+                            )}
                         </div>
                     </div>
                 </div>
@@ -78,6 +114,10 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
         </motion.header>
     );
 }
+
+// Helper (no changes, just included for context if needed, but not replacing it)
+// We are only targeting DashboardNavbar replacement mainly.
+
 
 function NavLink({ href, icon: Icon, label, active }: { href: string; icon: any; label: string; active?: boolean }) {
     return (
