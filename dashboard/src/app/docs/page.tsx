@@ -36,7 +36,7 @@ export default function DocsPage() {
             <div className="max-w-7xl mx-auto px-6 pb-32 grid grid-cols-1 lg:grid-cols-4 gap-12">
                 {/* Sidebar Navigation */}
                 <div className="hidden lg:block col-span-1">
-                    <div className="sticky top-32 space-y-8">
+                    <div className="sticky top-32 space-y-8 max-h-[calc(100vh-10rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                         <NavGroup title="Start Here">
                             <NavLink href="#getting-started">Getting Started</NavLink>
                             <NavLink href="#faq">FAQ</NavLink>
@@ -54,11 +54,12 @@ export default function DocsPage() {
                         <NavGroup title="Life Sim">
                             <NavLink href="#career">Career</NavLink>
                             <NavLink href="#education">Education</NavLink>
-                            <NavLink href="#family">Family & Family</NavLink>
+                            <NavLink href="#family">Family & Lifestyle</NavLink>
                         </NavGroup>
                         <NavGroup title="Admin">
                             <NavLink href="#config">Configuration</NavLink>
                             <NavLink href="#moderation">Moderation</NavLink>
+                            <NavLink href="#admin-all">All Commands</NavLink>
                         </NavGroup>
                     </div>
                 </div>
@@ -245,6 +246,61 @@ export default function DocsPage() {
                             <CommandCard cmd="!reset-economy" args="" desc="DANGER: Resets all server economy data." />
                             <CommandCard cmd="!casino-ban" args="<@user>" desc="Ban a user from bot commands." />
                             <CommandCard cmd="!set-casino-channel" args="add <#channel>" desc="Whitelist bot to specific channels." />
+                        </div>
+                    </section>
+
+                    <section id="admin-all">
+                        <SectionHeader icon={<Shield />} title="All Admin Commands" />
+                        <div className="grid grid-cols-1 gap-4">
+                            <CommandCard cmd="!add-credit-tier" args="" desc="Add a new credit tier configuration." />
+                            <CommandCard cmd="!add-emoji" args="" desc="Add an emoji to the bot." />
+                            <CommandCard cmd="!add-money" args="<@user> <amount>" desc="Add money to a user's balance." />
+                            <CommandCard cmd="!add-shop-item" args="" desc="Add a new item to the global shop." />
+                            <CommandCard cmd="!admin-dashboard" args="" desc="View the admin dashboard statistics." />
+                            <CommandCard cmd="!admin-property" args="" desc="Manage properties as an admin." />
+                            <CommandCard cmd="!bet-limit" args="" desc="Set betting limits for games." />
+                            <CommandCard cmd="!casino-ban" args="<@user>" desc="Ban a user from using casino commands." />
+                            <CommandCard cmd="!casino-unban" args="<@user>" desc="Unban a user from casino commands." />
+                            <CommandCard cmd="!chat-money-config" args="" desc="Configure money earned from chatting." />
+                            <CommandCard cmd="!config-credit-tier" args="" desc="Configure existing credit tiers." />
+                            <CommandCard cmd="!config-jobs" args="" desc="Configure job settings." />
+                            <CommandCard cmd="!debug-permissions" args="" desc="Debug user permissions." />
+                            <CommandCard cmd="!drop" args="" desc="Create a money drop in the channel." />
+                            <CommandCard cmd="!education-admin" args="" desc="Manage education settings." />
+                            <CommandCard cmd="!factory-reset" args="" desc="Reset all server settings to default." />
+                            <CommandCard cmd="!manage-casino-admin" args="" desc="Manage casino admin roles." />
+                            <CommandCard cmd="!manage-chicken" args="" desc="Manage chicken fighting settings." />
+                            <CommandCard cmd="!manage-credit-config" args="" desc="Manage credit system configuration." />
+                            <CommandCard cmd="!manage-credit-score" args="<@user>" desc="Manage a user's credit score." />
+                            <CommandCard cmd="!manage-job-store" args="" desc="Manage items in the job store." />
+                            <CommandCard cmd="!manage-loan-ban" args="" desc="Manage bans from the loan system." />
+                            <CommandCard cmd="!manage-shop" args="" desc="Manage the global shop." />
+                            <CommandCard cmd="!manage-uni-store" args="" desc="Manage items in the university store." />
+                            <CommandCard cmd="!remove-item" args="<@user> <item>" desc="Remove an item from a user." />
+                            <CommandCard cmd="!remove-money" args="<@user> <amount>" desc="Remove money from a user." />
+                            <CommandCard cmd="!reset-admin-config" args="" desc="Reset admin configurations." />
+                            <CommandCard cmd="!reset-economy" args="" desc="Reset the entire server economy." />
+                            <CommandCard cmd="!reset-loans" args="" desc="Reset all active loans." />
+                            <CommandCard cmd="!reset-shop" args="" desc="Reset the shop to default items." />
+                            <CommandCard cmd="!set-casino-channel" args="" desc="Set the allowed channel for casino games." />
+                            <CommandCard cmd="!set-cockfight" args="" desc="Configure cockfight settings." />
+                            <CommandCard cmd="!set-currency" args="" desc="Set the server's currency name." />
+                            <CommandCard cmd="!set-currency-emoji" args="" desc="Set the server's currency emoji." />
+                            <CommandCard cmd="!set-economy-config" args="" desc="Configure general economy settings." />
+                            <CommandCard cmd="!set-game-cooldown" args="" desc="Set cooldowns for specific games." />
+                            <CommandCard cmd="!set-global-game-cooldown" args="" desc="Set a global cooldown for all games." />
+                            <CommandCard cmd="!set-income" args="" desc="Set income configuration." />
+                            <CommandCard cmd="!set-income-cooldown" args="" desc="Set cooldown for income commands." />
+                            <CommandCard cmd="!set-log-channel" args="" desc="Set the channel for bot logs." />
+                            <CommandCard cmd="!set-min-bet" args="" desc="Set minimum bet amounts." />
+                            <CommandCard cmd="!set-money" args="<@user> <amount>" desc="Set a user's balance to a specific amount." />
+                            <CommandCard cmd="!set-prefix" args="<prefix>" desc="Change the bot's command prefix." />
+                            <CommandCard cmd="!set-rob" args="" desc="Configure robbery settings." />
+                            <CommandCard cmd="!set-role-income" args="" desc="Set income for specific roles." />
+                            <CommandCard cmd="!set-start-money" args="<amount>" desc="Set the starting money for new users." />
+                            <CommandCard cmd="!setup" args="" desc="Run the initial server setup." />
+                            <CommandCard cmd="!setup-drop" args="" desc="Configure drop settings." />
+                            <CommandCard cmd="!view-config" args="" desc="View the current server configuration." />
                         </div>
                     </section>
 
