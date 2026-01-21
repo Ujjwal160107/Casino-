@@ -74,10 +74,9 @@ export async function handleCockFight(message: Message, args: string[]) {
     const cdSeconds = cooldowns["cockfight"] || 0;
     if (cdSeconds > 0) {
         const key = `game:cockfight:${message.guild.id}:${message.author.id}`;
-        const remaining = checkCooldown(key, cdSeconds);
-        if (remaining > 0) {
-            const expire = getCooldownExpiry(key);
-            const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
+        const expiry = getCooldownExpiry(key);
+        if (expiry && expiry > Date.now()) {
+            const ts = Math.floor(expiry / 1000);
             return message.reply({
                 embeds: [errorEmbed(message.author, "Cooldown Active", `<:cooldown:1454025354631970826> You are on cooldown. Wait <t:${ts}:R>.`)]
             });
