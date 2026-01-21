@@ -667,6 +667,10 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const { handleCommandStatus } = require("./commands/admin/debugPermissions");
       return handleCommandStatus(message, args);
     }
+    case "testwelcome": {
+      const { handleTestWelcome } = require("./commands/admin/testwelcome");
+      return handleTestWelcome(message);
+    }
     case "adminpanel":
     case "admin-panel": {
       return handleAdminDashboard(message);
@@ -893,7 +897,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const VALID_COMMANDS = [
         "balance", "bank", "deposit", "withdraw", "transfer", "collect",
         "work", "crime", "beg", "slut", "rob", "shop", "inventory", "profile",
-        "leaderboard",  "bet", "blackjack", "coinflip", "slots",
+        "leaderboard", "bet", "blackjack", "coinflip", "slots",
         "add-money", "remove-money", "set-start-money", "reset-economy", "set-currency",
         "min-bet", "viewconfig", "shop-add", "manage-item",
         "casino-ban", "casino-unban", "banlist", "black-market",
