@@ -6,6 +6,8 @@ import { updateGeneralSettings, resetEconomy } from "@/actions/settings-actions"
 import { Loader2, Save, Trash2, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+import { DurationInput } from "../ui/DurationInput";
+
 interface GeneralConfigFormProps {
     guildId: string;
     initialData: {
@@ -19,6 +21,7 @@ interface GeneralConfigFormProps {
         minBet?: number | null;
         maxBet?: number | null;
         logChannelId?: string | null;
+        dropExpiration?: number;
     };
     channels?: { id: string; name: string }[];
 }
@@ -32,7 +35,8 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
         bankLimit: initialData.bankLimit ?? null,
         minBet: initialData.minBet ?? 100,
         maxBet: initialData.maxBet ?? 100000,
-        logChannelId: initialData.logChannelId ?? ""
+        logChannelId: initialData.logChannelId ?? "",
+        dropExpiration: initialData.dropExpiration ?? 60
     });
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
     const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -206,6 +210,18 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                     </div>
                 </div>
 
+                {/* Drop Expiration */}
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                    <h3 className="text-sm font-bold text-white mb-2">Money Settings</h3>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-zinc-400">Drop Expiration</label>
+                        <DurationInput
+                            value={formData.dropExpiration || 60}
+                            onChange={(val) => setFormData({ ...formData, dropExpiration: val })}
+                        />
+                        <p className="text-xs text-zinc-500">How long money drops last before disappearing.</p>
+                    </div>
+                </div>
 
             </div>
 

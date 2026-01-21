@@ -21,6 +21,7 @@ const EFFECT_TYPES = [
     { label: "Add Role (Perm)", value: "ROLE_PERMANENT" },
     { label: "Add Role (Temp)", value: "ROLE_TEMPORARY" },
     { label: "Give Money", value: "MONEY" },
+    { label: "Remove Role", value: "REMOVE_ROLE" },
     { label: "Stat Boost (Chicken)", value: "STAT_BOOST" },
     { label: "Stress Reduction", value: "STRESS_REDUCE" },
     { label: "Death Save", value: "DEATH_SAVE" },
@@ -389,20 +390,35 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                 {roles.find(r => r.id === roleId)?.name || "Unknown Role"}
                                             </div>
                                         ) : (
-                                            <select
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    if (val) {
-                                                        const newRoles = [...formData.requirements.roles];
-                                                        newRoles[idx] = val;
-                                                        handleReqChange("roles", newRoles);
-                                                    }
-                                                }}
-                                                className="bg-[#1e1f22] text-sm text-zinc-200 focus:outline-none border border-white/10 rounded px-2 py-1"
-                                            >
-                                                <option value="">Select Role...</option>
-                                                {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                                            </select>
+                                            <div className="flex flex-col gap-1 w-full">
+                                                <select
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val) {
+                                                            const newRoles = [...formData.requirements.roles];
+                                                            newRoles[idx] = val;
+                                                            handleReqChange("roles", newRoles);
+                                                        }
+                                                    }}
+                                                    className="bg-[#1e1f22] text-sm text-zinc-200 focus:outline-none border border-white/10 rounded px-2 py-1 w-full"
+                                                >
+                                                    <option value="">Select Role...</option>
+                                                    {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                                </select>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Or Enter Role ID Manually"
+                                                    className="bg-transparent text-[10px] text-zinc-400 focus:outline-none border-b border-zinc-700/50 p-1 w-full font-mono"
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val) {
+                                                            const newRoles = [...formData.requirements.roles];
+                                                            newRoles[idx] = val;
+                                                            handleReqChange("roles", newRoles);
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
                                         )}
                                         <button
                                             onClick={() => {
@@ -546,6 +562,27 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                         {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                     </select>
                                 </div>
+                                {/* Manual Input for Deny Role */}
+                                <div className="relative">
+                                    <button className="text-xs bg-[#1e1f22] text-zinc-400 px-2 py-1 rounded border border-white/5 hover:border-white/10 flex items-center gap-1">
+                                        <Plus size={12} /> Add ID
+                                    </button>
+                                    <input
+                                        type="text"
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-text"
+                                        onBlur={(e) => {
+                                            const roleId = e.target.value;
+                                            if (roleId) {
+                                                const current = formData.requirements?.denyRoles || [];
+                                                if (!current.includes(roleId)) {
+                                                    handleReqChange("denyRoles", [...current, roleId]);
+                                                }
+                                                e.target.value = "";
+                                            }
+                                        }}
+                                        placeholder="Paste ID"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -620,7 +657,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                 <label className="text-[10px] font-bold text-zinc-500 uppercase">CONFIGURATION</label>
                                                 <div className="bg-[#1e1f22] rounded p-2 space-y-2">
 
-                                                    {(effect.type === "ROLE_PERMANENT" || effect.type === "ROLE_TEMPORARY") && (
+                                                    {(effect.type === "ROLE_PERMANENT" || effect.type === "ROLE_TEMPORARY" || effect.type === "REMOVE_ROLE") && (
                                                         <div className="space-y-2">
                                                             <div className="relative">
                                                                 <select

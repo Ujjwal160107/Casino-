@@ -6,6 +6,7 @@ import { Mascot } from "../config/branding";
 export type EffectType =
     | "ROLE_PERMANENT"
     | "ROLE_TEMPORARY"
+    | "REMOVE_ROLE"
     | "STAT_BOOST"
     | "DEATH_SAVE"
     | "STRESS_REDUCE"
@@ -78,6 +79,19 @@ async function applyEffect(
             return {
                 message: `${Mascot.Emotes.Accept} Granted permanent role <@&${effect.roleId}>`,
                 type: "ROLE_PERMANENT"
+            };
+
+        case "REMOVE_ROLE":
+            if (!effect.roleId || !member) throw new Error("Missing role ID or member");
+            await member.roles.remove(effect.roleId);
+
+            if (client) {
+                await logEffectAction(client, guildId, "REMOVE_ROLE", `Removed role <@&${effect.roleId}> from <@${userId}>`);
+            }
+
+            return {
+                message: `${Mascot.Emotes.Accept} Removed role <@&${effect.roleId}>`,
+                type: "REMOVE_ROLE"
             };
 
         case "ROLE_TEMPORARY":

@@ -130,3 +130,36 @@ export async function updateGameSettings(guildId: string, gameKey: string, setti
         return { success: false, error: "Failed to update settings" };
     }
 }
+
+export async function updateGlobalGameCooldown(guildId: string, cooldown: number) {
+    try {
+        const config = await prisma.guildConfig.findUnique({
+            where: { guildId },
+            select: { gameCooldowns: true }
+        });
+
+        if (!config) return { success: false, error: "Config not found" };
+
+        const currentCooldowns = (config.gameCooldowns as any) || {};
+
+        // List of all games to update
+        const games = ["blackjack", "roulette", "slots", "coinflip", "cockfight", "russianRoulette"];
+
+        games.forEach(game => {
+            currentCooldowns[game] = cooldown;
+        });
+
+        await prisma.guildConfig.update({
+            where: { guildId },
+            data: { gameCooldowns: currentCooldowns }
+        });
+
+        await invalidateGuildConfig(guildId);
+        revalidatePath(`/dashboard/${guildId}/games`);
+
+        return { success: true };
+    } catch (error) {
+        console.error("Error updating global game cooldown:", error);
+        return { success: false, error: "Failed to update global cooldown" };
+    }
+}

@@ -245,6 +245,11 @@ export default function DocsPage() {
                             <CommandCard cmd="!remove-money" args="<@user> <amount>" desc="Remove money from a user." />
                             <CommandCard cmd="!reset-economy" args="" desc="DANGER: Resets all server economy data." />
                             <CommandCard cmd="!casino-ban" args="<@user>" desc="Ban a user from bot commands." />
+                            <CommandCard cmd="!casino-unban" args="<@user>" desc="Unban a user from bot commands." />
+                            <CommandCard cmd="!casino-ban-list" args="" desc="View list of banned users." />
+                            <CommandCard cmd="!loan-ban" args="<@user>" desc="Ban a user from taking loans." />
+                            <CommandCard cmd="!loan-unban" args="<@user>" desc="Unban a user from taking loans." />
+                            <CommandCard cmd="!reset-loans" args="<@user>" desc="Reset all active loans for a user (Admin)." />
                             <CommandCard cmd="!set-casino-channel" args="add <#channel>" desc="Whitelist bot to specific channels." />
                         </div>
                     </section>
@@ -259,8 +264,12 @@ export default function DocsPage() {
                             <CommandCard cmd="!admin-dashboard" args="" desc="View the admin dashboard statistics." />
                             <CommandCard cmd="!admin-property" args="" desc="Manage properties as an admin." />
                             <CommandCard cmd="!bet-limit" args="" desc="Set betting limits for games." />
+                            <CommandCard cmd="!bot-commander" args="<@user>" desc="Toggle Bot Commander status for a user." />
                             <CommandCard cmd="!casino-ban" args="<@user>" desc="Ban a user from using casino commands." />
+                            <CommandCard cmd="!casino-ban-list" args="" desc="View list of banned users." />
                             <CommandCard cmd="!casino-unban" args="<@user>" desc="Unban a user from casino commands." />
+                            <CommandCard cmd="!casino-admins-list" args="" desc="List all casino admins." />
+                            <CommandCard cmd="!channel-override" args="" desc="Toggle channel override for commands." />
                             <CommandCard cmd="!chat-money-config" args="" desc="Configure money earned from chatting." />
                             <CommandCard cmd="!config-credit-tier" args="" desc="Configure existing credit tiers." />
                             <CommandCard cmd="!config-jobs" args="" desc="Configure job settings." />
@@ -268,29 +277,37 @@ export default function DocsPage() {
                             <CommandCard cmd="!drop" args="" desc="Create a money drop in the channel." />
                             <CommandCard cmd="!education-admin" args="" desc="Manage education settings." />
                             <CommandCard cmd="!factory-reset" args="" desc="Reset all server settings to default." />
+                            <CommandCard cmd="!grant-degree" args="<@user> <degree_id>" desc="Grant a degree to a user." />
+                            <CommandCard cmd="!loan-ban" args="<@user>" desc="Ban a user from taking loans." />
+                            <CommandCard cmd="!loan-unban" args="<@user>" desc="Unban a user from taking loans." />
+                            <CommandCard cmd="!make-casino-admin" args="<@user>" desc="Promote a user to Casino Admin." />
                             <CommandCard cmd="!manage-casino-admin" args="" desc="Manage casino admin roles." />
                             <CommandCard cmd="!manage-chicken" args="" desc="Manage chicken fighting settings." />
                             <CommandCard cmd="!manage-credit-config" args="" desc="Manage credit system configuration." />
                             <CommandCard cmd="!manage-credit-score" args="<@user>" desc="Manage a user's credit score." />
                             <CommandCard cmd="!manage-job-store" args="" desc="Manage items in the job store." />
-                            <CommandCard cmd="!manage-loan-ban" args="" desc="Manage bans from the loan system." />
                             <CommandCard cmd="!manage-shop" args="" desc="Manage the global shop." />
                             <CommandCard cmd="!manage-uni-store" args="" desc="Manage items in the university store." />
+                            <CommandCard cmd="!remove-casino-admin" args="<@user>" desc="Demote a Casino Admin." />
                             <CommandCard cmd="!remove-item" args="<@user> <item>" desc="Remove an item from a user." />
                             <CommandCard cmd="!remove-money" args="<@user> <amount>" desc="Remove money from a user." />
                             <CommandCard cmd="!reset-admin-config" args="" desc="Reset admin configurations." />
                             <CommandCard cmd="!reset-economy" args="" desc="Reset the entire server economy." />
+                            <CommandCard cmd="!reset-edu" args="<@user>" desc="Reset a user's education progress." />
                             <CommandCard cmd="!reset-loans" args="" desc="Reset all active loans." />
                             <CommandCard cmd="!reset-shop" args="" desc="Reset the shop to default items." />
                             <CommandCard cmd="!set-casino-channel" args="" desc="Set the allowed channel for casino games." />
                             <CommandCard cmd="!set-cockfight" args="" desc="Configure cockfight settings." />
                             <CommandCard cmd="!set-currency" args="" desc="Set the server's currency name." />
                             <CommandCard cmd="!set-currency-emoji" args="" desc="Set the server's currency emoji." />
+                            <CommandCard cmd="!set-degree-cost" args="<id> <cost>" desc="Set the tuition cost for a degree." />
+                            <CommandCard cmd="!set-dis" args="<@user> <val>" desc="Set a user's discipline stat." />
                             <CommandCard cmd="!set-economy-config" args="" desc="Configure general economy settings." />
                             <CommandCard cmd="!set-game-cooldown" args="" desc="Set cooldowns for specific games." />
                             <CommandCard cmd="!set-global-game-cooldown" args="" desc="Set a global cooldown for all games." />
                             <CommandCard cmd="!set-income" args="" desc="Set income configuration." />
                             <CommandCard cmd="!set-income-cooldown" args="" desc="Set cooldown for income commands." />
+                            <CommandCard cmd="!set-int" args="<@user> <val>" desc="Set a user's intelligence stat." />
                             <CommandCard cmd="!set-log-channel" args="" desc="Set the channel for bot logs." />
                             <CommandCard cmd="!set-min-bet" args="" desc="Set minimum bet amounts." />
                             <CommandCard cmd="!set-money" args="<@user> <amount>" desc="Set a user's balance to a specific amount." />
@@ -298,6 +315,7 @@ export default function DocsPage() {
                             <CommandCard cmd="!set-rob" args="" desc="Configure robbery settings." />
                             <CommandCard cmd="!set-role-income" args="" desc="Set income for specific roles." />
                             <CommandCard cmd="!set-start-money" args="<amount>" desc="Set the starting money for new users." />
+                            <CommandCard cmd="!set-study-cooldown" args="<seconds>" desc="Set cooldown for studying." />
                             <CommandCard cmd="!setup" args="" desc="Run the initial server setup." />
                             <CommandCard cmd="!setup-drop" args="" desc="Configure drop settings." />
                             <CommandCard cmd="!view-config" args="" desc="View the current server configuration." />

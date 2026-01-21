@@ -120,9 +120,10 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                         >
                             <button
                                 onClick={() => removeDrop(index)}
-                                className="absolute top-2 right-2 text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1"
+                                className="absolute top-2 right-2 text-zinc-500 hover:text-red-400 hover:bg-white/5 p-2 rounded-lg transition-all"
+                                title="Remove Drop"
                             >
-                                <Trash2 size={14} />
+                                <Trash2 size={20} />
                             </button>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
