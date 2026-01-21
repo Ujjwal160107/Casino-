@@ -3,13 +3,19 @@ import { guildCleanupService } from "../services/guildCleanupService";
 import { Mascot } from "../config/branding";
 
 export const guildCreateListener = (client: Client) => {
+    console.log("✅ Guild Create Listener Registered");
     client.on("guildCreate", async (guild: Guild) => {
         console.log(`[GuildCreate] Bot joined guild: ${guild.name} (${guild.id})`);
 
-        // Check if there's a pending deletion and restore it
-        await guildCleanupService.restoreGuild(guild.id);
-
         try {
+            // Check if there's a pending deletion and restore it
+            // Wrapped in try-catch in case DB/Redis is offline so it doesn't block welcome message
+            try {
+                await guildCleanupService.restoreGuild(guild.id);
+            } catch (err) {
+                console.warn(`[GuildCreate] Failed to restore guild (DB error?):`, err);
+            }
+
             // 1. Prepare Welcome Embed
             const welcomeEmbed = new EmbedBuilder()
                 .setTitle(`🎉 Thanks for adding ${Mascot.Name}!`)
