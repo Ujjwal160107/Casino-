@@ -2,13 +2,15 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
+import Link from "next/link";
 import { ArrowRight, LayoutDashboard, ExternalLink } from "lucide-react";
 import { BackgroundParticles } from "./ui/BackgroundParticles";
 import { ScrollReveal } from "./ui/ScrollReveal";
 import { InteractiveCardDeck } from "./InteractiveCardDeck";
 
 export function Hero() {
+    const { data: session } = useSession();
     return (
         <div className="relative min-h-screen flex flex-col justify-center overflow-hidden font-sans bg-background text-foreground selection:bg-primary/30">
             {/* Background Image with Overlay */}
@@ -56,13 +58,23 @@ export function Hero() {
                             <ExternalLink size={20} />
                             Add to Discord
                         </a>
-                        <button
-                            onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
-                            className="bg-zinc-800 hover:bg-zinc-700 text-white text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 border border-white/10 flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                            <LayoutDashboard size={20} />
-                            Dashboard
-                        </button>
+                        {session ? (
+                            <Link
+                                href="/dashboard"
+                                className="bg-zinc-800 hover:bg-zinc-700 text-white text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 border border-white/10 flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <LayoutDashboard size={20} />
+                                Dashboard
+                            </Link>
+                        ) : (
+                            <button
+                                onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
+                                className="bg-zinc-800 hover:bg-zinc-700 text-white text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 border border-white/10 flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <LayoutDashboard size={20} />
+                                Dashboard
+                            </button>
+                        )}
                     </ScrollReveal>
 
                     {/* Stats Row */}
