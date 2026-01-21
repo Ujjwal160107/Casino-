@@ -7,9 +7,9 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
-interface Channel {
-    id: string;
-    name: string;
+import { DurationInput } from "@/components/dashboard/ui/DurationInput";
+id: string;
+name: string;
 }
 
 interface DropConfig {
@@ -197,17 +197,15 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                                 </div>
 
                                 {/* Expiration */}
-                                <div className="space-y-1">
                                     <label className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-1">
-                                        <Clock size={10} /> Expires (Sec)
+                                        <Clock size={10} /> Expires
                                     </label>
-                                    <input
-                                        type="number"
-                                        min={5}
-                                        value={drop.expiration || 60}
-                                        onChange={(e) => updateDrop(index, "expiration", parseInt(e.target.value) || 60)}
-                                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50"
-                                    />
+                                    <div className="pt-1">
+                                        <DurationInput
+                                            value={drop.expiration || 60}
+                                            onChange={(val) => updateDrop(index, "expiration", val)}
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Dynamic Fields based on Type */}
@@ -292,6 +290,6 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                     Save Drops
                 </button>
             </div>
-        </div>
+        </div >
     );
 }

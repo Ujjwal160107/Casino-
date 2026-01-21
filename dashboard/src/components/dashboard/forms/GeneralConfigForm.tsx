@@ -79,6 +79,31 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
         }
     };
 
+    // Global Cooldown Logic (Standalone)
+    const [globalCooldown, setGlobalCooldown] = useState("");
+    const [cooldownLoading, setCooldownLoading] = useState(false);
+    import { updateGlobalGameCooldown } from "@/actions/game-actions";
+
+    const handleSetGlobalCooldown = async () => {
+        const val = parseInt(globalCooldown);
+        if (isNaN(val) || val < 0) {
+            // Basic alert or toast? Form handles errors via message state usually
+            return;
+        }
+
+        setCooldownLoading(true);
+        const res = await updateGlobalGameCooldown(guildId, val);
+        setCooldownLoading(false);
+
+        if (res.success) {
+            setMessage({ type: "success", text: "Global Game Cooldown updated!" });
+            setGlobalCooldown("");
+            router.refresh();
+        } else {
+            setMessage({ type: "error", text: res.error || "Failed" });
+        }
+    };
+
     return (
         <form onSubmit={handleSubmit} className="space-y-8 max-w-2xl">
             <div className="space-y-4">
