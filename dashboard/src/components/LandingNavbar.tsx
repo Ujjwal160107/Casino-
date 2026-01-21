@@ -2,14 +2,23 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
-import { LayoutDashboard, Menu, X } from "lucide-react";
+import { signIn, signOut } from "next-auth/react";
+import { LayoutDashboard, Menu, X, LogOut, User } from "lucide-react";
 import { useState, useEffect } from "react";
 import { GlassCard } from "./ui/GlassCard";
+import Image from "next/image";
 
-export function LandingNavbar() {
+interface LandingNavbarProps {
+    user?: {
+        name?: string | null;
+        image?: string | null;
+    };
+}
+
+export function LandingNavbar({ user }: LandingNavbarProps) {
     const [isScrolled, setIsScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -52,12 +61,76 @@ export function LandingNavbar() {
                                 <Link href="/terms" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Terms</Link>
                             </div>
                             <div className="h-4 w-[1px] bg-white/10 hidden md:block"></div>
-                            <button
-                                onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
-                                className="px-6 py-2 rounded-full border border-white/10 text-zinc-300 font-medium text-sm hover:bg-white/5 hover:text-white hover:border-white/20 transition-all cursor-pointer"
-                            >
-                                Login
-                            </button>
+
+                            {user ? (
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                        className="flex items-center gap-3 focus:outline-none group pl-2"
+                                    >
+                                        <div className="text-right hidden sm:block">
+                                            <p className="text-sm font-bold text-zinc-200 group-hover:text-white transition-colors">{user.name}</p>
+                                        </div>
+                                        <div className="relative w-9 h-9 rounded-full p-0.5 bg-zinc-800 border border-zinc-600 group-hover:border-violet-500 transition-colors">
+                                            {user.image ? (
+                                                <Image
+                                                    src={user.image}
+                                                    width={36}
+                                                    height={36}
+                                                    alt="Profile"
+                                                    className="rounded-full w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full rounded-full bg-zinc-700 flex items-center justify-center">
+                                                    <span className="text-xs font-bold text-zinc-400">
+                                                        {user.name?.charAt(0) || "?"}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </button>
+
+                                    {/* Dropdown Menu */}
+                                    {isDropdownOpen && (
+                                        <>
+                                            <div className="absolute right-0 top-full mt-4 w-56 bg-[#0f0f11] border border-white/10 rounded-xl shadow-2xl overflow-hidden backdrop-blur-xl z-50">
+                                                <div className="p-4 border-b border-white/5">
+                                                    <p className="text-sm font-bold text-white truncate">{user.name}</p>
+                                                    <p className="text-xs text-zinc-500">Logged in via Discord</p>
+                                                </div>
+                                                <div className="p-2 space-y-1">
+                                                    <Link
+                                                        href="/dashboard"
+                                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 hover:text-white rounded-lg transition-colors"
+                                                    >
+                                                        <LayoutDashboard size={16} />
+                                                        Dashboard
+                                                    </Link>
+                                                    <button
+                                                        onClick={() => signOut({ callbackUrl: "/" })}
+                                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-colors text-left"
+                                                    >
+                                                        <LogOut size={16} />
+                                                        Sign Out
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {/* Backdrop */}
+                                            <div
+                                                className="fixed inset-0 z-40"
+                                                onClick={() => setIsDropdownOpen(false)}
+                                            />
+                                        </>
+                                    )}
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
+                                    className="px-6 py-2 rounded-full border border-white/10 text-zinc-300 font-medium text-sm hover:bg-white/5 hover:text-white hover:border-white/20 transition-all cursor-pointer"
+                                >
+                                    Login
+                                </button>
+                            )}
                             <button
                                 className="px-6 py-2 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold text-sm hover:brightness-110 transition-all shadow-lg hover:shadow-indigo-500/25 cursor-pointer"
                             >
