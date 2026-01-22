@@ -15,7 +15,7 @@ export async function getAdminData(guildId: string) {
         ]);
 
         return {
-            config: config || { disabledCommands: [], casinoChannels: [], stockRefreshRate: 600 },
+            config: config || { disabledCommands: [], casinoChannels: [], stockRefreshRate: 600, maxBet: 100000, minBet: 100 },
             permissions,
             stocks,
             casinoAdmins

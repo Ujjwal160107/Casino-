@@ -98,7 +98,9 @@ export async function updateGeneralSettings(guildId: string, data: {
         // Invalidate Bot Cache
         await invalidateGuildConfig(guildId);
 
+        console.log(`[Dashboard] Settings Updated. MaxBet: ${data.maxBet}`);
         revalidatePath(`/dashboard/${guildId}`, "layout");
+        revalidatePath(`/dashboard/${guildId}/general-economy/config`);
         return { success: true };
     } catch (error) {
         console.error("Failed to update general settings:", error);
