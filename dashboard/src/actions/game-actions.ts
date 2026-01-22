@@ -155,7 +155,7 @@ export async function updateGlobalGameCooldown(guildId: string, cooldown: number
         });
 
         await invalidateGuildConfig(guildId);
-        revalidatePath(`/dashboard/${guildId}/games`);
+        revalidatePath(`/dashboard/${guildId}`, "layout");
 
         return { success: true };
     } catch (error) {

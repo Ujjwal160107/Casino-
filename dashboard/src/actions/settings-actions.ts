@@ -98,7 +98,7 @@ export async function updateGeneralSettings(guildId: string, data: {
         // Invalidate Bot Cache
         await invalidateGuildConfig(guildId);
 
-        revalidatePath(`/dashboard/${guildId}`);
+        revalidatePath(`/dashboard/${guildId}`, "layout");
         return { success: true };
     } catch (error) {
         console.error("Failed to update general settings:", error);
@@ -149,6 +149,7 @@ export async function resetEconomy(guildId: string) {
             })
         ]);
 
+        revalidatePath(`/dashboard/${guildId}`, "layout");
         return { success: true };
     } catch (error) {
         console.error("Failed to reset economy:", error);
@@ -227,7 +228,7 @@ export async function updateBankSettings(guildId: string, data: any) {
         });
 
         await invalidateGuildConfig(guildId);
-        revalidatePath(`/dashboard/${guildId}/general-economy/bank`);
+        revalidatePath(`/dashboard/${guildId}`, "layout");
 
         return { success: true };
     } catch (error) {
