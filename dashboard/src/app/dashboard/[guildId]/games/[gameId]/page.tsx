@@ -47,6 +47,7 @@ export default async function GameConfigPage({ params }: PageProps) {
                 gameName={gameName}
                 initialSettings={data.settings}
                 globalLimits={{ min: data.globalmin, max: data.globalmax || 100000 }}
+                key={JSON.stringify(data)}
             />
         </div>
     );

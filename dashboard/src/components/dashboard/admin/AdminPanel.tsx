@@ -82,6 +82,7 @@ export function AdminPanel({ guildId, data }: AdminPanelProps) {
                                 walletLimit: data.config.walletLimit ?? null,
                                 bankLimit: data.config.bankLimit ?? null
                             }}
+                            key={JSON.stringify(data.config)}
                         />
                     )}
 
