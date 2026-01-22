@@ -1,11 +1,22 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Shield, Book, CreditCard, DollarSign, Dna, Bot, Briefcase, GraduationCap, Heart, ShoppingBag, TrendingUp, Gavel, Settings, HelpCircle, UserPlus, MessageCircle } from "lucide-react";
 
 export default function DocsPage() {
+    const [inviteUrl, setInviteUrl] = useState("#");
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const clientId = "1371816936857669702";
+            const redirectUri = encodeURIComponent(`${window.location.origin}/dashboard`);
+            setInviteUrl(`https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=8&response_type=code&scope=bot%20applications.commands&redirect_uri=${redirectUri}`);
+        }
+    }, []);
+
     return (
         <main className="min-h-screen bg-[#0a0a0a] text-zinc-100 selection:bg-violet-500/30">
             <LandingNavbar />
@@ -74,7 +85,7 @@ export default function DocsPage() {
                             <div className="space-y-4">
                                 <h3 className="text-xl font-bold text-white">1. Invite Fortuna</h3>
                                 <p className="text-zinc-400">Add the bot to your server using the invite link below. You need "Manage Server" permissions.</p>
-                                <a href="https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot%20applications.commands" className="inline-block px-6 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors font-medium">Add to Discord</a>
+                                <a href={inviteUrl} className="inline-block px-6 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors font-medium">Add to Discord</a>
                             </div>
                             <div className="space-y-4 pt-6 border-t border-white/10">
                                 <h3 className="text-xl font-bold text-white">2. Initial Setup</h3>

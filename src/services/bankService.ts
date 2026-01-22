@@ -1,4 +1,5 @@
-import prisma from "../utils/prisma";
+import prisma, { runWithRetry } from "../utils/prisma";
+import { PrismaClient } from "@prisma/client";
 import { getGuildConfig } from "./guildConfigService";
 
 export async function ensureBankForUser(userIdOrDiscordId: string, guildId?: string, username?: string) {
@@ -58,14 +59,16 @@ export async function depositToBank(walletId: string, userId: string, amount: nu
   if (!wallet) throw new Error("Wallet not found.");
   if (wallet.balance < depositAmount) throw new Error("Insufficient wallet balance.");
 
-  await prisma.$transaction([
-    // FIX: Update balances FIRST to acquire exclusive locks and avoid deadlocks
-    prisma.wallet.update({ where: { id: walletId }, data: { balance: { decrement: depositAmount } } }),
-    prisma.bank.update({ where: { id: bank.id }, data: { balance: { increment: depositAmount } } }),
-    // Record transaction after updates
-    prisma.transaction.create({ data: { walletId, amount: -depositAmount, type: "wallet_to_bank", meta: { toBank: true }, isEarned: false } }),
-    prisma.audit.create({ data: { userId: wallet.userId, type: "bank_deposit", meta: { amount: depositAmount } } })
-  ]);
+  await runWithRetry(async (tx: PrismaClient) => {
+    await tx.$transaction([
+      // FIX: Update balances FIRST to acquire exclusive locks and avoid deadlocks
+      tx.wallet.update({ where: { id: walletId }, data: { balance: { decrement: depositAmount } } }),
+      tx.bank.update({ where: { id: bank.id }, data: { balance: { increment: depositAmount } } }),
+      // Record transaction after updates
+      tx.transaction.create({ data: { walletId, amount: -depositAmount, type: "wallet_to_bank", meta: { toBank: true }, isEarned: false } }),
+      tx.audit.create({ data: { userId: wallet.userId, type: "bank_deposit", meta: { amount: depositAmount } } })
+    ]);
+  });
   return { bank, actualAmount: depositAmount };
 }
 
@@ -86,34 +89,36 @@ export async function withdrawFromBank(walletId: string, userId: string, amount:
     }
   }
 
-  await prisma.$transaction([
-    // FIX: Update balances FIRST to acquire exclusive locks and avoid deadlocks
-    prisma.wallet.update({
-      where: { id: walletId },
-      data: { balance: { increment: amount } }
-    }),
-    prisma.bank.update({
-      where: { id: bank.id },
-      data: { balance: { decrement: amount } }
-    }),
-    // Record transaction after updates
-    prisma.transaction.create({
-      data: {
-        walletId,
-        amount,
-        type: "bank_to_wallet",
-        meta: { fromBank: bank.id },
-        isEarned: false
-      }
-    }),
-    prisma.audit.create({
-      data: {
-        userId,
-        type: "bank_withdraw",
-        meta: { amount }
-      }
-    })
-  ]);
+  await runWithRetry(async (tx: PrismaClient) => {
+    await tx.$transaction([
+      // FIX: Update balances FIRST to acquire exclusive locks and avoid deadlocks
+      tx.wallet.update({
+        where: { id: walletId },
+        data: { balance: { increment: amount } }
+      }),
+      tx.bank.update({
+        where: { id: bank.id },
+        data: { balance: { decrement: amount } }
+      }),
+      // Record transaction after updates
+      tx.transaction.create({
+        data: {
+          walletId,
+          amount,
+          type: "bank_to_wallet",
+          meta: { fromBank: bank.id },
+          isEarned: false
+        }
+      }),
+      tx.audit.create({
+        data: {
+          userId,
+          type: "bank_withdraw",
+          meta: { amount }
+        }
+      })
+    ]);
+  });
 
   return bank;
 }
@@ -125,10 +130,12 @@ export async function removeMoneyFromBank(userId: string, amount: number) {
   const wallet = await prisma.wallet.findUnique({ where: { userId } });
   if (!wallet) throw new Error("Wallet not found (DB Error).");
 
-  const [updatedBank] = await prisma.$transaction([
-    // FIX: Update first
-    prisma.bank.update({ where: { userId }, data: { balance: { decrement: amount } } }),
-    prisma.transaction.create({ data: { walletId: wallet.id, amount: -amount, type: "admin_remove_bank", meta: { by: "admin" }, isEarned: false } })
-  ]);
+  const [updatedBank] = await runWithRetry(async (tx: PrismaClient) => {
+    return await tx.$transaction([
+      // FIX: Update first
+      tx.bank.update({ where: { userId }, data: { balance: { decrement: amount } } }),
+      tx.transaction.create({ data: { walletId: wallet.id, amount: -amount, type: "admin_remove_bank", meta: { by: "admin" }, isEarned: false } })
+    ]);
+  });
   return updatedBank.balance;
 }

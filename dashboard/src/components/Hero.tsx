@@ -1,6 +1,8 @@
 
 "use client";
 
+import { useState, useEffect } from "react";
+
 import { motion } from "framer-motion";
 import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
@@ -11,6 +13,16 @@ import { InteractiveCardDeck } from "./InteractiveCardDeck";
 
 export function Hero() {
     const { data: session } = useSession();
+    const [inviteUrl, setInviteUrl] = useState("#");
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const clientId = "1371816936857669702";
+            const redirectUri = encodeURIComponent(`${window.location.origin}/dashboard`);
+            setInviteUrl(`https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=8&response_type=code&scope=bot%20applications.commands&redirect_uri=${redirectUri}`);
+        }
+    }, []);
+
     return (
         <div className="relative min-h-screen flex flex-col justify-center overflow-hidden font-sans bg-background text-foreground selection:bg-primary/30">
             {/* Background Image with Overlay */}
@@ -50,7 +62,7 @@ export function Hero() {
 
                     <ScrollReveal delay={0.3} direction="up" className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
                         <a
-                            href="https://discord.com/oauth2/authorize?client_id=1371816936857669702"
+                            href={inviteUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="bg-primary hover:bg-primary/90 text-black text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 shadow-[0_0_20px_rgba(0,240,255,0.4)] flex items-center justify-center gap-2 cursor-pointer"
