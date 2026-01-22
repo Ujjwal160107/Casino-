@@ -698,8 +698,8 @@ async function runCockFight(
         const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
         const cdSeconds = cooldowns["cockfight"] || 0;
         if (cdSeconds > 0) {
-            setCooldown(`game: cockfight: ${guildId}: ${p1.id}`, cdSeconds);
-            setCooldown(`game: cockfight: ${guildId}: ${p2.id}`, cdSeconds);
+            setCooldown(`game:cockfight:${guildId}:${p1.id}`, cdSeconds);
+            setCooldown(`game:cockfight:${guildId}:${p2.id}`, cdSeconds);
         }
 
         await gameMsg.edit({ embeds: [resultEmbed], components: [], files: [winnerImage] });
