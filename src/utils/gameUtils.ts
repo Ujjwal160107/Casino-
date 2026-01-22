@@ -128,7 +128,7 @@ export function getGameBetLimits(config: GuildConfig, gameKey: string): { min: n
     const globalMax = config.maxBet || 100000;
 
     const min = typeof gameLimits.min === "number" ? gameLimits.min : globalMin;
-    let max = typeof gameLimits.max === "number" ? gameLimits.max : globalMax;
+    let max = (typeof gameLimits.max === "number" && gameLimits.max !== 0) ? gameLimits.max : globalMax;
 
     if (max === -1) max = Infinity;
 

@@ -7,16 +7,18 @@ import { invalidateGuildConfig } from "@/lib/cache";
 
 export async function getAdminData(guildId: string) {
     try {
-        const [config, permissions, stocks] = await Promise.all([
+        const [config, permissions, stocks, casinoAdmins] = await Promise.all([
             prisma.guildConfig.findUnique({ where: { guildId } }),
             prisma.commandPermission.findMany({ where: { guildId }, orderBy: { id: 'desc' } }),
-            prisma.stock.findMany({ where: { guildId } })
+            prisma.stock.findMany({ where: { guildId } }),
+            prisma.user.findMany({ where: { guildId, isCasinoAdmin: true }, select: { discordId: true, username: true } })
         ]);
 
         return {
             config: config || { disabledCommands: [], casinoChannels: [], stockRefreshRate: 600 },
             permissions,
-            stocks
+            stocks,
+            casinoAdmins
         };
     } catch (error) {
         console.error("Failed to fetch admin data:", error);
@@ -172,4 +174,52 @@ export async function factoryResetGuild(guildId: string) {
     }
 
     return result;
+}
+
+export async function getCasinoAdmins(guildId: string) {
+    try {
+        const admins = await prisma.user.findMany({
+            where: { guildId, isCasinoAdmin: true },
+            select: { discordId: true, username: true }
+        });
+        return { success: true, admins };
+    } catch (error) {
+        return { success: false, error: "Failed to fetch casino admins" };
+    }
+}
+
+export async function addCasinoAdmin(guildId: string, discordId: string) {
+    try {
+        // Ensure user exists first
+        await prisma.user.upsert({
+            where: { discordId_guildId: { discordId, guildId } },
+            update: { isCasinoAdmin: true },
+            create: {
+                discordId,
+                guildId,
+                username: "Unknown", // Will be updated on first interaction or we rely on ID
+                isCasinoAdmin: true,
+                wallet: { create: {} },
+                bank: { create: {} }
+            }
+        });
+        revalidatePath(`/dashboard/${guildId}/moderation`);
+        return { success: true };
+    } catch (error) {
+        console.error(error);
+        return { success: false, error: "Failed to add casino admin" };
+    }
+}
+
+export async function removeCasinoAdmin(guildId: string, discordId: string) {
+    try {
+        await prisma.user.update({
+            where: { discordId_guildId: { discordId, guildId } },
+            data: { isCasinoAdmin: false }
+        });
+        revalidatePath(`/dashboard/${guildId}/moderation`);
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: "Failed to remove casino admin" };
+    }
 }

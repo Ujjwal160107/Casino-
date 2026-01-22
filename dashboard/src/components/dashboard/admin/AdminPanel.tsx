@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { GeneralConfigForm } from "../forms/GeneralConfigForm";
 import { GlobalDisables } from "./GlobalDisables";
 import { GranularPermissions } from "./GranularPermissions";
+import { CasinoAdmins } from "./CasinoAdmins";
 import { CasinoChannels } from "./CasinoChannels";
 import { StockMarketConfig } from "./StockMarketConfig";
 import { ChatMoneyConfig } from "./ChatMoneyConfig";
@@ -18,6 +19,7 @@ interface AdminPanelProps {
         config: any;
         permissions: any[];
         stocks: any[];
+        casinoAdmins: any[];
     };
 }
 
@@ -103,10 +105,22 @@ export function AdminPanel({ guildId, data }: AdminPanelProps) {
                     )}
 
                     {activeTab === "perms" && (
-                        <GranularPermissions
-                            guildId={guildId}
-                            permissions={data.permissions}
-                        />
+                        <div className="space-y-8">
+                            <CasinoAdmins
+                                guildId={guildId}
+                                initialAdmins={data.casinoAdmins || []}
+                            />
+                            <div className="border-t border-white/5 pt-8">
+                                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                                    <span className="text-yellow-500">🛡️</span> Granular Command Permissions
+                                </h3>
+                                <p className="text-sm text-zinc-400 mb-6">Restricted permissions for specific commands, users, roles, or channels.</p>
+                                <GranularPermissions
+                                    guildId={guildId}
+                                    permissions={data.permissions}
+                                />
+                            </div>
+                        </div>
                     )}
 
                     {activeTab === "channels" && (

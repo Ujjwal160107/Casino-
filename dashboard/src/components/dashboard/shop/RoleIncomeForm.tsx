@@ -126,7 +126,7 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                                     <select
                                         value={income.roleId}
                                         onChange={(e) => updateIncome(idx, "roleId", e.target.value, type)}
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50"
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50 mb-2"
                                     >
                                         {roles.map(r => (
                                             <option key={r.id} value={r.id} style={{ color: r.color ? `#${r.color.toString(16)}` : 'white' }}>
@@ -134,6 +134,13 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                                             </option>
                                         ))}
                                     </select>
+                                    <input
+                                        type="text"
+                                        placeholder="Or Enter Role ID"
+                                        value={income.roleId}
+                                        onChange={(e) => updateIncome(idx, "roleId", e.target.value, type)}
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-400 font-mono focus:outline-none focus:border-yellow-500/50"
+                                    />
                                 </div>
 
                                 {/* Amount */}

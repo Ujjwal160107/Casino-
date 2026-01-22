@@ -175,14 +175,6 @@ export async function handleCockFight(message: Message, args: string[]) {
             const cdSeconds = cooldowns["cockfight"] || 0;
             if (cdSeconds > 0) {
                 const key = `game:cockfight:${message.guild!.id}:${targetUser.id}`;
-                const remaining = checkCooldown(key, cdSeconds); // This resets/checks logic, but here we just want to read. 
-                // Wait, checkCooldown actually *sets* if not exists? No, checkCooldown(key, seconds) returns remaining time if exists, else 0. 
-                // But wait, checkCooldown *sets* it if it doesn't exist? 
-                // Looking at util: if (now < expiresAt) return remaining. else set(key, now + seconds). return 0.
-                // WE DO NOT WANT TO SET COOLDOWN ON CHECK HERE. 
-                // We should only check existence.
-                // Let's use getCooldownExpiry manually or checkCooldown with 0? No.
-                // We need to use `getCooldownExpiry` to check without setting.
 
                 const existingExpiry = getCooldownExpiry(key);
                 if (existingExpiry && existingExpiry > Date.now()) {

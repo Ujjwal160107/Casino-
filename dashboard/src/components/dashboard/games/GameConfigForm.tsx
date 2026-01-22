@@ -34,7 +34,9 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
     // Auto-set default max bet if 0
     const [settings, setSettings] = useState(() => ({
         ...initialSettings,
-        maxBet: initialSettings.maxBet === 0 ? globalLimits.max : initialSettings.maxBet
+        // maxBet: initialSettings.maxBet === 0 ? globalLimits.max : initialSettings.maxBet 
+        // FIX: Keep 0 as 0 to represent inheritance
+        maxBet: initialSettings.maxBet
     }));
 
     const handleSave = async () => {
@@ -94,20 +96,24 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                         <div className="relative">
                             <input
                                 type="number"
-                                value={settings.maxBet}
-                                onChange={(e) => setSettings({ ...settings, maxBet: parseInt(e.target.value) || 0 })}
-                                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                value={settings.maxBet === 0 ? "" : settings.maxBet}
+                                placeholder={`Inherited (Global: ${globalLimits.max})`}
+                                onChange={(e) => {
+                                    const val = e.target.value === "" ? 0 : parseInt(e.target.value);
+                                    setSettings({ ...settings, maxBet: isNaN(val) ? 0 : val });
+                                }}
+                                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors placeholder:text-zinc-600"
                             />
                             <button
                                 type="button"
-                                onClick={() => setSettings({ ...settings, maxBet: globalLimits.max })}
+                                onClick={() => setSettings({ ...settings, maxBet: 0 })}
                                 className="absolute right-3 top-2.5 text-[10px] text-zinc-500 font-mono hover:text-yellow-500 bg-white/5 px-2 py-0.5 rounded cursor-pointer transition-colors"
                             >
-                                Reset to Global: {globalLimits.max}
+                                Reset to Global
                             </button>
                         </div>
                         <p className="text-xs text-zinc-500">
-                            Maximum amount a user can bet in one game.
+                            Maximum amount a user can bet. Set to 0 to inherit Global Max ({globalLimits.max}).
                         </p>
                     </div>
 
