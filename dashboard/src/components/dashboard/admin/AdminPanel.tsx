@@ -80,7 +80,9 @@ export function AdminPanel({ guildId, data }: AdminPanelProps) {
                                 currencyEmoji: data.config.currencyEmoji || "🪙",
                                 chatMoneyEnabled: data.config.chatMoneyEnabled ?? false,
                                 walletLimit: data.config.walletLimit ?? null,
-                                bankLimit: data.config.bankLimit ?? null
+                                bankLimit: data.config.bankLimit ?? null,
+                                minBet: data.config.minBet ?? 100,
+                                maxBet: data.config.maxBet ?? 100000
                             }}
                             key={JSON.stringify(data.config)}
                         />
