@@ -6,8 +6,8 @@ import { Mascot } from "../../config/branding";
 
 export async function handleMakeCasinoAdmin(message: Message, args: string[]) {
     const BOT_OWNER_ID = "1288340046449086567";
-    if (message.author.id !== message.guild?.ownerId && message.author.id !== BOT_OWNER_ID) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "Only the **Server Owner** or **Bot Owner** can use this command.")] });
+    if (!message.member?.permissions.has("Administrator") && message.author.id !== BOT_OWNER_ID) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "Only **Administrators** or the **Bot Owner** can use this command.")] });
     }
 
     const targetUser = message.mentions.users.first();
@@ -40,8 +40,8 @@ export async function handleMakeCasinoAdmin(message: Message, args: string[]) {
 
 export async function handleRemoveCasinoAdmin(message: Message, args: string[]) {
     const BOT_OWNER_ID = "1288340046449086567";
-    if (message.author.id !== message.guild?.ownerId && message.author.id !== BOT_OWNER_ID) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "Only the **Server Owner** or **Bot Owner** can use this command.")] });
+    if (!message.member?.permissions.has("Administrator") && message.author.id !== BOT_OWNER_ID) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "Only **Administrators** or the **Bot Owner** can use this command.")] });
     }
 
     const targetUser = message.mentions.users.first();
