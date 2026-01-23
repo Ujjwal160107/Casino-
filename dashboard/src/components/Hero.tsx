@@ -13,7 +13,7 @@ import { InteractiveCardDeck } from "./InteractiveCardDeck";
 
 export function Hero() {
     const { data: session } = useSession();
-    const inviteUrl = "https://discord.com/oauth2/authorize?client_id=1371816936857669702&permissions=268823664&scope=bot%20applications.commands";
+    const inviteUrl = "https://discord.com/oauth2/authorize?client_id=1371816936857669702&permissions=268823672&scope=bot%20applications.commands";
 
     return (
         <div className="relative min-h-screen flex flex-col justify-center overflow-hidden font-sans bg-background text-foreground selection:bg-primary/30">

@@ -7,7 +7,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Shield, Book, CreditCard, DollarSign, Dna, Bot, Briefcase, GraduationCap, Heart, ShoppingBag, TrendingUp, Gavel, Settings, HelpCircle, UserPlus, MessageCircle } from "lucide-react";
 
 export default function DocsPage() {
-    const inviteUrl = "https://discord.com/oauth2/authorize?client_id=1371816936857669702&permissions=268823664&scope=bot%20applications.commands";
+    const inviteUrl = "https://discord.com/oauth2/authorize?client_id=1371816936857669702&permissions=268823672&scope=bot%20applications.commands";
 
     return (
         <main className="min-h-screen bg-[#0a0a0a] text-zinc-100 selection:bg-violet-500/30">
