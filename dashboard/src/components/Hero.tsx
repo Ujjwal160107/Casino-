@@ -13,15 +13,7 @@ import { InteractiveCardDeck } from "./InteractiveCardDeck";
 
 export function Hero() {
     const { data: session } = useSession();
-    const [inviteUrl, setInviteUrl] = useState("#");
-
-    useEffect(() => {
-        if (typeof window !== "undefined") {
-            const clientId = "1371816936857669702";
-            const redirectUri = encodeURIComponent(`${window.location.origin}/dashboard`);
-            setInviteUrl(`https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=8&response_type=code&scope=bot%20applications.commands&redirect_uri=${redirectUri}`);
-        }
-    }, []);
+    const inviteUrl = "https://discord.com/oauth2/authorize?client_id=1371816936857669702&permissions=8&scope=bot%20applications.commands";
 
     return (
         <div className="relative min-h-screen flex flex-col justify-center overflow-hidden font-sans bg-background text-foreground selection:bg-primary/30">
