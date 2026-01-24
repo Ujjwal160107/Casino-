@@ -81,21 +81,7 @@ export function Hero() {
                         )}
                     </ScrollReveal>
 
-                    {/* Stats Row */}
-                    <ScrollReveal delay={0.4} direction="up" className="mt-12 flex items-center gap-8 border-t border-white/10 pt-8 w-full">
-                        <div>
-                            <p className="text-3xl font-black text-white">14M+</p>
-                            <p className="text-sm text-zinc-500 uppercase tracking-widest font-bold">Users</p>
-                        </div>
-                        <div>
-                            <p className="text-3xl font-black text-white">50K+</p>
-                            <p className="text-sm text-zinc-500 uppercase tracking-widest font-bold">Servers</p>
-                        </div>
-                        <div>
-                            <p className="text-3xl font-black text-white">99.9%</p>
-                            <p className="text-sm text-zinc-500 uppercase tracking-widest font-bold">Uptime</p>
-                        </div>
-                    </ScrollReveal>
+
                 </div>
 
                 {/* Right Column: Interactive Card Deck */}
