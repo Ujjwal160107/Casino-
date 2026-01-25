@@ -335,15 +335,22 @@ export async function useItem(userId: string, guildId: string, itemName: string,
 
   // Decrease or remove from inventory if consumable OR usable
   if (item.consumable || item.usable) {
-    if (inventoryItem.amount === 1) {
-      await prisma.inventory.delete({
-        where: { id: inventoryItem.id }
-      });
-    } else {
-      await prisma.inventory.update({
-        where: { id: inventoryItem.id },
-        data: { amount: { decrement: 1 } }
-      });
+    // Robust Fix: Re-fetch inventory to get live amount after potential async delays in effects
+    const freshInv = await prisma.inventory.findUnique({
+      where: { id: inventoryItem.id }
+    });
+
+    if (freshInv) {
+      if (freshInv.amount <= 1) {
+        await prisma.inventory.delete({
+          where: { id: freshInv.id }
+        });
+      } else {
+        await prisma.inventory.update({
+          where: { id: freshInv.id },
+          data: { amount: { decrement: 1 } }
+        });
+      }
     }
   }
 
