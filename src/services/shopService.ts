@@ -270,28 +270,45 @@ export async function useItem(userId: string, guildId: string, itemName: string,
   // Search shopItems first is standard, but if "item not found" is the error, maybe `getShopItemByName` failing?
   // Let's try to find the item in their inventory directly if possible.
 
+  // 1. Fetch Inventory with DETERMINISTIC sorting (Alphabetical)
+  // This matches !inv and allows "use by number" to work consistently.
   const inventoryItems = await prisma.inventory.findMany({
     where: { userId: user.id },
-    include: { shopItem: true }
+    include: { shopItem: true },
+    orderBy: { shopItem: { name: 'asc' } }
   });
 
-  // Normalize helper: trim, lowercase, collapse spaces
-  const normalize = (str: string) => str.trim().toLowerCase().replace(/\s+/g, " ");
-  const targetName = normalize(itemName);
+  let targetInvItem;
 
-  const targetInvItem = inventoryItems.find(i => {
-    const dbName = normalize(i.shopItem.name);
-    return dbName === targetName && i.amount > 0;
-  });
+  // 2. CHECK: Is input a Number? (Use by Index)
+  const index = parseInt(itemName);
+  if (!isNaN(index) && index > 0 && index <= inventoryItems.length) {
+    // 1-based index
+    targetInvItem = inventoryItems[index - 1];
+  } else {
+    // 3. Search by Name (Exact -> StartsWith/Partial)
+    const normalize = (str: string) => str.trim().toLowerCase().replace(/\s+/g, " ");
+    const search = normalize(itemName);
+
+    // A. Exact Match
+    targetInvItem = inventoryItems.find(i => normalize(i.shopItem.name) === search && i.amount > 0);
+
+    // B. Partial Match (Starts With) - if no exact match
+    if (!targetInvItem) {
+      targetInvItem = inventoryItems.find(i => normalize(i.shopItem.name).startsWith(search) && i.amount > 0);
+    }
+  }
 
   if (!targetInvItem) {
-    throw new Error("You don't own this item.");
+    throw new Error(`You don't own an item matching "**${itemName}**".`);
   }
 
   const item = targetInvItem.shopItem;
 
-  if (!item.consumable && (!item.effects || (Array.isArray(item.effects) && item.effects.length === 0))) {
-    throw new Error("This item cannot be used.");
+  // 4. STRICT CONSUMABLE CHECK
+  // ONLY items marked as "consumable" (Usable toggle) can be used.
+  if (!item.consumable) {
+    throw new Error(`**${item.name}** is not usable.`);
   }
 
   // Reload inventory item to get a focused object for updates (though targetInvItem is valid)
@@ -345,6 +362,11 @@ export async function getUserInventory(discordId: string, guildId: string) {
       guildId,
       userId: user.id
     },
-    include: { shopItem: true }
+    include: { shopItem: true },
+    orderBy: {
+      shopItem: {
+        name: 'asc'
+      }
+    }
   });
 }
