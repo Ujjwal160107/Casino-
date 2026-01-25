@@ -333,8 +333,8 @@ export async function useItem(userId: string, guildId: string, itemName: string,
   const effectsToApply = allEffects.filter(e => !e.trigger || e.trigger === "USE");
   const results = await applyItemEffects(userId, guildId, effectsToApply, member);
 
-  // Decrease or remove from inventory if consumable
-  if (item.consumable) {
+  // Decrease or remove from inventory if consumable OR usable
+  if (item.consumable || item.usable) {
     if (inventoryItem.amount === 1) {
       await prisma.inventory.delete({
         where: { id: inventoryItem.id }
