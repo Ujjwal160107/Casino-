@@ -36,6 +36,7 @@ export async function upsertShopItem(guildId: string, data: any) {
             emoji: data.emoji || null,
             expiresIn: data.expiresIn || null,
             usable: data.usable ?? false,
+            consumable: data.usable ?? false, // Sync consumable with usable for now as per user request to ensure deletion
             showInInventory: data.showInInventory ?? true,
             requirements: data.requirements || {},
             onBuyActions: data.onBuyActions || [],

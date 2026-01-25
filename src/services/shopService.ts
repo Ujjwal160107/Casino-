@@ -307,7 +307,7 @@ export async function useItem(userId: string, guildId: string, itemName: string,
 
   // 4. STRICT CONSUMABLE CHECK
   // ONLY items marked as "consumable" (Usable toggle) can be used.
-  if (!item.consumable) {
+  if (!item.usable) {
     throw new Error(`**${item.name}** is not usable.`);
   }
 
