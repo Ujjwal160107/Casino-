@@ -82,13 +82,21 @@ export async function deleteShopItem(itemId: string) {
   return prisma.shopItem.delete({ where: { id: itemId } });
 }
 
-export async function buyItem(guildId: string, userId: string, itemName: string, member?: GuildMember) {
-  const item = await prisma.shopItem.findFirst({
-    where: {
-      guildId,
-      name: { equals: itemName, mode: "insensitive" }
-    }
-  });
+export async function buyItem(guildId: string, userId: string, identifier: string, member?: GuildMember, byId: boolean = false) {
+  let item;
+
+  if (byId) {
+    item = await prisma.shopItem.findUnique({
+      where: { id: identifier }
+    });
+  } else {
+    item = await prisma.shopItem.findFirst({
+      where: {
+        guildId,
+        name: { equals: identifier, mode: "insensitive" }
+      }
+    });
+  }
 
   if (!item) throw new Error("Item not found.");
   if (item.stock !== -1 && item.stock <= 0) throw new Error("Out of stock.");
