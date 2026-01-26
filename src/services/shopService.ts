@@ -334,24 +334,37 @@ export async function useItem(userId: string, guildId: string, itemName: string,
   const results = await applyItemEffects(userId, guildId, effectsToApply, member);
 
   // Decrease or remove from inventory if consumable OR usable
-  if (item.consumable || item.usable) {
+  const shouldConsume = item.consumable || item.usable;
+  console.log(`[ShopService] processing consumption for item '${item.name}' (ID: ${item.id}). Usable=${item.usable}, Consumable=${item.consumable} -> Should Consume? ${shouldConsume}`);
+
+  if (shouldConsume) {
     // Robust Fix: Re-fetch inventory to get live amount after potential async delays in effects
+    console.log(`[ShopService] Re-fetching inventory item ${inventoryItem.id} for consumption...`);
     const freshInv = await prisma.inventory.findUnique({
       where: { id: inventoryItem.id }
     });
 
     if (freshInv) {
+      console.log(`[ShopService] Fresh Amount: ${freshInv.amount}`);
       if (freshInv.amount <= 1) {
+        console.log(`[ShopService] Deleting inventory item ${freshInv.id} (Amount <= 1)`);
         await prisma.inventory.delete({
           where: { id: freshInv.id }
         });
+        console.log(`[ShopService] Item deleted.`);
       } else {
+        console.log(`[ShopService] Decrementing inventory item ${freshInv.id} (Amount > 1)`);
         await prisma.inventory.update({
           where: { id: freshInv.id },
           data: { amount: { decrement: 1 } }
         });
+        console.log(`[ShopService] Item decremented.`);
       }
+    } else {
+      console.log(`[ShopService] Item ${inventoryItem.id} NOT FOUND during re-fetch. It may have been removed by an effect or concurrent process.`);
     }
+  } else {
+    console.log(`[ShopService] Item ${item.name} is configured as NOT consumable and NOT usable (logic-wise). Skipping deletion.`);
   }
 
   return { item, results };
