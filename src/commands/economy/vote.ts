@@ -54,12 +54,9 @@ export async function handleVote(message: Message, args: string[]) {
     if (user.lastVote) {
         const diff = now.getTime() - user.lastVote.getTime();
         if (diff < cooldown) {
-            const remaining = cooldown - diff;
-            const hours = Math.floor(remaining / (1000 * 60 * 60));
-            const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-
+            const readyAt = new Date(user.lastVote.getTime() + cooldown);
             return message.reply({
-                embeds: [errorEmbed(message.author, "Already Voted", `You can vote again in **${hours}h ${minutes}m**.`)]
+                embeds: [errorEmbed(message.author, "Already Voted", `You can vote again <t:${Math.floor(readyAt.getTime() / 1000)}:R>.`)]
             });
         }
     }
