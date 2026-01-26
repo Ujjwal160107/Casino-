@@ -20,6 +20,7 @@ export async function getGeneralSettings(guildId: string) {
                 minBet: true,
                 maxBet: true,
                 logChannelId: true,
+                voteReward: true,
             }
         });
 
@@ -36,6 +37,7 @@ export async function getGeneralSettings(guildId: string) {
             minBet: 100,
             maxBet: 100000,
             logChannelId: null,
+            voteReward: 5000,
         };
     } catch (error) {
         console.error("Failed to fetch general settings:", error);
@@ -55,6 +57,7 @@ export async function updateGeneralSettings(guildId: string, data: {
     minBet?: number;
     maxBet?: number;
     logChannelId?: string | null;
+    voteReward?: number;
 }) {
     try {
         // Basic validation
@@ -78,6 +81,7 @@ export async function updateGeneralSettings(guildId: string, data: {
                 minBet: data.minBet,
                 maxBet: data.maxBet,
                 logChannelId: data.logChannelId,
+                voteReward: data.voteReward,
             },
             create: {
                 guildId,
@@ -91,7 +95,8 @@ export async function updateGeneralSettings(guildId: string, data: {
                 dropExpiration: data.dropExpiration ?? 60,
                 minBet: data.minBet ?? 100,
                 maxBet: data.maxBet ?? 100000,
-                logChannelId: data.logChannelId
+                logChannelId: data.logChannelId,
+                voteReward: data.voteReward ?? 5000,
             }
         });
 

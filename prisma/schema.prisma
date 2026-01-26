@@ -40,6 +40,10 @@ model User {
   lastDaily   DateTime?
   lastWeekly  DateTime?
   lastMonthly DateTime?
+  lastVote    DateTime?
+  lastVoteReminder DateTime?
+  voteReminder Boolean @default(true)
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
@@ -407,6 +411,9 @@ model GuildConfig {
 
   jobShiftReqs        Json?    @default("{}") // { "tech_junior": 20 }
   jobRelaxControllers Json?    @default("{}") // { "gym": 500, "meditation": 250, "sports": 750 }
+
+  // Vote Config
+  voteReward    Int      @default(5000)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

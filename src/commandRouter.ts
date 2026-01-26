@@ -282,6 +282,9 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "dailyquests":
       const { handleDailyQuest } = require("./commands/life/dailyQuest");
       return handleDailyQuest(message, args);
+    case "vote":
+      const { handleVote } = require("./commands/economy/vote");
+      return handleVote(message, args);
 
     case "stock":
     case "stocks":

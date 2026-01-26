@@ -23,6 +23,7 @@ interface GeneralConfigFormProps {
         maxBet?: number | null;
         logChannelId?: string | null;
         dropExpiration?: number;
+        voteReward?: number;
     };
     channels?: { id: string; name: string }[];
 }
@@ -37,7 +38,8 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
         minBet: initialData.minBet ?? 100,
         maxBet: initialData.maxBet ?? 100000,
         logChannelId: initialData.logChannelId ?? "",
-        dropExpiration: initialData.dropExpiration ?? 60
+        dropExpiration: initialData.dropExpiration ?? 60,
+        voteReward: initialData.voteReward ?? 5000
     });
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
     const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -133,6 +135,19 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             onChange={(e) => setFormData({ ...formData, startMoney: parseInt(e.target.value) || 0 })}
                             className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
                         />
+                    </div>
+
+                    {/* Vote Reward */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-zinc-400">Vote Reward</label>
+                        <input
+                            type="number"
+                            min={0}
+                            value={formData.voteReward}
+                            onChange={(e) => setFormData({ ...formData, voteReward: parseInt(e.target.value) || 0 })}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+                        />
+                        <p className="text-xs text-zinc-500">Reward for voting (every 12h).</p>
                     </div>
 
                     {/* Currency Name */}

@@ -82,7 +82,8 @@ export function AdminPanel({ guildId, data }: AdminPanelProps) {
                                 walletLimit: data.config.walletLimit ?? null,
                                 bankLimit: data.config.bankLimit ?? null,
                                 minBet: data.config.minBet ?? 100,
-                                maxBet: data.config.maxBet ?? 100000
+                                maxBet: data.config.maxBet ?? 100000,
+                                voteReward: data.config.voteReward ?? 5000
                             }}
                             key={JSON.stringify(data.config)}
                         />
