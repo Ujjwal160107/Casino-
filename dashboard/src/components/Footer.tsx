@@ -5,7 +5,7 @@ import { Twitter, Instagram } from "lucide-react";
 
 export function Footer() {
     return (
-        <footer className="w-full bg-[#09090b] text-zinc-400 py-16 border-t border-white/5">
+        <footer className="w-full bg-[#09090b] text-zinc-400 py-16 border-t border-white/5 relative z-10">
             <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12">
                 {/* Brand Column */}
                 <div className="space-y-4">

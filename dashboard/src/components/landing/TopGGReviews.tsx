@@ -60,11 +60,17 @@ export function TopGGReviews() {
         return null;
     }
 
-    const currentReview = reviews[currentIndex];
+    // Clean content function
+    const cleanContent = (text: string) => {
+        // Remove leading "• 1 day ago", "• 2 hours ago", etc.
+        return text.replace(/^[•\s]*(?:\d+|an?)\s+(?:days?|hours?|minutes?|seconds?)\s+ago\s*/i, "").trim();
+    };
+
+    const cleanedContent = cleanContent(currentReview.content);
 
     // Check if content is long
-    const isLongReview = currentReview.content.length > 200;
-    const displayContent = isExpanded ? currentReview.content : (isLongReview ? currentReview.content.slice(0, 200) + "..." : currentReview.content);
+    const isLongReview = cleanedContent.length > 200;
+    const displayContent = isExpanded ? cleanedContent : (isLongReview ? cleanedContent.slice(0, 200) + "..." : cleanedContent);
 
     // Function to render stars
     const renderStars = (score: number) => {
