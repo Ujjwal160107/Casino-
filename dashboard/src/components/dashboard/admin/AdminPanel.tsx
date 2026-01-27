@@ -83,8 +83,10 @@ export function AdminPanel({ guildId, data }: AdminPanelProps) {
                                 bankLimit: data.config.bankLimit ?? null,
                                 minBet: data.config.minBet ?? 100,
                                 maxBet: data.config.maxBet ?? 100000,
+                                logChannelId: data.config.logChannelId ?? "",
                                 voteReward: data.config.voteReward ?? 5000
                             }}
+                            channels={data.config.casinoChannels ? data.config.casinoChannels.map((id: string) => ({ id, name: id })) : []}
                             key={JSON.stringify(data.config)}
                         />
                     )}

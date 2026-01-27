@@ -686,6 +686,19 @@ async function runCockFight(
             )
             .setFooter({ text: `${Mascot.Name} • Arena` });
 
+        // LOGGING
+        const logColor = winnerIsP1 ? 0x00FF00 : 0xFF0000;
+        await import("../../utils/discordLogger").then(({ logToChannel }) => {
+            logToChannel(p1.client, {
+                guild: originalMsg.guild!,
+                type: "ECONOMY",
+                title: "Cockfight Result",
+                description: `**Winner:** ${winnerUser}\n**Loser:** ${loserUser}\n**Pot:** ${pot}\n**Outcome:** ${actuallyDead ? "DEATH" : "INJURY"}\n**Winner Level:** ${newLevel}`,
+                color: logColor,
+                thumbnail: winnerUser.displayAvatarURL()
+            }).catch(() => { });
+        });
+
         // Set Cooldowns for NEXT fight
         const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
         const cdSeconds = cooldowns["cockfight"] || 0;

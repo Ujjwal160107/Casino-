@@ -125,6 +125,19 @@ export async function handleSlots(message: Message, args: string[]) {
   await updateQuestProgress(user.id, "GAMBLE").catch(console.error);
   if (win) await updateQuestProgress(user.id, "WIN_SLOTS").catch(console.error);
 
+  // LOGGING
+  const logColor = win ? 0x00FF00 : 0xFF0000;
+  await import("../../utils/discordLogger").then(({ logToChannel }) => {
+    logToChannel(message.client, {
+      guild: message.guild!,
+      type: "ECONOMY",
+      title: "Slots Game",
+      description: `**User:** ${message.author.toString()}\n**Reels:** [ ${reel1} | ${reel2} | ${reel3} ]\n**Bet:** ${fmtCurrency(amount, emoji)}\n**Payout:** ${fmtCurrency(payout, emoji)}`,
+      color: logColor,
+      thumbnail: message.author.displayAvatarURL()
+    }).catch(() => { });
+  });
+
 
   const eTitle = "<a:casino:1445732641545654383>";
   const embed = new EmbedBuilder()

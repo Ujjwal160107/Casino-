@@ -119,6 +119,19 @@ export async function handleCoinflip(message: Message, args: string[]) {
   await updateQuestProgress(user.id, "GAMBLE").catch(console.error);
   if (didWin) await updateQuestProgress(user.id, "WIN_COINFLIP").catch(console.error);
 
+  // LOGGING
+  const logColor = didWin ? 0x00FF00 : 0xFF0000;
+  await import("../../utils/discordLogger").then(({ logToChannel }) => {
+    logToChannel(message.client, {
+      guild: message.guild!,
+      type: "ECONOMY",
+      title: "Coinflip Game",
+      description: `**User:** ${message.author.toString()}\n**Choice:** ${choice.toUpperCase()}\n**Result:** ${result.toUpperCase()}\n**Bet:** ${fmtCurrency(amount, emoji)}\n**Payout:** ${fmtCurrency(payout, emoji)}`,
+      color: logColor,
+      thumbnail: message.author.displayAvatarURL()
+    }).catch(() => { });
+  });
+
   const finalWalletBalance = user.wallet.balance - amount + payout;
   const finalWalletBalanceIntl = finalWalletBalance.toLocaleString("en-US");
   let footerIconURL: string | undefined;

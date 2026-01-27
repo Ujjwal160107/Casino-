@@ -263,6 +263,18 @@ async function startGame(channelId: string, message: Message) {
             // Audit Log? Maybe later.
         }
 
+        // LOGGING
+        await import("../../utils/discordLogger").then(({ logToChannel }) => {
+            logToChannel(message.client, {
+                guild: message.guild!,
+                type: "ECONOMY",
+                title: "Russian Roulette Result",
+                description: `**Eliminated:** ${deadPlayer?.username}\n**Survivors:** ${winners.length}\n**Pot:** ${fmtCurrency(pot, currency)}\n**Win/Person:** ${fmtCurrency(winAmount, currency)}`,
+                color: Colors.DarkRed,
+                thumbnail: message.guild?.iconURL() || undefined
+            }).catch(() => { });
+        });
+
         const winMsg = winners.map(w => `**${w.username}** (+${fmtCurrency(winAmount - lobby.betAmount, currency)})`).join(", ");
 
         const finalEmbed = new EmbedBuilder()

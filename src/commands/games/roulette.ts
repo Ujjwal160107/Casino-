@@ -214,6 +214,19 @@ export async function handleBet(message: Message, args: string[]) {
   // Cleanup spinning message
   await spinMsg.delete().catch(() => { });
 
+  // LOGGING
+  const logColor = didWin ? 0x00FF00 : 0xFF0000;
+  await import("../../utils/discordLogger").then(({ logToChannel }) => {
+    logToChannel(message.client, {
+      guild: message.guild!,
+      type: "ECONOMY",
+      title: "Roulette Game",
+      description: `**User:** ${message.author.toString()}\n**Bet on:** ${choiceRaw}\n**Result:** ${isRed ? "RED" : (isBlack ? "BLACK" : "ZERO")} (${spin})\n**Bet:** ${fmtCurrency(amount, emoji)}\n**Payout:** ${fmtCurrency(payout, emoji)}`,
+      color: logColor,
+      thumbnail: message.author.displayAvatarURL()
+    }).catch(() => { });
+  });
+
   const eRedCoin = "<:redcoin:1446217599439343772>";
   const eBlackCoin = "<:BlackCoin:1446217613632999565>";
   const displayColor = spin === 0 ? "🟢" : (isRed ? eRedCoin : eBlackCoin);

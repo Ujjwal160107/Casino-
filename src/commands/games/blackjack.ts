@@ -282,6 +282,20 @@ export async function handleBlackjack(message: Message, args: string[]) {
             await updateQuestProgress(user.id, "GAMBLE").catch(console.error);
             if (payout > currentBet) await updateQuestProgress(user.id, "WIN_BLACKJACK").catch(console.error);
 
+            // LOGGING
+            const logColor = payout > currentBet ? 0x00FF00 : (payout === currentBet ? 0xFFFF00 : 0xFF0000);
+            await import("../../utils/discordLogger").then(({ logToChannel }) => {
+                logToChannel(message.client, {
+                    guild: message.guild!,
+                    type: "ECONOMY",
+                    title: "Blackjack Game",
+                    description: `**User:** ${message.author.toString()}\n**Result:** ${result}\n**Bet:** ${fmtCurrency(currentBet, currencyEmoji)}\n**Payout:** ${fmtCurrency(payout, currencyEmoji)}`,
+                    color: logColor,
+                    thumbnail: message.author.displayAvatarURL()
+                }).catch(() => { });
+            });
+
+
             await i.update({ embeds: [getEmbed(true)], components: [] });
         }
     });
