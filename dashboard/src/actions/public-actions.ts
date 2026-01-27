@@ -3,10 +3,10 @@
 export async function getTopGGReviews() {
     try {
         const token = process.env.TOPGG_TOKEN;
-        const clientId = process.env.CLIENT_ID;
+        const clientId = process.env.CLIENT_ID || process.env.DISCORD_CLIENT_ID;
 
         if (!token || !clientId) {
-            console.error("Missing TOPGG_TOKEN or CLIENT_ID");
+            console.error("Missing TOPGG_TOKEN or CLIENT_ID (or DISCORD_CLIENT_ID)");
             return [];
         }
 

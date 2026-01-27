@@ -84,7 +84,7 @@ export function TopGGReviews() {
     };
 
     return (
-        <div className="w-full bg-black/40 border-t border-white/5 py-12 overflow-hidden relative">
+        <div className="w-full py-12 overflow-hidden relative">
             <div className="max-w-4xl mx-auto px-4 text-center">
                 <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent mb-8">
                     Loved by our Community
