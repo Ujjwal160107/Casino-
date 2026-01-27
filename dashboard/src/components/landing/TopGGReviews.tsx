@@ -21,9 +21,8 @@ export function TopGGReviews() {
         async function fetchReviews() {
             try {
                 const data = await getTopGGReviews();
-                console.log("[TopGG] Client received:", data);
 
-                let mapped = data.map((r: any) => ({
+                const mapped = data.map((r: any) => ({
                     id: r.id || "unknown",
                     username: r.username || "Anonymous",
                     avatar: r.avatar || "",
@@ -31,16 +30,6 @@ export function TopGGReviews() {
                     score: r.score || 5,
                     date: r.date || new Date().toISOString()
                 }));
-
-                // Fallback for testing execution/UI if no API keys or no reviews yet
-                if (mapped.length === 0) {
-                    console.log("[TopGG] No reviews found, using mock data for demo.");
-                    mapped = [
-                        { id: "1", username: "CasinoKing", avatar: "", content: "Best casino bot ever! The roulette animation is sick.", score: 5, date: new Date().toISOString() },
-                        { id: "2", username: "SlackUser", avatar: "", content: "I lost all my life savings but it was fun 10/10", score: 5, date: new Date().toISOString() },
-                        { id: "3", username: "DiscordDev", avatar: "", content: "Great API integration and smooth slash commands.", score: 4, date: new Date().toISOString() },
-                    ];
-                }
 
                 setReviews(mapped);
             } catch (e) {
