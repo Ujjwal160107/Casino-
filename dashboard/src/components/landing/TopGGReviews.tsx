@@ -60,6 +60,8 @@ export function TopGGReviews() {
         return null;
     }
 
+    const currentReview = reviews[currentIndex];
+
     // Clean content function
     const cleanContent = (text: string) => {
         // Remove leading "• 1 day ago", "• 2 hours ago", etc.
