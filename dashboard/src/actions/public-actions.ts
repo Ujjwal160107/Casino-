@@ -14,20 +14,21 @@ export async function getTopGGReviews() {
             headers: {
                 Authorization: token,
             },
-            next: { revalidate: 3600 }, // Cache for 1 hour
+            next: { revalidate: 3600 },
         });
 
         if (!response.ok) {
-            console.error(`Failed to fetch reviews: ${response.status} ${response.statusText}`);
+            console.error(`[TopGG] Failed to fetch reviews: ${response.status} ${response.statusText}`);
+            const text = await response.text();
+            console.error(`[TopGG] Response: ${text}`);
             return [];
         }
 
         const data = await response.json();
-        // Top.gg returns an array of reviews directly or paginated? 
-        // Docs say GET /bots/:id/reviews returns an array.
+        console.log(`[TopGG] Fetched ${Array.isArray(data) ? data.length : 0} reviews.`);
         return Array.isArray(data) ? data : [];
     } catch (error) {
-        console.error("Error fetching Top.gg reviews:", error);
+        console.error("[TopGG] Error fetching reviews:", error);
         return [];
     }
 }
