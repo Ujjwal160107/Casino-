@@ -26,8 +26,8 @@ export function TopGGReviews() {
                     id: r.id || "unknown",
                     username: r.username || "Anonymous",
                     avatar: r.avatar || "",
-                    content: r.content || "",
-                    score: r.score || 5,
+                    content: r.review || r.content || "",
+                    score: r.rating || r.score || 5,
                     date: r.date || new Date().toISOString()
                 }));
 
