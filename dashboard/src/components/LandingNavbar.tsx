@@ -57,8 +57,6 @@ export function LandingNavbar({ user }: LandingNavbarProps) {
                         <div className="flex items-center gap-6">
                             <div className="hidden md:flex items-center gap-6">
                                 <Link href="/docs" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Documentation</Link>
-                                <Link href="/policy" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Privacy</Link>
-                                <Link href="/terms" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Terms</Link>
                             </div>
                             <div className="h-4 w-[1px] bg-white/10 hidden md:block"></div>
 

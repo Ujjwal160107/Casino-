@@ -39,21 +39,32 @@ export function TopGGReviews() {
         fetchReviews();
     }, []);
 
+    const [isExpanded, setIsExpanded] = useState(false);
+
     useEffect(() => {
-        if (reviews.length <= 1) return;
+        if (reviews.length <= 1 || isExpanded) return;
 
         const interval = setInterval(() => {
             setCurrentIndex((prev) => (prev + 1) % reviews.length);
-        }, 5000); // Change every 5 seconds
+        }, 5000);
 
         return () => clearInterval(interval);
-    }, [reviews]);
+    }, [reviews, isExpanded]);
+
+    // Reset extended state when index changes (manual or auto)
+    useEffect(() => {
+        setIsExpanded(false);
+    }, [currentIndex]);
 
     if (!reviews || reviews.length === 0) {
-        return null; // Don't show anything if no reviews
+        return null;
     }
 
     const currentReview = reviews[currentIndex];
+
+    // Check if content is long
+    const isLongReview = currentReview.content.length > 200;
+    const displayContent = isExpanded ? currentReview.content : (isLongReview ? currentReview.content.slice(0, 200) + "..." : currentReview.content);
 
     // Function to render stars
     const renderStars = (score: number) => {
@@ -79,7 +90,7 @@ export function TopGGReviews() {
                     Loved by our Community
                 </h2>
 
-                <div className="relative h-48 flex items-center justify-center">
+                <div className="relative min-h-[12rem] flex items-center justify-center">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={currentReview.id}
@@ -95,9 +106,9 @@ export function TopGGReviews() {
                             </div>
 
                             <div className="flex flex-col items-center gap-4 relative z-10">
-                                <div className="flex items-center gap-3 mb-2">
+                                <div className="flex items-center gap-3 mb-2 w-full">
                                     {/* Avatar Placeholder or Image */}
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center text-white font-bold text-sm overflow-hidden">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center text-white font-bold text-sm overflow-hidden shrink-0">
                                         {currentReview.avatar ? (
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img src={currentReview.avatar} alt={currentReview.username} className="w-full h-full object-cover" />
@@ -105,25 +116,35 @@ export function TopGGReviews() {
                                             currentReview.username.slice(0, 2).toUpperCase()
                                         )}
                                     </div>
-                                    <div className="text-left">
-                                        <div className="font-semibold text-white">{currentReview.username}</div>
+                                    <div className="text-left flex-1 min-w-0">
+                                        <div className="font-semibold text-white truncate">{currentReview.username}</div>
                                         <div className="text-xs text-zinc-400">Top.gg Review</div>
                                     </div>
-                                    <div className="ml-auto">
+                                    <div className="ml-auto flex-shrink-0">
                                         {renderStars(currentReview.score)}
                                     </div>
                                 </div>
 
-                                <p className="text-zinc-300 italic text-lg line-clamp-3">
-                                    "{currentReview.content}"
-                                </p>
+                                <div className="w-full text-center">
+                                    <p className="text-zinc-300 italic text-lg leading-relaxed">
+                                        "{displayContent}"
+                                    </p>
+                                    {isLongReview && (
+                                        <button
+                                            onClick={() => setIsExpanded(!isExpanded)}
+                                            className="mt-2 text-sm text-yellow-400 hover:text-yellow-300 underline underline-offset-4 focus:outline-none"
+                                        >
+                                            {isExpanded ? "Read Less" : "Read More"}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </motion.div>
                     </AnimatePresence>
                 </div>
 
                 {/* Indicators */}
-                <div className="flex justify-center gap-2 mt-6">
+                <div className="flex justify-center gap-2 mt-8">
                     {reviews.map((_, idx) => (
                         <button
                             key={idx}
