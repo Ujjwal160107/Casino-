@@ -42,7 +42,6 @@ export function Footer() {
                     <h3 className="text-white font-semibold">Connect</h3>
                     <ul className="space-y-3 text-sm">
                         <li><Link href="https://discord.gg/Y5P44UCH2Y" target="_blank" className="hover:text-white transition-colors">Support Server</Link></li>
-                        <li><Link href="https://github.com/Ujjwal160107/Casino-" target="_blank" className="hover:text-white transition-colors">GitHub</Link></li>
                     </ul>
                 </div>
             </div>
