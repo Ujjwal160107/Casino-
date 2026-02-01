@@ -104,10 +104,10 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
                     <Link
                         href={`/dashboard/${guild.id}`}
                         className={cn(
-                            "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 border border-white/5",
+                            "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 border border-white/5 font-display",
                             pathname === `/dashboard/${guild.id}`
                                 ? "bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.05)]"
-                                : "bg-[#111] text-zinc-400 hover:text-white hover:bg-white/5"
+                                : "glass-card text-zinc-400 hover:text-white hover:bg-white/5"
                         )}
                     >
                         <Home size={16} />
@@ -116,7 +116,7 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
                     <button
                         onClick={handleSync}
                         disabled={isSyncing}
-                        className="px-3 py-2.5 rounded-lg bg-[#111] border border-white/5 text-zinc-400 hover:text-primary hover:bg-white/5 transition-colors disabled:opacity-50"
+                        className="px-3 py-2.5 rounded-lg glass-card border border-white/5 text-zinc-400 hover:text-primary hover:bg-white/5 transition-colors disabled:opacity-50"
                         title="Sync Roles & Channels"
                     >
                         <RotateCw size={16} className={cn(isSyncing && "animate-spin")} />
@@ -128,7 +128,7 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
                 {sections.map((section) => (
                     <div key={section.title} className="space-y-2">
                         <div className="flex items-center justify-between px-3">
-                            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest leading-none">
+                            <h3 className="text-[10px] font-bold font-display text-zinc-500 uppercase tracking-widest leading-none">
                                 {section.title}
                             </h3>
                         </div>

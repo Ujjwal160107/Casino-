@@ -63,7 +63,7 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
         <div className="space-y-10 mt-4">
             {/* Welcome Header */}
             <div className="space-y-2">
-                <h1 className="text-4xl font-bold text-white tracking-tight">
+                <h1 className="text-4xl font-bold font-display text-white tracking-tight">
                     Welcome <span className="text-primary">{userName}</span>,
                 </h1>
                 <p className="text-xl text-zinc-400 font-light">
@@ -76,7 +76,7 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
                 {commonPages.map((page) => (
                     <div
                         key={page.title}
-                        className={`group relative p-6 rounded-2xl bg-[#111] border border-white/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${page.border}`}
+                        className={`group relative p-6 rounded-2xl glass-card transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${page.border}`}
                     >
                         {/* Glow Effect */}
                         <div className={`absolute top-0 right-0 w-32 h-32 ${page.bg} blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`} />
@@ -88,7 +88,7 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
                                 </div>
                             </div>
 
-                            <h3 className="text-xl font-bold text-white mb-2">{page.title}</h3>
+                            <h3 className="text-xl font-bold font-display text-white mb-2">{page.title}</h3>
                             <p className="text-zinc-400 text-sm mb-6 flex-1 pr-8">
                                 {page.description}
                             </p>
