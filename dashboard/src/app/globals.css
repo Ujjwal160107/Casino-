@@ -37,17 +37,17 @@
 :root {
   /* Casino Luxury Theme (Refined - Lighter Dark) */
 
-  /* Zinc-950 Background (#09090b) */
-  --background: 240 10% 4%;
+  /* Custom Dashboard Background (#212831) */
+  --background: 214 20% 16%;
 
   /* #FFFAEB */
   --foreground: 48 100% 96%;
 
-  /* Zinc-900 Cards (#18181b) */
-  --card: 240 10% 7%;
+  /* Custom Navbar/Card (#1B2028) */
+  --card: 217 19% 13%;
   --card-foreground: 48 100% 96%;
 
-  --popover: 240 10% 7%;
+  --popover: 217 19% 13%;
   --popover-foreground: 48 100% 96%;
 
   /* Luxury Gold Primary (#FFD700) */
@@ -58,19 +58,19 @@
   --secondary: 48 20% 12%;
   --secondary-foreground: 48 100% 96%;
 
-  /* Muted Gold */
-  --muted: 240 4% 16%;
-  --muted-foreground: 240 5% 65%;
+  /* Muted Blue-Grey */
+  --muted: 217 15% 18%;
+  --muted-foreground: 215 16% 70%;
 
   /* Accents */
-  --accent: 240 4% 16%;
+  --accent: 217 19% 13%;
   --accent-foreground: 48 100% 50%;
 
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 48 100% 96%;
 
-  --border: 240 4% 16%;
-  --input: 240 4% 16%;
+  --border: 217 19% 20%;
+  --input: 217 19% 13%;
   /* Gold Ring */
   --ring: 48 100% 50%;
 
@@ -86,7 +86,7 @@
 }
 
 .glass-card {
-  background: linear-gradient(145deg, rgba(24, 24, 27, 0.9), rgba(9, 9, 11, 0.8));
+  background: linear-gradient(145deg, rgba(33, 40, 49, 0.9), rgba(27, 32, 40, 0.8));
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   /* Lighter border */
@@ -94,8 +94,8 @@
 }
 
 .glass-sidebar {
-  background: rgba(9, 9, 11, 0.98);
-  /* Zinc-950 */
+  background: rgba(27, 32, 40, 0.98);
+  /* Custom Dark Blue-Grey */
   backdrop-filter: blur(16px);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
