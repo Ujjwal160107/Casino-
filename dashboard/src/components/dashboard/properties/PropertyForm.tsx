@@ -57,7 +57,7 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="glass-card rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
                 >
-                    <div className="flex items-center justify-between p-6 border-b border-white/10 sticky top-0 bg-[#1B2028]/95 backdrop-blur z-10">>
+                    <div className="flex items-center justify-between p-6 border-b border-white/10 sticky top-0 bg-[#1B2028]/95 backdrop-blur z-10">
                         <h2 className="text-xl font-bold text-white">
                             {initialData ? "Edit Property" : "Add New Property"}
                         </h2>

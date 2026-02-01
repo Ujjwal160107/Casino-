@@ -86,59 +86,58 @@
 }
 
 .glass-card {
-  .glass-card {
-    background: linear-gradient(145deg, rgba(40, 48, 58, 0.6), rgba(33, 40, 49, 0.4));
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    /* Lighter border */
-    box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.2);
-  }
+  background: linear-gradient(145deg, rgba(40, 48, 58, 0.6), rgba(33, 40, 49, 0.4));
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* Lighter border */
+  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.2);
+}
 
-  .glass-sidebar {
-    background: rgba(27, 32, 40, 0.98);
-    /* Custom Dark Blue-Grey */
-    backdrop-filter: blur(16px);
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-  }
+.glass-sidebar {
+  background: rgba(27, 32, 40, 0.98);
+  /* Custom Dark Blue-Grey */
+  backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
 
 
-  body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
-    font-family: 'Inter', sans-serif;
-  }
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Inter', sans-serif;
+}
 
-  /* Force cursor pointer on all interactive elements */
-  button,
-  a,
-  input[type="button"],
-  input[type="submit"],
-  input[type="checkbox"],
-  input[type="radio"],
-  select,
-  label,
-  [role="button"] {
-    cursor: pointer;
-  }
+/* Force cursor pointer on all interactive elements */
+button,
+a,
+input[type="button"],
+input[type="submit"],
+input[type="checkbox"],
+input[type="radio"],
+select,
+label,
+[role="button"] {
+  cursor: pointer;
+}
 
-  /* Custom Scrollbar for Webkit (Chrome, Safari, Edge) */
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
+/* Custom Scrollbar for Webkit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
 
-  ::-webkit-scrollbar-track {
-    background: hsl(var(--background));
-  }
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
 
-  ::-webkit-scrollbar-thumb {
-    background: #3f3f46;
-    /* zinc-700: Dark Grey */
-    border: 2px solid hsl(var(--background));
-    border-radius: 9999px;
-  }
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  /* zinc-700: Dark Grey */
+  border: 2px solid hsl(var(--background));
+  border-radius: 9999px;
+}
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: #52525b;
-    /* zinc-600: Slightly lighter grey */
-  }
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+  /* zinc-600: Slightly lighter grey */
+}
