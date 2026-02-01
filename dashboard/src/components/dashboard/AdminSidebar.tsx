@@ -13,7 +13,6 @@ import {
     Coins,
     Settings,
     Dices,
-    ShieldAlert,
     ChevronDown,
     ChevronRight,
     ShoppingBag
@@ -30,7 +29,7 @@ type NavItem = {
     label: string;
     href: string;
     icon: any;
-    matches?: string[]; // strings to match against pathname 
+    matches?: string[];
 }
 
 type NavSection = {
@@ -40,9 +39,13 @@ type NavSection = {
 
 export function AdminSidebar({ guild }: AdminSidebarProps) {
     const pathname = usePathname();
+    // Default open sections for better UX
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-        "Life Economy": true,
+        "Overview": true,
         "General Economy": true,
+        "Life Economy": false,
+        "Casino": true,
+        "Shop & Misc": false,
     });
 
     const toggleSection = (title: string) => {
@@ -53,7 +56,7 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
         {
             title: "Overview",
             items: [
-                { label: "Overview", href: `/dashboard/${guild.id}`, icon: LayoutDashboard, matches: [`/dashboard/${guild.id}`] }
+                { label: "Overview", href: `/dashboard/${guild.id}`, icon: LayoutDashboard }
             ]
         },
         {
@@ -93,46 +96,55 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
         : null;
 
     return (
-        <aside className="fixed left-0 top-0 h-screen w-64 bg-zinc-950 border-r border-white/5 flex flex-col z-40">
-            {/* Header / Guild Info */}
-            <div className="p-6 border-b border-white/5 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-zinc-800 shrink-0 overflow-hidden border border-white/10">
+        <aside className="fixed left-0 top-0 h-screen w-64 glass-sidebar flex flex-col z-40 text-zinc-300">
+            {/* Header */}
+            <div className="p-6 border-b border-primary/10 flex items-center gap-3 bg-black/20">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-zinc-800 to-black shrink-0 overflow-hidden border border-primary/20 shadow-lg shadow-black/50">
                     {iconUrl ? (
                         <Image
                             src={iconUrl}
                             alt={guild.name}
-                            width={40}
-                            height={40}
+                            width={48}
+                            height={48}
                             className="object-cover"
                         />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center text-zinc-400 font-bold">
+                        <div className="w-full h-full flex items-center justify-center text-primary font-bold text-xl font-serif">
                             {guild.name.charAt(0)}
                         </div>
                     )}
                 </div>
                 <div className="overflow-hidden">
                     <h2 className="text-white font-bold truncate text-sm font-serif tracking-wide">{guild.name}</h2>
-                    <p className="text-xs text-yellow-500 uppercase tracking-widest font-semibold">Admin Panel</p>
+                    <p className="text-[10px] text-primary uppercase tracking-[0.2em] font-bold opacity-80">Admin Panel</p>
                 </div>
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+            <nav className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
                 {sections.map((section) => (
                     <div key={section.title}>
                         {section.title !== "Overview" && (
                             <button
                                 onClick={() => toggleSection(section.title)}
-                                className="flex items-center justify-between w-full text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 hover:text-zinc-300 transition-colors"
+                                className="flex items-center justify-between w-full text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3 hover:text-primary transition-colors px-2"
                             >
                                 {section.title}
-                                {openSections[section.title] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                <motion.div
+                                    animate={{ rotate: openSections[section.title] ? 0 : -90 }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    <ChevronDown size={12} />
+                                </motion.div>
                             </button>
                         )}
 
-                        {(section.title === "Overview" || openSections[section.title]) && (
-                            <div className="space-y-1">
+                        <motion.div
+                            initial={false}
+                            animate={{ height: openSections[section.title] ? "auto" : 0, opacity: openSections[section.title] ? 1 : 0 }}
+                            className="overflow-hidden"
+                        >
+                            <div className="space-y-1 mb-4">
                                 {section.items.map((item) => {
                                     const isActive = pathname === item.href;
                                     const Icon = item.icon;
@@ -142,33 +154,45 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
                                             key={item.href}
                                             href={item.href}
                                             className={cn(
-                                                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group",
+                                                "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 group overflow-hidden",
                                                 isActive
-                                                    ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
-                                                    : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 border border-transparent"
+                                                    ? "text-primary bg-primary/10 shadow-[0_0_15px_-3px_rgba(255,215,0,0.15)] border border-primary/20"
+                                                    : "text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent"
                                             )}
                                         >
+                                            {isActive && (
+                                                <motion.div
+                                                    layoutId="activeTab"
+                                                    className="absolute inset-0 bg-primary/5 rounded-lg"
+                                                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                                                />
+                                            )}
+
                                             <Icon size={18} className={cn(
-                                                "transition-colors",
-                                                isActive ? "text-yellow-500" : "text-zinc-600 group-hover:text-zinc-400"
+                                                "relative z-10 transition-colors duration-300",
+                                                isActive ? "text-primary drop-shadow-[0_0_8px_rgba(255,215,0,0.5)]" : "text-zinc-600 group-hover:text-zinc-300"
                                             )} />
-                                            {item.label}
+                                            <span className="relative z-10">{item.label}</span>
+
+                                            {isActive && (
+                                                <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(255,215,0,0.8)]" />
+                                            )}
                                         </Link>
                                     )
                                 })}
                             </div>
-                        )}
+                        </motion.div>
                     </div>
                 ))}
             </nav>
 
-            {/* Footer / Back link */}
-            <div className="p-4 border-t border-white/5">
+            {/* Footer */}
+            <div className="p-4 border-t border-primary/10 bg-black/20 backdrop-blur-md">
                 <Link
                     href="/dashboard"
-                    className="flex items-center gap-2 justify-center text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                    className="flex items-center gap-2 justify-center text-xs font-medium text-zinc-500 hover:text-primary transition-colors py-2 rounded-md hover:bg-white/5"
                 >
-                    &larr; Return to Server Selection
+                    &larr; Switch Server
                 </Link>
             </div>
         </aside>

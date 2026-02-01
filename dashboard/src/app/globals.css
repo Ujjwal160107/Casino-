@@ -35,47 +35,66 @@
 }
 
 :root {
-  /* Cyber-Japanese Theme */
+  /* Casino Luxury Theme */
 
-  /* Deep Navy Background (#0b0d17) */
-  --background: 230 35% 7%;
+  /* Deep Black Background with Gold Tint (#050505) */
+  --background: 0 0% 2%;
   /* White Foreground */
-  --foreground: 0 0% 100%;
+  --foreground: 0 0% 98%;
 
-  /* Glass/Deep Navy for Cards */
-  --card: 230 35% 10%;
-  --card-foreground: 0 0% 100%;
+  /* Glass/Deep Black for Cards */
+  --card: 0 0% 5%;
+  --card-foreground: 0 0% 98%;
 
-  --popover: 230 35% 7%;
-  --popover-foreground: 0 0% 100%;
+  --popover: 0 0% 4%;
+  --popover-foreground: 0 0% 98%;
 
-  /* Neon Cyan for Primary (#00f0ff) */
-  --primary: 183 100% 50%;
-  --primary-foreground: 230 35% 7%;
+  /* Gold for Primary (#FFD700) */
+  --primary: 51 100% 50%;
+  --primary-foreground: 0 0% 5%;
 
-  /* Hot Pink for Secondary/Accents (#ff0055) */
-  --secondary: 340 100% 50%;
+  /* Rich Red for Secondary/Accents (#D2042D) - Velvet */
+  --secondary: 348 95% 42%;
   --secondary-foreground: 0 0% 100%;
 
-  /* Muted Deep Blue */
-  --muted: 230 25% 15%;
-  --muted-foreground: 230 10% 70%;
+  /* Muted Charcoal */
+  --muted: 0 0% 12%;
+  --muted-foreground: 0 0% 60%;
 
-  /* Neon Cyan for Accents */
-  --accent: 183 100% 50%;
-  --accent-foreground: 230 35% 7%;
+  /* Emerald Green for Money/Success */
+  --accent: 142 76% 36%;
+  --accent-foreground: 0 0% 100%;
 
-  --destructive: 0 62.8% 30.6%;
+  --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
 
-  /* Cyan Border */
-  --border: 230 25% 20%;
-  --input: 230 25% 20%;
+  /* Gold Border */
+  --border: 51 50% 15%;
+  --input: 0 0% 15%;
 
-  --ring: 183 100% 50%;
+  --ring: 51 100% 50%;
 
-  --radius: 0.75rem;
-  /* Slightly larger radius for modern look */
+  --radius: 0.5rem;
+}
+
+/* Glassmorphism Utilities */
+.glass {
+  background: rgba(15, 15, 20, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 215, 0, 0.1);
+}
+
+.glass-card {
+  background: linear-gradient(145deg, rgba(20, 20, 20, 0.9), rgba(10, 10, 10, 0.8));
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+}
+
+.glass-sidebar {
+  background: rgba(5, 5, 5, 0.85);
+  backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(255, 215, 0, 0.1);
 }
 
 

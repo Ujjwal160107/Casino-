@@ -119,7 +119,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             maxLength={5}
                             value={formData.prefix}
                             onChange={(e) => setFormData({ ...formData, prefix: e.target.value })}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                             placeholder="!"
                         />
                         <p className="text-xs text-zinc-500">Maximum 5 characters.</p>
@@ -133,7 +133,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             min={0}
                             value={formData.startMoney}
                             onChange={(e) => setFormData({ ...formData, startMoney: parseInt(e.target.value) || 0 })}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                         />
                     </div>
 
@@ -145,7 +145,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             min={0}
                             value={formData.voteReward}
                             onChange={(e) => setFormData({ ...formData, voteReward: parseInt(e.target.value) || 0 })}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                         />
                         <p className="text-xs text-zinc-500">Reward for voting (every 12h).</p>
                     </div>
@@ -158,7 +158,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             maxLength={32}
                             value={formData.currencyName}
                             onChange={(e) => setFormData({ ...formData, currencyName: e.target.value })}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                             placeholder="Coins"
                         />
                     </div>
@@ -169,7 +169,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                         <div className="flex gap-2">
                             <input
                                 type="text"
-                                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all font-mono text-sm"
+                                className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm backdrop-blur-sm"
                                 value={formData.currencyEmoji}
                                 onChange={(e) => setFormData({ ...formData, currencyEmoji: e.target.value })}
                                 placeholder="🪙 or <:copy:123...>"
@@ -207,7 +207,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             placeholder="No Limit"
                             value={formData.walletLimit ?? ""}
                             onChange={(e) => setFormData({ ...formData, walletLimit: e.target.value ? parseInt(e.target.value) : null })}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                         />
                         <p className="text-xs text-zinc-500">Max cash in wallet.</p>
                     </div>
@@ -219,7 +219,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             placeholder="No Limit"
                             value={formData.bankLimit ?? ""}
                             onChange={(e) => setFormData({ ...formData, bankLimit: e.target.value ? parseInt(e.target.value) : null })}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                         />
                         <p className="text-xs text-zinc-500">Max cash in bank.</p>
                     </div>
@@ -234,7 +234,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             min={0}
                             value={formData.minBet || 0}
                             onChange={(e) => setFormData({ ...formData, minBet: parseInt(e.target.value) || 0 })}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                         />
                         <p className="text-xs text-zinc-500">Default minimum bet for all games.</p>
                     </div>
@@ -245,7 +245,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             min={0}
                             value={formData.maxBet || 0}
                             onChange={(e) => setFormData({ ...formData, maxBet: parseInt(e.target.value) || 0 })}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all"
+                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                         />
                         <p className="text-xs text-zinc-500">Default maximum bet for all games.</p>
                     </div>
@@ -262,7 +262,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                     <select
                         value={formData.logChannelId || ""}
                         onChange={(e) => setFormData({ ...formData, logChannelId: e.target.value })}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all appearance-none"
+                        className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all appearance-none backdrop-blur-sm"
                     >
                         <option value="">Select a channel...</option>
                         {channels.map((channel) => (
@@ -283,7 +283,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                         placeholder="Channel ID"
                         value={formData.logChannelId || ""}
                         onChange={(e) => setFormData({ ...formData, logChannelId: e.target.value })}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-sm text-zinc-400 focus:text-white focus:outline-none focus:border-white/20 transition-all"
+                        className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2 text-sm text-zinc-400 focus:text-white focus:outline-none focus:border-white/20 transition-all backdrop-blur-sm"
                     />
                 </div>
             </div>
@@ -297,7 +297,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                 <button
                     type="button"
                     onClick={() => setFormData({ ...formData, chatMoneyEnabled: !formData.chatMoneyEnabled })}
-                    className={`relative w-12 h-7 rounded-full transition-colors duration-200 focus:outline-none ${formData.chatMoneyEnabled ? "bg-yellow-500" : "bg-zinc-700"
+                    className={`relative w-12 h-7 rounded-full transition-colors duration-200 focus:outline-none ${formData.chatMoneyEnabled ? "bg-primary shadow-[0_0_10px_rgba(255,215,0,0.5)]" : "bg-zinc-700"
                         }`}
                 >
                     <span
@@ -390,7 +390,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
             <button
                 type="submit"
                 disabled={isLoading}
-                className="flex items-center gap-2 bg-yellow-500 text-black px-6 py-2.5 rounded-lg font-bold hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-bold hover:brightness-110 transition-all shadow-[0_0_15px_rgba(255,215,0,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                 Save Changes

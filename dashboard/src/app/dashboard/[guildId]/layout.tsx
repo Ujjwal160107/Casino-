@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getGuild } from "@/lib/discord";
 import { AdminSidebar } from "@/components/dashboard/AdminSidebar";
+import { canManageGuild } from "@/lib/permissions";
 
 interface DashboardLayoutProps {
     children: ReactNode;
@@ -32,6 +33,20 @@ export default async function AdminLayout({ children, params }: DashboardLayoutP
     // Optimization: We could reuse the logic from `getUserGuilds` to filter, 
     // but fetching all user guilds every request might be slow.
     // Proceeding assuming initial entry was valid, but a real prod app needs strict per-route checks.
+
+    // SECURITY UPDATE: Enforce permission check
+    // We must ensure the logged-in user actually has rights to manage this guild.
+    // getGuild() only proves the BOT calls the guild, not the user.
+    if (session.accessToken) {
+        const hasPermission = await canManageGuild(session.accessToken, guildId);
+        if (!hasPermission) {
+            console.warn(`Unauthorized access attempt by user ${session.user?.id} to guild ${guildId}`);
+            redirect("/dashboard?error=unauthorized");
+        }
+    } else {
+        // Should not happen if session exists, but safe fallback
+        redirect("/");
+    }
 
     return (
         <div className="flex min-h-screen bg-zinc-900 text-zinc-200 font-sans">
