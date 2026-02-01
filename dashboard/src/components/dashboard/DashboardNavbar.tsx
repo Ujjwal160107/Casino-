@@ -8,6 +8,7 @@ import { type Session } from "next-auth";
 import { signOut } from "next-auth/react";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface DashboardNavbarProps {
     guild: DiscordGuild;
@@ -30,10 +31,11 @@ export function DashboardNavbar({ guild, user }: DashboardNavbarProps) {
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         if (!searchQuery.trim()) return;
-        // Basic search routing - strictly for demonstration as requested "functionable"
-        // Ideally opens a Command Palette (CMDK)
+
+        // Demonstration of functional search
         console.log("Searching for:", searchQuery);
-        // Could router.push(`/dashboard/${guild.id}/search?q=${searchQuery}`)
+        toast.info(`Searching for "${searchQuery}"...`);
+        // Future: router.push(`/dashboard/${guild.id}/search?q=${searchQuery}`)
     };
 
     return (
@@ -46,9 +48,13 @@ export function DashboardNavbar({ guild, user }: DashboardNavbarProps) {
 
                 <Link href="/dashboard" className="flex items-center gap-3 group">
                     <div className="w-9 h-9 relative rounded-full overflow-hidden border border-white/10 shadow-[0_0_15px_rgba(255,215,0,0.2)] group-hover:shadow-[0_0_25px_rgba(255,215,0,0.4)] transition-all">
-                        {/* Replace with actual Fortuna Avatar URL if available, else standard fallback */}
-                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center font-bold text-primary">F</div>
-                        {/* <Image src={botAvatarUrl} alt="Fortuna" fill className="object-cover" /> */}
+                        <Image
+                            src="/fortuna_icon.png"
+                            alt="Fortuna"
+                            fill
+                            className="object-cover"
+                            priority
+                        />
                     </div>
                     <span className="font-bold text-xl tracking-tight text-white hidden sm:block">
                         FORTUNA
@@ -182,10 +188,7 @@ export function DashboardNavbar({ guild, user }: DashboardNavbarProps) {
                                     <p className="text-sm font-medium text-white">{user?.name}</p>
                                     <p className="text-xs text-zinc-500 truncate">{user?.email || "User"}</p>
                                 </div>
-                                <button className="w-full text-left flex items-center gap-2 px-2 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
-                                    <SettingsIcon size={16} />
-                                    User Settings
-                                </button>
+                                {/* User Settings removed */}
                                 <button
                                     onClick={() => signOut()}
                                     className="w-full text-left flex items-center gap-2 px-2 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
