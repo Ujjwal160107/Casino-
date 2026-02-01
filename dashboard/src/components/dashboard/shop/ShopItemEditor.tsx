@@ -148,10 +148,10 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
             <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="bg-black/90 border border-white/10 rounded-2xl w-full max-w-5xl overflow-hidden flex flex-col shadow-2xl relative max-h-[90vh]"
+                className="glass-card border border-white/10 rounded-2xl w-full max-w-5xl overflow-hidden flex flex-col shadow-2xl relative max-h-[90vh]"
             >
                 {/* Header */}
-                <div className="px-8 py-6 border-b border-white/10 flex justify-between items-center bg-black/50">
+                <div className="px-8 py-6 border-b border-white/10 flex justify-between items-center bg-white/5">
                     <div>
                         <h2 className="text-2xl font-bold text-white flex items-center gap-2 tracking-wide">
                             {item ? "Edit Item" : "Create New Item"}
@@ -180,7 +180,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                         type="text"
                                         value={formData.name}
                                         onChange={e => handleChange("name", e.target.value)}
-                                        className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-medium placeholder:text-zinc-700"
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-medium placeholder:text-zinc-500"
                                         placeholder="Ex: VIP Pass"
                                     />
                                 </div>
@@ -192,7 +192,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                             type="number"
                                             value={formData.price}
                                             onChange={e => handleNumberChange("price", e.target.value)}
-                                            className="w-full bg-black/50 border border-white/10 rounded-lg pl-8 pr-4 py-3 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono placeholder:text-zinc-700"
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-4 py-3 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono placeholder:text-zinc-500"
                                             placeholder="0"
                                         />
                                     </div>
@@ -204,7 +204,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                 <textarea
                                     value={formData.description}
                                     onChange={e => handleChange("description", e.target.value)}
-                                    className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all resize-none min-h-[100px] placeholder:text-zinc-700"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all resize-none min-h-[100px] placeholder:text-zinc-500"
                                     placeholder="Describe what this item does..."
                                 />
                             </div>
@@ -220,14 +220,14 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                             type="text"
                                             value={formData.emoji || ""}
                                             onChange={e => handleChange("emoji", e.target.value)}
-                                            className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-center text-xl focus:outline-none focus:border-primary/50 transition-all"
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-center text-xl focus:outline-none focus:border-primary/50 transition-all"
                                             placeholder="🎫"
                                             maxLength={4}
                                         />
                                     </div>
                                     <div className="space-y-2 flex-1">
                                         <label className="text-[10px] font-bold text-zinc-400 uppercase">Preview</label>
-                                        <div className="h-[42px] bg-black/50 border border-white/10 rounded-lg flex items-center justify-center">
+                                        <div className="h-[42px] bg-white/5 border border-white/10 rounded-lg flex items-center justify-center">
                                             {formData.image ? (
                                                 <img src={formData.image} className="h-6 w-6 object-contain" />
                                             ) : (
@@ -242,7 +242,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                         type="text"
                                         value={formData.image || ""}
                                         onChange={e => handleChange("image", e.target.value)}
-                                        className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-primary/50 transition-all placeholder:text-zinc-700 truncated"
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-primary/50 transition-all placeholder:text-zinc-500 truncated"
                                         placeholder="https://..."
                                     />
                                 </div>
@@ -266,7 +266,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                             type="number"
                                             value={formData.stock}
                                             onChange={e => handleNumberChange("stock", e.target.value)}
-                                            className="w-16 bg-black/50 border border-white/10 rounded px-2 py-1 text-sm text-right focus:outline-none focus:border-primary/50"
+                                            className="w-16 bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-right focus:outline-none focus:border-primary/50"
                                         />
                                     )}
                                 </div>
@@ -302,10 +302,10 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                         }}
                                         className="absolute inset-0 opacity-0 cursor-pointer"
                                     >
-                                        <option value="" className="bg-zinc-900">+ Add</option>
-                                        <option value="ROLE" className="bg-zinc-900">Role</option>
-                                        <option value="ITEM" className="bg-zinc-900">Item</option>
-                                        <option value="BALANCE" className="bg-zinc-900">Balance</option>
+                                        <option value="" className="bg-[#1B2028]">+ Add</option>
+                                        <option value="ROLE" className="bg-[#1B2028]">Role</option>
+                                        <option value="ITEM" className="bg-[#1B2028]">Item</option>
+                                        <option value="BALANCE" className="bg-[#1B2028]">Balance</option>
                                     </select>
                                 </div>
                             </div>
@@ -335,8 +335,8 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                     }}
                                                     className="w-full bg-transparent text-sm text-zinc-200 border-none outline-none py-1 cursor-pointer"
                                                 >
-                                                    <option value="" className="bg-black">Select Role...</option>
-                                                    {roles.map(r => <option key={r.id} value={r.id} className="bg-black">{r.name}</option>)}
+                                                    <option value="" className="bg-[#1B2028]">Select Role...</option>
+                                                    {roles.map(r => <option key={r.id} value={r.id} className="bg-[#1B2028]">{r.name}</option>)}
                                                 </select>
                                             )}
                                         </div>
@@ -396,7 +396,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                 {formData.effects?.map((effect: any, idx: number) => (
                                     <div key={idx} className="bg-white/5 border border-white/5 rounded-lg overflow-hidden group">
                                         {/* Effect Header */}
-                                        <div className="flex items-center gap-3 p-3 bg-black/40 border-b border-white/5">
+                                        <div className="flex items-center gap-3 p-3 bg-white/5 border-b border-white/5">
                                             <div className="bg-amber-500/20 p-1 rounded text-amber-400">
                                                 <Sparkles size={12} />
                                             </div>
@@ -408,8 +408,8 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                     onChange={e => updateEffect(idx, "trigger", e.target.value)}
                                                     className="appearance-none bg-transparent text-[10px] uppercase font-bold text-zinc-400 focus:text-white focus:outline-none cursor-pointer pr-4 hover:bg-white/5 rounded px-1"
                                                 >
-                                                    <option value="BUY" className="bg-black">On Purchase</option>
-                                                    <option value="USE" className="bg-black">On Use</option>
+                                                    <option value="BUY" className="bg-[#1B2028]">On Purchase</option>
+                                                    <option value="USE" className="bg-[#1B2028]">On Use</option>
                                                 </select>
                                                 <ChevronDown size={10} className="absolute right-0 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none" />
                                             </div>
@@ -423,7 +423,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                     onChange={e => updateEffect(idx, "type", e.target.value)}
                                                     className="appearance-none bg-transparent text-xs font-medium text-white focus:outline-none cursor-pointer w-full"
                                                 >
-                                                    {EFFECT_TYPES.map(t => <option key={t.value} value={t.value} className="bg-black">{t.label}</option>)}
+                                                    {EFFECT_TYPES.map(t => <option key={t.value} value={t.value} className="bg-[#1B2028]">{t.label}</option>)}
                                                 </select>
                                             </div>
 
@@ -433,7 +433,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                         </div>
 
                                         {/* Effect Configuration Content */}
-                                        <div className="p-3 bg-black/20">
+                                        <div className="p-3 bg-white/5">
                                             {effect.type === "CUSTOM_MESSAGE" && (
                                                 <input
                                                     type="text"
@@ -451,10 +451,10 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                         <select
                                                             value={effect.roleId || ""}
                                                             onChange={e => updateEffect(idx, "roleId", e.target.value)}
-                                                            className="w-full bg-black/50 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/50 transition-colors"
+                                                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/50 transition-colors"
                                                         >
-                                                            <option value="" className="bg-black">Select Role...</option>
-                                                            {roles.map(r => <option key={r.id} value={r.id} className="bg-black">{r.name}</option>)}
+                                                            <option value="" className="bg-[#1B2028]">Select Role...</option>
+                                                            {roles.map(r => <option key={r.id} value={r.id} className="bg-[#1B2028]">{r.name}</option>)}
                                                         </select>
                                                     </div>
                                                     {(effect.type === "ROLE_TEMPORARY") && (
@@ -492,7 +492,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                 </div>
 
                 {/* Footer Controls */}
-                <div className="px-8 py-5 border-t border-white/10 bg-black/80 flex justify-between items-center backdrop-blur-md">
+                <div className="px-8 py-5 border-t border-white/10 bg-[#1B2028]/80 flex justify-between items-center backdrop-blur-md">
                     <div className="flex items-center gap-4">
                         <label className="flex items-center gap-2 cursor-pointer group">
                             <div className={`w-10 h-6 rounded-full p-1 transition-colors ${formData.showInShop ? "bg-primary" : "bg-zinc-800"}`} onClick={() => handleChange("showInShop", !formData.showInShop)}>

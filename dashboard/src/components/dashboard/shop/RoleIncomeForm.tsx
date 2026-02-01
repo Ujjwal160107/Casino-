@@ -99,12 +99,12 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
 
     const renderSection = (title: string, description: string, type: "COLLECTIBLE" | "AUTOMATIC", items: RoleIncome[], limit: number) => (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="flex items-center justify-between bg-black/20 p-4 rounded-xl border border-white/5">
+            <div className="flex items-center justify-between glass-card p-4 rounded-xl border border-white/5">
                 <div>
                     <h3 className="text-lg font-bold text-white">{title}</h3>
                     <p className="text-sm text-zinc-400">{description}</p>
                 </div>
-                <div className="text-sm font-mono text-zinc-500 bg-black/20 px-3 py-1 rounded-full border border-white/5">
+                <div className="text-sm font-mono text-zinc-500 bg-white/5 px-3 py-1 rounded-full border border-white/5">
                     {items.length} / {limit} Slots
                 </div>
             </div>
@@ -117,7 +117,7 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: "auto" }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="bg-black/20 p-4 rounded-lg border border-white/5"
+                            className="glass-card p-4 rounded-lg border border-white/5"
                         >
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 items-start">
                                 {/* Role Selection */}
@@ -126,7 +126,7 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                                     <select
                                         value={income.roleId}
                                         onChange={(e) => updateIncome(idx, "roleId", e.target.value, type)}
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50 mb-2"
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50 mb-2 transition-colors"
                                     >
                                         {roles.map(r => (
                                             <option key={r.id} value={r.id} style={{ color: r.color ? `#${r.color.toString(16)}` : 'white' }}>
@@ -139,7 +139,7 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                                         placeholder="Or Enter Role ID"
                                         value={income.roleId}
                                         onChange={(e) => updateIncome(idx, "roleId", e.target.value, type)}
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-400 font-mono focus:outline-none focus:border-yellow-500/50"
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-400 font-mono focus:outline-none focus:border-yellow-500/50 transition-colors"
                                     />
                                 </div>
 
@@ -152,7 +152,7 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                                             min={0}
                                             value={income.amount === 0 ? "" : income.amount}
                                             onChange={(e) => updateIncome(idx, "amount", e.target.value === "" ? 0 : parseInt(e.target.value), type)}
-                                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50"
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                         />
                                     </div>
                                 </div>

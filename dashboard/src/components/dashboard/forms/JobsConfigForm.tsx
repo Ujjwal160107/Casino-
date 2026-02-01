@@ -93,9 +93,9 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl">
+        <form onSubmit={handleSubmit} className="space-y-8 max-w-7xl mx-auto w-full">
             {/* General Settings */}
-            <div className="space-y-4 rounded-xl border border-white/5 bg-zinc-900/50 p-6">
+            <div className="space-y-4 glass-card p-6 rounded-xl">
                 <h2 className="text-xl font-bold text-white mb-4">General Settings</h2>
                 <div className="space-y-2">
                     <DurationInput
@@ -108,7 +108,7 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
             </div>
 
             {/* Sector Salaries */}
-            <div className="space-y-4 rounded-xl border border-white/5 bg-zinc-900/50 p-6">
+            <div className="space-y-4 glass-card p-6 rounded-xl">
                 <h2 className="text-xl font-bold text-white mb-4">Sector Base Salaries</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {SECTORS.map(sector => {
@@ -124,7 +124,7 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
                                     min={0}
                                     value={formData.jobSectorBasePay[sector] === 0 ? "" : (formData.jobSectorBasePay[sector] ?? "")}
                                     onChange={(e) => handleNestedChange("jobSectorBasePay", sector, e.target.value)}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                     placeholder={`Def: ${initialData.defaultSectorPay ? initialData.defaultSectorPay[sector] || 'N/A' : 'N/A'}`}
                                 />
                             </div>
@@ -135,7 +135,7 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
             </div>
 
             {/* Relax Activities */}
-            <div className="space-y-4 rounded-xl border border-white/5 bg-zinc-900/50 p-6">
+            <div className="space-y-4 glass-card p-6 rounded-xl">
                 <h2 className="text-xl font-bold text-white mb-4">Relax Activity Costs</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {RELAX_ACTIVITIES.map(activity => {
@@ -151,7 +151,7 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
                                     min={0}
                                     value={formData.jobRelaxControllers[activity] === 0 ? "" : (formData.jobRelaxControllers[activity] ?? "")}
                                     onChange={(e) => handleNestedChange("jobRelaxControllers", activity, e.target.value)}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                     placeholder="Default"
                                 />
                             </div>
@@ -161,13 +161,13 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
             </div>
 
             {/* Promotion Requirements */}
-            <div className="space-y-4 rounded-xl border border-white/5 bg-zinc-900/50 p-6">
+            <div className="space-y-4 glass-card p-6 rounded-xl">
                 <h2 className="text-xl font-bold text-white mb-4">Promotion Requirements</h2>
                 <p className="text-sm text-zinc-400 mb-4">Set the required XP and Shifts needed to be PROMOTED TO this job.</p>
 
                 <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
                     {ALL_JOBS.map(job => (
-                        <div key={job.id} className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-white/5">
+                        <div key={job.id} className="flex items-center gap-4 p-3 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 transition-colors">
                             <div className="flex-1">
                                 <p className="text-white font-medium">{job.title}</p>
                                 <p className="text-xs text-zinc-500 font-mono">{job.id}</p>

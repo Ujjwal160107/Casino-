@@ -55,9 +55,9 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="bg-zinc-900 border border-white/10 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
+                    className="glass-card rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
                 >
-                    <div className="flex items-center justify-between p-6 border-b border-white/10 sticky top-0 bg-zinc-900/95 backdrop-blur z-10">
+                    <div className="flex items-center justify-between p-6 border-b border-white/10 sticky top-0 bg-[#1B2028]/95 backdrop-blur z-10">>
                         <h2 className="text-xl font-bold text-white">
                             {initialData ? "Edit Property" : "Add New Property"}
                         </h2>
@@ -77,7 +77,7 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                                     type="text"
                                     value={formData.name}
                                     onChange={(e) => handleChange("name", e.target.value)}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                     placeholder="e.g. Penthouse"
                                 />
                             </div>
@@ -89,7 +89,7 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                                     disabled={!!initialData} // Lock key on edit
                                     value={formData.key}
                                     onChange={(e) => handleChange("key", e.target.value)}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 disabled:opacity-50 font-mono text-sm"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 disabled:opacity-50 font-mono text-sm transition-colors"
                                     placeholder="penthouse"
                                 />
                             </div>
@@ -100,7 +100,7 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                             <textarea
                                 value={formData.description}
                                 onChange={(e) => handleChange("description", e.target.value)}
-                                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 h-24"
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 h-24 transition-colors"
                                 placeholder="A luxurious penthouse in the city center..."
                             />
                         </div>
@@ -114,7 +114,7 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                                     min={0}
                                     value={formData.basePrice === 0 ? "" : formData.basePrice}
                                     onChange={(e) => handleChange("basePrice", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                 />
                             </div>
                             <div className="space-y-1">
@@ -124,7 +124,7 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                                     min={0}
                                     value={formData.incomePerCycle === 0 ? "" : formData.incomePerCycle}
                                     onChange={(e) => handleChange("incomePerCycle", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                 />
                             </div>
                             <div className="space-y-1">
@@ -134,7 +134,7 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                                     min={1}
                                     value={formData.incomeCycleHours === 0 ? "" : formData.incomeCycleHours}
                                     onChange={(e) => handleChange("incomeCycleHours", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                 />
                             </div>
                         </div>
@@ -148,7 +148,7 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                                     min={1}
                                     value={formData.maxPerUser === 0 ? "" : formData.maxPerUser}
                                     onChange={(e) => handleChange("maxPerUser", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                 />
                             </div>
                             <div className="flex items-center gap-3 pt-6">
@@ -157,7 +157,7 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                                     id="isPublic"
                                     checked={formData.isPublic}
                                     onChange={(e) => handleChange("isPublic", e.target.checked)}
-                                    className="w-5 h-5 rounded border-white/10 bg-black/40 text-yellow-500 focus:ring-yellow-500 focus:ring-offset-0"
+                                    className="w-5 h-5 rounded border-white/10 bg-white/5 text-yellow-500 focus:ring-yellow-500 focus:ring-offset-0"
                                 />
                                 <label htmlFor="isPublic" className="text-sm font-medium text-white cursor-pointer select-none">
                                     Publicly Purchasable

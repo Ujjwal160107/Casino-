@@ -59,7 +59,7 @@ export function DurationInput({ value, onChange, label = "Duration", disabled = 
                         value={days}
                         onChange={handleD}
                         placeholder="Days"
-                        className="bg-black/40 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full"
+                        className="bg-white/5 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full transition-colors focus:bg-white/10 outline-none focus:border-white/20"
                         disabled={disabled}
                     />
                     <span className="text-[10px] text-zinc-600 text-center">Days</span>
@@ -71,7 +71,7 @@ export function DurationInput({ value, onChange, label = "Duration", disabled = 
                         value={hours}
                         onChange={handleH}
                         placeholder="Hr"
-                        className="bg-black/40 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full"
+                        className="bg-white/5 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full transition-colors focus:bg-white/10 outline-none focus:border-white/20"
                         disabled={disabled}
                     />
                     <span className="text-[10px] text-zinc-600 text-center">Hrs</span>
@@ -84,7 +84,7 @@ export function DurationInput({ value, onChange, label = "Duration", disabled = 
                         value={minutes}
                         onChange={handleM}
                         placeholder="Min"
-                        className="bg-black/40 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full"
+                        className="bg-white/5 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full transition-colors focus:bg-white/10 outline-none focus:border-white/20"
                         disabled={disabled}
                     />
                     <span className="text-[10px] text-zinc-600 text-center">Mins</span>
@@ -97,7 +97,7 @@ export function DurationInput({ value, onChange, label = "Duration", disabled = 
                         value={seconds}
                         onChange={handleS}
                         placeholder="Sec"
-                        className="bg-black/40 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full"
+                        className="bg-white/5 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full transition-colors focus:bg-white/10 outline-none focus:border-white/20"
                         disabled={disabled}
                     />
                     <span className="text-[10px] text-zinc-600 text-center">Secs</span>

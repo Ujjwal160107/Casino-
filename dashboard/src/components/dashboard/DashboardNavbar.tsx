@@ -117,7 +117,7 @@ export function DashboardNavbar({ guild, user }: DashboardNavbarProps) {
     };
 
     return (
-        <header className="fixed top-0 left-0 right-0 h-16 bg-[#09090b] border-b border-white/5 z-50 flex items-center justify-between px-4 md:px-6">
+        <header className="fixed top-0 left-0 right-0 h-16 glass z-50 flex items-center justify-between px-4 md:px-6 transition-all duration-300">
             {/* Left: Branding & Mobile Menu */}
             <div className="flex items-center gap-4">
                 <button className="md:hidden text-zinc-400 hover:text-white">
@@ -172,7 +172,7 @@ export function DashboardNavbar({ guild, user }: DashboardNavbarProps) {
                     {isServerMenuOpen && (
                         <>
                             <div className="fixed inset-0 z-40" onClick={() => setIsServerMenuOpen(false)} />
-                            <div className="absolute top-full left-0 mt-2 w-64 bg-[#111] border border-white/10 rounded-xl shadow-xl z-50 p-2 animate-in fade-in slide-in-from-top-2">
+                            <div className="absolute top-full left-0 mt-2 w-64 glass-card rounded-xl shadow-xl z-50 p-2 animate-in fade-in slide-in-from-top-2">
                                 <div className="px-2 py-1.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                                     Current Server
                                 </div>
@@ -210,7 +210,7 @@ export function DashboardNavbar({ guild, user }: DashboardNavbarProps) {
             <div className="flex items-center gap-4">
                 {/* Search */}
                 <div ref={searchContainerRef} className="relative hidden md:block">
-                    <div className="flex items-center px-3 py-1.5 bg-zinc-900 border border-white/5 rounded-full text-zinc-500 text-sm w-64 hover:border-white/10 transition-colors focus-within:border-primary/30 focus-within:text-white focus-within:w-72 focus-within:bg-black duration-200">
+                    <div className="flex items-center px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-zinc-400 text-sm w-64 hover:bg-white/10 transition-colors focus-within:border-primary/50 focus-within:text-white focus-within:w-72 focus-within:bg-black/40 duration-200">
                         <Search size={14} className="mr-2 shrink-0" />
                         <input
                             type="text"
@@ -230,7 +230,7 @@ export function DashboardNavbar({ guild, user }: DashboardNavbarProps) {
 
                     {/* Search Results Dropdown */}
                     {showResults && searchQuery.trim() && (
-                        <div className="absolute top-full right-0 mt-2 w-80 bg-[#111] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-2">
+                        <div className="absolute top-full right-0 mt-2 w-80 glass-card rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-2">
                             {filteredResults.length > 0 ? (
                                 <div className="space-y-1">
                                     <div className="px-2 py-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
@@ -304,7 +304,7 @@ export function DashboardNavbar({ guild, user }: DashboardNavbarProps) {
                     {isUserMenuOpen && (
                         <>
                             <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)} />
-                            <div className="absolute top-full right-0 mt-2 w-56 bg-[#111] border border-white/10 rounded-xl shadow-xl z-50 p-1 animate-in fade-in slide-in-from-top-2">
+                            <div className="absolute top-full right-0 mt-2 w-56 glass-card rounded-xl shadow-xl z-50 p-1 animate-in fade-in slide-in-from-top-2">
                                 <div className="px-2 py-2 border-b border-white/5 mb-1">
                                     <p className="text-sm font-medium text-white">{user?.name}</p>
                                     <p className="text-xs text-zinc-500 truncate">{user?.email || "User"}</p>

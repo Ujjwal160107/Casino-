@@ -55,7 +55,7 @@ export function ShopItemsPanel({ guildId, items, roles, currencyEmoji }: ShopIte
                         key={item.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="bg-black/20 border border-white/10 rounded-xl p-4 hover:border-white/20 transition-all group relative overflow-hidden"
+                        className="glass-card border border-white/10 rounded-xl p-4 hover:border-white/20 transition-all group relative overflow-hidden"
                     >
                         {item.image && (
                             <div className="absolute top-0 right-0 w-24 h-24 opacity-10 pointer-events-none transform translate-x-8 -translate-y-8 rotate-12">
