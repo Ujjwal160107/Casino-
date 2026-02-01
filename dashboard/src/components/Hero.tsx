@@ -38,7 +38,7 @@ export function Hero() {
                         >
                             <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter text-white mb-6 drop-shadow-[0_0_30px_rgba(255,255,255,0.1)]">
                                 BUILD THE <br />
-                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
+                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-yellow-200 to-yellow-500 animate-gradient-x bg-[length:200%_auto]">
                                     ULTIMATE
                                 </span> <br />
                                 SERVER.
@@ -57,7 +57,7 @@ export function Hero() {
                             href={inviteUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="bg-primary hover:bg-primary/90 text-black text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 shadow-[0_0_20px_rgba(0,240,255,0.4)] flex items-center justify-center gap-2 cursor-pointer"
+                            className="bg-primary hover:bg-primary/90 text-black text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 flex items-center justify-center gap-2 cursor-pointer"
                         >
                             <ExternalLink size={20} />
                             Add to Discord
