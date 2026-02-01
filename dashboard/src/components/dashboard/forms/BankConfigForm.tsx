@@ -80,8 +80,8 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                         </label>
                         <input
                             type="number"
-                            value={formData.loanInterestRate}
-                            onChange={(e) => handleChange("loanInterestRate", parseInt(e.target.value) || 0)}
+                            value={formData.loanInterestRate === 0 ? "" : formData.loanInterestRate}
+                            onChange={(e) => handleChange("loanInterestRate", e.target.value === "" ? 0 : parseInt(e.target.value))}
                             className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-600 mt-2">Daily interest charged on active loans.</p>
@@ -92,8 +92,8 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                         </label>
                         <input
                             type="number"
-                            value={formData.fdInterestRate}
-                            onChange={(e) => handleChange("fdInterestRate", parseInt(e.target.value) || 0)}
+                            value={formData.fdInterestRate === 0 ? "" : formData.fdInterestRate}
+                            onChange={(e) => handleChange("fdInterestRate", e.target.value === "" ? 0 : parseInt(e.target.value))}
                             className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-600 mt-2">Flat interest for Fixed Deposits.</p>
@@ -104,8 +104,8 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                         </label>
                         <input
                             type="number"
-                            value={formData.rdInterestRate}
-                            onChange={(e) => handleChange("rdInterestRate", parseInt(e.target.value) || 0)}
+                            value={formData.rdInterestRate === 0 ? "" : formData.rdInterestRate}
+                            onChange={(e) => handleChange("rdInterestRate", e.target.value === "" ? 0 : parseInt(e.target.value))}
                             className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-600 mt-2">Interest for Recurring Deposits.</p>
@@ -159,8 +159,8 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                         <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">Min Credit Score</label>
                         <input
                             type="number"
-                            value={formData.minCreditScore}
-                            onChange={(e) => handleChange("minCreditScore", parseInt(e.target.value) || 0)}
+                            value={formData.minCreditScore === 0 ? "" : formData.minCreditScore}
+                            onChange={(e) => handleChange("minCreditScore", e.target.value === "" ? 0 : parseInt(e.target.value))}
                             className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
                         />
                     </div>
@@ -168,8 +168,8 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                         <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">Max Credit Score</label>
                         <input
                             type="number"
-                            value={formData.maxCreditScore}
-                            onChange={(e) => handleChange("maxCreditScore", parseInt(e.target.value) || 0)}
+                            value={formData.maxCreditScore === 0 ? "" : formData.maxCreditScore}
+                            onChange={(e) => handleChange("maxCreditScore", e.target.value === "" ? 0 : parseInt(e.target.value))}
                             className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
                         />
                     </div>
@@ -177,8 +177,8 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                         <label className="block text-xs font-semibold text-green-400 uppercase mb-2">Repay Reward (+)</label>
                         <input
                             type="number"
-                            value={formData.creditScoreReward}
-                            onChange={(e) => handleChange("creditScoreReward", parseInt(e.target.value) || 0)}
+                            value={formData.creditScoreReward === 0 ? "" : formData.creditScoreReward}
+                            onChange={(e) => handleChange("creditScoreReward", e.target.value === "" ? 0 : parseInt(e.target.value))}
                             className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
                         />
                     </div>
@@ -186,8 +186,8 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                         <label className="block text-xs font-semibold text-red-400 uppercase mb-2">Late Penalty (-)</label>
                         <input
                             type="number"
-                            value={formData.creditScorePenalty}
-                            onChange={(e) => handleChange("creditScorePenalty", parseInt(e.target.value) || 0)}
+                            value={formData.creditScorePenalty === 0 ? "" : formData.creditScorePenalty}
+                            onChange={(e) => handleChange("creditScorePenalty", e.target.value === "" ? 0 : parseInt(e.target.value))}
                             className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
                         />
                     </div>

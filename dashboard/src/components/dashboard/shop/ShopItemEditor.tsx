@@ -302,10 +302,10 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                         }}
                                         className="absolute inset-0 opacity-0 cursor-pointer"
                                     >
-                                        <option value="">+ Add</option>
-                                        <option value="ROLE">Role</option>
-                                        <option value="ITEM">Item</option>
-                                        <option value="BALANCE">Balance</option>
+                                        <option value="" className="bg-zinc-900">+ Add</option>
+                                        <option value="ROLE" className="bg-zinc-900">Role</option>
+                                        <option value="ITEM" className="bg-zinc-900">Item</option>
+                                        <option value="BALANCE" className="bg-zinc-900">Balance</option>
                                     </select>
                                 </div>
                             </div>
@@ -408,8 +408,8 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                     onChange={e => updateEffect(idx, "trigger", e.target.value)}
                                                     className="appearance-none bg-transparent text-[10px] uppercase font-bold text-zinc-400 focus:text-white focus:outline-none cursor-pointer pr-4 hover:bg-white/5 rounded px-1"
                                                 >
-                                                    <option value="BUY" className="bg-zinc-900">On Purchase</option>
-                                                    <option value="USE" className="bg-zinc-900">On Use</option>
+                                                    <option value="BUY" className="bg-black">On Purchase</option>
+                                                    <option value="USE" className="bg-black">On Use</option>
                                                 </select>
                                                 <ChevronDown size={10} className="absolute right-0 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none" />
                                             </div>
@@ -423,7 +423,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                     onChange={e => updateEffect(idx, "type", e.target.value)}
                                                     className="appearance-none bg-transparent text-xs font-medium text-white focus:outline-none cursor-pointer w-full"
                                                 >
-                                                    {EFFECT_TYPES.map(t => <option key={t.value} value={t.value} className="bg-zinc-900">{t.label}</option>)}
+                                                    {EFFECT_TYPES.map(t => <option key={t.value} value={t.value} className="bg-black">{t.label}</option>)}
                                                 </select>
                                             </div>
 
