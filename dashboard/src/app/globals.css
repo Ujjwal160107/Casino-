@@ -35,64 +35,71 @@
 }
 
 :root {
-  /* Sapphire Modern Theme (Slate/Blue) */
+  /* Casino Luxury Theme (Black/Gold) */
 
-  /* Deep Slate Background (#020617) */
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
+  /* Deep Black Background */
+  --background: 0 0% 0%;
+  /* #000000 */
+  --foreground: 48 100% 96%;
+  /* #FFFAEB */
 
-  /* Darker Slate for Cards */
-  --card: 222.2 47.4% 11.2%;
-  --card-foreground: 210 40% 98%;
+  /* Rich Gold Cards */
+  --card: 0 0% 5%;
+  /* #0D0D0D */
+  --card-foreground: 48 100% 96%;
 
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
+  --popover: 0 0% 5%;
+  --popover-foreground: 48 100% 96%;
 
-  /* Vibrant Blue Primary (#3b82f6) */
-  --primary: 217.2 91.2% 59.8%;
-  --primary-foreground: 222.2 47.4% 11.2%;
+  /* Luxury Gold Primary (#FFD700) */
+  --primary: 48 100% 50%;
+  --primary-foreground: 0 0% 0%;
 
-  /* Subtle Slate Secondary */
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
+  /* Dark Gold/Brown Secondary */
+  --secondary: 48 20% 12%;
+  --secondary-foreground: 48 100% 96%;
 
-  /* Muted Slate */
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
+  /* Muted Gold */
+  --muted: 48 20% 12%;
+  --muted-foreground: 48 60% 70%;
 
   /* Accents */
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
+  --accent: 48 30% 15%;
+  --accent-foreground: 48 100% 50%;
 
   --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive-foreground: 48 100% 96%;
 
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  /* Blue Ring */
-  --ring: 217.2 91.2% 59.8%;
+  --border: 48 30% 20%;
+  --input: 48 30% 20%;
+  /* Gold Ring */
+  --ring: 48 100% 50%;
 
   --radius: 0.5rem;
 }
 
-/* Glassmorphism Utilities - Sapphire Style */
+/* Glassmorphism Utilities - Luxury Gold Style */
 .glass {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(10, 10, 10, 0.7);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(255, 215, 0, 0.15);
+  /* Gold Tint */
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .glass-card {
-  background: linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.6));
+  background: linear-gradient(145deg, rgba(20, 20, 20, 0.9), rgba(10, 10, 10, 0.8));
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 215, 0, 0.15);
+  /* Gold Border */
+  box-shadow: 0 4px 20px -5px rgba(255, 215, 0, 0.15);
+  /* Gold Glow */
 }
 
 .glass-sidebar {
-  background: rgba(2, 6, 23, 0.95);
+  background: rgba(5, 5, 5, 0.95);
   backdrop-filter: blur(16px);
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  border-right: 1px solid rgba(255, 215, 0, 0.2);
 }
 
 

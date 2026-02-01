@@ -96,10 +96,10 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
         : null;
 
     return (
-        <aside className="fixed left-0 top-0 h-screen w-64 glass-sidebar flex flex-col z-40 text-slate-300 font-sans">
+        <aside className="fixed left-0 top-0 h-screen w-64 glass-sidebar flex flex-col z-40 text-zinc-300 font-sans">
             {/* Header */}
-            <div className="p-6 border-b border-white/5 flex items-center gap-3 bg-slate-900/50">
-                <div className="w-12 h-12 rounded-xl bg-slate-800 shrink-0 overflow-hidden border border-white/10 shadow-lg">
+            <div className="p-6 border-b border-white/5 flex items-center gap-3 bg-black/20">
+                <div className="w-12 h-12 rounded-xl bg-white/5 shrink-0 overflow-hidden border border-white/10 shadow-lg">
                     {iconUrl ? (
                         <Image
                             src={iconUrl}
@@ -121,13 +121,13 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+            <nav className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
                 {sections.map((section) => (
                     <div key={section.title}>
                         {section.title !== "Overview" && (
                             <button
                                 onClick={() => toggleSection(section.title)}
-                                className="flex items-center justify-between w-full text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 hover:text-primary transition-colors px-2"
+                                className="flex items-center justify-between w-full text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3 hover:text-primary transition-colors px-2"
                             >
                                 {section.title}
                                 <motion.div
@@ -156,13 +156,13 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
                                             className={cn(
                                                 "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 group overflow-hidden",
                                                 isActive
-                                                    ? "text-white bg-primary shadow-lg shadow-primary/25 border border-primary/50"
-                                                    : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+                                                    ? "text-black bg-primary shadow-lg shadow-primary/20 font-bold"
+                                                    : "text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent"
                                             )}
                                         >
                                             <Icon size={18} className={cn(
                                                 "relative z-10 transition-colors duration-300",
-                                                isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"
+                                                isActive ? "text-black" : "text-zinc-500 group-hover:text-zinc-300"
                                             )} />
                                             <span className="relative z-10">{item.label}</span>
                                         </Link>
@@ -175,10 +175,10 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
             </nav>
 
             {/* Footer */}
-            <div className="p-4 border-t border-white/5 bg-slate-900/50 backdrop-blur-md">
+            <div className="p-4 border-t border-white/5 bg-black/20 backdrop-blur-md">
                 <Link
                     href="/dashboard"
-                    className="flex items-center gap-2 justify-center text-xs font-medium text-slate-500 hover:text-primary transition-colors py-2 rounded-md hover:bg-white/5"
+                    className="flex items-center gap-2 justify-center text-xs font-medium text-zinc-500 hover:text-primary transition-colors py-2 rounded-md hover:bg-white/5"
                 >
                     &larr; Switch Server
                 </Link>

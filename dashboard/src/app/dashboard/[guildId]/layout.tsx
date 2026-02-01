@@ -58,7 +58,7 @@ export default async function AdminLayout({ children, params }: DashboardLayoutP
             {/* Main Content Area */}
             <main className="flex-1 min-w-0 md:ml-64 relative">
                 {/* Mobile Header Placeholder */}
-                <div className="md:hidden p-4 border-b border-white/5 bg-slate-900/50 backdrop-blur-md flex items-center justify-between sticky top-0 z-30">
+                <div className="md:hidden p-4 border-b border-white/5 bg-black/50 backdrop-blur-md flex items-center justify-between sticky top-0 z-30">
                     <span className="font-bold text-white">Fortuna Admin</span>
                     {/* Add Mobile Menu Toggle Here */}
                 </div>
