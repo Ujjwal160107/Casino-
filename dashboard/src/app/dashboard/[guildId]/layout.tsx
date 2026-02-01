@@ -49,16 +49,16 @@ export default async function AdminLayout({ children, params }: DashboardLayoutP
     }
 
     return (
-        <div className="flex min-h-screen bg-zinc-900 text-zinc-200 font-sans">
+        <div className="flex min-h-screen bg-background text-foreground font-sans">
             {/* Sidebar - Desktop */}
-            <div className="hidden md:block w-64 shrink-0">
+            <div className="hidden md:block">
                 <AdminSidebar guild={guild} />
             </div>
 
             {/* Main Content Area */}
-            <main className="flex-1 min-w-0 md:ml-64 relative"> {/* md:ml-64 because sidebar is fixed */}
+            <main className="flex-1 min-w-0 md:ml-64 relative">
                 {/* Mobile Header Placeholder */}
-                <div className="md:hidden p-4 border-b border-white/5 bg-zinc-900 flex items-center justify-between sticky top-0 z-30">
+                <div className="md:hidden p-4 border-b border-white/5 bg-slate-900/50 backdrop-blur-md flex items-center justify-between sticky top-0 z-30">
                     <span className="font-bold text-white">Fortuna Admin</span>
                     {/* Add Mobile Menu Toggle Here */}
                 </div>

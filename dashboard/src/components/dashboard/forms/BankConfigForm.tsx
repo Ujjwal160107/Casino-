@@ -278,11 +278,11 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                 <button
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="flex items-center gap-2 bg-yellow-500 text-black px-6 py-3 rounded-full font-bold shadow-lg shadow-yellow-500/20 hover:scale-105 active:scale-95 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full font-bold shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {isSaving ? (
                         <>
-                            <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             Saving...
                         </>
                     ) : (

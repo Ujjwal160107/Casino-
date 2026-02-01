@@ -35,72 +35,71 @@
 }
 
 :root {
-  /* Casino Luxury Theme */
+  /* Sapphire Modern Theme (Slate/Blue) */
 
-  /* Deep Black Background with Gold Tint (#050505) */
-  --background: 0 0% 2%;
-  /* White Foreground */
-  --foreground: 0 0% 98%;
+  /* Deep Slate Background (#020617) */
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
 
-  /* Glass/Deep Black for Cards */
-  --card: 0 0% 5%;
-  --card-foreground: 0 0% 98%;
+  /* Darker Slate for Cards */
+  --card: 222.2 47.4% 11.2%;
+  --card-foreground: 210 40% 98%;
 
-  --popover: 0 0% 4%;
-  --popover-foreground: 0 0% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
 
-  /* Gold for Primary (#FFD700) */
-  --primary: 51 100% 50%;
-  --primary-foreground: 0 0% 5%;
+  /* Vibrant Blue Primary (#3b82f6) */
+  --primary: 217.2 91.2% 59.8%;
+  --primary-foreground: 222.2 47.4% 11.2%;
 
-  /* Rich Red for Secondary/Accents (#D2042D) - Velvet */
-  --secondary: 348 95% 42%;
-  --secondary-foreground: 0 0% 100%;
+  /* Subtle Slate Secondary */
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
 
-  /* Muted Charcoal */
-  --muted: 0 0% 12%;
-  --muted-foreground: 0 0% 60%;
+  /* Muted Slate */
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
 
-  /* Emerald Green for Money/Success */
-  --accent: 142 76% 36%;
-  --accent-foreground: 0 0% 100%;
+  /* Accents */
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
 
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
 
-  /* Gold Border */
-  --border: 51 50% 15%;
-  --input: 0 0% 15%;
-
-  --ring: 51 100% 50%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  /* Blue Ring */
+  --ring: 217.2 91.2% 59.8%;
 
   --radius: 0.5rem;
 }
 
-/* Glassmorphism Utilities */
+/* Glassmorphism Utilities - Sapphire Style */
 .glass {
-  background: rgba(15, 15, 20, 0.6);
+  background: rgba(15, 23, 42, 0.6);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 215, 0, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.1);
 }
 
 .glass-card {
-  background: linear-gradient(145deg, rgba(20, 20, 20, 0.9), rgba(10, 10, 10, 0.8));
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.6));
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
 }
 
 .glass-sidebar {
-  background: rgba(5, 5, 5, 0.85);
+  background: rgba(2, 6, 23, 0.95);
   backdrop-filter: blur(16px);
-  border-right: 1px solid rgba(255, 215, 0, 0.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+  font-family: 'Inter', sans-serif;
 }
 
 /* Force cursor pointer on all interactive elements */
