@@ -43,7 +43,7 @@ export default async function CasinoPage({ params }: PageProps) {
     return (
         <div className="space-y-8">
             <div>
-                <h1 className="text-3xl font-bold text-white mb-2 font-serif">Games & Stats</h1>
+                <h1 className="text-3xl font-bold font-display text-white mb-2">Games & Stats</h1>
                 <p className="text-zinc-400">Configure individual game settings, limits, and availability.</p>
             </div>
 

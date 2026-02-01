@@ -11,7 +11,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 
     return (
         <div>
-            <h1 className="text-3xl font-bold text-white mb-6 font-serif">Property Management</h1>
+            <h1 className="text-3xl font-bold font-display text-white mb-6">Property Management</h1>
             <PropertyManager guildId={guildId} initialProperties={properties} />
         </div>
     );

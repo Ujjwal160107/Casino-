@@ -14,7 +14,7 @@ export default async function MarriagePage({ params }: PageProps) {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold text-white font-serif">Marriage Settings</h1>
+                <h1 className="text-3xl font-bold font-display text-white">Marriage Settings</h1>
                 <p className="text-zinc-400">Configure costs and rules for the marriage system.</p>
             </div>
 

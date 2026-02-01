@@ -17,7 +17,7 @@ export default async function IncomePage({ params }: PageProps) {
     return (
         <div>
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-white mb-2 font-serif">Income Settings</h1>
+                <h1 className="text-3xl font-bold font-display text-white mb-2">Income Settings</h1>
                 <p className="text-zinc-400">Configure payouts, cooldowns, and rewards for economy commands.</p>
             </div>
 

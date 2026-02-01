@@ -29,7 +29,7 @@ export default async function RoleIncomePage({ params }: PageProps) {
     return (
         <div className="space-y-8">
             <div>
-                <h1 className="text-3xl font-bold text-white mb-2 font-serif">Role Income</h1>
+                <h1 className="text-3xl font-bold font-display text-white mb-2">Role Income</h1>
                 <p className="text-zinc-400">Configure passive income for specific Discord roles.</p>
             </div>
 

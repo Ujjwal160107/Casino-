@@ -18,7 +18,7 @@ export function ServerList({ guilds }: ServerListProps) {
                 <div className="w-20 h-20 bg-zinc-800 rounded-full mx-auto flex items-center justify-center mb-6">
                     <span className="text-4xl">🃏</span>
                 </div>
-                <h2 className="text-2xl font-bold text-zinc-200 mb-2 font-serif">No Tables Found</h2>
+                <h2 className="text-2xl font-bold text-zinc-200 mb-2 font-display">No Tables Found</h2>
                 <p className="text-zinc-400 max-w-md mx-auto">
                     We couldn't find any servers where you're an admin and Fortuna is present.
                     <br /><br />

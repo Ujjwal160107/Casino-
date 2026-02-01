@@ -14,7 +14,7 @@ export default async function ConfigPage({ params }: PageProps) {
     return (
         <div className="max-w-5xl">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-white mb-2 font-serif">Configuration & Admin Panel</h1>
+                <h1 className="text-3xl font-bold font-display text-white mb-2">Configuration & Admin Panel</h1>
                 <p className="text-zinc-400">Manage all aspect of your server's economy, permissions, and game modules.</p>
             </div>
 

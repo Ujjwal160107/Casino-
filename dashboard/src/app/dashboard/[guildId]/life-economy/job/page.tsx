@@ -24,7 +24,7 @@ export default async function JobPage({ params }: { params: Promise<{ guildId: s
 
     return (
         <div>
-            <h1 className="text-3xl font-bold text-white mb-6 font-serif">Job Management</h1>
+            <h1 className="text-3xl font-bold font-display text-white mb-6">Job Management</h1>
             <div className="mb-6">
                 <p className="text-zinc-400">Manage job listings, salary brackets, and work requirements.</p>
             </div>

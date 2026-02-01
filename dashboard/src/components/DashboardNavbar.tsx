@@ -37,7 +37,7 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
                                 className="object-cover"
                             />
                         </div>
-                        <span className="text-xl font-bold text-white hidden sm:block font-serif tracking-wider">
+                        <span className="text-xl font-bold text-white hidden sm:block font-display tracking-wider">
                             FORTUNA
                         </span>
                     </div>

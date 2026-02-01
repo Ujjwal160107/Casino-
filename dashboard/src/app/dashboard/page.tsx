@@ -46,7 +46,7 @@ export default async function DashboardPage() {
 
             <main className="max-w-7xl mx-auto py-12 relative z-10">
                 <div className="text-center mb-16">
-                    <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-yellow-200 to-yellow-500 font-serif mb-4 drop-shadow-sm">
+                    <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-yellow-200 to-yellow-500 font-display mb-4 drop-shadow-sm">
                         Select Your Table
                     </h1>
                     <p className="text-zinc-400 text-lg max-w-2xl mx-auto">

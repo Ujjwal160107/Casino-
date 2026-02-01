@@ -75,7 +75,7 @@ export function ServerPokerChip({ guild, onClick, index }: ServerPokerChipProps)
                             className="object-cover group-hover:scale-110 transition-transform duration-500"
                         />
                     ) : (
-                        <div className="text-4xl font-bold text-yellow-500 font-serif">
+                        <div className="text-4xl font-bold text-yellow-500 font-display">
                             {guild.name.charAt(0)}
                         </div>
                     )}
@@ -87,7 +87,7 @@ export function ServerPokerChip({ guild, onClick, index }: ServerPokerChipProps)
 
             {/* Label */}
             <div className="text-center">
-                <h3 className="text-lg font-bold text-zinc-200 group-hover:text-yellow-400 transition-colors font-serif tracking-wide shadow-black drop-shadow-md">
+                <h3 className="text-lg font-bold text-zinc-200 group-hover:text-yellow-400 transition-colors font-display tracking-wide shadow-black drop-shadow-md">
                     {guild.name}
                 </h3>
                 <span className="text-xs text-zinc-500 uppercase tracking-widest group-hover:text-zinc-400 transition-colors">

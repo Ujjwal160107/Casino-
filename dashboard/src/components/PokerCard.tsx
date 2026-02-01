@@ -79,13 +79,13 @@ export function PokerCard({ suit, rank, title, description, index, imageSrc }: P
                 <>
                     {/* Card Corner Top-Left */}
                     <div className="absolute top-2 left-3 flex flex-col items-center leading-none">
-                        <span className="text-3xl font-bold font-serif">{rank}</span>
+                        <span className="text-3xl font-bold font-display">{rank}</span>
                         {Icon && <Icon className="w-6 h-6" fill="currentColor" />}
                     </div>
 
                     {/* Card Corner Bottom-Right (Rotated) */}
                     <div className="absolute bottom-2 right-3 flex flex-col items-center leading-none rotate-180">
-                        <span className="text-3xl font-bold font-serif">{rank}</span>
+                        <span className="text-3xl font-bold font-display">{rank}</span>
                         {Icon && <Icon className="w-6 h-6" fill="currentColor" />}
                     </div>
 
@@ -94,7 +94,7 @@ export function PokerCard({ suit, rank, title, description, index, imageSrc }: P
                         <div className="w-20 h-20 rounded-full bg-zinc-100 dark:bg-zinc-200 flex items-center justify-center mb-4 shadow-inner">
                             {Icon && <Icon className="w-10 h-10 opacity-80" />}
                         </div>
-                        <h3 className="text-xl font-bold text-zinc-900 mb-2 font-serif">{title}</h3>
+                        <h3 className="text-xl font-bold text-zinc-900 mb-2 font-display">{title}</h3>
                         <p className="text-sm text-zinc-600 font-medium leading-relaxed">
                             {description}
                         </p>
