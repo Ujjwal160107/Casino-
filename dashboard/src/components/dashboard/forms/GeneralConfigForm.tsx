@@ -31,19 +31,45 @@ interface GeneralConfigFormProps {
 export function GeneralConfigForm({ guildId, initialData, channels = [] }: GeneralConfigFormProps) {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<{
+        prefix: string;
+        startMoney: number | "";
+        currencyName: string;
+        currencyEmoji: string;
+        chatMoneyEnabled: boolean;
+        walletLimit: number | "" | null;
+        bankLimit: number | "" | null;
+        minBet: number | "";
+        maxBet: number | "";
+        logChannelId: string;
+        dropExpiration: number;
+        voteReward: number | "";
+    }>({
         ...initialData,
-        walletLimit: initialData.walletLimit ?? null,
-        bankLimit: initialData.bankLimit ?? null,
+        walletLimit: initialData.walletLimit ?? "",
+        bankLimit: initialData.bankLimit ?? "",
         minBet: initialData.minBet ?? 100,
         maxBet: initialData.maxBet ?? 100000,
         logChannelId: initialData.logChannelId ?? "",
-        dropExpiration: initialData.dropExpiration ?? 60,
-        voteReward: initialData.voteReward ?? 5000
+        startMoney: initialData.startMoney ?? 0,
+        voteReward: initialData.voteReward ?? 5000,
+        dropExpiration: initialData.dropExpiration ?? 60
     });
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
+
+    // Helper for number inputs
+    const handleNumberChange = (field: string, value: string) => {
+        if (value === "") {
+            setFormData(prev => ({ ...prev, [field]: "" }));
+            return;
+        }
+        const num = parseInt(value);
+        if (!isNaN(num)) {
+            setFormData(prev => ({ ...prev, [field]: num }));
+        }
+    };
 
     const handleResetEconomy = async () => {
         setIsResetting(true);
@@ -67,8 +93,19 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
         setIsLoading(true);
         setMessage(null);
 
+        // sanitize data before sending: convert "" back to null or 0 depending on field logic
+        const payload = {
+            ...formData,
+            walletLimit: formData.walletLimit === "" ? null : formData.walletLimit,
+            bankLimit: formData.bankLimit === "" ? null : formData.bankLimit,
+            minBet: formData.minBet === "" ? 0 : formData.minBet,
+            maxBet: formData.maxBet === "" ? 0 : formData.maxBet,
+            startMoney: formData.startMoney === "" ? 0 : formData.startMoney,
+            voteReward: formData.voteReward === "" ? 0 : formData.voteReward,
+        };
+
         try {
-            const result = await updateGeneralSettings(guildId, formData);
+            const result = await updateGeneralSettings(guildId, payload);
             if (result.success) {
                 setMessage({ type: "success", text: "Configuration saved successfully!" });
                 router.refresh();
@@ -132,7 +169,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             type="number"
                             min={0}
                             value={formData.startMoney}
-                            onChange={(e) => setFormData({ ...formData, startMoney: parseInt(e.target.value) || 0 })}
+                            onChange={(e) => handleNumberChange("startMoney", e.target.value)}
                             className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                         />
                     </div>
@@ -144,7 +181,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             type="number"
                             min={0}
                             value={formData.voteReward}
-                            onChange={(e) => setFormData({ ...formData, voteReward: parseInt(e.target.value) || 0 })}
+                            onChange={(e) => handleNumberChange("voteReward", e.target.value)}
                             className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                         />
                         <p className="text-xs text-zinc-500">Reward for voting (every 12h).</p>
@@ -206,7 +243,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             min={0}
                             placeholder="No Limit"
                             value={formData.walletLimit ?? ""}
-                            onChange={(e) => setFormData({ ...formData, walletLimit: e.target.value ? parseInt(e.target.value) : null })}
+                            onChange={(e) => handleNumberChange("walletLimit", e.target.value)}
                             className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                         />
                         <p className="text-xs text-zinc-500">Max cash in wallet.</p>
@@ -218,7 +255,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             min={0}
                             placeholder="No Limit"
                             value={formData.bankLimit ?? ""}
-                            onChange={(e) => setFormData({ ...formData, bankLimit: e.target.value ? parseInt(e.target.value) : null })}
+                            onChange={(e) => handleNumberChange("bankLimit", e.target.value)}
                             className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                         />
                         <p className="text-xs text-zinc-500">Max cash in bank.</p>
@@ -232,8 +269,8 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                         <input
                             type="number"
                             min={0}
-                            value={formData.minBet || 0}
-                            onChange={(e) => setFormData({ ...formData, minBet: parseInt(e.target.value) || 0 })}
+                            value={formData.minBet}
+                            onChange={(e) => handleNumberChange("minBet", e.target.value)}
                             className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                         />
                         <p className="text-xs text-zinc-500">Default minimum bet for all games.</p>
@@ -243,8 +280,8 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                         <input
                             type="number"
                             min={0}
-                            value={formData.maxBet || 0}
-                            onChange={(e) => setFormData({ ...formData, maxBet: parseInt(e.target.value) || 0 })}
+                            value={formData.maxBet}
+                            onChange={(e) => handleNumberChange("maxBet", e.target.value)}
                             className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
                         />
                         <p className="text-xs text-zinc-500">Default maximum bet for all games.</p>
