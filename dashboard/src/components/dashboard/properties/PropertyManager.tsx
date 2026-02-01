@@ -66,7 +66,7 @@ export function PropertyManager({ guildId, initialProperties }: PropertyManagerP
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center bg-zinc-900/50 p-6 rounded-xl border border-white/5">
+            <div className="flex justify-between items-center glass-card p-6 rounded-xl border border-white/5">
                 <div>
                     <h2 className="text-xl font-bold text-white">Active Listings</h2>
                     <p className="text-sm text-zinc-400">Manage real estate available for purchase on the server.</p>
@@ -87,7 +87,7 @@ export function PropertyManager({ guildId, initialProperties }: PropertyManagerP
                         layout
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="group relative bg-zinc-900 border border-white/5 rounded-xl overflow-hidden hover:border-white/10 transition-colors"
+                        className="group relative glass-card border border-white/5 rounded-xl overflow-hidden hover:border-white/10 transition-colors"
                     >
                         {property.imageUrl && (
                             <div className="h-48 w-full bg-zinc-800 relative">
@@ -96,7 +96,7 @@ export function PropertyManager({ guildId, initialProperties }: PropertyManagerP
                             </div>
                         )}
                         {!property.imageUrl && (
-                            <div className="h-48 w-full bg-zinc-800/50 flex items-center justify-center relative">
+                            <div className="h-48 w-full bg-white/5 flex items-center justify-center relative">
                                 <Home size={48} className="text-zinc-700" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 to-transparent" />
                             </div>

@@ -124,7 +124,7 @@ export function GamesPanel({ guildId, games, globalLimits }: GamesPanelProps) {
                                 "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all border",
                                 isSelected
                                     ? "bg-yellow-500 text-black border-yellow-500 shadow-lg shadow-yellow-500/20"
-                                    : "bg-zinc-900 text-zinc-400 border-white/5 hover:text-white hover:bg-zinc-800"
+                                    : "glass-card text-zinc-400 border-white/5 hover:text-white hover:bg-white/10"
                             )}
                         >
                             <Icon size={16} />

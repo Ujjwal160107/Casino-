@@ -88,9 +88,9 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
     ).slice(0, 10); // Limit to 10 suggestions
 
     return (
-        <div className={`bg-zinc-900/50 border border-white/5 rounded-xl p-6 relative transition-opacity ${formData.enabled === false ? 'opacity-70' : ''}`}>
+        <div className={`glass-card border border-white/5 rounded-xl p-6 relative transition-opacity ${formData.enabled === false ? 'opacity-70' : ''}`}>
             {!formData.enabled && (
-                <div className="absolute inset-0 z-10 bg-black/50 backdrop-blur-[1px] rounded-xl flex items-center justify-center pointer-events-none">
+                <div className="absolute inset-0 z-10 bg-black/40 backdrop-blur-md rounded-xl flex items-center justify-center pointer-events-none">
                     <span className="bg-black/80 px-4 py-2 rounded text-red-400 font-bold uppercase tracking-widest border border-red-500/20 transform -rotate-12">
                         Robbery Disabled
                     </span>
@@ -99,7 +99,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
 
             <div className="flex items-start justify-between mb-6 relative z-20 pointer-events-auto">
                 <div>
-                    <h3 className="text-lg font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <h3 className="text-lg font-bold font-display text-white uppercase tracking-wider flex items-center gap-2">
                         <Shield size={18} className="text-blue-400" />
                         Robbery Settings
                     </h3>
@@ -125,7 +125,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                         min={1} max={100}
                         value={formData.robSuccessPct === 0 ? "" : formData.robSuccessPct}
                         onChange={(e) => setFormData({ ...formData, robSuccessPct: e.target.value === "" ? 0 : parseInt(e.target.value) })}
-                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+                        className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                         disabled={formData.enabled === false}
                     />
                     <p className="text-[10px] text-zinc-600">Base chance to successfully rob someone.</p>
@@ -137,7 +137,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                         min={0} max={100}
                         value={formData.robFinePct === 0 ? "" : formData.robFinePct}
                         onChange={(e) => setFormData({ ...formData, robFinePct: e.target.value === "" ? 0 : parseInt(e.target.value) })}
-                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+                        className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                         disabled={formData.enabled === false}
                     />
                     <p className="text-[10px] text-zinc-600">Percent of wallet lost if caught.</p>
@@ -165,7 +165,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                             min={0}
                             value={formData.jailFine === 0 ? "" : formData.jailFine}
                             onChange={(e) => setFormData({ ...formData, jailFine: e.target.value === "" ? 0 : parseInt(e.target.value) })}
-                            className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-red-500/50"
+                            className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white focus:outline-none focus:border-red-500/50"
                             placeholder="1000"
                             disabled={formData.enabled === false}
                         />
@@ -200,7 +200,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                                 value={searchRole}
                                 onChange={(e) => setSearchRole(e.target.value)}
                                 placeholder="Search role or paste ID..."
-                                className="w-full bg-black/40 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
+                                className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
                                 disabled={formData.enabled === false}
                             />
                         </div>
@@ -216,7 +216,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
 
                     {/* Results Dropdown */}
                     {searchRole && filteredRoles.length > 0 && formData.enabled !== false && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-white/10 rounded-lg shadow-xl overflow-hidden z-20">
+                        <div className="absolute top-full left-0 right-0 mt-2 glass-card border border-white/10 rounded-lg shadow-xl overflow-hidden z-20">
                             {filteredRoles.map(role => (
                                 <button
                                     key={role.id}
@@ -245,7 +245,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                                     initial={{ scale: 0.8, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1 }}
                                     exit={{ scale: 0.8, opacity: 0 }}
-                                    className="flex items-center gap-2 bg-zinc-800 border border-white/5 rounded-full pl-3 pr-1 py-1 text-xs text-zinc-300"
+                                    className="flex items-center gap-2 bg-white/5 border border-white/5 rounded-full pl-3 pr-1 py-1 text-xs text-zinc-300"
                                 >
                                     {role ? (
                                         <div

@@ -75,9 +75,9 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
     };
 
     return (
-        <div className={`bg-zinc-900/50 border border-white/5 rounded-xl p-6 relative transition-opacity ${formData.enabled === false ? 'opacity-70' : ''}`}>
+        <div className={`glass-card border border-white/5 rounded-xl p-6 relative transition-opacity ${formData.enabled === false ? 'opacity-70' : ''}`}>
             {!formData.enabled && (
-                <div className="absolute inset-0 z-10 bg-black/50 backdrop-blur-[1px] rounded-xl flex items-center justify-center pointer-events-none">
+                <div className="absolute inset-0 z-10 bg-black/40 backdrop-blur-md rounded-xl flex items-center justify-center pointer-events-none">
                     <span className="bg-black/80 px-4 py-2 rounded text-red-400 font-bold uppercase tracking-widest border border-red-500/20 transform -rotate-12">
                         Module Disabled
                     </span>
@@ -86,7 +86,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
 
             <div className="flex items-start justify-between mb-4 relative z-20 pointer-events-auto">
                 <div>
-                    <h3 className="text-lg font-bold text-white uppercase tracking-wider">{label}</h3>
+                    <h3 className="text-lg font-bold font-display text-white uppercase tracking-wider">{label}</h3>
                     <p className="text-sm text-zinc-400">{description}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -109,7 +109,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                         min={0}
                         value={formData.minPay}
                         onChange={(e) => setFormData({ ...formData, minPay: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white"
+                        className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white"
                         disabled={formData.enabled === false}
                     />
                 </div>
@@ -120,7 +120,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                         min={0}
                         value={formData.maxPay}
                         onChange={(e) => setFormData({ ...formData, maxPay: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white"
+                        className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white"
                         disabled={formData.enabled === false}
                     />
                 </div>
@@ -131,7 +131,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                         min={1} max={100}
                         value={formData.successPct}
                         onChange={(e) => setFormData({ ...formData, successPct: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white"
+                        className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white"
                         disabled={formData.enabled === false}
                     />
                 </div>
@@ -142,13 +142,13 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                         min={0} max={100}
                         value={formData.failPenaltyPct}
                         onChange={(e) => setFormData({ ...formData, failPenaltyPct: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white"
+                        className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white"
                         disabled={formData.enabled === false}
                     />
                 </div>
             </div>
 
-            <div className="mb-6 p-4 bg-black/20 rounded-lg border border-white/5">
+            <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/5">
                 <DurationInput
                     value={formData.cooldown}
                     onChange={(val) => setFormData({ ...formData, cooldown: val })}
@@ -192,7 +192,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                                 min={0}
                                 value={formData.jailFine}
                                 onChange={(e) => setFormData({ ...formData, jailFine: parseInt(e.target.value) || 0 })}
-                                className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white"
+                                className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white"
                                 placeholder="1000"
                                 disabled={formData.enabled === false}
                             />

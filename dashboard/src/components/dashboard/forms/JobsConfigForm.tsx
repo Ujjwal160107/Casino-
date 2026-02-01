@@ -96,7 +96,7 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
         <form onSubmit={handleSubmit} className="space-y-8 max-w-7xl mx-auto w-full">
             {/* General Settings */}
             <div className="space-y-4 glass-card p-6 rounded-xl">
-                <h2 className="text-xl font-bold text-white mb-4">General Settings</h2>
+                <h2 className="text-xl font-bold font-display text-white mb-4">General Settings</h2>
                 <div className="space-y-2">
                     <DurationInput
                         label="Work Cooldown"
@@ -109,7 +109,7 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
 
             {/* Sector Salaries */}
             <div className="space-y-4 glass-card p-6 rounded-xl">
-                <h2 className="text-xl font-bold text-white mb-4">Sector Base Salaries</h2>
+                <h2 className="text-xl font-bold font-display text-white mb-4">Sector Base Salaries</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {SECTORS.map(sector => {
                         const Icon = SECTOR_ICONS[sector] || Briefcase;
@@ -136,7 +136,7 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
 
             {/* Relax Activities */}
             <div className="space-y-4 glass-card p-6 rounded-xl">
-                <h2 className="text-xl font-bold text-white mb-4">Relax Activity Costs</h2>
+                <h2 className="text-xl font-bold font-display text-white mb-4">Relax Activity Costs</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {RELAX_ACTIVITIES.map(activity => {
                         const Icon = ACTIVITY_ICONS[activity] || Dumbbell;
@@ -162,7 +162,7 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
 
             {/* Promotion Requirements */}
             <div className="space-y-4 glass-card p-6 rounded-xl">
-                <h2 className="text-xl font-bold text-white mb-4">Promotion Requirements</h2>
+                <h2 className="text-xl font-bold font-display text-white mb-4">Promotion Requirements</h2>
                 <p className="text-sm text-zinc-400 mb-4">Set the required XP and Shifts needed to be PROMOTED TO this job.</p>
 
                 <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
@@ -180,7 +180,7 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
                                     min={0}
                                     value={formData.jobShiftReqs[job.id] ?? 0}
                                     onChange={(e) => handleNestedChange("jobShiftReqs", job.id, e.target.value)}
-                                    className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-white text-sm"
+                                    className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm"
                                     placeholder="Def"
                                 />
                             </div>

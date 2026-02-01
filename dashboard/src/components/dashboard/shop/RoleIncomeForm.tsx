@@ -265,7 +265,7 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
             </div>
 
             <div className="flex justify-end pt-4 sticky bottom-6">
-                <div className="bg-zinc-900/90 backdrop-blur-sm p-2 rounded-xl border border-white/10 shadow-2xl">
+                <div className="glass-card backdrop-blur-sm p-2 rounded-xl border border-white/10 shadow-2xl">
                     <button
                         onClick={handleSubmit}
                         disabled={isLoading}

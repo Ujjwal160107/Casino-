@@ -46,13 +46,13 @@ export function CasinoAdmins({ guildId, initialAdmins }: CasinoAdminsProps) {
 
     return (
         <div className="space-y-6">
-            <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
+            <div className="glass-card border border-white/5 rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-6">
                     <div className="p-3 rounded-lg bg-red-500/10 text-red-500">
                         <Shield size={24} />
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-white">Casino Admins</h2>
+                        <h2 className="text-xl font-bold font-display text-white">Casino Admins</h2>
                         <p className="text-sm text-zinc-400">Users with access to casino management commands.</p>
                     </div>
                 </div>
@@ -64,7 +64,7 @@ export function CasinoAdmins({ guildId, initialAdmins }: CasinoAdminsProps) {
                         placeholder="Discord User ID"
                         value={newAdminId}
                         onChange={(e) => setNewAdminId(e.target.value)}
-                        className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-red-500/50 font-mono text-sm"
+                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-red-500/50 font-mono text-sm"
                     />
                     <button
                         type="submit"
@@ -79,12 +79,12 @@ export function CasinoAdmins({ guildId, initialAdmins }: CasinoAdminsProps) {
                 {/* List */}
                 <div className="space-y-2">
                     {initialAdmins.length === 0 ? (
-                        <div className="text-center py-8 text-zinc-500 text-sm bg-black/20 rounded-lg border border-white/5 border-dashed">
+                        <div className="text-center py-8 text-zinc-500 text-sm bg-white/5 rounded-lg border border-white/5 border-dashed">
                             No Casino Admins assigned.
                         </div>
                     ) : (
                         initialAdmins.map((admin) => (
-                            <div key={admin.discordId} className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
+                            <div key={admin.discordId} className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
                                 <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400">
                                         <User size={16} />

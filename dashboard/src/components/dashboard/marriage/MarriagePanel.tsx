@@ -54,11 +54,11 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 backdrop-blur-md"
+            className="glass-card border border-white/5 rounded-2xl p-6 backdrop-blur-md"
         >
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h2 className="text-xl font-bold text-white font-serif tracking-wide flex items-center gap-2">
+                    <h2 className="text-xl font-bold font-display text-white tracking-wide flex items-center gap-2">
                         <Heart className="text-pink-500" size={24} />
                         Marriage Configuration
                     </h2>
@@ -78,7 +78,7 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
             </div>
 
             {/* Enable/Disable Toggle */}
-            <div className="mb-8 p-4 bg-zinc-950/50 border border-white/10 rounded-xl flex items-center justify-between">
+            <div className="mb-8 p-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-lg ${config.marriageEnabled ? "bg-pink-500/20 text-pink-400" : "bg-zinc-800 text-zinc-500"}`}>
                         <Heart size={20} />
@@ -111,7 +111,7 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
                             name="marriageCost"
                             value={config.marriageCost === 0 ? "" : config.marriageCost}
                             onChange={(e) => setConfig({ ...config, marriageCost: e.target.value === "" ? 0 : parseInt(e.target.value) })}
-                            className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/50 transition-all font-mono"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/50 transition-all font-mono"
                             min={0}
                             disabled={!config.marriageEnabled}
                         />
@@ -130,7 +130,7 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
                             name="divorceCost"
                             value={config.divorceCost === 0 ? "" : config.divorceCost}
                             onChange={(e) => setConfig({ ...config, divorceCost: e.target.value === "" ? 0 : parseInt(e.target.value) })}
-                            className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all font-mono"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all font-mono"
                             min={0}
                             disabled={!config.marriageEnabled}
                         />
@@ -143,7 +143,7 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
                     <label className="text-xs uppercase tracking-wider font-bold text-zinc-500 flex items-center gap-1">
                         <Clock size={12} /> Remarry Cooldown
                     </label>
-                    <div className="bg-zinc-950 border border-white/10 rounded-xl px-4 py-2">
+                    <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-2">
                         <DurationInput
                             value={config.marriageCooldown}
                             onChange={handleDurationChange}

@@ -56,14 +56,14 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
 
     return (
         <div className="space-y-6">
-            <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
+            <div className="glass-card border border-white/5 rounded-xl p-6">
                 <div className="flex items-center justify-between gap-3 mb-6">
                     <div className="flex items-center gap-3">
                         <div className="p-3 rounded-lg bg-yellow-500/10 text-yellow-500">
                             <Dices size={24} />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-white">{gameName} Configuration</h2>
+                            <h2 className="text-xl font-bold font-display text-white">{gameName} Configuration</h2>
                             <p className="text-sm text-zinc-400">Manage betting limits and cooldowns for {gameName}.</p>
                         </div>
                     </div>
@@ -102,7 +102,7 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                                     const val = e.target.value;
                                     setSettings({ ...settings, maxBet: val === "" ? 0 : parseInt(val) });
                                 }}
-                                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors placeholder:text-zinc-600"
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors placeholder:text-zinc-600"
                             />
                             <button
                                 type="button"
@@ -129,7 +129,7 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                                 const val = e.target.value;
                                 setSettings({ ...settings, minBet: val === "" ? 0 : parseInt(val) });
                             }}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-500">
                             Minimum amount required to play. Global Min: {globalLimits.min}
@@ -160,7 +160,7 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                                 type="number"
                                 value={settings.rouletteSpinTime || 0}
                                 onChange={(e) => setSettings({ ...settings, rouletteSpinTime: parseInt(e.target.value) || 0 })}
-                                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                             />
                             <p className="text-xs text-zinc-500">
                                 Duration of the roulette spin animation.
@@ -177,7 +177,7 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                                 type="number"
                                 value={settings.cockfightBetTime || 0}
                                 onChange={(e) => setSettings({ ...settings, cockfightBetTime: parseInt(e.target.value) || 0 })}
-                                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                             />
                             <p className="text-xs text-zinc-500">
                                 Duration of the betting phase before the fight starts.
@@ -195,7 +195,7 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                                     type="number"
                                     value={settings.chickenHealCost || 0}
                                     onChange={(e) => setSettings({ ...settings, chickenHealCost: parseInt(e.target.value) || 0 })}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                 />
                                 <p className="text-xs text-zinc-500">
                                     Cost to heal an injured chicken.
@@ -210,7 +210,7 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                                     type="number"
                                     value={settings.chickenTrainBaseCost || 0}
                                     onChange={(e) => setSettings({ ...settings, chickenTrainBaseCost: parseInt(e.target.value) || 0 })}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                 />
                                 <p className="text-xs text-zinc-500">
                                     Base cost for training a chicken.
@@ -226,7 +226,7 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                                     step="0.1"
                                     value={settings.chickenTrainMultiplier || 0}
                                     onChange={(e) => setSettings({ ...settings, chickenTrainMultiplier: parseFloat(e.target.value) || 0 })}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                 />
                                 <p className="text-xs text-zinc-500">
                                     Cost multiplier per training level (e.g., 0.5).

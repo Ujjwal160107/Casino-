@@ -56,8 +56,8 @@ export function GlobalDisables({ guildId, disabledCommands }: GlobalDisablesProp
 
     return (
         <div className="space-y-6">
-            <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <div className="glass-card border border-white/5 rounded-xl p-6">
+                <h3 className="text-lg font-bold font-display text-white mb-4 flex items-center gap-2">
                     <span className="text-red-500">🚫</span> Global Disabled Commands
                 </h3>
 
@@ -66,11 +66,11 @@ export function GlobalDisables({ guildId, disabledCommands }: GlobalDisablesProp
                         <select
                             value={selectedCmd}
                             onChange={(e) => setSelectedCmd(e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white appearance-none focus:outline-none focus:border-red-500/50 cursor-pointer"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white appearance-none focus:outline-none focus:border-red-500/50 cursor-pointer"
                         >
                             <option value="">Select a command to disable...</option>
                             {AVAILABLE_COMMANDS.filter(cmd => !disabledCommands.includes(cmd)).map(cmd => (
-                                <option key={cmd} value={cmd} className="bg-zinc-900">
+                                <option key={cmd} value={cmd} className="bg-[#212831]">
                                     {cmd}
                                 </option>
                             ))}
@@ -94,7 +94,7 @@ export function GlobalDisables({ guildId, disabledCommands }: GlobalDisablesProp
                         <p className="text-zinc-500 text-sm col-span-full italic">No commands disabled.</p>
                     ) : (
                         disabledCommands.map(cmd => (
-                            <div key={cmd} className="flex items-center justify-between bg-zinc-950 p-3 rounded-lg border border-white/5 group">
+                            <div key={cmd} className="flex items-center justify-between bg-white/5 p-3 rounded-lg border border-white/5 group">
                                 <code className="text-red-400 font-mono text-sm">{cmd}</code>
                                 <button
                                     onClick={() => handleRemove(cmd)}

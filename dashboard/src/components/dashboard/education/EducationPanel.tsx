@@ -68,8 +68,8 @@ export function EducationPanel({ guildId, config, degrees }: EducationPanelProps
     return (
         <div className="space-y-6">
             {/* Global Configs */}
-            <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-white uppercase tracking-wider flex items-center gap-2 mb-6">
+            <div className="glass-card border border-white/5 rounded-xl p-6">
+                <h3 className="text-lg font-bold font-display text-white uppercase tracking-wider flex items-center gap-2 mb-6">
                     <Activity size={18} className="text-blue-400" />
                     General Settings
                 </h3>
@@ -99,7 +99,7 @@ export function EducationPanel({ guildId, config, degrees }: EducationPanelProps
                             type="number"
                             value={formData.eduGymCost === 0 ? "" : formData.eduGymCost}
                             onChange={(e) => handleConfigChange("eduGymCost", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-blue-900/10 border border-blue-500/20 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
                         />
                     </div>
 
@@ -111,7 +111,7 @@ export function EducationPanel({ guildId, config, degrees }: EducationPanelProps
                             type="number"
                             value={formData.eduSportsCost === 0 ? "" : formData.eduSportsCost}
                             onChange={(e) => handleConfigChange("eduSportsCost", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-blue-900/10 border border-blue-500/20 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
                         />
                     </div>
 
@@ -123,21 +123,21 @@ export function EducationPanel({ guildId, config, degrees }: EducationPanelProps
                             type="number"
                             value={formData.eduMeditationCost === 0 ? "" : formData.eduMeditationCost}
                             onChange={(e) => handleConfigChange("eduMeditationCost", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-blue-900/10 border border-blue-500/20 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
                         />
                     </div>
                 </div>
             </div>
-            <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-white uppercase tracking-wider flex items-center gap-2 mb-6">
+            <div className="glass-card border border-white/5 rounded-xl p-6">
+                <h3 className="text-lg font-bold font-display text-white uppercase tracking-wider flex items-center gap-2 mb-6">
                     <GraduationCap size={18} className="text-yellow-400" />
                     Degree Tuitions
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {degreeData.map((degree, index) => (
-                        <div key={degree.id} className="bg-black/20 border border-white/5 rounded-lg p-4 flex flex-col gap-3">
-                            <div className="flex items-center gap-2 text-white font-serif font-bold">
+                        <div key={degree.id} className="bg-white/5 border border-white/5 rounded-lg p-4 flex flex-col gap-3">
+                            <div className="flex items-center gap-2 text-white font-display font-bold">
                                 <GraduationCap size={16} className="text-zinc-500" />
                                 <span className="truncate">{degree.name}</span>
                             </div>
@@ -150,7 +150,7 @@ export function EducationPanel({ guildId, config, degrees }: EducationPanelProps
                                     type="number"
                                     value={degree.tuitionPerSem === 0 ? "" : degree.tuitionPerSem}
                                     onChange={(e) => handleDegreeChange(index, e.target.value === "" ? 0 : parseInt(e.target.value))}
-                                    className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                 />
                             </div>
                         </div>

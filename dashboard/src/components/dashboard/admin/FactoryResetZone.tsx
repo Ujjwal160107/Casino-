@@ -41,7 +41,7 @@ export function FactoryResetZone({ guildId }: FactoryResetZoneProps) {
                 <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-6">
                     <div className="flex items-start justify-between gap-4">
                         <div className="space-y-1">
-                            <h3 className="text-xl font-bold text-red-500 flex items-center gap-2">
+                            <h3 className="text-xl font-bold font-display text-red-500 flex items-center gap-2">
                                 <AlertTriangle className="h-5 w-5" /> Danger Zone
                             </h3>
                             <p className="text-zinc-400 max-w-2xl">
@@ -74,10 +74,10 @@ export function FactoryResetZone({ guildId }: FactoryResetZoneProps) {
                 </div>
 
                 <div>
-                    <h3 className="text-2xl font-bold text-white mb-2">Are you absolutely sure?</h3>
+                    <h3 className="text-2xl font-bold font-display text-white mb-2">Are you absolutely sure?</h3>
                     <p className="text-zinc-300 max-w-md mx-auto">
                         This will wipe <strong>everything</strong>. There is no going back.
-                        Please type <span className="bg-black/40 px-2 py-0.5 rounded font-mono text-white select-all">DELETE</span> below to confirm.
+                        Please type <span className="bg-white/10 px-2 py-0.5 rounded font-mono text-white select-all">DELETE</span> below to confirm.
                     </p>
                 </div>
 
@@ -87,7 +87,7 @@ export function FactoryResetZone({ guildId }: FactoryResetZoneProps) {
                         value={confirmText}
                         onChange={(e) => setConfirmText(e.target.value)}
                         placeholder="Type DELETE to confirm"
-                        className="w-full bg-black/40 border border-red-500/30 rounded-lg px-4 py-3 text-center text-white placeholder:text-zinc-600 focus:outline-none focus:border-red-500"
+                        className="w-full bg-white/5 border border-red-500/30 rounded-lg px-4 py-2.5 text-center text-white placeholder:text-zinc-600 focus:outline-none focus:border-red-500"
                     />
 
                     <div className="flex gap-2 justify-center">

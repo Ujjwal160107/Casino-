@@ -94,7 +94,7 @@ export function StockMarketConfig({ guildId, stocks, refreshRate }: StockMarketC
     return (
         <div className="space-y-8">
             {/* Refresh Rate Config */}
-            <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6 flex items-end gap-4">
+            <div className="glass-card border border-white/5 rounded-xl p-6 flex items-end gap-4">
                 <div className="flex-1 space-y-2">
                     <DurationInput
                         value={rateInput * 60} // Convert mins to seconds for display
@@ -113,7 +113,7 @@ export function StockMarketConfig({ guildId, stocks, refreshRate }: StockMarketC
 
             {/* Stocks List Header */}
             <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <h3 className="text-xl font-bold font-display text-white flex items-center gap-2">
                     <TrendingUp className="text-green-500" /> Market Listings
                 </h3>
                 <button
@@ -126,21 +126,21 @@ export function StockMarketConfig({ guildId, stocks, refreshRate }: StockMarketC
 
             {/* Add Stock Form */}
             {isAdding && (
-                <form onSubmit={handleAddStock} className="bg-zinc-800/50 p-6 rounded-xl border border-green-500/30 animate-in slide-in-from-top-2">
-                    <h4 className="font-bold text-white mb-4">New Listing</h4>
+                <form onSubmit={handleAddStock} className="bg-white/5 p-6 rounded-xl border border-green-500/30 animate-in slide-in-from-top-2">
+                    <h4 className="font-bold font-display text-white mb-4">New Listing</h4>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                         <input
                             placeholder="Symbol (BTC)"
                             value={addForm.symbol}
                             onChange={e => setAddForm({ ...addForm, symbol: e.target.value })}
-                            className="bg-zinc-900 border border-white/10 rounded p-2 text-white"
+                            className="bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white"
                             required maxLength={5}
                         />
                         <input
                             placeholder="Name (Bitcoin)"
                             value={addForm.name}
                             onChange={e => setAddForm({ ...addForm, name: e.target.value })}
-                            className="bg-zinc-900 border border-white/10 rounded p-2 text-white"
+                            className="bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white"
                             required
                         />
                         <input
@@ -148,7 +148,7 @@ export function StockMarketConfig({ guildId, stocks, refreshRate }: StockMarketC
                             placeholder="Price"
                             value={addForm.price === 0 ? "" : addForm.price}
                             onChange={e => setAddForm({ ...addForm, price: e.target.value === "" ? 0 : parseInt(e.target.value) })}
-                            className="bg-zinc-900 border border-white/10 rounded p-2 text-white"
+                            className="bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white"
                             required
                         />
                         <input
@@ -156,7 +156,7 @@ export function StockMarketConfig({ guildId, stocks, refreshRate }: StockMarketC
                             placeholder="Volatility %"
                             value={addForm.vol === 0 ? "" : addForm.vol}
                             onChange={e => setAddForm({ ...addForm, vol: e.target.value === "" ? 0 : parseInt(e.target.value) })}
-                            className="bg-zinc-900 border border-white/10 rounded p-2 text-white"
+                            className="bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white"
                             required
                         />
                     </div>
@@ -170,7 +170,7 @@ export function StockMarketConfig({ guildId, stocks, refreshRate }: StockMarketC
             {/* Stocks Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {stocks.map(stock => (
-                    <div key={stock.id} className="bg-zinc-900/50 border border-white/5 rounded-xl p-4 flex justify-between items-center">
+                    <div key={stock.id} className="glass-card border border-white/5 rounded-xl p-4 flex justify-between items-center">
                         {editingId === stock.id ? (
                             <div className="flex-1 flex gap-2 items-center">
                                 <div className="space-y-1">
@@ -179,7 +179,7 @@ export function StockMarketConfig({ guildId, stocks, refreshRate }: StockMarketC
                                         type="number"
                                         value={editForm.price === 0 ? "" : editForm.price}
                                         onChange={e => setEditForm({ ...editForm, price: e.target.value === "" ? 0 : parseInt(e.target.value) })}
-                                        className="w-24 bg-black border border-zinc-700 rounded px-2 py-1 text-white"
+                                        className="w-20 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white"
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -188,7 +188,7 @@ export function StockMarketConfig({ guildId, stocks, refreshRate }: StockMarketC
                                         type="number"
                                         value={editForm.vol === 0 ? "" : editForm.vol}
                                         onChange={e => setEditForm({ ...editForm, vol: e.target.value === "" ? 0 : parseInt(e.target.value) })}
-                                        className="w-16 bg-black border border-zinc-700 rounded px-2 py-1 text-white"
+                                        className="w-20 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white"
                                     />
                                 </div>
                                 <button onClick={saveEdit} className="p-2 bg-yellow-500 text-black rounded hover:bg-yellow-400"><Save size={16} /></button>

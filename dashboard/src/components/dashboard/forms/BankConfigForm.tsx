@@ -68,8 +68,8 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
         <div className="space-y-8 max-w-5xl pb-20">
 
             {/* Interest Rates Section */}
-            <section className="bg-black/20 border border-white/5 rounded-xl p-6">
-                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <section className="glass-card border border-white/5 rounded-xl p-6">
+                <h3 className="text-xl font-bold font-display text-white mb-4 flex items-center gap-2">
                     <span className="w-1 h-6 bg-green-500 rounded-full"></span>
                     Interest Rates
                 </h3>
@@ -82,7 +82,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                             type="number"
                             value={formData.loanInterestRate === 0 ? "" : formData.loanInterestRate}
                             onChange={(e) => handleChange("loanInterestRate", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500/50 transition-colors"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-600 mt-2">Daily interest charged on active loans.</p>
                     </div>
@@ -94,7 +94,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                             type="number"
                             value={formData.fdInterestRate === 0 ? "" : formData.fdInterestRate}
                             onChange={(e) => handleChange("fdInterestRate", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500/50 transition-colors"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-600 mt-2">Flat interest for Fixed Deposits.</p>
                     </div>
@@ -106,7 +106,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                             type="number"
                             value={formData.rdInterestRate === 0 ? "" : formData.rdInterestRate}
                             onChange={(e) => handleChange("rdInterestRate", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500/50 transition-colors"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-600 mt-2">Interest for Recurring Deposits.</p>
                     </div>
@@ -114,8 +114,8 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
             </section>
 
             {/* Limits & General Section */}
-            <section className="bg-black/20 border border-white/5 rounded-xl p-6">
-                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <section className="glass-card border border-white/5 rounded-xl p-6">
+                <h3 className="text-xl font-bold font-display text-white mb-4 flex items-center gap-2">
                     <span className="w-1 h-6 bg-blue-500 rounded-full"></span>
                     Global Limits
                 </h3>
@@ -129,7 +129,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                             value={formData.bankLimit ?? ""}
                             onChange={(e) => handleChange("bankLimit", e.target.value === "" ? 0 : parseInt(e.target.value))}
                             placeholder="Unlimited"
-                            className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-600 mt-2">Max coins a user can store in bank.</p>
                     </div>
@@ -141,7 +141,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                             type="number"
                             value={formData.maxActiveLoans === 0 ? "" : formData.maxActiveLoans}
                             onChange={(e) => handleChange("maxActiveLoans", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-600 mt-2">Simultaneous loans a single user can hold.</p>
                     </div>
@@ -149,8 +149,8 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
             </section>
 
             {/* Credit Score Logic */}
-            <section className="bg-black/20 border border-white/5 rounded-xl p-6">
-                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <section className="glass-card border border-white/5 rounded-xl p-6">
+                <h3 className="text-xl font-bold font-display text-white mb-4 flex items-center gap-2">
                     <span className="w-1 h-6 bg-purple-500 rounded-full"></span>
                     Credit System
                 </h3>
@@ -161,7 +161,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                             type="number"
                             value={formData.minCreditScore === 0 ? "" : formData.minCreditScore}
                             onChange={(e) => handleChange("minCreditScore", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white"
                         />
                     </div>
                     <div>
@@ -170,7 +170,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                             type="number"
                             value={formData.maxCreditScore === 0 ? "" : formData.maxCreditScore}
                             onChange={(e) => handleChange("maxCreditScore", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white"
                         />
                     </div>
                     <div>
@@ -179,7 +179,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                             type="number"
                             value={formData.creditScoreReward === 0 ? "" : formData.creditScoreReward}
                             onChange={(e) => handleChange("creditScoreReward", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white"
                         />
                     </div>
                     <div>
@@ -188,7 +188,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                             type="number"
                             value={formData.creditScorePenalty === 0 ? "" : formData.creditScorePenalty}
                             onChange={(e) => handleChange("creditScorePenalty", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white"
                         />
                     </div>
                 </div>
@@ -234,7 +234,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                                                 type="number"
                                                 value={tier.minScore}
                                                 onChange={(e) => updateCreditTier(idx, 'minScore', parseInt(e.target.value))}
-                                                className="w-full bg-black/20 border border-white/10 rounded px-2 py-1.5 text-sm text-white"
+                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-sm text-white"
                                             />
                                         </div>
                                         <div className="col-span-3">
@@ -242,7 +242,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                                                 type="number"
                                                 value={tier.maxLoan}
                                                 onChange={(e) => updateCreditTier(idx, 'maxLoan', parseInt(e.target.value))}
-                                                className="w-full bg-black/20 border border-white/10 rounded px-2 py-1.5 text-sm text-white"
+                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-sm text-white"
                                             />
                                         </div>
                                         <div className="col-span-3">
@@ -250,7 +250,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                                                 type="number"
                                                 value={tier.maxDays}
                                                 onChange={(e) => updateCreditTier(idx, 'maxDays', parseInt(e.target.value))}
-                                                className="w-full bg-black/20 border border-white/10 rounded px-2 py-1.5 text-sm text-white"
+                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-sm text-white"
                                             />
                                         </div>
                                         <div className="col-span-3 text-right">

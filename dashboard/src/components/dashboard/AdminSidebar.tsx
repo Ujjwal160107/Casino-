@@ -167,7 +167,7 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
             </nav>
 
             {/* Footer */}
-            <div className="p-4 border-t border-white/5 bg-black/20 backdrop-blur-md">
+            <div className="p-4 border-t border-white/5 bg-white/5 backdrop-blur-md">
                 <Link
                     href="/dashboard"
                     className="flex items-center gap-2 justify-center text-xs font-medium text-zinc-500 hover:text-primary transition-colors py-2 rounded-md hover:bg-white/5"

@@ -90,10 +90,10 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
     };
 
     return (
-        <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
+        <div className="glass-card border border-white/5 rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h3 className="text-lg font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <h3 className="text-lg font-bold font-display text-white uppercase tracking-wider flex items-center gap-2">
                         <Terminal size={18} className="text-purple-400" />
                         Casino Drops
                     </h3>
@@ -118,7 +118,7 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-black/20 border border-white/5 rounded-lg p-4 relative group"
+                            className="bg-white/5 border border-white/5 rounded-lg p-4 relative group"
                         >
                             <button
                                 onClick={() => removeDrop(index)}
@@ -135,7 +135,7 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                                     <select
                                         value={drop.type}
                                         onChange={(e) => updateDrop(index, "type", e.target.value)}
-                                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                        className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
                                     >
                                         <option value="INTERVAL">Interval (Every X min)</option>
                                         <option value="SCHEDULED">Scheduled (Specific Time)</option>
@@ -156,7 +156,7 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                                                     updateDrop(index, "channelId", e.target.value);
                                                 }
                                             }}
-                                            className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                            className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
                                         >
                                             <option value="" disabled>Select Channel</option>
                                             {channels.map(c => (
@@ -170,7 +170,7 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                                                 placeholder="Channel ID"
                                                 value={drop.channelId}
                                                 onChange={(e) => updateDrop(index, "channelId", e.target.value)}
-                                                className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-purple-500/50"
+                                                className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-xs text-zinc-300 focus:outline-none focus:border-purple-500/50"
                                             />
                                         )}
                                     </div>
@@ -184,7 +184,7 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                                         min={1}
                                         value={drop.minAmount}
                                         onChange={(e) => updateDrop(index, "minAmount", parseInt(e.target.value) || 0)}
-                                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                        className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -194,7 +194,7 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                                         min={1}
                                         value={drop.maxAmount}
                                         onChange={(e) => updateDrop(index, "maxAmount", parseInt(e.target.value) || 0)}
-                                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                        className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
                                     />
                                 </div>
 
@@ -222,7 +222,7 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                                             min={1}
                                             value={drop.interval || 60}
                                             onChange={(e) => updateDrop(index, "interval", parseInt(e.target.value) || 0)}
-                                            className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                            className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
                                         />
                                     </div>
                                 )}
@@ -236,7 +236,7 @@ export function CasinoDropsEditor({ guildId, initialData, channels }: CasinoDrop
                                             type="time"
                                             value={drop.scheduleTime || "12:00"}
                                             onChange={(e) => updateDrop(index, "scheduleTime", e.target.value)}
-                                            className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                            className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
                                         />
                                     </div>
                                 )}

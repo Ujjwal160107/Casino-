@@ -37,10 +37,10 @@ export function QuestEditor({ guildId, initialData }: QuestEditorProps) {
     };
 
     return (
-        <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6 relative">
+        <div className="glass-card border border-white/5 rounded-xl p-6 relative">
             <div className="flex items-start justify-between mb-6">
                 <div>
-                    <h3 className="text-lg font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <h3 className="text-lg font-bold font-display text-white uppercase tracking-wider flex items-center gap-2">
                         <ScrollText size={18} className="text-purple-400" />
                         Daily Quest Rewards
                     </h3>
@@ -57,7 +57,7 @@ export function QuestEditor({ guildId, initialData }: QuestEditorProps) {
                         min={0}
                         value={formData.questPay === 0 ? "" : formData.questPay}
                         onChange={(e) => setFormData({ ...formData, questPay: e.target.value === "" ? 0 : parseInt(e.target.value) })}
-                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-purple-500/50 transition-colors"
+                        className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white focus:outline-none focus:border-purple-500/50 transition-colors"
                     />
                     <p className="text-[10px] text-zinc-600">Fixed currency reward.</p>
                 </div>

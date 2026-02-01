@@ -210,7 +210,7 @@ export function DashboardNavbar({ guild, user }: DashboardNavbarProps) {
             <div className="flex items-center gap-4">
                 {/* Search */}
                 <div ref={searchContainerRef} className="relative hidden md:block">
-                    <div className="flex items-center px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-zinc-400 text-sm w-64 hover:bg-white/10 transition-colors focus-within:border-primary/50 focus-within:text-white focus-within:w-72 focus-within:bg-black/40 duration-200">
+                    <div className="flex items-center px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-zinc-400 text-sm w-64 hover:bg-white/10 transition-colors focus-within:border-primary/50 focus-within:text-white focus-within:w-72 focus-within:bg-white/10 duration-200">
                         <Search size={14} className="mr-2 shrink-0" />
                         <input
                             type="text"

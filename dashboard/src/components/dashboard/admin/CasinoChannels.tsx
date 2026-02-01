@@ -41,8 +41,8 @@ export function CasinoChannels({ guildId, channels }: CasinoChannelsProps) {
 
     return (
         <div className="space-y-6">
-            <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+            <div className="glass-card border border-white/5 rounded-xl p-6">
+                <h3 className="text-lg font-bold font-display text-white mb-2 flex items-center gap-2">
                     <span className="text-blue-500">#</span> Casino Channel Whitelist
                 </h3>
                 <p className="text-sm text-zinc-400 mb-6">If list is empty, bot works in ALL channels.</p>
@@ -53,7 +53,7 @@ export function CasinoChannels({ guildId, channels }: CasinoChannelsProps) {
                         value={channelId}
                         onChange={(e) => setChannelId(e.target.value)}
                         placeholder="Channel ID"
-                        className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500/50 font-mono"
+                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 font-mono"
                         onKeyDown={(e) => e.key === "Enter" && handleAdd()}
                     />
                     <button
@@ -72,7 +72,7 @@ export function CasinoChannels({ guildId, channels }: CasinoChannelsProps) {
                         </div>
                     ) : (
                         channels.map(id => (
-                            <div key={id} className="flex items-center justify-between bg-zinc-950 p-3 rounded-lg border border-white/5 group">
+                            <div key={id} className="flex items-center justify-between bg-white/5 p-3 rounded-lg border border-white/5 group">
                                 <div className="flex items-center gap-3">
                                     <Hash size={16} className="text-zinc-600" />
                                     <code className="text-zinc-300 font-mono text-sm">{id}</code>

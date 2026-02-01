@@ -49,8 +49,8 @@ export function GranularPermissions({ guildId, permissions }: GranularPermission
     return (
         <div className="space-y-6">
             {/* Add New Permission Form */}
-            <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <div className="glass-card border border-white/5 rounded-xl p-6">
+                <h3 className="text-lg font-bold font-display text-white mb-4 flex items-center gap-2">
                     <span className="text-yellow-500">🔒</span> Add Permission
                 </h3>
                 <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
@@ -61,7 +61,7 @@ export function GranularPermissions({ guildId, permissions }: GranularPermission
                             placeholder="e.g. robbery"
                             value={formData.command}
                             onChange={(e) => setFormData({ ...formData, command: e.target.value.toLowerCase() })}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm font-mono"
                         />
                     </div>
                     <div className="md:col-span-2 space-y-1">
@@ -69,7 +69,7 @@ export function GranularPermissions({ guildId, permissions }: GranularPermission
                         <select
                             value={formData.targetType}
                             onChange={(e) => setFormData({ ...formData, targetType: e.target.value })}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm font-mono"
                         >
                             <option value="USER">User</option>
                             <option value="ROLE">Role</option>
@@ -83,7 +83,7 @@ export function GranularPermissions({ guildId, permissions }: GranularPermission
                             placeholder="Discord ID"
                             value={formData.targetId}
                             onChange={(e) => setFormData({ ...formData, targetId: e.target.value })}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-mono"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm font-mono"
                         />
                     </div>
                     <div className="md:col-span-3">
@@ -102,7 +102,7 @@ export function GranularPermissions({ guildId, permissions }: GranularPermission
             {/* Permissions List */}
             <div className="space-y-2">
                 {permissions.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between bg-zinc-900/30 p-4 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
+                    <div key={p.id} className="flex items-center justify-between glass-card p-4 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
                         <div className="flex items-center gap-4">
                             <div className="p-2 bg-yellow-500/10 rounded text-yellow-500">
                                 <GripVertical size={16} />

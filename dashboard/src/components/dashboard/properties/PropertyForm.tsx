@@ -50,15 +50,15 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-md">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="glass-card rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
                 >
-                    <div className="flex items-center justify-between p-6 border-b border-white/10 sticky top-0 bg-[#1B2028]/95 backdrop-blur z-10">
-                        <h2 className="text-xl font-bold text-white">
+                    <div className="flex items-center justify-between p-6 border-b border-white/10 sticky top-0 glass-card backdrop-blur z-10">
+                        <h2 className="text-xl font-bold font-display text-white">
                             {initialData ? "Edit Property" : "Add New Property"}
                         </h2>
                         <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors">
@@ -171,7 +171,7 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                                 type="url"
                                 value={formData.imageUrl || ""}
                                 onChange={(e) => handleChange("imageUrl", e.target.value)}
-                                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
                                 placeholder="https://..."
                             />
                         </div>
