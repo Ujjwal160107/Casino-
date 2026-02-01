@@ -126,8 +126,8 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                         </label>
                         <input
                             type="number"
-                            value={formData.bankLimit || ""}
-                            onChange={(e) => handleChange("bankLimit", parseInt(e.target.value) || 0)}
+                            value={formData.bankLimit ?? ""}
+                            onChange={(e) => handleChange("bankLimit", e.target.value === "" ? 0 : parseInt(e.target.value))}
                             placeholder="Unlimited"
                             className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                         />
@@ -139,8 +139,8 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                         </label>
                         <input
                             type="number"
-                            value={formData.maxActiveLoans}
-                            onChange={(e) => handleChange("maxActiveLoans", parseInt(e.target.value) || 1)}
+                            value={formData.maxActiveLoans === 0 ? "" : formData.maxActiveLoans}
+                            onChange={(e) => handleChange("maxActiveLoans", e.target.value === "" ? 0 : parseInt(e.target.value))}
                             className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-600 mt-2">Simultaneous loans a single user can hold.</p>

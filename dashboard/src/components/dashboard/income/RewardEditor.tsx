@@ -49,8 +49,8 @@ export function RewardEditor({ guildId, initialData }: RewardEditorProps) {
                             <label className="text-xs text-zinc-500">Amount</label>
                             <input
                                 type="number"
-                                value={formData.dailyAmount}
-                                onChange={(e) => setFormData({ ...formData, dailyAmount: parseInt(e.target.value) || 0 })}
+                                value={formData.dailyAmount === 0 ? "" : formData.dailyAmount}
+                                onChange={(e) => setFormData({ ...formData, dailyAmount: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                                 className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white"
                             />
                         </div>
@@ -66,8 +66,8 @@ export function RewardEditor({ guildId, initialData }: RewardEditorProps) {
                             <label className="text-xs text-zinc-500">Amount</label>
                             <input
                                 type="number"
-                                value={formData.weeklyAmount}
-                                onChange={(e) => setFormData({ ...formData, weeklyAmount: parseInt(e.target.value) || 0 })}
+                                value={formData.weeklyAmount === 0 ? "" : formData.weeklyAmount}
+                                onChange={(e) => setFormData({ ...formData, weeklyAmount: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                                 className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white"
                             />
                         </div>
@@ -83,8 +83,8 @@ export function RewardEditor({ guildId, initialData }: RewardEditorProps) {
                             <label className="text-xs text-zinc-500">Amount</label>
                             <input
                                 type="number"
-                                value={formData.monthlyAmount}
-                                onChange={(e) => setFormData({ ...formData, monthlyAmount: parseInt(e.target.value) || 0 })}
+                                value={formData.monthlyAmount === 0 ? "" : formData.monthlyAmount}
+                                onChange={(e) => setFormData({ ...formData, monthlyAmount: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                                 className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white"
                             />
                         </div>

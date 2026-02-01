@@ -122,7 +122,7 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
                                 <input
                                     type="number"
                                     min={0}
-                                    value={formData.jobSectorBasePay[sector] ?? 0}
+                                    value={formData.jobSectorBasePay[sector] === 0 ? "" : (formData.jobSectorBasePay[sector] ?? "")}
                                     onChange={(e) => handleNestedChange("jobSectorBasePay", sector, e.target.value)}
                                     className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
                                     placeholder={`Def: ${initialData.defaultSectorPay ? initialData.defaultSectorPay[sector] || 'N/A' : 'N/A'}`}
@@ -149,7 +149,7 @@ export function JobsConfigForm({ guildId, initialData }: JobsConfigFormProps) {
                                 <input
                                     type="number"
                                     min={0}
-                                    value={formData.jobRelaxControllers[activity] ?? 0}
+                                    value={formData.jobRelaxControllers[activity] === 0 ? "" : (formData.jobRelaxControllers[activity] ?? "")}
                                     onChange={(e) => handleNestedChange("jobRelaxControllers", activity, e.target.value)}
                                     className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
                                     placeholder="Default"

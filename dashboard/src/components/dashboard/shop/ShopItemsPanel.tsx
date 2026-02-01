@@ -66,7 +66,7 @@ export function ShopItemsPanel({ guildId, items, roles, currencyEmoji }: ShopIte
                         <div className="flex justify-between items-start mb-2">
                             <div className="flex items-center gap-2">
                                 <div className={`w-3 h-3 rounded-full ${item.stock === 0 ? "bg-red-500" : "bg-green-500"}`} />
-                                <h3 className="font-bold text-white text-lg font-serif">{item.name}</h3>
+                                <h3 className="font-bold text-white text-lg font-sans">{item.name}</h3>
                             </div>
                             <div className="flex gap-1">
                                 <button

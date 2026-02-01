@@ -454,7 +454,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                                         <option value="" className="bg-black">Select Role...</option>
                                                         {roles.map(r => <option key={r.id} value={r.id} className="bg-black">{r.name}</option>)}
                                                     </select>
-                                                    {(["ROLE_TEMPORARY"].includes(effect.type)) && (
+                                                    {(effect.type === "ROLE_TEMPORARY") && (
                                                         <DurationInput
                                                             value={effect.duration || 0}
                                                             onChange={val => updateEffect(idx, "duration", val)}

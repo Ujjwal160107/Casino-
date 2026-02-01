@@ -99,8 +99,8 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                                 value={settings.maxBet === 0 ? "" : settings.maxBet}
                                 placeholder={`Inherited (Global: ${globalLimits.max})`}
                                 onChange={(e) => {
-                                    const val = e.target.value === "" ? 0 : parseInt(e.target.value);
-                                    setSettings({ ...settings, maxBet: isNaN(val) ? 0 : val });
+                                    const val = e.target.value;
+                                    setSettings({ ...settings, maxBet: val === "" ? 0 : parseInt(val) });
                                 }}
                                 className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors placeholder:text-zinc-600"
                             />
@@ -124,8 +124,11 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                         </label>
                         <input
                             type="number"
-                            value={settings.minBet}
-                            onChange={(e) => setSettings({ ...settings, minBet: parseInt(e.target.value) || 0 })}
+                            value={settings.minBet === 0 ? "" : settings.minBet}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setSettings({ ...settings, minBet: val === "" ? 0 : parseInt(val) });
+                            }}
                             className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-500">

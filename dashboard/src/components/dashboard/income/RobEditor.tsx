@@ -123,8 +123,8 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                     <input
                         type="number"
                         min={1} max={100}
-                        value={formData.robSuccessPct}
-                        onChange={(e) => setFormData({ ...formData, robSuccessPct: parseInt(e.target.value) || 0 })}
+                        value={formData.robSuccessPct === 0 ? "" : formData.robSuccessPct}
+                        onChange={(e) => setFormData({ ...formData, robSuccessPct: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                         className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                         disabled={formData.enabled === false}
                     />
@@ -135,8 +135,8 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                     <input
                         type="number"
                         min={0} max={100}
-                        value={formData.robFinePct}
-                        onChange={(e) => setFormData({ ...formData, robFinePct: parseInt(e.target.value) || 0 })}
+                        value={formData.robFinePct === 0 ? "" : formData.robFinePct}
+                        onChange={(e) => setFormData({ ...formData, robFinePct: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                         className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                         disabled={formData.enabled === false}
                     />
@@ -163,8 +163,8 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                         <input
                             type="number"
                             min={0}
-                            value={formData.jailFine}
-                            onChange={(e) => setFormData({ ...formData, jailFine: parseInt(e.target.value) || 0 })}
+                            value={formData.jailFine === 0 ? "" : formData.jailFine}
+                            onChange={(e) => setFormData({ ...formData, jailFine: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                             className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-red-500/50"
                             placeholder="1000"
                             disabled={formData.enabled === false}

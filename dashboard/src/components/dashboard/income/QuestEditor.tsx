@@ -55,8 +55,8 @@ export function QuestEditor({ guildId, initialData }: QuestEditorProps) {
                     <input
                         type="number"
                         min={0}
-                        value={formData.questPay}
-                        onChange={(e) => setFormData({ ...formData, questPay: parseInt(e.target.value) || 0 })}
+                        value={formData.questPay === 0 ? "" : formData.questPay}
+                        onChange={(e) => setFormData({ ...formData, questPay: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                         className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-purple-500/50 transition-colors"
                     />
                     <p className="text-[10px] text-zinc-600">Fixed currency reward.</p>
