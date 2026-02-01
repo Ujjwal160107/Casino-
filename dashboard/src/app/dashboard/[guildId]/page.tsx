@@ -30,10 +30,8 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
             </div>
 
             {/* General Settings Config */}
-            <div className="mb-8 p-1 glass-card rounded-2xl">
-                <div className="p-6 md:p-8">
-                    <GeneralConfigForm guildId={guildId} initialData={settings} channels={channels} />
-                </div>
+            <div className="mb-8">
+                <GeneralConfigForm guildId={guildId} initialData={settings} channels={channels} />
             </div>
         </div>
     );

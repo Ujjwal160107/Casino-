@@ -98,18 +98,18 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
     return (
         <aside className="fixed left-0 top-0 h-screen w-64 glass-sidebar flex flex-col z-40 text-zinc-300 font-sans">
             {/* Header */}
-            <div className="p-6 border-b border-white/5 flex items-center gap-3 bg-black/20">
-                <div className="w-12 h-12 rounded-xl bg-white/5 shrink-0 overflow-hidden border border-white/10 shadow-lg">
+            <div className="p-6 border-b border-white/5 flex items-center gap-4 bg-black/20">
+                <div className="w-10 h-10 rounded-full bg-primary/10 shrink-0 overflow-hidden border border-white/5 flex items-center justify-center">
                     {iconUrl ? (
                         <Image
                             src={iconUrl}
                             alt={guild.name}
-                            width={48}
-                            height={48}
+                            width={40}
+                            height={40}
                             className="object-cover"
                         />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center text-primary font-bold text-xl">
+                        <div className="text-primary font-bold text-lg">
                             {guild.name.charAt(0)}
                         </div>
                     )}
@@ -121,55 +121,51 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+            <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-8 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
                 {sections.map((section) => (
-                    <div key={section.title}>
+                    <div key={section.title} className="space-y-3">
+                        {/* Sapphire Style Header: Small, Uppercase, Muted */}
                         {section.title !== "Overview" && (
-                            <button
-                                onClick={() => toggleSection(section.title)}
-                                className="flex items-center justify-between w-full text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3 hover:text-primary transition-colors px-2"
-                            >
-                                {section.title}
-                                <motion.div
-                                    animate={{ rotate: openSections[section.title] ? 0 : -90 }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <ChevronDown size={12} />
-                                </motion.div>
-                            </button>
+                            <div className="flex items-center justify-between px-3">
+                                <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest leading-none">
+                                    {section.title}
+                                </h3>
+                                {/* Toggle removed for cleaner list look, or can be kept if preferred. 
+                                    Sapphire usually lists all modules clearly. 
+                                    Expanding all by default for cleaner 'list' view. */}
+                            </div>
                         )}
 
-                        <motion.div
-                            initial={false}
-                            animate={{ height: openSections[section.title] ? "auto" : 0, opacity: openSections[section.title] ? 1 : 0 }}
-                            className="overflow-hidden"
-                        >
-                            <div className="space-y-1 mb-4">
-                                {section.items.map((item) => {
-                                    const isActive = pathname === item.href;
-                                    const Icon = item.icon;
+                        <div className="space-y-1">
+                            {section.items.map((item) => {
+                                const isActive = pathname === item.href;
+                                const Icon = item.icon;
 
-                                    return (
-                                        <Link
-                                            key={item.href}
-                                            href={item.href}
-                                            className={cn(
-                                                "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 group overflow-hidden",
-                                                isActive
-                                                    ? "text-black bg-primary shadow-lg shadow-primary/20 font-bold"
-                                                    : "text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent"
-                                            )}
-                                        >
-                                            <Icon size={18} className={cn(
-                                                "relative z-10 transition-colors duration-300",
-                                                isActive ? "text-black" : "text-zinc-500 group-hover:text-zinc-300"
-                                            )} />
-                                            <span className="relative z-10">{item.label}</span>
-                                        </Link>
-                                    )
-                                })}
-                            </div>
-                        </motion.div>
+                                return (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        className={cn(
+                                            "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 group relative",
+                                            isActive
+                                                ? "text-white font-medium bg-white/5" // Active: Simple background highlight
+                                                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                                        )}
+                                    >
+                                        {/* Active Indicator Bar on Left */}
+                                        {isActive && (
+                                            <div className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-1 bg-primary rounded-r-full" />
+                                        )}
+
+                                        <Icon size={18} className={cn(
+                                            "shrink-0 transition-colors",
+                                            isActive ? "text-primary dark:text-primary" : "text-zinc-500 group-hover:text-zinc-300"
+                                        )} />
+                                        <span className="truncate">{item.label}</span>
+                                    </Link>
+                                )
+                            })}
+                        </div>
                     </div>
                 ))}
             </nav>

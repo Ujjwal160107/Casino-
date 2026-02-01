@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateGeneralSettings, resetEconomy } from "@/actions/settings-actions";
-import { Loader2, Save, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Save, Trash2, AlertTriangle, Settings, Hash, Lock, CircleDollarSign } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { DurationInput } from "../ui/DurationInput";
@@ -145,228 +145,333 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-8 max-w-2xl">
-            <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+
+
+            {/* SETTINGS CARD: General */}
+            <div className="bg-[#111] border border-white/5 rounded-2xl overflow-hidden shadow-sm">
+                <div className="px-6 py-4 border-b border-white/5 bg-white/2">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <Settings size={20} className="text-zinc-500" />
+                        General Settings
+                    </h3>
+                </div>
+
+                <div className="divide-y divide-white/5">
+
                     {/* Prefix */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Bot Prefix</label>
-                        <input
-                            type="text"
-                            maxLength={5}
-                            value={formData.prefix}
-                            onChange={(e) => setFormData({ ...formData, prefix: e.target.value })}
-                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
-                            placeholder="!"
-                        />
-                        <p className="text-xs text-zinc-500">Maximum 5 characters.</p>
+                    <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/2 transition-colors">
+                        <div className="md:w-2/3">
+                            <h4 className="text-base font-medium text-zinc-100">Bot Prefix</h4>
+                            <p className="text-sm text-zinc-500 mt-1">The symbol used to trigger commands (legacy).</p>
+                        </div>
+                        <div className="md:w-1/3 flex justify-end">
+                            <input
+                                type="text"
+                                maxLength={5}
+                                value={formData.prefix}
+                                onChange={(e) => setFormData({ ...formData, prefix: e.target.value })}
+                                className="w-32 bg-black border border-white/10 rounded-lg px-3 py-2 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                                placeholder="!"
+                            />
+                        </div>
                     </div>
 
                     {/* Start Money */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Starting Balance</label>
-                        <input
-                            type="number"
-                            min={0}
-                            value={formData.startMoney}
-                            onChange={(e) => handleNumberChange("startMoney", e.target.value)}
-                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
-                        />
+                    <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/2 transition-colors">
+                        <div className="md:w-2/3">
+                            <h4 className="text-base font-medium text-zinc-100">Starting Balance</h4>
+                            <p className="text-sm text-zinc-500 mt-1">Initial cash for new users.</p>
+                        </div>
+                        <div className="md:w-1/3 flex justify-end">
+                            <input
+                                type="number"
+                                min={0}
+                                value={formData.startMoney}
+                                onChange={(e) => handleNumberChange("startMoney", e.target.value)}
+                                className="w-32 bg-black border border-white/10 rounded-lg px-3 py-2 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                            />
+                        </div>
                     </div>
 
                     {/* Vote Reward */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Vote Reward</label>
-                        <input
-                            type="number"
-                            min={0}
-                            value={formData.voteReward}
-                            onChange={(e) => handleNumberChange("voteReward", e.target.value)}
-                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
-                        />
-                        <p className="text-xs text-zinc-500">Reward for voting (every 12h).</p>
+                    <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/2 transition-colors">
+                        <div className="md:w-2/3">
+                            <h4 className="text-base font-medium text-zinc-100">Vote Reward</h4>
+                            <p className="text-sm text-zinc-500 mt-1">Reward for voting (every 12h).</p>
+                        </div>
+                        <div className="md:w-1/3 flex justify-end">
+                            <input
+                                type="number"
+                                min={0}
+                                value={formData.voteReward}
+                                onChange={(e) => handleNumberChange("voteReward", e.target.value)}
+                                className="w-32 bg-black border border-white/10 rounded-lg px-3 py-2 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                            />
+                        </div>
                     </div>
 
                     {/* Currency Name */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Currency Name</label>
-                        <input
-                            type="text"
-                            maxLength={32}
-                            value={formData.currencyName}
-                            onChange={(e) => setFormData({ ...formData, currencyName: e.target.value })}
-                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
-                            placeholder="Coins"
-                        />
+                    <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/2 transition-colors">
+                        <div className="md:w-2/3">
+                            <h4 className="text-base font-medium text-zinc-100">Currency Name</h4>
+                            <p className="text-sm text-zinc-500 mt-1">The name of your server's currency.</p>
+                        </div>
+                        <div className="md:w-1/3 flex justify-end">
+                            <input
+                                type="text"
+                                maxLength={32}
+                                value={formData.currencyName}
+                                onChange={(e) => setFormData({ ...formData, currencyName: e.target.value })}
+                                className="w-48 bg-black border border-white/10 rounded-lg px-3 py-2 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-medium text-sm text-white"
+                                placeholder="Coins"
+                            />
+                        </div>
                     </div>
 
                     {/* Currency Emoji */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Currency Emoji</label>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm backdrop-blur-sm"
-                                value={formData.currencyEmoji}
-                                onChange={(e) => setFormData({ ...formData, currencyEmoji: e.target.value })}
-                                placeholder="🪙 or <:copy:123...>"
-                            />
-                            <div className="flex items-center justify-center w-12 shrink-0 bg-white/5 rounded-lg border border-white/10 overflow-hidden">
-                                {(() => {
-                                    const customEmojiMatch = formData.currencyEmoji.match(/<?(a)?:?(\w+):(\d+)>?/);
-                                    if (customEmojiMatch) {
-                                        const isAnimated = customEmojiMatch[1] === "a";
-                                        const id = customEmojiMatch[3];
-                                        const url = `https://cdn.discordapp.com/emojis/${id}.${isAnimated ? "gif" : "png"}`;
+                    <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/2 transition-colors">
+                        <div className="md:w-2/3">
+                            <h4 className="text-base font-medium text-zinc-100">Currency Emoji</h4>
+                            <p className="text-sm text-zinc-500 mt-1">Symbol displayed next to amounts.</p>
+                        </div>
+                        <div className="md:w-1/3 flex justify-end">
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    className="w-32 bg-black border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-right"
+                                    value={formData.currencyEmoji}
+                                    onChange={(e) => setFormData({ ...formData, currencyEmoji: e.target.value })}
+                                    placeholder="🪙"
+                                />
+                                <div className="flex items-center justify-center w-10 shrink-0 bg-white/5 rounded-lg border border-white/10 overflow-hidden">
+                                    {(() => {
+                                        const customEmojiMatch = formData.currencyEmoji.match(/<?(a)?:?(\w+):(\d+)>?/);
+                                        if (customEmojiMatch) {
+                                            const isAnimated = customEmojiMatch[1] === "a";
+                                            const id = customEmojiMatch[3];
+                                            const url = `https://cdn.discordapp.com/emojis/${id}.${isAnimated ? "gif" : "png"}`;
+                                            return (
+                                                <img src={url} alt="currency" className="w-6 h-6 object-contain" />
+                                            );
+                                        }
                                         return (
-                                            <img src={url} alt="currency" className="w-6 h-6 object-contain" />
+                                            <span className="text-xl">
+                                                {formData.currencyEmoji || "🪙"}
+                                            </span>
                                         );
-                                    }
-                                    return (
-                                        <span className="text-xl truncate px-1">
-                                            {formData.currencyEmoji || "🪙"}
-                                        </span>
-                                    );
-                                })()}
+                                    })()}
+                                </div>
                             </div>
                         </div>
-                        <p className="text-xs text-zinc-500">Supports Unicode emojis or Discord custom emoji IDs.</p>
                     </div>
-                </div>
 
-                {/* Wallet & Bank Limits */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Wallet Limit</label>
-                        <input
-                            type="number"
-                            min={0}
-                            placeholder="No Limit"
-                            value={formData.walletLimit ?? ""}
-                            onChange={(e) => handleNumberChange("walletLimit", e.target.value)}
-                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
-                        />
-                        <p className="text-xs text-zinc-500">Max cash in wallet.</p>
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Bank Limit</label>
-                        <input
-                            type="number"
-                            min={0}
-                            placeholder="No Limit"
-                            value={formData.bankLimit ?? ""}
-                            onChange={(e) => handleNumberChange("bankLimit", e.target.value)}
-                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
-                        />
-                        <p className="text-xs text-zinc-500">Max cash in bank.</p>
-                    </div>
-                </div>
-
-                {/* Global Bet Limits */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Global Min Bet</label>
-                        <input
-                            type="number"
-                            min={0}
-                            value={formData.minBet}
-                            onChange={(e) => handleNumberChange("minBet", e.target.value)}
-                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
-                        />
-                        <p className="text-xs text-zinc-500">Default minimum bet for all games.</p>
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Global Max Bet</label>
-                        <input
-                            type="number"
-                            min={0}
-                            value={formData.maxBet}
-                            onChange={(e) => handleNumberChange("maxBet", e.target.value)}
-                            className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all backdrop-blur-sm"
-                        />
-                        <p className="text-xs text-zinc-500">Default maximum bet for all games.</p>
-                    </div>
-                </div>
-
-
-
-            </div>
-
-            {/* Log Channel */}
-            <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-400">Casino Log Channel</label>
-                <div className="relative">
-                    <select
-                        value={formData.logChannelId || ""}
-                        onChange={(e) => setFormData({ ...formData, logChannelId: e.target.value })}
-                        className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all appearance-none backdrop-blur-sm"
-                    >
-                        <option value="">Select a channel...</option>
-                        {channels.map((channel) => (
-                            <option key={channel.id} value={channel.id}>
-                                #{channel.name}
-                            </option>
-                        ))}
-                    </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </div>
-                </div>
-
-                <div className="mt-2">
-                    <p className="text-xs text-zinc-500 mb-1">Or paste Channel ID if not listed:</p>
-                    <input
-                        type="text"
-                        placeholder="Channel ID"
-                        value={formData.logChannelId || ""}
-                        onChange={(e) => setFormData({ ...formData, logChannelId: e.target.value })}
-                        className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2 text-sm text-zinc-400 focus:text-white focus:outline-none focus:border-white/20 transition-all backdrop-blur-sm"
-                    />
                 </div>
             </div>
 
-            {/* Chat Money Toggle */}
-            <div className="p-4 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between">
-                <div>
-                    <h3 className="text-white font-medium">Chat Money</h3>
-                    <p className="text-sm text-zinc-400 mt-1">Earn currency by chatting in active channels.</p>
+            {/* SETTINGS CARD: Economy Limits */}
+            <div className="bg-[#111] border border-white/5 rounded-2xl overflow-hidden shadow-sm">
+                <div className="px-6 py-4 border-b border-white/5 bg-white/2">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <Lock size={20} className="text-zinc-500" />
+                        Economy Limits
+                    </h3>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, chatMoneyEnabled: !formData.chatMoneyEnabled })}
-                    className={`relative w-12 h-7 rounded-full transition-colors duration-200 focus:outline-none ${formData.chatMoneyEnabled ? "bg-primary shadow-[0_0_10px_rgba(255,215,0,0.5)]" : "bg-zinc-700"
-                        }`}
-                >
-                    <span
-                        className={`absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform duration-200 ${formData.chatMoneyEnabled ? "translate-x-5" : "translate-x-0"
-                            }`}
-                    />
-                </button>
+                <div className="divide-y divide-white/5">
+                    {/* Wallet Limit */}
+                    <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/2 transition-colors">
+                        <div className="md:w-2/3">
+                            <h4 className="text-base font-medium text-zinc-100">Wallet Limit</h4>
+                            <p className="text-sm text-zinc-500 mt-1">Maximum cash a user can hold on hand.</p>
+                        </div>
+                        <div className="md:w-1/3 flex justify-end">
+                            <input
+                                type="number"
+                                min={0}
+                                placeholder="No Limit"
+                                value={formData.walletLimit ?? ""}
+                                onChange={(e) => handleNumberChange("walletLimit", e.target.value)}
+                                className="w-32 bg-black border border-white/10 rounded-lg px-3 py-2 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Bank Limit */}
+                    <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/2 transition-colors">
+                        <div className="md:w-2/3">
+                            <h4 className="text-base font-medium text-zinc-100">Bank Limit</h4>
+                            <p className="text-sm text-zinc-500 mt-1">Maximum cash a user can store in the bank.</p>
+                        </div>
+                        <div className="md:w-1/3 flex justify-end">
+                            <input
+                                type="number"
+                                min={0}
+                                placeholder="No Limit"
+                                value={formData.bankLimit ?? ""}
+                                onChange={(e) => handleNumberChange("bankLimit", e.target.value)}
+                                className="w-32 bg-black border border-white/10 rounded-lg px-3 py-2 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                            />
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            {/* Danger Zone */}
-            <div className="border border-red-500/20 bg-red-500/5 rounded-xl p-6 mt-8">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <h3 className="text-red-400 font-bold flex items-center gap-2">
-                            <AlertTriangle size={18} /> Danger Zone
-                        </h3>
-                        <p className="text-sm text-zinc-400 mt-1">Destructive actions that cannot be undone.</p>
+            {/* SETTINGS CARD: Betting */}
+            <div className="bg-[#111] border border-white/5 rounded-2xl overflow-hidden shadow-sm">
+                <div className="px-6 py-4 border-b border-white/5 bg-white/2">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <CircleDollarSign size={20} className="text-zinc-500" />
+                        Betting Configuration
+                    </h3>
+                </div>
+                <div className="divide-y divide-white/5">
+                    {/* Min Bet */}
+                    <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/2 transition-colors">
+                        <div className="md:w-2/3">
+                            <h4 className="text-base font-medium text-zinc-100">Global Min Bet</h4>
+                            <p className="text-sm text-zinc-500 mt-1">Minimum allowed bet across all games.</p>
+                        </div>
+                        <div className="md:w-1/3 flex justify-end">
+                            <input
+                                type="number"
+                                min={0}
+                                value={formData.minBet}
+                                onChange={(e) => handleNumberChange("minBet", e.target.value)}
+                                className="w-32 bg-black border border-white/10 rounded-lg px-3 py-2 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Max Bet */}
+                    <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/2 transition-colors">
+                        <div className="md:w-2/3">
+                            <h4 className="text-base font-medium text-zinc-100">Global Max Bet</h4>
+                            <p className="text-sm text-zinc-500 mt-1">Maximum allowed bet across all games.</p>
+                        </div>
+                        <div className="md:w-1/3 flex justify-end">
+                            <input
+                                type="number"
+                                min={0}
+                                value={formData.maxBet}
+                                onChange={(e) => handleNumberChange("maxBet", e.target.value)}
+                                className="w-32 bg-black border border-white/10 rounded-lg px-3 py-2 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                            />
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <div className="mt-6 pt-6 border-t border-red-500/10 flex items-center justify-between">
-                    <div>
-                        <p className="text-white font-medium">Reset Economy</p>
-                        <p className="text-xs text-zinc-500 mt-1">Deletes all wallets, banks, items, and resets user statistics for everyone.</p>
+            {/* SETTINGS CARD: System Configuration */}
+            <div className="bg-[#111] border border-white/5 rounded-2xl overflow-hidden shadow-sm">
+                <div className="px-6 py-4 border-b border-white/5 bg-white/2">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <Hash size={20} className="text-zinc-500" />
+                        System Configuration
+                    </h3>
+                </div>
+                <div className="divide-y divide-white/5">
+
+                    {/* Log Channel */}
+                    <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/2 transition-colors">
+                        <div className="md:w-2/3">
+                            <h4 className="text-base font-medium text-zinc-100">Casino Log Channel</h4>
+                            <p className="text-sm text-zinc-500 mt-1">Channel where casino transactions are logged.</p>
+                        </div>
+                        <div className="md:w-1/3 flex flex-col gap-2 justify-end">
+                            <div className="relative">
+                                <select
+                                    value={formData.logChannelId || ""}
+                                    onChange={(e) => setFormData({ ...formData, logChannelId: e.target.value })}
+                                    className="w-full bg-black border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all appearance-none text-sm text-right pr-8"
+                                >
+                                    <option value="">Select a channel...</option>
+                                    {channels.map((channel) => (
+                                        <option key={channel.id} value={channel.id}>
+                                            #{channel.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                                    <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                </div>
+                            </div>
+                            {/* Manual ID Input fallback */}
+                            <input
+                                type="text"
+                                placeholder="Or enter Channel ID"
+                                value={formData.logChannelId || ""}
+                                onChange={(e) => setFormData({ ...formData, logChannelId: e.target.value })}
+                                className="w-full bg-black/50 border border-white/5 rounded-lg px-3 py-1.5 text-xs text-zinc-500 focus:text-white focus:border-primary/30 transition-all text-right"
+                            />
+                        </div>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => setShowResetConfirm(true)}
-                        className="bg-red-500/10 text-red-400 border border-red-500/20 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-500/20 hover:text-red-300 transition-colors flex items-center gap-2"
-                    >
-                        <Trash2 size={16} /> Reset
-                    </button>
+
+                    {/* Chat Money Toggle */}
+                    <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/2 transition-colors">
+                        <div className="md:w-2/3">
+                            <h4 className="text-base font-medium text-zinc-100">Chat Money</h4>
+                            <p className="text-sm text-zinc-500 mt-1">Allow users to earn currency by chatting in active channels.</p>
+                        </div>
+                        <div className="md:w-1/3 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, chatMoneyEnabled: !formData.chatMoneyEnabled })}
+                                className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${formData.chatMoneyEnabled ? "bg-primary shadow-[0_0_10px_rgba(255,215,0,0.3)]" : "bg-zinc-800 border border-white/10"
+                                    }`}
+                            >
+                                <span
+                                    className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${formData.chatMoneyEnabled ? "translate-x-6" : "translate-x-0"
+                                        }`}
+                                />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Drop Cooldown */}
+                    <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/2 transition-colors">
+                        <div className="md:w-2/3">
+                            <h4 className="text-base font-medium text-zinc-100">Drop Cooldown</h4>
+                            <p className="text-sm text-zinc-500 mt-1">Time in seconds before a drop disappears.</p>
+                        </div>
+                        <div className="md:w-1/3 flex justify-end">
+                            <input
+                                type="number"
+                                min={5}
+                                value={formData.dropExpiration}
+                                onChange={(e) => handleNumberChange("dropExpiration", e.target.value)}
+                                className="w-32 bg-black border border-white/10 rounded-lg px-3 py-2 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                            />
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            {/* SETTINGS CARD: Danger Zone */}
+            <div className="bg-[#111] border border-red-500/20 rounded-2xl overflow-hidden shadow-sm">
+                <div className="px-6 py-4 border-b border-red-500/10 bg-red-500/5">
+                    <h3 className="text-lg font-bold text-red-500 flex items-center gap-2">
+                        <AlertTriangle size={20} />
+                        Danger Zone
+                    </h3>
+                </div>
+                <div className="divide-y divide-red-500/10">
+                    {/* Reset Economy */}
+                    <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-red-500/5 transition-colors">
+                        <div className="md:w-2/3">
+                            <h4 className="text-base font-medium text-white">Reset Economy</h4>
+                            <p className="text-sm text-zinc-500 mt-1">Permanently delete all wallets, banks, items, and user stats.</p>
+                        </div>
+                        <div className="md:w-1/3 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setShowResetConfirm(true)}
+                                className="bg-red-500/10 text-red-500 border border-red-500/20 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-500 hover:text-white transition-all flex items-center gap-2"
+                            >
+                                <Trash2 size={16} /> Reset
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -409,20 +514,18 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
             </AnimatePresence>
 
             {/* Status Message */}
-            {
-                message && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`p-3 rounded-lg text-sm border ${message.type === "success"
-                            ? "bg-green-500/10 border-green-500/20 text-green-400"
-                            : "bg-red-500/10 border-red-500/20 text-red-400"
-                            }`}
-                    >
-                        {message.text}
-                    </motion.div>
-                )
-            }
+            {message && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`fixed bottom-8 right-8 p-4 rounded-xl shadow-2xl border ${message.type === "success"
+                        ? "bg-zinc-900/90 border-green-500/50 text-green-400"
+                        : "bg-zinc-900/90 border-red-500/50 text-red-400"
+                        } backdrop-blur-md z-50 font-medium`}
+                >
+                    {message.text}
+                </motion.div>
+            )}
 
             <button
                 type="submit"
@@ -432,6 +535,6 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                 {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                 Save Changes
             </button>
-        </form >
+        </form>
     );
 }
