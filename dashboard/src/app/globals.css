@@ -39,46 +39,49 @@
 }
 
 :root {
-  /* Casino Luxury Theme - Vibrant Edition */
+  /* Casino Luxury Theme - Vibrant Light-Blue Edition */
 
-  /* Rich Dark Background (Deep Blue-Black) */
-  --background: 222 47% 11%;
-  /* #0f172a */
+  /* Base Background - Lighter Midnight Blue */
+  --background: 222 47% 10%;
+  /* Slightly lighter than before, but preserving dark mode feel */
+  /* User asked for "light blue make it a bit light" - let's try a rich Slate-900 equivalent */
+  --background: 220 35% 13%;
 
   /* Ultra Bright Foreground */
-  --foreground: 210 40% 98%;
-  /* #f8fafc */
+  --foreground: 0 0% 100%;
+  /* Pure White */
 
-  /* Glass Cards (Translucent Deep Blue) */
-  --card: 217 33% 17%;
-  --card-foreground: 210 40% 98%;
+  /* Glass Cards */
+  --card: 220 35% 17%;
+  /* Lighter card background */
+  --card-foreground: 0 0% 100%;
 
-  --popover: 222 47% 11%;
-  --popover-foreground: 210 40% 98%;
+  --popover: 220 35% 17%;
+  --popover-foreground: 0 0% 100%;
 
   /* Neon Gold Primary */
   --primary: 48 100% 50%;
   /* #ffd700 */
   --primary-foreground: 0 0% 0%;
 
-  /* Vibrant Cyan Secondary/Accent (for contrast) */
+  /* Vibrant Cyan Secondary */
   --secondary: 190 100% 50%;
-  /* #00e5ff - Cyan Neon */
+  /* #00e5ff */
   --secondary-foreground: 222 47% 11%;
 
-  /* Muted but still rich */
-  --muted: 215 28% 17%;
-  --muted-foreground: 217 19% 75%;
+  /* Muted */
+  --muted: 215 25% 20%;
+  --muted-foreground: 215 15% 75%;
 
   /* Accents */
-  --accent: 217 33% 17%;
+  --accent: 217 33% 20%;
   --accent-foreground: 48 100% 50%;
 
   --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 217 33% 20%;
-  --input: 217 33% 15%;
+  --border: 217 30% 25%;
+  --input: 217 30% 20%;
   --ring: 48 100% 50%;
 
   --radius: 0.75rem;
@@ -90,7 +93,8 @@
 
 /* Glassmorphism Utilities - Vibrant Glow */
 .glass {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(30, 41, 59, 0.4);
+  /* Lighter base */
   backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
@@ -98,63 +102,67 @@
 
 .glass-card {
   background: linear-gradient(145deg,
-      rgba(30, 41, 59, 0.7) 0%,
-      rgba(15, 23, 42, 0.6) 100%);
+      rgba(51, 65, 85, 0.6) 0%,
+      /* Slate-700ish */
+      rgba(30, 41, 59, 0.5) 100%
+      /* Slate-800ish */
+    );
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow:
     0 4px 24px -1px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(255, 255, 255, 0.02);
-  /* Inner subtle stroke */
+    0 0 0 1px rgba(255, 255, 255, 0.05);
   transition: all 0.3s ease;
 }
 
 .glass-card:hover {
   background: linear-gradient(145deg,
-      rgba(30, 41, 59, 0.8) 0%,
-      rgba(15, 23, 42, 0.7) 100%);
-  border-color: rgba(255, 215, 0, 0.2);
-  /* Gold hint on hover */
+      rgba(51, 65, 85, 0.8) 0%,
+      rgba(30, 41, 59, 0.7) 100%);
+  border-color: rgba(255, 215, 0, 0.3);
   box-shadow:
     0 8px 32px -4px rgba(0, 0, 0, 0.3),
-    0 0 15px rgba(255, 215, 0, 0.1);
-  /* Subtle gold glow */
+    0 0 15px rgba(255, 215, 0, 0.15);
 }
 
 /* Inputs with Glow Focus */
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: rgba(255, 215, 0, 0.5) !important;
-  box-shadow: 0 0 15px rgba(255, 215, 0, 0.2) !important;
+  border-color: rgba(255, 215, 0, 0.6) !important;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.25) !important;
 }
 
 body {
+  /* Use a transparent background here so the base color can be managed by a lower layer if needed, 
+     but actually applying the color here acts as the 'canvas'. 
+     The z-[-1] fixed element will be painted ON TOP of this background color 
+     but BEHIND the flow content. This is correct. 
+     The issue might be opacity of the ambient elements. */
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: 'Inter', sans-serif;
-
-  /* Static background removed in favor of AmbientBackground component */
   background-attachment: fixed;
 }
 
-/* Typography Glows */
+/* Typography Overrides - Force Bright White */
 h1,
 h2,
 h3,
 h4,
 .font-display {
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-  /* Deep shadow for pop */
+  color: #ffffff !important;
+  text-shadow: 0 2px 15px rgba(0, 0, 0, 0.3);
+  /* Softer shadow, cleaner look */
 }
 
 h1 {
-  background: linear-gradient(to right, #ffffff, #e2e8f0);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  text-shadow:
-    0 0 30px rgba(255, 255, 255, 0.1);
+  /* Remove gradient for pure white per request */
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  color: #ffffff !important;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
 }
 
 /* Scrollbar */
