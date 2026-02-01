@@ -97,8 +97,8 @@ export function EducationPanel({ guildId, config, degrees }: EducationPanelProps
                         </label>
                         <input
                             type="number"
-                            value={formData.eduGymCost}
-                            onChange={(e) => handleConfigChange("eduGymCost", parseInt(e.target.value) || 0)}
+                            value={formData.eduGymCost === 0 ? "" : formData.eduGymCost}
+                            onChange={(e) => handleConfigChange("eduGymCost", e.target.value === "" ? 0 : parseInt(e.target.value))}
                             className="w-full bg-blue-900/10 border border-blue-500/20 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
                         />
                     </div>
@@ -109,8 +109,8 @@ export function EducationPanel({ guildId, config, degrees }: EducationPanelProps
                         </label>
                         <input
                             type="number"
-                            value={formData.eduSportsCost}
-                            onChange={(e) => handleConfigChange("eduSportsCost", parseInt(e.target.value) || 0)}
+                            value={formData.eduSportsCost === 0 ? "" : formData.eduSportsCost}
+                            onChange={(e) => handleConfigChange("eduSportsCost", e.target.value === "" ? 0 : parseInt(e.target.value))}
                             className="w-full bg-blue-900/10 border border-blue-500/20 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
                         />
                     </div>
@@ -121,8 +121,8 @@ export function EducationPanel({ guildId, config, degrees }: EducationPanelProps
                         </label>
                         <input
                             type="number"
-                            value={formData.eduMeditationCost}
-                            onChange={(e) => handleConfigChange("eduMeditationCost", parseInt(e.target.value) || 0)}
+                            value={formData.eduMeditationCost === 0 ? "" : formData.eduMeditationCost}
+                            onChange={(e) => handleConfigChange("eduMeditationCost", e.target.value === "" ? 0 : parseInt(e.target.value))}
                             className="w-full bg-blue-900/10 border border-blue-500/20 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
                         />
                     </div>
@@ -148,8 +148,8 @@ export function EducationPanel({ guildId, config, degrees }: EducationPanelProps
                                 </label>
                                 <input
                                     type="number"
-                                    value={degree.tuitionPerSem}
-                                    onChange={(e) => handleDegreeChange(index, parseInt(e.target.value) || 0)}
+                                    value={degree.tuitionPerSem === 0 ? "" : degree.tuitionPerSem}
+                                    onChange={(e) => handleDegreeChange(index, e.target.value === "" ? 0 : parseInt(e.target.value))}
                                     className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                 />
                             </div>

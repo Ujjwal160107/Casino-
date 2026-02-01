@@ -146,16 +146,16 @@ export function StockMarketConfig({ guildId, stocks, refreshRate }: StockMarketC
                         <input
                             type="number"
                             placeholder="Price"
-                            value={addForm.price}
-                            onChange={e => setAddForm({ ...addForm, price: parseInt(e.target.value) })}
+                            value={addForm.price === 0 ? "" : addForm.price}
+                            onChange={e => setAddForm({ ...addForm, price: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                             className="bg-zinc-900 border border-white/10 rounded p-2 text-white"
                             required
                         />
                         <input
                             type="number"
                             placeholder="Volatility %"
-                            value={addForm.vol}
-                            onChange={e => setAddForm({ ...addForm, vol: parseInt(e.target.value) })}
+                            value={addForm.vol === 0 ? "" : addForm.vol}
+                            onChange={e => setAddForm({ ...addForm, vol: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                             className="bg-zinc-900 border border-white/10 rounded p-2 text-white"
                             required
                         />
@@ -177,8 +177,8 @@ export function StockMarketConfig({ guildId, stocks, refreshRate }: StockMarketC
                                     <div className="text-xs text-zinc-500">Price</div>
                                     <input
                                         type="number"
-                                        value={editForm.price}
-                                        onChange={e => setEditForm({ ...editForm, price: parseInt(e.target.value) })}
+                                        value={editForm.price === 0 ? "" : editForm.price}
+                                        onChange={e => setEditForm({ ...editForm, price: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                                         className="w-24 bg-black border border-zinc-700 rounded px-2 py-1 text-white"
                                     />
                                 </div>
@@ -186,8 +186,8 @@ export function StockMarketConfig({ guildId, stocks, refreshRate }: StockMarketC
                                     <div className="text-xs text-zinc-500">Vol %</div>
                                     <input
                                         type="number"
-                                        value={editForm.vol}
-                                        onChange={e => setEditForm({ ...editForm, vol: parseInt(e.target.value) })}
+                                        value={editForm.vol === 0 ? "" : editForm.vol}
+                                        onChange={e => setEditForm({ ...editForm, vol: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                                         className="w-16 bg-black border border-zinc-700 rounded px-2 py-1 text-white"
                                     />
                                 </div>
@@ -218,6 +218,6 @@ export function StockMarketConfig({ guildId, stocks, refreshRate }: StockMarketC
                     </div>
                 ))}
             </div>
-        </div>
+        </div >
     );
 }

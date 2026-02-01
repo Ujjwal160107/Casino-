@@ -112,8 +112,8 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                                 <input
                                     type="number"
                                     min={0}
-                                    value={formData.basePrice}
-                                    onChange={(e) => handleChange("basePrice", parseInt(e.target.value) || 0)}
+                                    value={formData.basePrice === 0 ? "" : formData.basePrice}
+                                    onChange={(e) => handleChange("basePrice", e.target.value === "" ? 0 : parseInt(e.target.value))}
                                     className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
                                 />
                             </div>
@@ -122,8 +122,8 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                                 <input
                                     type="number"
                                     min={0}
-                                    value={formData.incomePerCycle}
-                                    onChange={(e) => handleChange("incomePerCycle", parseInt(e.target.value) || 0)}
+                                    value={formData.incomePerCycle === 0 ? "" : formData.incomePerCycle}
+                                    onChange={(e) => handleChange("incomePerCycle", e.target.value === "" ? 0 : parseInt(e.target.value))}
                                     className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
                                 />
                             </div>
@@ -132,8 +132,8 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                                 <input
                                     type="number"
                                     min={1}
-                                    value={formData.incomeCycleHours}
-                                    onChange={(e) => handleChange("incomeCycleHours", parseInt(e.target.value) || 24)}
+                                    value={formData.incomeCycleHours === 0 ? "" : formData.incomeCycleHours}
+                                    onChange={(e) => handleChange("incomeCycleHours", e.target.value === "" ? 0 : parseInt(e.target.value))}
                                     className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
                                 />
                             </div>
@@ -146,8 +146,8 @@ export function PropertyForm({ initialData, isOpen, onClose, onSubmit, isSubmitt
                                 <input
                                     type="number"
                                     min={1}
-                                    value={formData.maxPerUser}
-                                    onChange={(e) => handleChange("maxPerUser", parseInt(e.target.value) || 1)}
+                                    value={formData.maxPerUser === 0 ? "" : formData.maxPerUser}
+                                    onChange={(e) => handleChange("maxPerUser", e.target.value === "" ? 0 : parseInt(e.target.value))}
                                     className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50"
                                 />
                             </div>

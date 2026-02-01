@@ -109,8 +109,8 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
                         <input
                             type="number"
                             name="marriageCost"
-                            value={config.marriageCost}
-                            onChange={handleChange}
+                            value={config.marriageCost === 0 ? "" : config.marriageCost}
+                            onChange={(e) => setConfig({ ...config, marriageCost: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                             className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/50 transition-all font-mono"
                             min={0}
                             disabled={!config.marriageEnabled}
@@ -128,8 +128,8 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
                         <input
                             type="number"
                             name="divorceCost"
-                            value={config.divorceCost}
-                            onChange={handleChange}
+                            value={config.divorceCost === 0 ? "" : config.divorceCost}
+                            onChange={(e) => setConfig({ ...config, divorceCost: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                             className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all font-mono"
                             min={0}
                             disabled={!config.marriageEnabled}

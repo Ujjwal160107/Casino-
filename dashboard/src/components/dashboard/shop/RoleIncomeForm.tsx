@@ -150,8 +150,8 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                                         <input
                                             type="number"
                                             min={0}
-                                            value={income.amount}
-                                            onChange={(e) => updateIncome(idx, "amount", parseInt(e.target.value) || 0, type)}
+                                            value={income.amount === 0 ? "" : income.amount}
+                                            onChange={(e) => updateIncome(idx, "amount", e.target.value === "" ? 0 : parseInt(e.target.value), type)}
                                             className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50"
                                         />
                                     </div>

@@ -445,15 +445,18 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                             )}
 
                                             {(effect.type.includes("ROLE")) && (
-                                                <div className="grid grid-cols-[1fr_auto] gap-2">
-                                                    <select
-                                                        value={effect.roleId || ""}
-                                                        onChange={e => updateEffect(idx, "roleId", e.target.value)}
-                                                        className="bg-transparent border-b border-white/10 text-sm py-1 focus:outline-none text-zinc-300 w-full"
-                                                    >
-                                                        <option value="" className="bg-black">Select Role...</option>
-                                                        {roles.map(r => <option key={r.id} value={r.id} className="bg-black">{r.name}</option>)}
-                                                    </select>
+                                                <div className="flex flex-col gap-3">
+                                                    <div>
+                                                        <label className="text-xs text-zinc-500 font-bold uppercase mb-1 block">Role</label>
+                                                        <select
+                                                            value={effect.roleId || ""}
+                                                            onChange={e => updateEffect(idx, "roleId", e.target.value)}
+                                                            className="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                                        >
+                                                            <option value="" className="bg-black">Select Role...</option>
+                                                            {roles.map(r => <option key={r.id} value={r.id} className="bg-black">{r.name}</option>)}
+                                                        </select>
+                                                    </div>
                                                     {(effect.type === "ROLE_TEMPORARY") && (
                                                         <DurationInput
                                                             value={effect.duration || 0}

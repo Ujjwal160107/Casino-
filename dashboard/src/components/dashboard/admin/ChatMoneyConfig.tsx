@@ -62,8 +62,8 @@ export function ChatMoneyConfig({ guildId, config }: ChatMoneyConfigProps) {
                         <label className="text-sm font-medium text-zinc-400">Min Amount</label>
                         <input
                             type="number"
-                            value={formData.min}
-                            onChange={(e) => setFormData({ ...formData, min: parseInt(e.target.value) || 0 })}
+                            value={formData.min === 0 ? "" : formData.min}
+                            onChange={(e) => setFormData({ ...formData, min: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                             className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white"
                         />
                     </div>
@@ -71,8 +71,8 @@ export function ChatMoneyConfig({ guildId, config }: ChatMoneyConfigProps) {
                         <label className="text-sm font-medium text-zinc-400">Max Amount</label>
                         <input
                             type="number"
-                            value={formData.max}
-                            onChange={(e) => setFormData({ ...formData, max: parseInt(e.target.value) || 0 })}
+                            value={formData.max === 0 ? "" : formData.max}
+                            onChange={(e) => setFormData({ ...formData, max: e.target.value === "" ? 0 : parseInt(e.target.value) })}
                             className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white"
                         />
                     </div>
