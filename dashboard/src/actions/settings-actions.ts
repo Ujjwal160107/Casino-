@@ -243,3 +243,14 @@ export async function updateBankSettings(guildId: string, data: any) {
         return { success: false, error: "Failed to update bank settings" };
     }
 }
+
+export async function syncGuildData(guildId: string) {
+    try {
+        console.log(`[Dashboard] Sync requested for guild ${guildId}`);
+        revalidatePath(`/dashboard/${guildId}`, "layout");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to sync guild data:", error);
+        return { success: false, error: "Failed to sync data" };
+    }
+}
