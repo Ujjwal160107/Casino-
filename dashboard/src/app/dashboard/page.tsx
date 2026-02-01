@@ -33,7 +33,7 @@ export default async function DashboardPage() {
     });
 
     return (
-        <div className="min-h-screen bg-zinc-950 relative overflow-hidden font-sans text-foreground selection:bg-primary/30">
+        <div className="min-h-screen relative overflow-hidden font-sans text-foreground selection:bg-primary/30">
             {/* Background Image with Overlay */}
             <div
                 className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat fixed"

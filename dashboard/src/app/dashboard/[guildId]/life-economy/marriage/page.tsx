@@ -16,7 +16,7 @@ export default async function MarriagePage({ params }: PageProps) {
         <div className="space-y-6">
             <div>
                 <TextGlow variant="white">
-                    <h1 className="text-3xl font-bold font-display text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400">
+                    <h1 className="text-3xl font-bold font-display text-white">
                         Marriage Settings
                     </h1>
                 </TextGlow>

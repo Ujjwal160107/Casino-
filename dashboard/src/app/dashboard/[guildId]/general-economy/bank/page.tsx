@@ -16,7 +16,7 @@ export default async function BankConfigPage({ params }: PageProps) {
         <div className="max-w-5xl">
             <div className="mb-8">
                 <TextGlow variant="white">
-                    <h1 className="text-3xl font-bold font-display text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400 mb-2">
+                    <h1 className="text-3xl font-bold font-display text-white mb-2">
                         Bank Configuration
                     </h1>
                 </TextGlow>

@@ -26,7 +26,7 @@ export default async function JobPage({ params }: { params: Promise<{ guildId: s
     return (
         <div>
             <TextGlow variant="white">
-                <h1 className="text-3xl font-bold font-display text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400 mb-6">
+                <h1 className="text-3xl font-bold font-display text-white mb-6">
                     Job Management
                 </h1>
             </TextGlow>
