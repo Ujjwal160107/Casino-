@@ -1,5 +1,6 @@
 import { getJobSettings } from "@/actions/job-actions";
 import { JobsConfigForm } from "@/components/dashboard/forms/JobsConfigForm";
+import { TextGlow } from "@/components/ui/TextGlow";
 
 export default async function JobPage({ params }: { params: Promise<{ guildId: string }> }) {
     const resolvedParams = await params;
@@ -24,7 +25,11 @@ export default async function JobPage({ params }: { params: Promise<{ guildId: s
 
     return (
         <div>
-            <h1 className="text-3xl font-bold font-display text-white mb-6">Job Management</h1>
+            <TextGlow variant="white">
+                <h1 className="text-3xl font-bold font-display text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400 mb-6">
+                    Job Management
+                </h1>
+            </TextGlow>
             <div className="mb-6">
                 <p className="text-zinc-400">Manage job listings, salary brackets, and work requirements.</p>
             </div>

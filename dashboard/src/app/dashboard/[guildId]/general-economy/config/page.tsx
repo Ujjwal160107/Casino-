@@ -1,5 +1,6 @@
 import { getAdminData } from "@/actions/admin-actions";
 import { AdminPanel } from "@/components/dashboard/admin/AdminPanel";
+import { TextGlow } from "@/components/ui/TextGlow";
 
 interface PageProps {
     params: Promise<{
@@ -14,7 +15,11 @@ export default async function ConfigPage({ params }: PageProps) {
     return (
         <div className="max-w-5xl">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold font-display text-white mb-2">Configuration & Admin Panel</h1>
+                <TextGlow variant="white">
+                    <h1 className="text-3xl font-bold font-display text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400 mb-2">
+                        Configuration & Admin Panel
+                    </h1>
+                </TextGlow>
                 <p className="text-zinc-400">Manage all aspect of your server's economy, permissions, and game modules.</p>
             </div>
 

@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Toaster } from "sonner";
 import { CursorSpotlight } from "@/components/CursorSpotlight";
+import { AmbientBackground } from "@/components/AmbientBackground";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -37,6 +38,7 @@ export default function RootLayout({
         className={`${inter.variable} ${poppins.variable} ${orbitron.variable} antialiased font-sans`}
       >
         <Providers>
+          <AmbientBackground />
           <CursorSpotlight />
           {children}
           <Toaster position="top-right" theme="dark" richColors />

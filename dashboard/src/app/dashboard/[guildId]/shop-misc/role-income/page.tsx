@@ -2,6 +2,7 @@ import { getRoleIncomes } from "@/actions/income-actions";
 import { getGeneralSettings } from "@/actions/settings-actions";
 import { getGuildRoles } from "@/lib/discord";
 import { RoleIncomeForm } from "@/components/dashboard/shop/RoleIncomeForm";
+import { TextGlow } from "@/components/ui/TextGlow";
 
 interface PageProps {
     params: Promise<{
@@ -29,7 +30,11 @@ export default async function RoleIncomePage({ params }: PageProps) {
     return (
         <div className="space-y-8">
             <div>
-                <h1 className="text-3xl font-bold font-display text-white mb-2">Role Income</h1>
+                <TextGlow variant="white">
+                    <h1 className="text-3xl font-bold font-display text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400 mb-2">
+                        Role Income
+                    </h1>
+                </TextGlow>
                 <p className="text-zinc-400">Configure passive income for specific Discord roles.</p>
             </div>
 

@@ -1,5 +1,6 @@
 import { PropertyManager } from "@/components/dashboard/properties/PropertyManager";
 import { getProperties } from "@/actions/property-actions";
+import { TextGlow } from "@/components/ui/TextGlow";
 
 interface PropertyPageProps {
     params: Promise<{ guildId: string }>;
@@ -11,7 +12,11 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 
     return (
         <div>
-            <h1 className="text-3xl font-bold font-display text-white mb-6">Property Management</h1>
+            <TextGlow variant="white">
+                <h1 className="text-3xl font-bold font-display text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400 mb-6">
+                    Property Management
+                </h1>
+            </TextGlow>
             <PropertyManager guildId={guildId} initialProperties={properties} />
         </div>
     );

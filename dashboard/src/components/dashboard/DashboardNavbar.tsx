@@ -172,7 +172,7 @@ export function DashboardNavbar({ guild, user }: DashboardNavbarProps) {
                     {isServerMenuOpen && (
                         <>
                             <div className="fixed inset-0 z-40" onClick={() => setIsServerMenuOpen(false)} />
-                            <div className="absolute top-full left-0 mt-2 w-64 glass-card rounded-xl shadow-xl z-50 p-2 animate-in fade-in slide-in-from-top-2">
+                            <div className="absolute top-full left-0 mt-2 w-64 bg-zinc-950 border border-white/10 rounded-xl shadow-xl z-50 p-2 animate-in fade-in slide-in-from-top-2">
                                 <div className="px-2 py-1.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                                     Current Server
                                 </div>
@@ -230,7 +230,7 @@ export function DashboardNavbar({ guild, user }: DashboardNavbarProps) {
 
                     {/* Search Results Dropdown */}
                     {showResults && searchQuery.trim() && (
-                        <div className="absolute top-full right-0 mt-2 w-80 glass-card rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-2">
+                        <div className="absolute top-full right-0 mt-2 w-80 bg-zinc-950 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-2">
                             {filteredResults.length > 0 ? (
                                 <div className="space-y-1">
                                     <div className="px-2 py-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
