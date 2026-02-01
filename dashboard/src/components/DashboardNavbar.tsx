@@ -26,7 +26,7 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
             className="sticky top-0 z-50 w-full px-6 py-4"
         >
             <div className="max-w-7xl mx-auto">
-                <div className="relative bg-gradient-to-b from-white/5 to-white/0 backdrop-blur-3xl rounded-full px-6 py-3 flex items-center justify-between shadow-[0_0_40px_-10px_rgba(255,255,255,0.1)] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),_inset_0_-1px_0_0_rgba(255,255,255,0.05)]">
+                <div className="relative bg-gradient-to-b from-white/10 to-white/0 backdrop-blur-3xl rounded-full px-6 py-3 flex items-center justify-between shadow-[0_0_40px_-10px_rgba(255,215,0,0.15)] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),_inset_0_-1px_0_0_rgba(255,255,255,0.05)] border border-white/5">
                     {/* Brand / Logo */}
                     <div className="flex items-center gap-3">
                         <div className="relative w-10 h-10 rounded-full border-2 border-yellow-600/50 shadow-md overflow-hidden">

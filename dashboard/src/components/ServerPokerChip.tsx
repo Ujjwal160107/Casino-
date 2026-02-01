@@ -42,7 +42,7 @@ export function ServerPokerChip({ guild, onClick, index }: ServerPokerChipProps)
                 scale: 1.1,
                 rotate: 5,
                 y: -10,
-                boxShadow: "0 20px 40px -10px rgba(0,0,0,0.5)"
+                boxShadow: "0 20px 40px -10px rgba(0,0,0,0.5), 0 0 30px rgba(255, 215, 0, 0.3)"
             }}
             whileTap={{ scale: 0.95 }}
             onClick={onClick}

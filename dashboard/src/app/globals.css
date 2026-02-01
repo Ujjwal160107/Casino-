@@ -1,6 +1,5 @@
 @import "tailwindcss";
 
-
 @theme inline {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-poppins), system-ui, sans-serif;
@@ -40,95 +39,132 @@
 }
 
 :root {
-  /* Casino Luxury Theme (Refined - Lighter Dark) */
+  /* Casino Luxury Theme - Vibrant Edition */
 
-  /* Custom Dashboard Background (#212831) */
-  --background: 214 20% 16%;
+  /* Rich Dark Background (Deep Blue-Black) */
+  --background: 222 47% 11%;
+  /* #0f172a */
 
-  /* #FFFAEB */
-  --foreground: 48 100% 96%;
+  /* Ultra Bright Foreground */
+  --foreground: 210 40% 98%;
+  /* #f8fafc */
 
-  /* Custom Navbar/Card (Lighter than bg) */
-  --card: 217 19% 20%;
-  --card-foreground: 48 100% 96%;
+  /* Glass Cards (Translucent Deep Blue) */
+  --card: 217 33% 17%;
+  --card-foreground: 210 40% 98%;
 
-  --popover: 217 19% 20%;
-  --popover-foreground: 48 100% 96%;
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
 
-  /* Luxury Gold Primary (#FFD700) */
+  /* Neon Gold Primary */
   --primary: 48 100% 50%;
+  /* #ffd700 */
   --primary-foreground: 0 0% 0%;
 
-  /* Dark Gold/Brown Secondary */
-  --secondary: 48 20% 12%;
-  --secondary-foreground: 48 100% 96%;
+  /* Vibrant Cyan Secondary/Accent (for contrast) */
+  --secondary: 190 100% 50%;
+  /* #00e5ff - Cyan Neon */
+  --secondary-foreground: 222 47% 11%;
 
-  /* Muted Blue-Grey */
-  --muted: 217 15% 18%;
-  --muted-foreground: 215 16% 70%;
+  /* Muted but still rich */
+  --muted: 215 28% 17%;
+  --muted-foreground: 217 19% 75%;
 
   /* Accents */
-  --accent: 217 19% 13%;
+  --accent: 217 33% 17%;
   --accent-foreground: 48 100% 50%;
 
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 48 100% 96%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
 
-  --border: 217 19% 20%;
-  --input: 217 19% 13%;
-  /* Gold Ring */
+  --border: 217 33% 20%;
+  --input: 217 33% 15%;
   --ring: 48 100% 50%;
 
-  --radius: 0.5rem;
+  --radius: 0.75rem;
+
+  /* Custom Neon Variables */
+  --neon-gold: rgba(255, 215, 0, 0.6);
+  --neon-blue: rgba(0, 229, 255, 0.4);
 }
 
-/* Glassmorphism Utilities - Lighter Aesthetic */
+/* Glassmorphism Utilities - Vibrant Glow */
 .glass {
-  background: rgba(33, 40, 49, 0.7);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
 }
 
 .glass-card {
-  background: linear-gradient(145deg, rgba(40, 48, 58, 0.6), rgba(33, 40, 49, 0.4));
+  background: linear-gradient(145deg,
+      rgba(30, 41, 59, 0.7) 0%,
+      rgba(15, 23, 42, 0.6) 100%);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  /* Lighter border */
-  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 4px 24px -1px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.02);
+  /* Inner subtle stroke */
+  transition: all 0.3s ease;
 }
 
-.glass-sidebar {
-  background: rgba(27, 32, 40, 0.98);
-  /* Custom Dark Blue-Grey */
-  backdrop-filter: blur(16px);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+.glass-card:hover {
+  background: linear-gradient(145deg,
+      rgba(30, 41, 59, 0.8) 0%,
+      rgba(15, 23, 42, 0.7) 100%);
+  border-color: rgba(255, 215, 0, 0.2);
+  /* Gold hint on hover */
+  box-shadow:
+    0 8px 32px -4px rgba(0, 0, 0, 0.3),
+    0 0 15px rgba(255, 215, 0, 0.1);
+  /* Subtle gold glow */
 }
 
+/* Inputs with Glow Focus */
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(255, 215, 0, 0.5) !important;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.2) !important;
+}
 
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: 'Inter', sans-serif;
+
+  /* Ambient Background Glows */
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 85% 20%, rgba(255, 215, 0, 0.05) 0%, transparent 35%),
+    radial-gradient(circle at 15% 80%, rgba(255, 215, 0, 0.03) 0%, transparent 40%);
+  background-attachment: fixed;
 }
 
-/* Force cursor pointer on all interactive elements */
-button,
-a,
-input[type="button"],
-input[type="submit"],
-input[type="checkbox"],
-input[type="radio"],
-select,
-label,
-[role="button"] {
-  cursor: pointer;
+/* Typography Glows */
+h1,
+h2,
+h3,
+h4,
+.font-display {
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  /* Deep shadow for pop */
 }
 
-/* Custom Scrollbar for Webkit (Chrome, Safari, Edge) */
+h1 {
+  background: linear-gradient(to right, #ffffff, #e2e8f0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow:
+    0 0 30px rgba(255, 255, 255, 0.1);
+}
+
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -136,13 +172,28 @@ label,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  /* zinc-700: Dark Grey */
-  border: 2px solid hsl(var(--background));
+  background: #334155;
   border-radius: 9999px;
+  border: 2px solid hsl(var(--background));
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
-  /* zinc-600: Slightly lighter grey */
+  background: #475569;
+}
+
+/* Utility Animations */
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 25px rgba(255, 215, 0, 0.4);
+  }
+}
+
+.animate-glow {
+  animation: pulse-glow 3s infinite;
 }

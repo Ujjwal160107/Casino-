@@ -4,6 +4,7 @@ import { getUserGuilds, getBotGuilds, type DiscordGuild } from "@/lib/discord";
 import { redirect } from "next/navigation";
 import { ServerList } from "@/components/ServerList";
 import { DashboardNavbar } from "@/components/DashboardNavbar";
+import { TextGlow } from "@/components/ui/TextGlow";
 
 export default async function DashboardPage() {
     const session = await getServerSession(authOptions);
@@ -46,9 +47,11 @@ export default async function DashboardPage() {
 
             <main className="max-w-7xl mx-auto py-12 relative z-10">
                 <div className="text-center mb-16">
-                    <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-yellow-200 to-yellow-500 font-display mb-4 drop-shadow-sm">
-                        Select Your Table
-                    </h1>
+                    <TextGlow variant="gold">
+                        <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-yellow-200 to-yellow-500 font-display mb-4 drop-shadow-sm">
+                            Select Your Table
+                        </h1>
+                    </TextGlow>
                     <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
                         Choose a server to manage. Only servers where you have Admin access and Fortuna is deployed are shown.
                     </p>

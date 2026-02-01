@@ -3,6 +3,7 @@ import { Inter, Poppins, Orbitron } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Toaster } from "sonner";
+import { CursorSpotlight } from "@/components/CursorSpotlight";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -36,6 +37,7 @@ export default function RootLayout({
         className={`${inter.variable} ${poppins.variable} ${orbitron.variable} antialiased font-sans`}
       >
         <Providers>
+          <CursorSpotlight />
           {children}
           <Toaster position="top-right" theme="dark" richColors />
         </Providers>
