@@ -35,20 +35,19 @@
 }
 
 :root {
-  /* Casino Luxury Theme (Black/Gold) */
+  /* Casino Luxury Theme (Refined - Lighter Dark) */
 
-  /* Deep Black Background */
-  --background: 0 0% 0%;
-  /* #000000 */
-  --foreground: 48 100% 96%;
+  /* Zinc-950 Background (#09090b) */
+  --background: 240 10% 4%;
+
   /* #FFFAEB */
+  --foreground: 48 100% 96%;
 
-  /* Rich Gold Cards */
-  --card: 0 0% 5%;
-  /* #0D0D0D */
+  /* Zinc-900 Cards (#18181b) */
+  --card: 240 10% 7%;
   --card-foreground: 48 100% 96%;
 
-  --popover: 0 0% 5%;
+  --popover: 240 10% 7%;
   --popover-foreground: 48 100% 96%;
 
   /* Luxury Gold Primary (#FFD700) */
@@ -60,46 +59,45 @@
   --secondary-foreground: 48 100% 96%;
 
   /* Muted Gold */
-  --muted: 48 20% 12%;
-  --muted-foreground: 48 60% 70%;
+  --muted: 240 4% 16%;
+  --muted-foreground: 240 5% 65%;
 
   /* Accents */
-  --accent: 48 30% 15%;
+  --accent: 240 4% 16%;
   --accent-foreground: 48 100% 50%;
 
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 48 100% 96%;
 
-  --border: 48 30% 20%;
-  --input: 48 30% 20%;
+  --border: 240 4% 16%;
+  --input: 240 4% 16%;
   /* Gold Ring */
   --ring: 48 100% 50%;
 
   --radius: 0.5rem;
 }
 
-/* Glassmorphism Utilities - Luxury Gold Style */
+/* Glassmorphism Utilities - Lighter Aesthetic */
 .glass {
-  background: rgba(10, 10, 10, 0.7);
+  background: rgba(24, 24, 27, 0.7);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 215, 0, 0.15);
-  /* Gold Tint */
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .glass-card {
-  background: linear-gradient(145deg, rgba(20, 20, 20, 0.9), rgba(10, 10, 10, 0.8));
+  background: linear-gradient(145deg, rgba(24, 24, 27, 0.9), rgba(9, 9, 11, 0.8));
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 215, 0, 0.15);
-  /* Gold Border */
-  box-shadow: 0 4px 20px -5px rgba(255, 215, 0, 0.15);
-  /* Gold Glow */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* Lighter border */
+  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.2);
 }
 
 .glass-sidebar {
-  background: rgba(5, 5, 5, 0.95);
+  background: rgba(9, 9, 11, 0.98);
+  /* Zinc-950 */
   backdrop-filter: blur(16px);
-  border-right: 1px solid rgba(255, 215, 0, 0.2);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 
