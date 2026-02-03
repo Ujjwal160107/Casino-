@@ -41,21 +41,21 @@ export function SentenceEditor({
     return (
         <div className={`glass-card rounded-lg border border-white/5 p-4 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
             <div className="flex items-center gap-2 mb-2">
-                <MessageSquare size={16} className="text-zinc-400" />
+                <MessageSquare size={16} className="text-zinc-300" />
                 <h4 className="text-sm font-bold font-display text-white">{title}</h4>
-                <span className="text-xs text-zinc-500 ml-auto">{sentences.length}/{maxLimit}</span>
+                <span className="text-xs text-zinc-300 ml-auto">{sentences.length}/{maxLimit}</span>
             </div>
-            <p className="text-xs text-zinc-500 mb-4">{description}</p>
+            <p className="text-xs text-zinc-300 mb-4">{description}</p>
 
             <div className="space-y-2 mb-4">
                 {sentences.length === 0 && (
-                    <div className="text-xs text-zinc-600 italic py-2 text-center border border-dashed border-white/5 rounded">
+                    <div className="text-xs text-zinc-400 italic py-2 text-center border border-dashed border-white/5 rounded">
                         No custom sentences. Default bot messages will be used.
                     </div>
                 )}
                 {sentences.map((sentence, i) => (
                     <div key={i} className="flex items-center gap-2 bg-white/5 p-2 rounded border border-white/5 group">
-                        <span className="text-sm text-zinc-300 flex-1 truncate">{sentence}</span>
+                        <span className="text-sm text-white flex-1 truncate">{sentence}</span>
                         <button
                             onClick={() => handleDelete(i)}
                             className="text-zinc-600 group-hover:text-red-400 transition-colors p-1"

@@ -1,6 +1,7 @@
-import { getGuild } from "@/lib/discord";
+import { getGuild, getGuildMember } from "@/lib/discord";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { OverviewLogs } from "@/components/dashboard/OverviewLogs";
 import Link from "next/link";
 import { Settings, ShoppingBag, Briefcase, Dices, ArrowRight } from "lucide-react";
 
@@ -57,14 +58,16 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
         }
     ];
 
-    const userName = session?.user?.name || "User";
+    const member = session?.user?.id ? await getGuildMember(guildId, session.user.id) : null;
+    // Fallback: Guild Nickname -> Global Display Name -> Username -> "User"
+    const displayName = member?.nick || member?.user?.global_name || session?.user?.name || "User";
 
     return (
         <div className="space-y-10 mt-4">
             {/* Welcome Header */}
             <div className="space-y-2">
                 <h1 className="text-4xl font-bold font-display text-white tracking-tight">
-                    Welcome <span className="text-primary">{userName}</span>,
+                    Welcome <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-amber-300 font-black drop-shadow-sm">{displayName}</span>,
                 </h1>
                 <p className="text-xl text-zinc-400 font-light">
                     find commonly used dashboard pages below.
@@ -103,6 +106,11 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
                         </div>
                     </div>
                 ))}
+            </div>
+
+            {/* Admin Activity Logs */}
+            <div className="w-full">
+                <OverviewLogs guildId={guildId} />
             </div>
 
             {/* Decorative/Info Section */}

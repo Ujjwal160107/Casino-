@@ -87,7 +87,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
             <div className="flex items-start justify-between mb-4 relative z-20 pointer-events-auto">
                 <div>
                     <h3 className="text-lg font-bold font-display text-white uppercase tracking-wider">{label}</h3>
-                    <p className="text-sm text-zinc-400">{description}</p>
+                    <p className="text-sm text-zinc-200">{description}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-zinc-500 uppercase">
@@ -103,7 +103,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
             {/* Configuration Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div className="space-y-1">
-                    <label className="text-xs text-zinc-500">Min Pay</label>
+                    <label className="text-xs text-white uppercase font-bold tracking-wider">Min Pay</label>
                     <input
                         type="number"
                         min={0}
@@ -114,7 +114,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                     />
                 </div>
                 <div className="space-y-1">
-                    <label className="text-xs text-zinc-500">Max Pay</label>
+                    <label className="text-xs text-white uppercase font-bold tracking-wider">Max Pay</label>
                     <input
                         type="number"
                         min={0}
@@ -125,7 +125,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                     />
                 </div>
                 <div className="space-y-1">
-                    <label className="text-xs text-zinc-500">Success Rate %</label>
+                    <label className="text-xs text-white uppercase font-bold tracking-wider">Success Rate %</label>
                     <input
                         type="number"
                         min={1} max={100}
@@ -136,7 +136,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                     />
                 </div>
                 <div className="space-y-1">
-                    <label className="text-xs text-zinc-500">Fail Penalty %</label>
+                    <label className="text-xs text-white uppercase font-bold tracking-wider">Fail Penalty %</label>
                     <input
                         type="number"
                         min={0} max={100}
@@ -186,7 +186,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs text-zinc-500">Bail Amount (Fine)</label>
+                            <label className="text-xs text-white uppercase font-bold tracking-wider">Bail Amount (Fine)</label>
                             <input
                                 type="number"
                                 min={0}
@@ -196,7 +196,7 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                                 placeholder="1000"
                                 disabled={formData.enabled === false}
                             />
-                            <p className="text-[10px] text-zinc-600">Cost to bail out instantly.</p>
+                            <p className="text-[10px] text-zinc-400">Cost to bail out instantly.</p>
                         </div>
                         <div className="space-y-1">
                             <DurationInput
@@ -205,14 +205,14 @@ export function CommandEditor({ guildId, commandKey, label, description, initial
                                 label="Jail Time"
                                 disabled={formData.enabled === false}
                             />
-                            <p className="text-[10px] text-zinc-600">Time spent in jail.</p>
+                            <p className="text-[10px] text-zinc-400">Time spent in jail.</p>
                         </div>
                     </div>
                 </div>
             )}
 
             {isCrime && (
-                <p className="text-xs text-zinc-600 mt-2 mb-6 italic">
+                <p className="text-xs text-zinc-400 mt-2 mb-6 italic">
                     Note: Crime scenarios have complex logic handled by the bot. Custom messages are not supported here yet.
                 </p>
             )}

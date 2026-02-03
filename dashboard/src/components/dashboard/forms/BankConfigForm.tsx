@@ -75,38 +75,38 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
-                        <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                        <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
                             Loan Interest (%)
                         </label>
                         <input
                             type="number"
                             value={formData.loanInterestRate === 0 ? "" : formData.loanInterestRate}
                             onChange={(e) => handleChange("loanInterestRate", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500/50 transition-colors"
+                            className="w-full bg-white/5 border-black rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                         />
-                        <p className="text-xs text-zinc-600 mt-2">Daily interest charged on active loans.</p>
+                        <p className="text-xs text-zinc-400 mt-2">Simultaneous loans a single user can hold.</p>
                     </div>
                     <div>
-                        <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                        <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
                             FD Interest (%)
                         </label>
                         <input
                             type="number"
                             value={formData.fdInterestRate === 0 ? "" : formData.fdInterestRate}
                             onChange={(e) => handleChange("fdInterestRate", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500/50 transition-colors"
+                            className="w-full bg-white/5 border-black rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-600 mt-2">Flat interest for Fixed Deposits.</p>
                     </div>
                     <div>
-                        <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                        <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
                             RD Interest (%)
                         </label>
                         <input
                             type="number"
                             value={formData.rdInterestRate === 0 ? "" : formData.rdInterestRate}
                             onChange={(e) => handleChange("rdInterestRate", e.target.value === "" ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-green-500/50 transition-colors"
+                            className="w-full bg-white/5 border-black rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                         />
                         <p className="text-xs text-zinc-600 mt-2">Interest for Recurring Deposits.</p>
                     </div>
@@ -121,7 +121,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                        <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
                             Bank Capacity
                         </label>
                         <input
@@ -134,7 +134,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                         <p className="text-xs text-zinc-600 mt-2">Max coins a user can store in bank.</p>
                     </div>
                     <div>
-                        <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                        <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
                             Max Active Loans
                         </label>
                         <input
@@ -156,7 +156,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div>
-                        <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">Min Credit Score</label>
+                        <label className="block text-xs font-semibold text-zinc-300 uppercase mb-2">Max Credit Score</label>
                         <input
                             type="number"
                             value={formData.minCreditScore === 0 ? "" : formData.minCreditScore}
@@ -209,12 +209,11 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
 
                     {formData.creditConfig.length === 0 ? (
                         <div className="text-center py-10 border border-dashed border-white/10 rounded-lg">
-                            <Info className="mx-auto text-zinc-600 mb-2" />
-                            <p className="text-zinc-500 text-sm">No credit tiers defined. Default system limits will apply.</p>
+                            <p className="text-zinc-400 text-sm">No credit tiers defined. Default system limits will apply.</p>
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-zinc-500 uppercase px-2">
+                            <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-zinc-300 uppercase px-2">
                                 <div className="col-span-3">Min Score</div>
                                 <div className="col-span-3">Max Loan</div>
                                 <div className="col-span-3">Max Days</div>
@@ -250,7 +249,7 @@ export function BankConfigForm({ guildId, initialData }: BankConfigFormProps) {
                                                 type="number"
                                                 value={tier.maxDays}
                                                 onChange={(e) => updateCreditTier(idx, 'maxDays', parseInt(e.target.value))}
-                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-sm text-white"
+                                                className="w-full bg-white/5 border-black rounded px-2 py-1.5 text-sm text-white"
                                             />
                                         </div>
                                         <div className="col-span-3 text-right">

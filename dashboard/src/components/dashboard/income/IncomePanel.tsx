@@ -114,7 +114,7 @@ export function IncomePanel({ guildId, data }: IncomePanelProps) {
                             guildId={guildId}
                             commandKey="beg"
                             label="Beg Command"
-                            description="Configure payouts and messages for the !beg command."
+                            description="Configure payouts and messages for the beg command."
                             initialData={data.commands.beg}
                         />
                     </div>
@@ -138,7 +138,7 @@ export function IncomePanel({ guildId, data }: IncomePanelProps) {
                             guildId={guildId}
                             commandKey="crime"
                             label="Crime Command"
-                            description="Configure settings for !crime."
+                            description="Configure settings for crime."
                             initialData={{
                                 ...data.commands.crime,
                                 jailTime: data.rob.jailTime,

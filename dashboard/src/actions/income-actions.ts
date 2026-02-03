@@ -6,6 +6,10 @@ import { getGuildRoles as fetchGuildRoles, getGuildChannels } from "@/lib/discor
 import { redis } from "@/lib/redis";
 import { invalidateGuildConfig } from "@/lib/cache";
 
+import { createAuditLog } from "@/lib/audit";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+
 export async function getIncomeSettings(guildId: string) {
     const config = await prisma.guildConfig.findUnique({ where: { guildId } });
 
@@ -136,6 +140,18 @@ export async function updateIncomeCommand(guildId: string, commandKey: string, d
             await invalidateGuildConfig(guildId);
         }
 
+        // Audit Log
+        const session = await getServerSession(authOptions);
+        if (session?.user?.id) {
+            await createAuditLog(guildId, session.user.id, "UPDATE_COMMAND_CONFIG", {
+                commandKey,
+                changes: cleanData,
+                jailTime,
+                jailFine,
+                enabled
+            });
+        }
+
         revalidatePath(`/dashboard/${guildId}/general-economy/income`);
         return { success: true };
     } catch (error: any) {
@@ -155,6 +171,12 @@ export async function updateRewardAmounts(guildId: string, data: {
             data: { ...data }
         });
         await invalidateGuildConfig(guildId);
+
+        const session = await getServerSession(authOptions);
+        if (session?.user?.id) {
+            await createAuditLog(guildId, session.user.id, "UPDATE_REWARD_AMOUNTS", data);
+        }
+
         revalidatePath(`/dashboard/${guildId}/general-economy/income`);
         return { success: true };
     } catch (error) {
@@ -243,6 +265,14 @@ export async function updateRoleIncomes(guildId: string, incomes: {
         // The bot fetches role incomes directly from DB usually, depending on implementation
         // If there's a cached 'roleIncome' key, we'd invalidate it here.
 
+        const session = await getServerSession(authOptions);
+        if (session?.user?.id) {
+            await createAuditLog(guildId, session.user.id, "UPDATE_ROLE_INCOMES", {
+                count: incomes.length,
+                types: [...new Set(incomes.map(i => i.incomeType))]
+            });
+        }
+
         revalidatePath(`/dashboard/${guildId}/general-economy/income`);
         return { success: true };
     } catch (error: any) {
@@ -286,6 +316,14 @@ export async function updateRobSettings(guildId: string, data: {
 
         await invalidateGuildConfig(guildId);
 
+        const session = await getServerSession(authOptions);
+        if (session?.user?.id) {
+            await createAuditLog(guildId, session.user.id, "UPDATE_ROB_SETTINGS", {
+                ...robData,
+                enabled
+            });
+        }
+
         revalidatePath(`/dashboard/${guildId}/general-economy/income`);
         return { success: true };
     } catch (error) {
@@ -302,6 +340,12 @@ export async function updateQuestSettings(guildId: string, data: {
             where: { guildId },
             data: { ...data }
         });
+
+        const session = await getServerSession(authOptions);
+        if (session?.user?.id) {
+            await createAuditLog(guildId, session.user.id, "UPDATE_QUEST_SETTINGS", data);
+        }
+
         revalidatePath(`/dashboard/${guildId}/general-economy/income`);
         return { success: true };
     } catch (error) {
@@ -335,6 +379,13 @@ export async function updateCasinoDrops(guildId: string, drops: any[]) {
                 });
             }
         });
+
+        const session = await getServerSession(authOptions);
+        if (session?.user?.id) {
+            await createAuditLog(guildId, session.user.id, "UPDATE_CASINO_DROPS", {
+                count: drops.length
+            });
+        }
 
         revalidatePath(`/dashboard/${guildId}/general-economy/income`);
         return { success: true, error: null };

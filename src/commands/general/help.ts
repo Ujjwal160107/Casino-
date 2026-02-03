@@ -191,7 +191,7 @@ export async function handleHelp(message: Message) {
     .setColor(Mascot.Colors.Base as any)
     .setThumbnail(thumbnail)
     .addFields(
-      { name: "🔗 Quick Links", value: `[Dashboard](${Mascot.Links.Dashboard}) • [Docs](${Mascot.Links.Docs}) • [Support Server](${Mascot.Links.Support})` }
+      { name: "🔗 Quick Links", value: `[Dashboard](${Mascot.Links.Dashboard}) • [Commands](${Mascot.Links.CommandList}) • [Guide](${Mascot.Links.Docs}) • [Support](${Mascot.Links.Support})` }
     );
 
   const initialComponents = generateComponents("none", 1, 1);

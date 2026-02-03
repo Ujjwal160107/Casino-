@@ -1,28 +1,28 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { Shield, Book, CreditCard, DollarSign, Dna, Bot, Briefcase, GraduationCap, Heart, ShoppingBag, TrendingUp, Gavel, Settings, HelpCircle, UserPlus, MessageCircle } from "lucide-react";
+import { NavGroup, NavLink, SectionHeader } from "@/components/docs/SharedDocs";
+import { Shield, Book, UserPlus, Briefcase, GraduationCap, TrendingUp, HelpCircle, Link as LinkIcon, Star, Dna, ShoppingBag, Landmark, Heart, Swords } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
 export default function DocsPage() {
-    const inviteUrl = "https://discord.com/oauth2/authorize?client_id=1371816936857669702&permissions=268823672&scope=bot%20applications.commands";
-
     return (
         <main className="min-h-screen bg-[#0a0a0a] text-zinc-100 selection:bg-violet-500/30">
-            <LandingNavbar />
+            <LandingNavbar hideLogin={true} />
 
             {/* Hero Section */}
             <section className="relative pt-32 pb-20 px-6">
-                <div className="absolute inset-0 bg-gradient-to-b from-violet-900/20 to-transparent pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-b from-blue-900/20 to-transparent pointer-events-none" />
                 <div className="max-w-4xl mx-auto text-center relative z-10">
                     <motion.h1
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-indigo-400 mb-6"
+                        className="text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-violet-400 mb-6"
                     >
-                        User Manual
+                        Player Guide
                     </motion.h1>
                     <motion.p
                         initial={{ opacity: 0, y: 20 }}
@@ -30,311 +30,271 @@ export default function DocsPage() {
                         transition={{ delay: 0.1 }}
                         className="text-xl text-zinc-400 max-w-2xl mx-auto"
                     >
-                        Everything you need to know to master Fortuna.
+                        Learn how to build your empire, climb the corporate ladder, and dominate the economy.
                     </motion.p>
                 </div>
             </section>
 
-            {/* Content */}
             <div className="max-w-7xl mx-auto px-6 pb-32 grid grid-cols-1 lg:grid-cols-4 gap-12">
                 {/* Sidebar Navigation */}
                 <div className="hidden lg:block col-span-1">
-                    <div className="sticky top-32 space-y-8 max-h-[calc(100vh-10rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-                        <NavGroup title="Start Here">
-                            <NavLink href="#getting-started">Getting Started</NavLink>
-                            <NavLink href="#faq">FAQ</NavLink>
-                            <NavLink href="#support">Support</NavLink>
+                    <div className="sticky top-32 space-y-8 max-h-[calc(100vh-10rem)] overflow-y-auto pr-2 custom-scrollbar">
+                        <NavGroup title="Basics">
+                            <NavLink href="#intro">Introduction</NavLink>
+                            <NavLink href="#dailies">Earning Money</NavLink>
+                            <NavLink href="#banking">Bank & Finance</NavLink>
                         </NavGroup>
-                        <NavGroup title="Economy">
-                            <NavLink href="#banking">Banking & Wallet</NavLink>
-                            <NavLink href="#income">Income & Rewards</NavLink>
-                            <NavLink href="#market">Shop & Market</NavLink>
-                            <NavLink href="#stocks">Stocks</NavLink>
-                        </NavGroup>
-                        <NavGroup title="Games">
-                            <NavLink href="#casino">Casino Games</NavLink>
-                        </NavGroup>
-                        <NavGroup title="Life Sim">
-                            <NavLink href="#career">Career</NavLink>
+                        <NavGroup title="Life & Career">
                             <NavLink href="#education">Education</NavLink>
-                            <NavLink href="#family">Family & Lifestyle</NavLink>
+                            <NavLink href="#jobs">Carreer & Jobs</NavLink>
+                            <NavLink href="#family">Marriage & Family</NavLink>
                         </NavGroup>
-                        <NavGroup title="Admin">
-                            <NavLink href="#config">Configuration</NavLink>
-                            <NavLink href="#moderation">Moderation</NavLink>
-                            <NavLink href="#admin-all">All Commands</NavLink>
+                        <NavGroup title="Assets">
+                            <NavLink href="#inventory">Inventory & Market</NavLink>
+                            <NavLink href="#stocks">Stock Market</NavLink>
+                            <NavLink href="#properties">Properties</NavLink>
+                        </NavGroup>
+                        <NavGroup title="Entertainment">
+                            <NavLink href="#games">Casino Games</NavLink>
+                            <NavLink href="#chicken">Chicken Training</NavLink>
+                        </NavGroup>
+                        <NavGroup title="Reference">
+                            <Link href="/docs/commands" className="text-violet-400 hover:text-violet-300 font-bold flex items-center gap-2 py-1">
+                                <LinkIcon size={14} /> Full Command List
+                            </Link>
                         </NavGroup>
                     </div>
                 </div>
 
                 {/* Main Content */}
-                <div className="col-span-1 lg:col-span-3 space-y-16">
+                <div className="col-span-1 lg:col-span-3 space-y-20">
 
-                    {/* Getting Started */}
-                    <section id="getting-started">
-                        <SectionHeader icon={<UserPlus />} title="Getting Started" />
+                    {/* Introduction */}
+                    <section id="intro">
+                        <SectionHeader icon={<UserPlus />} title="Welcome to Fortuna" />
                         <GlassCard className="p-8 space-y-6">
-                            <div className="space-y-4">
-                                <h3 className="text-xl font-bold text-white">1. Invite Fortuna</h3>
-                                <p className="text-zinc-400">Add the bot to your server using the invite link below. You need "Manage Server" permissions.</p>
-                                <a href={inviteUrl} className="inline-block px-6 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors font-medium">Add to Discord</a>
-                            </div>
-                            <div className="space-y-4 pt-6 border-t border-white/10">
-                                <h3 className="text-xl font-bold text-white">2. Initial Setup</h3>
-                                <p className="text-zinc-400">Once added, run the setup command to configure your currency and economy settings.</p>
-                                <CommandCard cmd="!setup" args="" desc="Launches interactive setup wizard." />
-                            </div>
+                            <p className="text-lg text-zinc-300 leading-relaxed">
+                                Fortuna is more than just a currency bot—it's a complete <strong>Life Simulation</strong>.
+                                You don't just click a button to get rich; you need to study, get a degree, find a job, manage your stress, and invest wisely.
+                            </p>
                         </GlassCard>
                     </section>
 
-                    {/* FAQ */}
-                    <section id="faq">
-                        <SectionHeader icon={<HelpCircle />} title="Frequently Asked Questions" />
-                        <div className="space-y-4">
-                            <FAQItem q="How do I earn money?" a="Use commands like !daily, !work, and !weekly. You can also gamble in the casino or play the stock market." />
-                            <FAQItem q="Why can't I use an item?" a="Check your inventory with !inv. Some items are passive, others require !use <item_name>." />
-                            <FAQItem q="My balance is gone?" a="If the server admin reset the economy, all data is wiped. Or, you might have been robbed!" />
-                            <FAQItem q="How do I get a job?" a="Use !jobs to see listing, then !apply <id>. Some jobs require a degree from !education." />
+                    {/* Earning Money */}
+                    <section id="dailies">
+                        <SectionHeader icon={<Star />} title="Earning Money" />
+                        <div className="space-y-6">
+                            <p className="text-zinc-400">There are many ways to make money, ranging from honest work to dangerous crimes.</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <GlassCard className="p-6">
+                                    <h4 className="font-bold text-white text-lg mb-2">Safe Income</h4>
+                                    <ul className="space-y-2 text-sm text-zinc-300 font-mono">
+                                        <li>• !daily / !weekly / !monthly</li>
+                                        <li>• !work (Requires a Job)</li>
+                                        <li>• !collect (Passive Income)</li>
+                                        <li>• !vote (Vote rewards)</li>
+                                        <li>• !beg (Ask strangers for cash)</li>
+                                    </ul>
+                                </GlassCard>
+                                <GlassCard className="p-6 border-red-500/20">
+                                    <h4 className="font-bold text-red-400 text-lg mb-2">Risky Business</h4>
+                                    <ul className="space-y-2 text-sm text-zinc-300 font-mono">
+                                        <li>• !crime (High risk, moderate reward)</li>
+                                        <li>• !rob @user (Steal from wallets)</li>
+                                        <li>• !slut (Sell your... dignity)</li>
+                                    </ul>
+                                    <p className="mt-4 text-xs text-red-400">
+                                        <strong>Warning:</strong> These commands carry a high risk of fines or jail time. If you land in jail, you cannot use commands until your sentence is over or you pay bail!
+                                    </p>
+                                </GlassCard>
+                            </div>
                         </div>
                     </section>
 
-                    {/* Economy Section */}
+                    {/* Banking Module */}
                     <section id="banking">
-                        <SectionHeader icon={<CreditCard />} title="Banking & Wallet" />
-                        <div className="grid grid-cols-1 gap-4">
-                            <CommandCard
-                                cmd="!balance"
-                                args=""
-                                desc="Displays your current Wallet, Bank, and Net Worth."
-                            />
-                            <CommandCard
-                                cmd="!deposit"
-                                args="<amount | all>"
-                                desc="Move money from your Wallet to your Bank. Banked money is safe from robbery."
-                            />
-                            <CommandCard
-                                cmd="!withdraw"
-                                args="<amount | all>"
-                                desc="Move money from your Bank to your Wallet for spending."
-                            />
-                            <CommandCard
-                                cmd="!transfer"
-                                args="<@user> <amount>"
-                                desc="Send money to another user. May be subject to transfer tax."
-                            />
+                        <SectionHeader icon={<Landmark />} title="Bank & Finance" />
+                        <div className="space-y-6 text-zinc-300">
+                            <p>
+                                Your <strong>Bank</strong> is safe from robbers. Always deposit your cash!
+                                Access the banking dashboard with <code className="bg-white/10 px-1 rounded">!bank</code>.
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                                <div>
+                                    <h4 className="text-white font-bold mb-2 text-lg">🏦 Loans</h4>
+                                    <p className="text-sm text-zinc-400 mb-2">Need quick cash? Take out a loan backed by your Credit Score.</p>
+                                    <ul className="list-disc list-inside text-sm text-zinc-400">
+                                        <li>Higher Credit Score = Bigger Loans</li>
+                                        <li>Miss payments = Score drops</li>
+                                        <li>Use <code className="text-zinc-300">!bank</code> to manage/repay loans.</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h4 className="text-white font-bold mb-2 text-lg">📈 Investments (FD/RD)</h4>
+                                    <p className="text-sm text-zinc-400 mb-2">Let your money grow over time.</p>
+                                    <ul className="list-disc list-inside text-sm text-zinc-400">
+                                        <li><strong>Fixed Deposit (FD):</strong> Lock money for a set time (e.g., 7 days) for high interest.</li>
+                                        <li><strong>Recurring Deposit (RD):</strong> Auto-save a small amount daily.</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </section>
 
-                    <section id="income">
-                        <SectionHeader icon={<DollarSign />} title="Income & Rewards" />
-                        <div className="grid grid-cols-1 gap-4">
-                            <CommandCard cmd="!daily" args="" desc="Claim your daily reward." />
-                            <CommandCard cmd="!weekly" args="" desc="Claim your weekly reward." />
-                            <CommandCard cmd="!monthly" args="" desc="Claim your monthly reward." />
-                            <CommandCard cmd="!work" args="" desc="Perform a shift at your job. Requires a job (see Life Sim)." />
-                            <CommandCard cmd="!crime" args="" desc="Attempt illegal activity for cash. High risk of fines/jail." />
-                            <CommandCard cmd="!rob" args="<@user>" desc="Steal from another user's wallet." />
-                            <CommandCard cmd="!collect" args="" desc="Collect income from Roles or Properties." />
+                    {/* Inventory & Market */}
+                    <section id="inventory">
+                        <SectionHeader icon={<ShoppingBag />} title="Inventory & Market" />
+                        <div className="space-y-6 text-zinc-300">
+                            <p>
+                                View your items with <code className="bg-white/10 px-1 rounded">!inventory</code> (or !inv).
+                            </p>
+
+                            <h4 className="text-xl font-bold text-white mt-8 mb-4">Trading & Selling</h4>
+                            <div className="grid grid-cols-1 gap-4">
+                                <div className="bg-white/5 p-4 rounded-lg">
+                                    <strong className="text-white block mb-1">Quick Sell</strong>
+                                    <p className="text-sm text-zinc-400">
+                                        Sell items back to the system instantly for a fraction of their value using <code className="text-zinc-300">!shop sell &lt;item&gt;</code>.
+                                    </p>
+                                </div>
+                                <div className="bg-white/5 p-4 rounded-lg">
+                                    <strong className="text-white block mb-1">Player Trading</strong>
+                                    <p className="text-sm text-zinc-400">
+                                        Give items to friends using <code className="text-zinc-300">!give &lt;@user&gt; &lt;item&gt;</code>.
+                                    </p>
+                                </div>
+                                <div className="bg-white/5 p-4 rounded-lg border border-purple-500/20">
+                                    <strong className="text-purple-400 block mb-1">The Black Market</strong>
+                                    <p className="text-sm text-zinc-400">
+                                        List items for other players to buy at your own price!
+                                        <br />• View listings: <code className="text-zinc-300">!market</code>
+                                        <br />• Sell item: <code className="text-zinc-300">!market list &lt;item&gt; &lt;price&gt;</code>
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </section>
 
-                    <section id="market">
-                        <SectionHeader icon={<ShoppingBag />} title="Shop & Market" />
-                        <div className="grid grid-cols-1 gap-4">
-                            <CommandCard cmd="!shop" args="" desc="View the server shop." />
-                            <CommandCard cmd="!shop buy" args="<item name>" desc="Purchase an item." />
-                            <CommandCard cmd="!inventory" args="" desc="View your owned items." />
-                            <CommandCard cmd="!use" args="<item name>" desc="Consume an item (e.g. food, potions)." />
-                            <CommandCard cmd="!market" args="" desc="View the global Black Market (Player Trading)." />
-                            <CommandCard cmd="!market list" args="<item> <price>" desc="Sell an item on the Black Market." />
-                        </div>
-                    </section>
-
-                    <section id="stocks">
-                        <SectionHeader icon={<TrendingUp />} title="Stocks" />
-                        <div className="grid grid-cols-1 gap-4">
-                            <CommandCard cmd="!stock" args="" desc="View real-time stock prices." />
-                            <CommandCard cmd="!stock buy" args="<symbol> <amount>" desc="Invest in a stock." />
-                            <CommandCard cmd="!portfolio" args="" desc="View your investments and profits." />
-                        </div>
-                    </section>
-
-                    {/* Games Section */}
-                    <section id="casino">
+                    {/* Games */}
+                    <section id="games">
                         <SectionHeader icon={<Dna />} title="Casino Games" />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <GameCard
-                                title="Blackjack"
-                                cmd="!blackjack <amount>"
-                                desc="Classic 21. Hit, Stand, Double Down supported."
-                            />
-                            <GameCard
-                                title="Roulette"
-                                cmd="!roulette <amount> <bet>"
-                                desc="Bet on Red/Black (2x), Odd/Even (2x), or Numbers (36x)."
-                            />
-                            <GameCard
-                                title="Slots"
-                                cmd="!slots <amount>"
-                                desc="Spin the machine for multipliers."
-                            />
-                            <GameCard
-                                title="Coinflip"
-                                cmd="!coinflip <amount> <heads/tails>"
-                                desc="Double or nothing."
-                            />
-                            <GameCard
-                                title="Cockfight"
-                                cmd="!cockfight <amount>"
-                                desc="Bet on your owned Chicken vs another."
-                            />
-                            <GameCard
-                                title="Russian Roulette"
-                                cmd="!rr <amount>"
-                                desc="1/6 chance to lose it all. High risk."
-                            />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            <GameTile name="Blackjack" cmd="!bj" desc="Beat the dealer to 21." />
+                            <GameTile name="Roulette" cmd="!roulette" desc="Bet on colors or numbers." />
+                            <GameTile name="Slots" cmd="!slots" desc="Spin to win jackpots." />
+                            <GameTile name="Coinflip" cmd="!cf" desc="Double or nothing." />
+                            <GameTile name="Russian Roulette" cmd="!rr" desc="High risk, high reward." />
+                            <GameTile name="Cockfight" cmd="!cockfight" desc="PVP Chicken Battles." />
                         </div>
                     </section>
 
-                    {/* Life Sim Section */}
-                    <section id="career">
-                        <SectionHeader icon={<Briefcase />} title="Career" />
-                        <GlassCard className="p-6 mb-4">
-                            <p className="text-zinc-400">Advance through job tiers to earn higher paychecks.</p>
+                    {/* Chicken Module */}
+                    <section id="chicken">
+                        <SectionHeader icon={<Swords />} title="Chicken Module" />
+                        <GlassCard className="p-6">
+                            <div className="flex flex-col md:flex-row gap-6">
+                                <div className="flex-1">
+                                    <h4 className="text-xl font-bold text-white mb-2">Own a Fighter</h4>
+                                    <p className="text-zinc-400 mb-4">
+                                        Buy a chicken from the shop and train it to become the ultimate champion.
+                                    </p>
+                                    <ul className="space-y-2 text-sm text-zinc-300">
+                                        <li>• <strong>Feed:</strong> Keeps your chicken alive and happy.</li>
+                                        <li>• <strong>Train:</strong> Improves stats (Attack, Defense, Speed).</li>
+                                        <li>• <strong>Fight:</strong> Battle against other players' chickens for money.</li>
+                                    </ul>
+                                </div>
+                                <div className="flex-1 bg-black/30 rounded-lg p-4 font-mono text-sm text-zinc-400">
+                                    <div className="mb-2 text-purple-400 font-bold">Commands:</div>
+                                    <div>!shop buy chicken</div>
+                                    <div>!manage-chicken feed</div>
+                                    <div>!manage-chicken train</div>
+                                    <div>!cockfight &lt;amount&gt;</div>
+                                </div>
+                            </div>
                         </GlassCard>
-                        <div className="grid grid-cols-1 gap-4">
-                            <CommandCard cmd="!jobs" args="" desc="List available jobs." />
-                            <CommandCard cmd="!apply" args="<job_id>" desc="Apply for a job (Checks Intelligence/Degrees)." />
-                            <CommandCard cmd="!work" args="" desc="Work a shift. Increases Stress." />
-                            <CommandCard cmd="!promote" args="" desc="Check eligibility for promotion." />
-                            <CommandCard cmd="!resign" args="" desc="Quit your current job." />
+                    </section>
+
+                    {/* Education */}
+                    <section id="education">
+                        <SectionHeader icon={<GraduationCap />} title="University & Education" />
+                        <div className="space-y-6 text-zinc-300">
+                            <p>Most high-paying jobs require a specific <strong>Degree</strong>.</p>
+                            <ol className="list-decimal list-inside space-y-4 ml-4">
+                                <li><strong>Browse:</strong> <code className="bg-white/10 px-1 rounded">!education</code></li>
+                                <li><strong>Enroll:</strong> <code className="bg-white/10 px-1 rounded">!enroll &lt;degree&gt;</code></li>
+                                <li><strong>Study:</strong> <code className="bg-white/10 px-1 rounded">!study</code> (Boosts GPA/Int)</li>
+                                <li><strong>Graduate:</strong> Hit the stat requirements!</li>
+                            </ol>
                         </div>
                     </section>
 
-                    <section id="education">
-                        <SectionHeader icon={<GraduationCap />} title="Education" />
-                        <div className="grid grid-cols-1 gap-4">
-                            <CommandCard cmd="!education" args="" desc="Browse university degrees." />
-                            <CommandCard cmd="!enroll" args="<degree>" desc="Start a degree program." />
-                            <CommandCard cmd="!study" args="" desc="Boost (GPA) and Intelligence." />
+                    {/* Jobs */}
+                    <section id="jobs">
+                        <SectionHeader icon={<Briefcase />} title="Jobs & Careers" />
+                        <GlassCard className="p-6">
+                            <p className="text-zinc-300 mb-4">
+                                Climb the ladder from Janitor to CEO.
+                                Work shifts with <code className="bg-white/10 px-1 rounded">!work</code> to earn XP.
+                                When you have enough XP, use <code className="bg-white/10 px-1 rounded">!promote</code>.
+                            </p>
+                            <div className="bg-red-500/10 p-4 rounded border border-red-500/20 text-sm">
+                                <strong className="text-red-400">Manage Stress:</strong> Working raises stress. Relax with <code className="text-red-300">!relax</code> or you may die.
+                            </div>
+                        </GlassCard>
+                    </section>
+
+                    {/* Propertes & Marriage */}
+                    <section id="properties">
+                        <SectionHeader icon={<Landmark />} title="Properties" />
+                        <div className="space-y-4 text-zinc-300">
+                            <p>
+                                Buy real estate to show off your wealth and earn perks. Properties can provide passive income or stat boosts.
+                            </p>
+                            <ul className="list-disc list-inside text-sm text-zinc-400">
+                                <li>View listings: <code className="text-zinc-300">!properties</code></li>
+                                <li>Buy: <code className="text-zinc-300">!buy-property &lt;id&gt;</code></li>
+                            </ul>
                         </div>
                     </section>
 
                     <section id="family">
-                        <SectionHeader icon={<Heart />} title="Family & Lifestyle" />
-                        <div className="grid grid-cols-1 gap-4">
-                            <CommandCard cmd="!marry" args="<@user>" desc="Propose to another user." />
-                            <CommandCard cmd="!divorce" args="" desc="End a marriage." />
-                            <CommandCard cmd="!relax" args="" desc="Reduce Stress (Gym, Meditation)." />
+                        <SectionHeader icon={<Heart />} title="Marriage & Family" />
+                        <div className="space-y-4 text-zinc-300">
+                            <p>
+                                Find a partner and get married to share wealth and potentially earn tax benefits (or just for fun).
+                            </p>
+                            <div className="flex gap-4 flex-wrap">
+                                <span className="bg-pink-500/20 text-pink-300 px-3 py-1 rounded text-sm code">!marry @user</span>
+                                <span className="bg-zinc-800 text-zinc-400 px-3 py-1 rounded text-sm code">!divorce</span>
+                                <span className="bg-zinc-800 text-zinc-400 px-3 py-1 rounded text-sm code">!family</span>
+                            </div>
                         </div>
                     </section>
 
-                    {/* Admin Section */}
-                    <section id="config">
-                        <SectionHeader icon={<Settings />} title="Admin Configuration" />
-                        <div className="grid grid-cols-1 gap-4">
-                            <CommandCard cmd="!setup" args="" desc="Interactive server setup wizard." />
-                            <CommandCard cmd="!set-currency" args="<name> <emoji>" desc="Customize currency (e.g. Coins 🪙)." />
-                            <CommandCard cmd="!set-income" args="" desc="Configure Taxes, Interest Rates, Pay Multipliers." />
-                            <CommandCard cmd="!add-shop-item" args="" desc="Create a new item in the shop." />
-                            <CommandCard cmd="!manage-item" args="<name>" desc="Edit/Delete a shop item." />
+                    {/* Stocks */}
+                    <section id="stocks">
+                        <SectionHeader icon={<TrendingUp />} title="Stock Market" />
+                        <div className="space-y-4 text-zinc-300">
+                            <p>
+                                Real-time simulated stock market. Buy low, sell high.
+                                <br />Use <code className="bg-white/10 px-1 rounded">!stock</code> to view the ticker.
+                            </p>
                         </div>
                     </section>
 
-                    <section id="moderation">
-                        <SectionHeader icon={<Gavel />} title="Moderation" />
-                        <div className="grid grid-cols-1 gap-4">
-                            <CommandCard cmd="!add-money" args="<@user> <amount>" desc="Spawn money for a user." />
-                            <CommandCard cmd="!remove-money" args="<@user> <amount>" desc="Remove money from a user." />
-                            <CommandCard cmd="!reset-economy" args="" desc="DANGER: Resets all server economy data." />
-                            <CommandCard cmd="!casino-ban" args="<@user>" desc="Ban a user from bot commands." />
-                            <CommandCard cmd="!casino-unban" args="<@user>" desc="Unban a user from bot commands." />
-                            <CommandCard cmd="!casino-ban-list" args="" desc="View list of banned users." />
-                            <CommandCard cmd="!loan-ban" args="<@user>" desc="Ban a user from taking loans." />
-                            <CommandCard cmd="!loan-unban" args="<@user>" desc="Unban a user from taking loans." />
-                            <CommandCard cmd="!reset-loans" args="<@user>" desc="Reset all active loans for a user (Admin)." />
-                            <CommandCard cmd="!set-casino-channel" args="add <#channel>" desc="Whitelist bot to specific channels." />
-                        </div>
-                    </section>
-
-                    <section id="admin-all">
-                        <SectionHeader icon={<Shield />} title="All Admin Commands" />
-                        <div className="grid grid-cols-1 gap-4">
-                            <CommandCard cmd="!add-credit-tier" args="" desc="Add a new credit tier configuration." />
-                            <CommandCard cmd="!add-emoji" args="" desc="Add an emoji to the bot." />
-                            <CommandCard cmd="!add-money" args="<@user> <amount>" desc="Add money to a user's balance." />
-                            <CommandCard cmd="!add-shop-item" args="" desc="Add a new item to the global shop." />
-                            <CommandCard cmd="!admin-dashboard" args="" desc="View the admin dashboard statistics." />
-                            <CommandCard cmd="!admin-property" args="" desc="Manage properties as an admin." />
-                            <CommandCard cmd="!bet-limit" args="" desc="Set betting limits for games." />
-                            <CommandCard cmd="!bot-commander" args="<@user>" desc="Toggle Bot Commander status for a user." />
-                            <CommandCard cmd="!casino-ban" args="<@user>" desc="Ban a user from using casino commands." />
-                            <CommandCard cmd="!casino-ban-list" args="" desc="View list of banned users." />
-                            <CommandCard cmd="!casino-unban" args="<@user>" desc="Unban a user from casino commands." />
-                            <CommandCard cmd="!casino-admins-list" args="" desc="List all casino admins." />
-                            <CommandCard cmd="!channel-override" args="" desc="Toggle channel override for commands." />
-                            <CommandCard cmd="!chat-money-config" args="" desc="Configure money earned from chatting." />
-                            <CommandCard cmd="!config-credit-tier" args="" desc="Configure existing credit tiers." />
-                            <CommandCard cmd="!config-jobs" args="" desc="Configure job settings." />
-                            <CommandCard cmd="!debug-permissions" args="" desc="Debug user permissions." />
-                            <CommandCard cmd="!drop" args="" desc="Create a money drop in the channel." />
-                            <CommandCard cmd="!education-admin" args="" desc="Manage education settings." />
-                            <CommandCard cmd="!factory-reset" args="" desc="Reset all server settings to default." />
-                            <CommandCard cmd="!grant-degree" args="<@user> <degree_id>" desc="Grant a degree to a user." />
-                            <CommandCard cmd="!loan-ban" args="<@user>" desc="Ban a user from taking loans." />
-                            <CommandCard cmd="!loan-unban" args="<@user>" desc="Unban a user from taking loans." />
-                            <CommandCard cmd="!make-casino-admin" args="<@user>" desc="Promote a user to Casino Admin." />
-                            <CommandCard cmd="!manage-casino-admin" args="" desc="Manage casino admin roles." />
-                            <CommandCard cmd="!manage-chicken" args="" desc="Manage chicken fighting settings." />
-                            <CommandCard cmd="!manage-credit-config" args="" desc="Manage credit system configuration." />
-                            <CommandCard cmd="!manage-credit-score" args="<@user>" desc="Manage a user's credit score." />
-                            <CommandCard cmd="!manage-job-store" args="" desc="Manage items in the job store." />
-                            <CommandCard cmd="!manage-shop" args="" desc="Manage the global shop." />
-                            <CommandCard cmd="!manage-uni-store" args="" desc="Manage items in the university store." />
-                            <CommandCard cmd="!remove-casino-admin" args="<@user>" desc="Demote a Casino Admin." />
-                            <CommandCard cmd="!remove-item" args="<@user> <item>" desc="Remove an item from a user." />
-                            <CommandCard cmd="!remove-money" args="<@user> <amount>" desc="Remove money from a user." />
-                            <CommandCard cmd="!reset-admin-config" args="" desc="Reset admin configurations." />
-                            <CommandCard cmd="!reset-economy" args="" desc="Reset the entire server economy." />
-                            <CommandCard cmd="!reset-edu" args="<@user>" desc="Reset a user's education progress." />
-                            <CommandCard cmd="!reset-loans" args="" desc="Reset all active loans." />
-                            <CommandCard cmd="!reset-shop" args="" desc="Reset the shop to default items." />
-                            <CommandCard cmd="!set-casino-channel" args="" desc="Set the allowed channel for casino games." />
-                            <CommandCard cmd="!set-cockfight" args="" desc="Configure cockfight settings." />
-                            <CommandCard cmd="!set-currency" args="" desc="Set the server's currency name." />
-                            <CommandCard cmd="!set-currency-emoji" args="" desc="Set the server's currency emoji." />
-                            <CommandCard cmd="!set-degree-cost" args="<id> <cost>" desc="Set the tuition cost for a degree." />
-                            <CommandCard cmd="!set-dis" args="<@user> <val>" desc="Set a user's discipline stat." />
-                            <CommandCard cmd="!set-economy-config" args="" desc="Configure general economy settings." />
-                            <CommandCard cmd="!set-game-cooldown" args="" desc="Set cooldowns for specific games." />
-                            <CommandCard cmd="!set-global-game-cooldown" args="" desc="Set a global cooldown for all games." />
-                            <CommandCard cmd="!set-income" args="" desc="Set income configuration." />
-                            <CommandCard cmd="!set-income-cooldown" args="" desc="Set cooldown for income commands." />
-                            <CommandCard cmd="!set-int" args="<@user> <val>" desc="Set a user's intelligence stat." />
-                            <CommandCard cmd="!set-log-channel" args="" desc="Set the channel for bot logs." />
-                            <CommandCard cmd="!set-min-bet" args="" desc="Set minimum bet amounts." />
-                            <CommandCard cmd="!set-money" args="<@user> <amount>" desc="Set a user's balance to a specific amount." />
-                            <CommandCard cmd="!set-prefix" args="<prefix>" desc="Change the bot's command prefix." />
-                            <CommandCard cmd="!set-rob" args="" desc="Configure robbery settings." />
-                            <CommandCard cmd="!set-role-income" args="" desc="Set income for specific roles." />
-                            <CommandCard cmd="!set-start-money" args="<amount>" desc="Set the starting money for new users." />
-                            <CommandCard cmd="!set-study-cooldown" args="<seconds>" desc="Set cooldown for studying." />
-                            <CommandCard cmd="!setup" args="" desc="Run the initial server setup." />
-                            <CommandCard cmd="!setup-drop" args="" desc="Configure drop settings." />
-                            <CommandCard cmd="!view-config" args="" desc="View the current server configuration." />
-                        </div>
-                    </section>
-
-                    {/* Support */}
-                    <section id="support">
-                        <SectionHeader icon={<MessageCircle />} title="Support & Community" />
-                        <GlassCard className="p-8 text-center">
-                            <h3 className="text-2xl font-bold text-white mb-4">Need Help?</h3>
-                            <p className="text-zinc-400 mb-8 max-w-lg mx-auto">Have a question that wasn't answered? Found a bug? Or just want to hang out with other users?</p>
-                            <a href="https://discord.gg/Y5P44UCH2Y" target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full transition-all font-bold shadow-lg hover:shadow-indigo-500/25">
-                                Join Support Server
-                            </a>
-                        </GlassCard>
+                    {/* Closing */}
+                    <section className="pt-20 border-t border-white/10 text-center">
+                        <h3 className="text-2xl font-bold text-white mb-6">Ready to explore?</h3>
+                        <Link
+                            href="/docs/commands"
+                            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-black font-bold rounded-lg hover:bg-zinc-200 transition-colors shadow-lg shadow-white/10"
+                        >
+                            <Book size={20} />
+                            View All Commands
+                        </Link>
                     </section>
 
                 </div>
@@ -343,65 +303,12 @@ export default function DocsPage() {
     );
 }
 
-// --- Components ---
-
-function NavGroup({ title, children }: { title: string; children: React.ReactNode }) {
+function GameTile({ name, cmd, desc }: { name: string, cmd: string, desc: string }) {
     return (
-        <div>
-            <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-3">{title}</h3>
-            <div className="flex flex-col space-y-2 border-l border-white/10 pl-4">
-                {children}
-            </div>
+        <div className="bg-white/5 border border-white/5 p-4 rounded-lg hover:bg-white/10 transition-colors">
+            <h5 className="font-bold text-white mb-1">{name}</h5>
+            <code className="text-xs text-violet-400 bg-black/30 px-1 py-0.5 rounded mb-2 inline-block">{cmd}</code>
+            <p className="text-xs text-zinc-400">{desc}</p>
         </div>
     );
-}
-
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
-    return (
-        <a href={href} className="text-sm text-zinc-400 hover:text-violet-400 transition-colors block py-1">
-            {children}
-        </a>
-    );
-}
-
-function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
-    return (
-        <div className="flex items-center gap-3 mb-6 scroll-mt-32">
-            <div className="p-2 bg-violet-500/10 rounded-lg text-violet-400">
-                {icon}
-            </div>
-            <h2 className="text-2xl font-bold text-white">{title}</h2>
-        </div>
-    );
-}
-
-function CommandCard({ cmd, args, desc }: { cmd: string; args: string; desc: string }) {
-    return (
-        <div className="bg-white/5 border border-white/5 rounded-lg p-5 hover:bg-white/10 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="font-mono text-sm">
-                <span className="text-violet-400 font-bold">{cmd}</span>
-                {args && <span className="text-zinc-500 ml-2">{args}</span>}
-            </div>
-            <p className="text-sm text-zinc-300 md:text-right">{desc}</p>
-        </div>
-    );
-}
-
-function GameCard({ title, cmd, desc }: { title: string; cmd: string; desc: string }) {
-    return (
-        <GlassCard className="p-6 space-y-3">
-            <h3 className="text-lg font-bold text-white">{title}</h3>
-            <code className="block text-xs bg-black/30 p-2 rounded text-violet-300 font-mono">{cmd}</code>
-            <p className="text-sm text-zinc-400">{desc}</p>
-        </GlassCard>
-    );
-}
-
-function FAQItem({ q, a }: { q: string, a: string }) {
-    return (
-        <div className="border border-white/5 rounded-lg p-4 bg-white/[0.02]">
-            <h4 className="text-white font-bold mb-2">{q}</h4>
-            <p className="text-zinc-400 text-sm">{a}</p>
-        </div>
-    )
 }

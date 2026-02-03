@@ -159,7 +159,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                 {item ? "Update" : "Draft"}
                             </span>
                         </h2>
-                        <p className="text-zinc-400 text-sm mt-1">Configure item details, requirements, and effects.</p>
+                        <p className="text-zinc-200 text-sm mt-1">Configure item details, requirements, and effects.</p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                         <X size={24} className="text-zinc-400" />
@@ -175,7 +175,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                         <div className="md:col-span-8 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Item Name</label>
+                                    <label className="text-xs font-bold text-white uppercase tracking-wider">Item Name</label>
                                     <input
                                         type="text"
                                         value={formData.name}
@@ -185,7 +185,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Price</label>
+                                    <label className="text-xs font-bold text-white uppercase tracking-wider">Price</label>
                                     <div className="relative">
                                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
                                         <input
@@ -200,7 +200,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Description</label>
+                                <label className="text-xs font-bold text-white uppercase tracking-wider">Description</label>
                                 <textarea
                                     value={formData.description}
                                     onChange={e => handleChange("description", e.target.value)}
@@ -215,7 +215,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                             <div className="glass-card p-5 rounded-xl space-y-4">
                                 <div className="flex gap-4">
                                     <div className="space-y-2 flex-1">
-                                        <label className="text-[10px] font-bold text-zinc-400 uppercase">Emoji</label>
+                                        <label className="text-[10px] font-bold text-white uppercase">Emoji</label>
                                         <input
                                             type="text"
                                             value={formData.emoji || ""}
@@ -226,7 +226,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                         />
                                     </div>
                                     <div className="space-y-2 flex-1">
-                                        <label className="text-[10px] font-bold text-zinc-400 uppercase">Preview</label>
+                                        <label className="text-[10px] font-bold text-white uppercase">Preview</label>
                                         <div className="h-[42px] bg-white/5 border border-white/10 rounded-lg flex items-center justify-center">
                                             {formData.image ? (
                                                 <img src={formData.image} className="h-6 w-6 object-contain" />
@@ -237,7 +237,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-zinc-400 uppercase">Image URL</label>
+                                    <label className="text-[10px] font-bold text-white uppercase">Image URL</label>
                                     <input
                                         type="text"
                                         value={formData.image || ""}
@@ -251,8 +251,8 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                             {/* Stock Control */}
                             <div className="glass-card p-4 rounded-xl flex items-center justify-between">
                                 <div>
-                                    <label className="text-[10px] font-bold text-zinc-400 uppercase block">Stock</label>
-                                    <span className="text-xs text-zinc-400">{formData.stock === -1 ? "Unlimited" : formData.stock}</span>
+                                    <label className="text-[10px] font-bold text-white uppercase block">Stock</label>
+                                    <span className="text-xs text-zinc-200">{formData.stock === -1 ? "Unlimited" : formData.stock}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <button
@@ -322,7 +322,7 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                                     <div key={`param-role-${idx}`} className="bg-white/5 border border-white/5 p-3 rounded-lg flex items-center gap-3 group">
                                         <div className="bg-red-500/20 p-1.5 rounded text-red-400"><ShieldAlert size={14} /></div>
                                         <div className="flex-1">
-                                            <label className="text-[10px] font-bold text-zinc-500 uppercase block">Required Role</label>
+                                            <label className="text-[10px] font-bold text-white uppercase block">Required Role</label>
                                             {roleId && roles.find(r => r.id === roleId) ? (
                                                 <div className="text-sm text-zinc-200">{roles.find(r => r.id === roleId)?.name}</div>
                                             ) : (
@@ -495,10 +495,10 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                 <div className="px-8 py-5 border-t border-white/10 glass-card flex justify-between items-center bg-black/20">
                     <div className="flex items-center gap-4">
                         <label className="flex items-center gap-2 cursor-pointer group">
-                            <div className={`w-10 h-6 rounded-full p-1 transition-colors ${formData.showInShop ? "bg-primary" : "bg-zinc-800"}`} onClick={() => handleChange("showInShop", !formData.showInShop)}>
-                                <div className={`w-4 h-4 bg-white rounded-full transition-transform ${formData.showInShop ? "translate-x-4" : ""}`} />
+                            <div className={`w-10 h-6 rounded-full p-1 transition-colors ${!formData.showInShop ? "bg-primary" : "bg-zinc-800"}`} onClick={() => handleChange("showInShop", !formData.showInShop)}>
+                                <div className={`w-4 h-4 bg-white rounded-full transition-transform ${!formData.showInShop ? "translate-x-4" : ""}`} />
                             </div>
-                            <span className="text-xs font-bold text-zinc-500 group-hover:text-white transition-colors uppercase">Show in Shop</span>
+                            <span className="text-xs font-bold text-white group-hover:text-white transition-colors uppercase">Don't Show in Shop</span>
                         </label>
 
                         <label className="flex items-center gap-2 cursor-pointer group">

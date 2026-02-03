@@ -2,6 +2,9 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { createAuditLog } from "@/lib/audit";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export async function getShopItems(guildId: string) {
     try {
@@ -46,7 +49,9 @@ export async function upsertShopItem(guildId: string, data: any) {
             effects: data.effects || [],
         };
 
+        let actionType = "CREATE_SHOP_ITEM";
         if (data.id && data.id !== "new") {
+            actionType = "UPDATE_SHOP_ITEM";
             await prisma.shopItem.update({
                 where: { id: data.id },
                 data: payload
@@ -63,6 +68,15 @@ export async function upsertShopItem(guildId: string, data: any) {
             });
         }
 
+        const session = await getServerSession(authOptions);
+        if (session?.user?.id) {
+            await createAuditLog(guildId, session.user.id, actionType, {
+                itemId: data.id !== "new" ? data.id : null,
+                name: payload.name,
+                price: payload.price
+            });
+        }
+
         revalidatePath(`/dashboard/${guildId}/shop-misc/shop`);
         return { success: true };
     } catch (error) {
@@ -76,6 +90,13 @@ export async function deleteShopItem(id: string, guildId: string) {
         await prisma.shopItem.delete({
             where: { id, guildId } // Ensure guildId matches for security
         });
+
+        const session = await getServerSession(authOptions);
+        if (session?.user?.id) {
+            await createAuditLog(guildId, session.user.id, "DELETE_SHOP_ITEM", {
+                itemId: id
+            });
+        }
         revalidatePath(`/dashboard/${guildId}/shop-misc/shop`);
         return { success: true };
     } catch (error) {

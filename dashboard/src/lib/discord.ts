@@ -117,3 +117,31 @@ export async function getGuildChannels(guildId: string): Promise<DiscordChannel[
     const channels = await res.json();
     return channels.filter((c: any) => c.type === 0 || c.type === 5);
 }
+
+export interface DiscordMember {
+    user: {
+        id: string;
+        username: string;
+        global_name: string | null;
+        avatar: string | null;
+    };
+    nick: string | null;
+    roles: string[];
+    joined_at: string;
+}
+
+export async function getGuildMember(guildId: string, userId: string): Promise<DiscordMember | null> {
+    if (!process.env.DISCORD_BOT_TOKEN) return null;
+
+    const res = await fetch(`${DISCORD_API_URL}/guilds/${guildId}/members/${userId}`, {
+        headers: { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` },
+        next: { revalidate: 0 } // Disable caching to fetch fresh nickname
+    });
+
+    if (!res.ok) {
+        console.error(`Failed to fetch member ${userId} in guild ${guildId}`, await res.text());
+        return null;
+    }
+
+    return res.json();
+}

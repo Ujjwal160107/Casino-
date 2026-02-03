@@ -128,7 +128,8 @@ export const Mascot = {
     Links: {
         Dashboard: "https://fortunabot.dev/",
         Support: "https://discord.gg/Y5P44UCH2Y",
-        Docs: "https://fortunabot.dev/docs"
+        Docs: "https://fortunabot.dev/docs",
+        CommandList: "http://fortunabot.dev/docs/commands"
     }
 };
 

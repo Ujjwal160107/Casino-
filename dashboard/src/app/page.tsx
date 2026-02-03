@@ -1,7 +1,6 @@
 import { Hero } from "@/components/Hero";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { TopGGReviews } from "@/components/landing/TopGGReviews";
-import { Footer } from "@/components/Footer";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
@@ -13,7 +12,6 @@ export default async function Home() {
       <LandingNavbar user={session?.user} />
       <Hero />
       <TopGGReviews />
-      <Footer />
     </main>
   );
 }

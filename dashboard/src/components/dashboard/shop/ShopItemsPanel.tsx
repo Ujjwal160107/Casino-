@@ -15,10 +15,23 @@ interface ShopItemsPanelProps {
     currencyEmoji: string;
 }
 
+const itemMatchesSearch = (item: any, query: string) => {
+    if (!query) return true;
+    const lowerQuery = query.toLowerCase();
+    return (
+        item.name?.toLowerCase().includes(lowerQuery) ||
+        item.description?.toLowerCase().includes(lowerQuery) ||
+        item.price?.toString().includes(lowerQuery) // Allow searching by price too
+    );
+};
+
 export function ShopItemsPanel({ guildId, items, roles, currencyEmoji }: ShopItemsPanelProps) {
     const router = useRouter();
     const [editingItem, setEditingItem] = useState<any>(null);
     const [isCreating, setIsCreating] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    const filteredItems = items.filter(item => itemMatchesSearch(item, searchQuery));
 
     const handleDelete = async (itemId: string) => {
         if (!confirm("Are you sure you want to delete this item?")) return;
@@ -39,7 +52,7 @@ export function ShopItemsPanel({ guildId, items, roles, currencyEmoji }: ShopIte
                         <Package className="text-yellow-500" />
                         Manage Items
                     </h2>
-                    <p className="text-sm text-zinc-400">Create, edit, and organize shop inventory.</p>
+                    <p className="text-sm text-zinc-200">Create, edit, and organize shop inventory.</p>
                 </div>
                 <button
                     onClick={() => setIsCreating(true)}
@@ -49,8 +62,19 @@ export function ShopItemsPanel({ guildId, items, roles, currencyEmoji }: ShopIte
                 </button>
             </div>
 
+            {/* Search Bar */}
+            <div className="relative">
+                <input
+                    type="text"
+                    placeholder="Search items by name, description, or price..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-all placeholder:text-zinc-500"
+                />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {items.map((item) => (
+                {filteredItems.map((item) => (
                     <motion.div
                         key={item.id}
                         initial={{ opacity: 0, y: 10 }}
@@ -127,9 +151,9 @@ export function ShopItemsPanel({ guildId, items, roles, currencyEmoji }: ShopIte
                 ))}
 
                 {items.length === 0 && (
-                    <div className="col-span-full border border-dashed border-white/10 rounded-xl p-12 text-center text-zinc-500">
+                    <div className="col-span-full border border-dashed border-white/10 rounded-xl p-12 text-center text-zinc-400">
                         <Package size={48} className="mx-auto mb-4 opacity-20" />
-                        <p>No items in shop yet.</p>
+                        <p>{items.length === 0 ? "No items in shop yet." : "No items match your search."}</p>
                         <button
                             onClick={() => setIsCreating(true)}
                             className="mt-4 text-yellow-500 hover:text-yellow-400 text-sm font-bold"
@@ -141,17 +165,19 @@ export function ShopItemsPanel({ guildId, items, roles, currencyEmoji }: ShopIte
             </div>
 
             {/* Modal */}
-            {(editingItem || isCreating) && (
-                <ShopItemEditor
-                    guildId={guildId}
-                    item={editingItem}
-                    roles={roles}
-                    onClose={() => {
-                        setEditingItem(null);
-                        setIsCreating(false);
-                    }}
-                />
-            )}
-        </div>
+            {
+                (editingItem || isCreating) && (
+                    <ShopItemEditor
+                        guildId={guildId}
+                        item={editingItem}
+                        roles={roles}
+                        onClose={() => {
+                            setEditingItem(null);
+                            setIsCreating(false);
+                        }}
+                    />
+                )
+            }
+        </div >
     );
 }

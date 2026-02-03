@@ -66,7 +66,8 @@ import { initScheduler } from "./scheduler"; const slashCommands = new Map<strin
           }
 
           const supportLink = "https://discord.gg/Y5P44UCH2Y";
-          return message.reply(`**Need Help?**\nJoin our support server: ${supportLink}\nUse \`${prefix}help\` or \`${prefix}guide\` to get started!`);
+          const cmdLink = "http://fortunabot.dev/docs/commands";
+          return message.reply(`**Need Help?**\nView all commands: <${cmdLink}>\nJoin support: ${supportLink}\nOr use \`${prefix}help\` to start!`);
         } else {
           // Mention + Command -> Execute
           isCommand = true;

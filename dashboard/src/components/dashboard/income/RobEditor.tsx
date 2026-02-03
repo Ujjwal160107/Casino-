@@ -119,7 +119,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
             {/* Config Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="space-y-2">
-                    <label className="text-xs text-zinc-500 font-bold uppercase">Success Rate %</label>
+                    <label className="text-xs text-white font-bold uppercase tracking-wider">Success Rate %</label>
                     <input
                         type="number"
                         min={1} max={100}
@@ -128,10 +128,10 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                         className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                         disabled={formData.enabled === false}
                     />
-                    <p className="text-[10px] text-zinc-600">Base chance to successfully rob someone.</p>
+                    <p className="text-[10px] text-zinc-400">Base chance to successfully rob someone.</p>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-xs text-zinc-500 font-bold uppercase">Fine Penalty %</label>
+                    <label className="text-xs text-white font-bold uppercase tracking-wider">Fine Penalty %</label>
                     <input
                         type="number"
                         min={0} max={100}
@@ -140,7 +140,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                         className="w-full bg-white/5 border border-white/10 rounded px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                         disabled={formData.enabled === false}
                     />
-                    <p className="text-[10px] text-zinc-600">Percent of wallet lost if caught.</p>
+                    <p className="text-[10px] text-zinc-400">Percent of wallet lost if caught.</p>
                 </div>
                 <div className="space-y-2">
                     <DurationInput
@@ -159,7 +159,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                        <label className="text-xs text-zinc-500">Bail Amount (Fine)</label>
+                        <label className="text-xs text-white font-bold uppercase tracking-wider">Bail Amount (Fine)</label>
                         <input
                             type="number"
                             min={0}
@@ -169,7 +169,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                             placeholder="1000"
                             disabled={formData.enabled === false}
                         />
-                        <p className="text-[10px] text-zinc-600">Cost to bail out instantly.</p>
+                        <p className="text-[10px] text-zinc-400">Cost to bail out instantly.</p>
                     </div>
                     <div className="space-y-1">
                         <DurationInput
@@ -178,7 +178,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                             label="Jail Time"
                             disabled={formData.enabled === false}
                         />
-                        <p className="text-[10px] text-zinc-600">Time spent in jail.</p>
+                        <p className="text-[10px] text-zinc-400">Time spent in jail.</p>
                     </div>
                 </div>
             </div>
@@ -188,7 +188,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
             {/* Immune Roles Section */}
             <div className="space-y-4">
                 <h4 className="text-sm font-bold text-white uppercase tracking-wider">Immune Roles</h4>
-                <p className="text-xs text-zinc-400 -mt-2">Users with these roles cannot be robbed.</p>
+                <p className="text-xs text-zinc-200 -mt-2">Users with these roles cannot be robbed.</p>
 
                 {/* Role Input / Dropdown */}
                 <div className="relative max-w-md">
@@ -268,7 +268,7 @@ export function RobEditor({ guildId, initialData, availableRoles }: RobEditorPro
                         })}
                     </AnimatePresence>
                     {formData.robImmuneRoles.length === 0 && (
-                        <span className="text-zinc-600 text-xs italic py-2">No immune roles configured.</span>
+                        <span className="text-zinc-400 text-xs italic py-2">No immune roles configured.</span>
                     )}
                 </div>
             </div>

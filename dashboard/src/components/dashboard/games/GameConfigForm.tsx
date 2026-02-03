@@ -64,7 +64,7 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                         </div>
                         <div>
                             <h2 className="text-xl font-bold font-display text-white">{gameName} Configuration</h2>
-                            <p className="text-sm text-zinc-400">Manage betting limits and cooldowns for {gameName}.</p>
+                            <p className="text-sm text-zinc-200">Manage betting limits and cooldowns for {gameName}.</p>
                         </div>
                     </div>
 
@@ -90,7 +90,7 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Max Bet */}
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                        <label className="text-xs font-bold text-white uppercase flex items-center gap-2 tracking-wider">
                             Max Bet (Coins)
                         </label>
                         <div className="relative">
@@ -112,14 +112,14 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                                 Reset to Global
                             </button>
                         </div>
-                        <p className="text-xs text-zinc-500">
+                        <p className="text-xs text-zinc-400">
                             Maximum amount a user can bet. Set to 0 to inherit Global Max ({globalLimits.max}).
                         </p>
                     </div>
 
                     {/* Min Bet */}
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                        <label className="text-xs font-bold text-white uppercase flex items-center gap-2 tracking-wider">
                             Min Bet (Coins)
                         </label>
                         <input
@@ -131,21 +131,21 @@ export function GameConfigForm({ guildId, gameKey, gameName, initialSettings, gl
                             }}
                             className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                         />
-                        <p className="text-xs text-zinc-500">
+                        <p className="text-xs text-zinc-400">
                             Minimum amount required to play. Global Min: {globalLimits.min}
                         </p>
                     </div>
 
                     {/* Cooldown */}
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2 mb-2">
+                        <label className="text-xs font-bold text-white uppercase flex items-center gap-2 mb-2 tracking-wider">
                             <Clock size={14} /> Cooldown
                         </label>
                         <DurationInput
                             value={settings.cooldown}
                             onChange={(val) => setSettings({ ...settings, cooldown: val })}
                         />
-                        <p className="text-xs text-zinc-500 mt-2">
+                        <p className="text-xs text-zinc-400 mt-2">
                             Time a user must wait between games.
                         </p>
                     </div>

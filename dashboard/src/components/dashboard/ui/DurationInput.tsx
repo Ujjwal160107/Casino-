@@ -50,7 +50,7 @@ export function DurationInput({ value, onChange, label = "Duration", disabled = 
 
     return (
         <div className={`space-y-1 ${disabled ? 'opacity-60' : ''} w-full`}>
-            {label && <label className="text-xs text-zinc-500">{label}</label>}
+            {label && <label className="text-xs text-white uppercase font-bold tracking-wider">{label}</label>}
             <div className="grid grid-cols-4 gap-2">
                 <div className="flex flex-col gap-0.5">
                     <input
@@ -62,7 +62,7 @@ export function DurationInput({ value, onChange, label = "Duration", disabled = 
                         className="bg-white/5 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full transition-colors focus:bg-white/10 outline-none focus:border-white/20"
                         disabled={disabled}
                     />
-                    <span className="text-[10px] text-zinc-600 text-center">Days</span>
+                    <span className="text-[10px] text-zinc-400 text-center">Days</span>
                 </div>
                 <div className="flex flex-col gap-0.5">
                     <input
@@ -74,7 +74,7 @@ export function DurationInput({ value, onChange, label = "Duration", disabled = 
                         className="bg-white/5 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full transition-colors focus:bg-white/10 outline-none focus:border-white/20"
                         disabled={disabled}
                     />
-                    <span className="text-[10px] text-zinc-600 text-center">Hrs</span>
+                    <span className="text-[10px] text-zinc-400 text-center">Hrs</span>
                 </div>
                 <div className="flex flex-col gap-0.5">
                     <input
@@ -87,7 +87,7 @@ export function DurationInput({ value, onChange, label = "Duration", disabled = 
                         className="bg-white/5 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full transition-colors focus:bg-white/10 outline-none focus:border-white/20"
                         disabled={disabled}
                     />
-                    <span className="text-[10px] text-zinc-600 text-center">Mins</span>
+                    <span className="text-[10px] text-zinc-400 text-center">Mins</span>
                 </div>
                 <div className="flex flex-col gap-0.5">
                     <input
@@ -100,7 +100,7 @@ export function DurationInput({ value, onChange, label = "Duration", disabled = 
                         className="bg-white/5 border border-white/10 rounded px-1 py-1.5 text-white text-center text-sm w-full transition-colors focus:bg-white/10 outline-none focus:border-white/20"
                         disabled={disabled}
                     />
-                    <span className="text-[10px] text-zinc-600 text-center">Secs</span>
+                    <span className="text-[10px] text-zinc-400 text-center">Secs</span>
                 </div>
             </div>
         </div>

@@ -91,7 +91,7 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
     ];
 
     return (
-        <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 glass-sidebar flex flex-col z-40 text-zinc-300 font-sans border-r border-white/5">
+        <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 glass-sidebar flex flex-col z-40 text-white font-sans border-r border-white/5">
 
             {/* Top Stats / Connectivity - Optional, maybe Server Status? */}
             {/* <div className="h-1 bg-gradient-to-r from-primary to-transparent" /> */}
@@ -107,7 +107,7 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
                             "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 border border-white/5 font-display",
                             pathname === `/dashboard/${guild.id}`
                                 ? "bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.05)]"
-                                : "glass-card text-zinc-400 hover:text-white hover:bg-white/5"
+                                : "glass-card text-white hover:text-white hover:bg-white/5"
                         )}
                     >
                         <Home size={16} />
@@ -116,7 +116,7 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
                     <button
                         onClick={handleSync}
                         disabled={isSyncing}
-                        className="px-3 py-2.5 rounded-lg glass-card border border-white/5 text-zinc-400 hover:text-primary hover:bg-white/5 transition-colors disabled:opacity-50"
+                        className="px-3 py-2.5 rounded-lg glass-card border border-white/5 text-white hover:text-primary hover:bg-white/5 transition-colors disabled:opacity-50"
                         title="Sync Roles & Channels"
                     >
                         <RotateCw size={16} className={cn(isSyncing && "animate-spin")} />
@@ -128,7 +128,7 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
                 {sections.map((section) => (
                     <div key={section.title} className="space-y-2">
                         <div className="flex items-center justify-between px-3">
-                            <h3 className="text-[10px] font-bold font-display text-zinc-500 uppercase tracking-widest leading-none">
+                            <h3 className="text-[10px] font-bold font-display text-white uppercase tracking-widest leading-none">
                                 {section.title}
                             </h3>
                         </div>
@@ -146,7 +146,7 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
                                             "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 group relative",
                                             isActive
                                                 ? "text-white font-medium bg-white/5"
-                                                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                                                : "text-zinc-100 hover:text-white hover:bg-white/5"
                                         )}
                                     >
                                         {isActive && (
@@ -155,7 +155,7 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
 
                                         <Icon size={18} className={cn(
                                             "shrink-0 transition-colors",
-                                            isActive ? "text-primary dark:text-primary" : "text-zinc-500 group-hover:text-zinc-300"
+                                            isActive ? "text-primary dark:text-primary" : "text-zinc-300 group-hover:text-white"
                                         )} />
                                         <span className="truncate">{item.label}</span>
                                     </Link>
@@ -170,7 +170,7 @@ export function AdminSidebar({ guild }: AdminSidebarProps) {
             <div className="p-4 border-t border-white/5 bg-white/5 backdrop-blur-md">
                 <Link
                     href="/dashboard"
-                    className="flex items-center gap-2 justify-center text-xs font-medium text-zinc-500 hover:text-primary transition-colors py-2 rounded-md hover:bg-white/5"
+                    className="flex items-center gap-2 justify-center text-xs font-medium text-zinc-300 hover:text-primary transition-colors py-2 rounded-md hover:bg-white/5"
                 >
                     &larr; Switch Server
                 </Link>

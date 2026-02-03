@@ -152,7 +152,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
             <div className="glass-card border border-white/5 rounded-2xl overflow-hidden shadow-sm">
                 <div className="px-6 py-4 border-b border-white/5 bg-white/2">
                     <h3 className="text-lg font-bold font-display text-white flex items-center gap-2">
-                        <Settings size={20} className="text-zinc-500" />
+                        <Settings size={20} className="text-zinc-300" />
                         General Settings
                     </h3>
                 </div>
@@ -163,7 +163,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                     <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/2 transition-colors">
                         <div className="md:w-2/3">
                             <h4 className="text-base font-medium text-zinc-100">Bot Prefix</h4>
-                            <p className="text-sm text-zinc-500 mt-1">The symbol used to trigger commands (legacy).</p>
+                            <p className="text-sm text-zinc-400 mt-1">The symbol used to trigger commands (legacy).</p>
                         </div>
                         <div className="md:w-1/3 flex justify-end">
                             <input
@@ -171,7 +171,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                                 maxLength={5}
                                 value={formData.prefix}
                                 onChange={(e) => setFormData({ ...formData, prefix: e.target.value })}
-                                className="w-32 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                                className="w-32 bg-white/5 border-black rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
                                 placeholder="!"
                             />
                         </div>
@@ -189,7 +189,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                                 min={0}
                                 value={formData.startMoney}
                                 onChange={(e) => handleNumberChange("startMoney", e.target.value)}
-                                className="w-32 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                                className="w-32 bg-white/5 border-black rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
                             />
                         </div>
                     </div>
@@ -206,7 +206,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                                 min={0}
                                 value={formData.voteReward}
                                 onChange={(e) => handleNumberChange("voteReward", e.target.value)}
-                                className="w-32 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                                className="w-32 bg-white/5 border-black rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
                             />
                         </div>
                     </div>
@@ -223,7 +223,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                                 maxLength={32}
                                 value={formData.currencyName}
                                 onChange={(e) => setFormData({ ...formData, currencyName: e.target.value })}
-                                className="w-48 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-medium text-sm text-white"
+                                className="w-48 bg-white/5 border-black rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-medium text-sm text-white"
                                 placeholder="Coins"
                             />
                         </div>
@@ -239,7 +239,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                             <div className="flex gap-2">
                                 <input
                                     type="text"
-                                    className="w-32 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-right"
+                                    className="w-32 bg-white/5 border-black rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-right"
                                     value={formData.currencyEmoji}
                                     onChange={(e) => setFormData({ ...formData, currencyEmoji: e.target.value })}
                                     placeholder="🪙"
@@ -273,7 +273,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
             <div className="glass-card border border-white/5 rounded-2xl overflow-hidden shadow-sm">
                 <div className="px-6 py-4 border-b border-white/5 bg-white/2">
                     <h3 className="text-lg font-bold font-display text-white flex items-center gap-2">
-                        <Lock size={20} className="text-zinc-500" />
+                        <Lock size={20} className="text-zinc-300" />
                         Economy Limits
                     </h3>
                 </div>
@@ -291,7 +291,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                                 placeholder="No Limit"
                                 value={formData.walletLimit ?? ""}
                                 onChange={(e) => handleNumberChange("walletLimit", e.target.value)}
-                                className="w-32 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                                className="w-32 bg-white/5 border-black rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
                             />
                         </div>
                     </div>
@@ -309,7 +309,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                                 placeholder="No Limit"
                                 value={formData.bankLimit ?? ""}
                                 onChange={(e) => handleNumberChange("bankLimit", e.target.value)}
-                                className="w-32 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                                className="w-32 bg-white/5 border-black rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
                             />
                         </div>
                     </div>
@@ -320,7 +320,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
             <div className="glass-card border border-white/5 rounded-2xl overflow-hidden shadow-sm">
                 <div className="px-6 py-4 border-b border-white/5 bg-white/2">
                     <h3 className="text-lg font-bold font-display text-white flex items-center gap-2">
-                        <CircleDollarSign size={20} className="text-zinc-500" />
+                        <CircleDollarSign size={20} className="text-zinc-300" />
                         Betting Configuration
                     </h3>
                 </div>
@@ -337,7 +337,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                                 min={0}
                                 value={formData.minBet}
                                 onChange={(e) => handleNumberChange("minBet", e.target.value)}
-                                className="w-32 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                                className="w-32 bg-white/5 border-black rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
                             />
                         </div>
                     </div>
@@ -354,7 +354,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                                 min={0}
                                 value={formData.maxBet}
                                 onChange={(e) => handleNumberChange("maxBet", e.target.value)}
-                                className="w-32 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                                className="w-32 bg-white/5 border-black rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
                             />
                         </div>
                     </div>
@@ -365,7 +365,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
             <div className="glass-card border border-white/5 rounded-2xl overflow-hidden shadow-sm">
                 <div className="px-6 py-4 border-b border-white/5 bg-white/2">
                     <h3 className="text-lg font-bold font-display text-white flex items-center gap-2">
-                        <Hash size={20} className="text-zinc-500" />
+                        <Hash size={20} className="text-zinc-300" />
                         System Configuration
                     </h3>
                 </div>
@@ -382,7 +382,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                                 <select
                                     value={formData.logChannelId || ""}
                                     onChange={(e) => setFormData({ ...formData, logChannelId: e.target.value })}
-                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all appearance-none text-sm text-right pr-8"
+                                    className="w-full bg-white/5 border-black rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all appearance-none text-sm text-right pr-8"
                                 >
                                     <option value="">Select a channel...</option>
                                     {channels.map((channel) => (
@@ -392,7 +392,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                                     ))}
                                 </select>
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                                    <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                    <svg className="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                                 </div>
                             </div>
                             {/* Manual ID Input fallback */}
@@ -439,7 +439,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                                 min={5}
                                 value={formData.dropExpiration}
                                 onChange={(e) => handleNumberChange("dropExpiration", e.target.value)}
-                                className="w-32 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
+                                className="w-32 bg-white/5 border-black rounded-lg px-4 py-2.5 text-right focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono text-sm text-white"
                             />
                         </div>
                     </div>
@@ -460,7 +460,7 @@ export function GeneralConfigForm({ guildId, initialData, channels = [] }: Gener
                     <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-red-500/5 transition-colors">
                         <div className="md:w-2/3">
                             <h4 className="text-base font-medium text-white">Reset Economy</h4>
-                            <p className="text-sm text-zinc-500 mt-1">Permanently delete all wallets, banks, items, and user stats.</p>
+                            <p className="text-sm text-zinc-400 mt-1">Permanently delete all wallets, banks, items, and user stats.</p>
                         </div>
                         <div className="md:w-1/3 flex justify-end">
                             <button

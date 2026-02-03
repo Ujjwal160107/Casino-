@@ -126,7 +126,7 @@ export function TopGGReviews() {
                                     </div>
                                     <div className="text-left flex-1 min-w-0">
                                         <div className="font-semibold text-white truncate">{currentReview.username}</div>
-                                        <div className="text-xs text-zinc-400">Top.gg Review</div>
+                                        <div className="text-xs text-zinc-300">Top.gg Review</div>
                                     </div>
                                     <div className="ml-auto flex-shrink-0">
                                         {renderStars(currentReview.score)}
@@ -134,7 +134,7 @@ export function TopGGReviews() {
                                 </div>
 
                                 <div className="w-full text-center">
-                                    <p className="text-zinc-300 italic text-lg leading-relaxed">
+                                    <p className="text-zinc-200 italic text-lg leading-relaxed">
                                         "{displayContent}"
                                     </p>
                                     {isLongReview && (

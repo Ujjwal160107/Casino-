@@ -55,21 +55,21 @@ export function GranularPermissions({ guildId, permissions }: GranularPermission
                 </h3>
                 <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                     <div className="md:col-span-3 space-y-1">
-                        <label className="text-xs text-zinc-400">Command</label>
+                        <label className="text-xs text-zinc-300">Command</label>
                         <input
                             type="text"
                             placeholder="e.g. robbery"
                             value={formData.command}
                             onChange={(e) => setFormData({ ...formData, command: e.target.value.toLowerCase() })}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm font-mono"
+                            className="w-full bg-white/5 border-black rounded-lg px-4 py-2.5 text-white text-sm font-mono"
                         />
                     </div>
                     <div className="md:col-span-2 space-y-1">
-                        <label className="text-xs text-zinc-400">Type</label>
+                        <label className="text-xs text-zinc-300">Type</label>
                         <select
                             value={formData.targetType}
                             onChange={(e) => setFormData({ ...formData, targetType: e.target.value })}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm font-mono"
+                            className="w-full bg-white/5 border-black rounded-lg px-4 py-2.5 text-white text-sm font-mono"
                         >
                             <option value="USER">User</option>
                             <option value="ROLE">Role</option>
@@ -77,13 +77,13 @@ export function GranularPermissions({ guildId, permissions }: GranularPermission
                         </select>
                     </div>
                     <div className="md:col-span-4 space-y-1">
-                        <label className="text-xs text-zinc-400">Target ID</label>
+                        <label className="text-xs text-zinc-300">Target ID</label>
                         <input
                             type="text"
                             placeholder="Discord ID"
                             value={formData.targetId}
                             onChange={(e) => setFormData({ ...formData, targetId: e.target.value })}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm font-mono"
+                            className="w-full bg-white/5 border-black rounded-lg px-4 py-2.5 text-white text-sm font-mono"
                         />
                     </div>
                     <div className="md:col-span-3">
@@ -109,7 +109,7 @@ export function GranularPermissions({ guildId, permissions }: GranularPermission
                             </div>
                             <div>
                                 <h4 className="text-sm font-mono text-white font-bold">{p.command}</h4>
-                                <div className="flex gap-2 text-xs text-zinc-500 mt-1">
+                                <div className="flex gap-2 text-xs text-zinc-400 mt-1">
                                     <span className="bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">{p.targetType}</span>
                                     <span className="font-mono">{p.targetId}</span>
                                 </div>
@@ -131,7 +131,7 @@ export function GranularPermissions({ guildId, permissions }: GranularPermission
                 ))}
 
                 {permissions.length === 0 && (
-                    <div className="text-center py-10 text-zinc-500">
+                    <div className="text-center py-10 text-zinc-400">
                         No granular permissions configured.
                     </div>
                 )}

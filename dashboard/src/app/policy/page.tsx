@@ -3,12 +3,12 @@
 import { motion } from "framer-motion";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { Shield, Lock, Eye, Trash2, Database, Users, Scale, FileText } from "lucide-react";
+import { Shield, Lock, Eye, Trash2, Database, Users, Scale, FileText, Server } from "lucide-react";
 
 export default function PolicyPage() {
     return (
         <main className="min-h-screen bg-[#0a0a0a] text-zinc-100 selection:bg-emerald-500/30">
-            <LandingNavbar />
+            <LandingNavbar hideLogin={true} />
 
             <section className="relative pt-32 pb-20 px-6">
                 <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/10 to-transparent pointer-events-none" />
@@ -26,39 +26,45 @@ export default function PolicyPage() {
                         transition={{ delay: 0.1 }}
                         className="text-xl text-zinc-400 max-w-2xl mx-auto"
                     >
-                        Transparency about how we handle your data.
+                        Official Statement Regarding Data Processing and Privacy Practices
                     </motion.p>
-                    <p className="mt-4 text-sm text-zinc-500">Last Updated: January 20, 2026</p>
+                    <p className="mt-4 text-sm text-zinc-500">Effective Date: February 3, 2026</p>
                 </div>
             </section>
 
             <div className="max-w-4xl mx-auto px-6 pb-32 space-y-8">
 
                 <GlassCard className="p-8">
-                    <p className="text-zinc-300 leading-relaxed">
-                        Fortuna Bot ("we", "us", or "our") respects your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Discord bot and associated services. By adding Fortuna Bot to your server or using its commands, you agree to the collection and use of information in accordance with this policy.
+                    <p className="text-zinc-300 leading-relaxed text-justify">
+                        This Privacy Policy ("Policy") constitutes a legal agreement between you ("User," "you," or "your") and the development team of Fortuna Bot ("Service Provider," "we," "us," or "our"). This Policy elucidates our practices regarding the collection, use, disclosure, and protection of your Personal Data in connection with your use of the Fortuna Bot services on the Discord platform ("Service").
+                        <br /><br />
+                        By accessing or using the Service, you expressly consent to the data processing practices described in this Policy. If you do not agree to the terms of this Policy, you must strictly refrain from using the Service.
                     </p>
                 </GlassCard>
 
                 <PolicySection
                     icon={<Eye className="text-blue-400" />}
-                    title="1. Information We Collect"
+                    title="1. Collection of Data"
                 >
                     <div className="space-y-6">
+                        <p className="text-zinc-400">We collect Specific Categories of Personal Data necessary for the operation of the Service, as classified below:</p>
+
                         <div>
-                            <h3 className="text-white font-bold mb-2">A. Information You Voluntarily Provide</h3>
-                            <p className="text-zinc-400 mb-2">We collect information that you voluntarily provide when using specific features:</p>
+                            <h3 className="text-white font-bold mb-2">1.1. User-Provided Information</h3>
+                            <p className="text-zinc-400 mb-2">We collect data that you voluntarily submit through direct interaction with the Service:</p>
                             <ul className="list-disc pl-5 space-y-2 text-zinc-400">
-                                <li><strong className="text-zinc-200">User IDs & Usernames:</strong> To link your account to your economy profile.</li>
-                                <li><strong className="text-zinc-200">Profile Data:</strong> Gameplay data including balances, inventory, job status, marriage, and game history.</li>
-                                <li><strong className="text-zinc-200">Server Configuration:</strong> Custom settings for your guild (currency, taxes, shops) if you are an admin.</li>
+                                <li><strong className="text-zinc-200">Identity Data:</strong> Discord User ID, Username, Discriminator, and Avatar URL.</li>
+                                <li><strong className="text-zinc-200">Transaction Data:</strong> Records of virtual currency transactions, inventory acquisitions, bank deposits, and loans.</li>
+                                <li><strong className="text-zinc-200">Configuration Data:</strong> Server-specific settings, preferences, and permissions configured by administrative users.</li>
                             </ul>
                         </div>
+
                         <div>
-                            <h3 className="text-white font-bold mb-2">B. Information Automatically Collected</h3>
+                            <h3 className="text-white font-bold mb-2">1.2. Automated Data Collection</h3>
+                            <p className="text-zinc-400 mb-2">Upon interaction with the Service, the following data is automatically generated and retained:</p>
                             <ul className="list-disc pl-5 space-y-2 text-zinc-400">
-                                <li><strong className="text-zinc-200">Guild IDs:</strong> The unique ID of Discord servers to maintain separate economies.</li>
-                                <li><strong className="text-zinc-200">Timestamps:</strong> For tracking cooldowns and account age.</li>
+                                <li><strong className="text-zinc-200">Metadata:</strong> Timestamps of account creation, command usage logs, and interaction frequency.</li>
+                                <li><strong className="text-zinc-200">Guild Data:</strong> Discord Server (Guild) IDs and channel associations required for segregated economy management.</li>
                             </ul>
                         </div>
                     </div>
@@ -66,70 +72,90 @@ export default function PolicyPage() {
 
                 <PolicySection
                     icon={<Database className="text-indigo-400" />}
-                    title="2. How We Use Your Information"
+                    title="2. Purpose and Legal Basis of Processing"
                 >
-                    <p>We use the collected information solely for providing the bot’s services:</p>
-                    <ul className="list-disc pl-5 space-y-2 mt-4 text-zinc-400">
-                        <li><strong className="text-zinc-200">Core Functionality:</strong> Processing transactions, calculating game outcomes, and managing inventory.</li>
-                        <li><strong className="text-zinc-200">Persistence:</strong> Ensuring your progress is saved securely.</li>
-                        <li><strong className="text-zinc-200">Permissions:</strong> Verifying administrative rights for sensitive commands.</li>
-                        <li><strong className="text-zinc-200">Improvement:</strong> Analyzing usage patterns to optimize performance.</li>
+                    <p className="mb-4">We process Personal Data under the following legal bases and for the specific purposes outlined herein:</p>
+                    <ul className="list-disc pl-5 space-y-3 text-zinc-400">
+                        <li>
+                            <strong className="text-zinc-200">Contractual Necessity:</strong> To fulfill our obligations under these Terms, including maintaining your virtual account balance, inventory, and progress.
+                        </li>
+                        <li>
+                            <strong className="text-zinc-200">Legitimate Interests:</strong> To analyze Service performance, prevent fraudulent activity (including automated "farming" or exploitation), and enforce our Terms of Service.
+                        </li>
+                        <li>
+                            <strong className="text-zinc-200">Compliance with Legal Obligations:</strong> To comply with applicable laws, regulations, or valid legal processes (e.g., subpoenas or court orders).
+                        </li>
                     </ul>
                 </PolicySection>
 
                 <PolicySection
                     icon={<Users className="text-emerald-400" />}
-                    title="3. Data Sharing & Disclosure"
+                    title="3. Disclosure of Information"
                 >
-                    <ul className="list-disc pl-5 space-y-2 text-zinc-400">
-                        <li><strong className="text-green-400">No Third-Party Sales:</strong> We do NOT sell, trade, or rent your personal information to others.</li>
-                        <li><strong className="text-green-400">No Advertising:</strong> We do not use your data for third-party advertising or tracking.</li>
-                        <li><strong className="text-zinc-200">Legal Compliance:</strong> We may disclose info if required by law.</li>
+                    <p className="mb-4">We adhere to a strict policy regarding the disclosure of your Personal Data:</p>
+                    <ul className="list-disc pl-5 space-y-3 text-zinc-400">
+                        <li>
+                            <strong className="text-emerald-400">No Commercial Transfer:</strong> We do not sell, license, lease, or commercially transfer User Data to third-party advertisers or data brokers.
+                        </li>
+                        <li>
+                            <strong className="text-zinc-200">Service Providers:</strong> We may disclose data to third-party infrastructure providers (e.g., cloud hosting services, database management systems) solely for the purpose of hosting and maintaining the Service. These providers are bound by confidentiality agreements.
+                        </li>
+                        <li>
+                            <strong className="text-zinc-200">Legal Requirements:</strong> We reserve the right to disclose data when we have a good-faith belief that such action is necessary to comply with a judicial proceeding, court order, or legal process served on us.
+                        </li>
                     </ul>
                 </PolicySection>
 
                 <PolicySection
                     icon={<Lock className="text-amber-400" />}
-                    title="4. Data Security"
-                >
-                    <p>
-                        We use administrative, technical, and physical security measures to protect your data. Information is stored in a secure MongoDB database with restricted access. However, no data transmission over the Internet can be guaranteed to be 100% secure.
-                    </p>
-                </PolicySection>
-
-                <PolicySection
-                    icon={<Trash2 className="text-red-400" />}
-                    title="5. Your Data Rights"
+                    title="4. Data Security and Retention"
                 >
                     <div className="space-y-4">
-                        <div>
-                            <h3 className="text-white font-bold mb-1">Access</h3>
-                            <p className="text-zinc-400">You can view all data stored about you by using the <code className="bg-white/10 px-1 rounded text-zinc-300">!profile</code>, <code className="bg-white/10 px-1 rounded text-zinc-300">!balance</code>, and <code className="bg-white/10 px-1 rounded text-zinc-300">!inventory</code> commands.</p>
-                        </div>
-                        <div>
-                            <h3 className="text-white font-bold mb-1">Deletion</h3>
-                            <p className="text-zinc-400">
-                                You may request deletion of your account data by contacting us. Server Administrators can delete all server-associated data using <code className="bg-white/10 px-1 rounded text-zinc-300">!reset-economy</code>.
-                            </p>
-                        </div>
+                        <p>
+                            We implement industry-standard technical and organizational measures designed to protect your Personal Data from unauthorized access, accidental loss, disclosure, or destruction. These measures include encryption in transit and rest, strict access controls, and regular security audits.
+                        </p>
+                        <p>
+                            We retain Personal Data only for as long as is necessary to fulfill the purposes for which it was collected, including for the purposes of satisfying any legal, accounting, or reporting requirements. Upon account deletion or termination, data is expunged from our active databases in accordance with our retention schedule.
+                        </p>
                     </div>
                 </PolicySection>
 
                 <PolicySection
+                    icon={<Trash2 className="text-red-400" />}
+                    title="5. User Rights and Control"
+                >
+                    <p className="mb-4">Subject to applicable law, you possess the following rights regarding your Personal Data:</p>
+                    <ul className="list-disc pl-5 space-y-2 text-zinc-400">
+                        <li><strong className="text-zinc-200">Right to Access:</strong> You may request a copy of the Personal Data we hold about you via the <code className="bg-white/10 px-1 rounded text-zinc-300">!profile</code> command.</li>
+                        <li><strong className="text-zinc-200">Right to Erasure ("Right to be Forgotten"):</strong> You may request the permanent deletion of your data. The Service provides the <code className="bg-white/10 px-1 rounded text-zinc-300">!reset-economy</code> command for Administrators to purge server-specific data. Individual deletion requests may be submitted via our Support Server.</li>
+                        <li><strong className="text-zinc-200">Right to Rectification:</strong> You have the right to request correction of inaccurate or incomplete data.</li>
+                    </ul>
+                </PolicySection>
+
+                <PolicySection
                     icon={<Scale className="text-violet-400" />}
-                    title="6. Children's Privacy"
+                    title="6. International Data Transfers"
                 >
                     <p>
-                        Our services are not directed to children under the age of 13. We do not knowingly collect personal information from children under 13. If we become aware of such collection, we will delete the information.
+                        The Service is hosted on infrastructure located in the United States and potentially other jurisdictions. By using the Service, you acknowledge and consent to the transfer of your data to, and processing in, jurisdictions that may have different data protection laws than your jurisdiction of residence.
+                    </p>
+                </PolicySection>
+
+                <PolicySection
+                    icon={<Server className="text-zinc-400" />}
+                    title="7. Amendments"
+                >
+                    <p>
+                        We reserve the right to modify this Policy at our sole discretion. Material changes will be notified via the Service or our official support channels. Your continued use of the Service following such notification constitutes your explicit acceptance of the amended Policy.
                     </p>
                 </PolicySection>
 
                 <PolicySection
                     icon={<FileText className="text-zinc-400" />}
-                    title="Contact Us"
+                    title="Contact Information"
                 >
                     <p>
-                        If you have questions about this Privacy Policy, please join our Support Server.
+                        For inquiries regarding this Policy or to exercise your data rights, please contact our Data Protection Officer via our official Support Server.
                     </p>
                     <div className="mt-6">
                         <a href="https://discord.gg/Y5P44UCH2Y" target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-6 py-3 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 transition-colors text-emerald-200 font-medium">
@@ -153,7 +179,7 @@ function PolicySection({ icon, title, children }: { icon: React.ReactNode; title
                 </div>
                 <h2 className="text-2xl font-bold text-white">{title}</h2>
             </div>
-            <div className="text-lg text-zinc-300 leading-relaxed">
+            <div className="text-lg text-zinc-300 leading-relaxed text-justify">
                 {children}
             </div>
         </GlassCard>

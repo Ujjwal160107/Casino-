@@ -102,9 +102,9 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
             <div className="flex items-center justify-between glass-card p-4 rounded-xl border border-white/5">
                 <div>
                     <h3 className="text-lg font-bold text-white">{title}</h3>
-                    <p className="text-sm text-zinc-400">{description}</p>
+                    <p className="text-sm text-zinc-300">{description}</p>
                 </div>
-                <div className="text-sm font-mono text-zinc-500 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                <div className="text-sm font-mono text-zinc-400 bg-white/5 px-3 py-1 rounded-full border border-white/5">
                     {items.length} / {limit} Slots
                 </div>
             </div>
@@ -122,11 +122,11 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 items-start">
                                 {/* Role Selection */}
                                 <div className="lg:col-span-4 space-y-1">
-                                    <label className="text-xs text-zinc-500">Role</label>
+                                    <label className="text-xs text-white uppercase font-bold tracking-wider">Role</label>
                                     <select
                                         value={income.roleId}
                                         onChange={(e) => updateIncome(idx, "roleId", e.target.value, type)}
-                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50 mb-2 transition-colors"
+                                        className="w-full bg-white/5 border-black rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50 mb-2 transition-colors"
                                     >
                                         {roles.map(r => (
                                             <option key={r.id} value={r.id} style={{ color: r.color ? `#${r.color.toString(16)}` : 'white' }}>
@@ -139,20 +139,20 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                                         placeholder="Or Enter Role ID"
                                         value={income.roleId}
                                         onChange={(e) => updateIncome(idx, "roleId", e.target.value, type)}
-                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-400 font-mono focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                        className="w-full bg-white/5 border-black rounded-lg px-3 py-2 text-xs text-zinc-300 font-mono focus:outline-none focus:border-yellow-500/50 transition-colors"
                                     />
                                 </div>
 
                                 {/* Amount */}
                                 <div className="lg:col-span-3 space-y-1">
-                                    <label className="text-xs text-zinc-500">Amount</label>
+                                    <label className="text-xs text-white uppercase font-bold tracking-wider">Amount</label>
                                     <div className="relative">
                                         <input
                                             type="number"
                                             min={0}
                                             value={income.amount === 0 ? "" : income.amount}
                                             onChange={(e) => updateIncome(idx, "amount", e.target.value === "" ? 0 : parseInt(e.target.value), type)}
-                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                            className="w-full bg-white/5 border-black rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                                         />
                                     </div>
                                 </div>
@@ -181,7 +181,7 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                 </AnimatePresence>
 
                 {items.length === 0 && (
-                    <div className="text-center py-12 text-zinc-500 text-sm border border-dashed border-white/10 rounded-lg bg-white/5">
+                    <div className="text-center py-12 text-zinc-400 text-sm border border-dashed border-white/10 rounded-lg bg-white/5">
                         <div className="flex justify-center mb-2">
                             {type === "COLLECTIBLE" ? <Coins size={32} className="opacity-20" /> : <Zap size={32} className="opacity-20" />}
                         </div>
@@ -228,7 +228,7 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                         onClick={() => setActiveTab("collectible")}
                         className={`px-4 py-2 rounded-t-lg font-bold text-sm flex items-center gap-2 transition-colors ${activeTab === "collectible"
                             ? "bg-yellow-500 text-black"
-                            : "text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10"
+                            : "text-zinc-300 hover:text-white bg-white/5 hover:bg-white/10"
                             }`}
                     >
                         <Coins size={16} /> Collectibles
@@ -237,7 +237,7 @@ export function RoleIncomeForm({ guildId, initialIncomes, roles, currencyEmoji =
                         onClick={() => setActiveTab("automatic")}
                         className={`px-4 py-2 rounded-t-lg font-bold text-sm flex items-center gap-2 transition-colors ${activeTab === "automatic"
                             ? "bg-purple-500 text-white"
-                            : "text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10"
+                            : "text-zinc-300 hover:text-white bg-white/5 hover:bg-white/10"
                             }`}
                     >
                         <Zap size={16} /> Automatic
