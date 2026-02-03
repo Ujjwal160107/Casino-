@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { NavGroup, NavLink, SectionHeader } from "@/components/docs/SharedDocs";
-import { Shield, Book, UserPlus, Briefcase, GraduationCap, TrendingUp, HelpCircle, Link as LinkIcon, Star, Dna, ShoppingBag, Landmark, Heart, Swords } from "lucide-react";
+import { Shield, Book, UserPlus, Briefcase, GraduationCap, TrendingUp, HelpCircle, Link as LinkIcon, Star, Dna, ShoppingBag, Landmark, Heart, Swords, Layout } from "lucide-react";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
 import { useState } from "react";
@@ -63,6 +63,8 @@ export default function DocsPage() {
                             <Link href="/docs/commands" className="text-violet-400 hover:text-violet-300 font-bold flex items-center gap-2 py-1">
                                 <LinkIcon size={14} /> Full Command List
                             </Link>
+                            <NavLink href="#dashboard-guide">Dashboard Guide</NavLink>
+                            <NavLink href="#faq">FAQ</NavLink>
                         </NavGroup>
                     </div>
                 </div>
@@ -286,6 +288,80 @@ export default function DocsPage() {
                         </div>
                     </section>
 
+
+
+                    {/* Dashboard Guide */}
+                    <section id="dashboard-guide">
+                        <SectionHeader icon={<Layout />} title="Dashboard Guide" />
+                        <GlassCard className="p-8 space-y-8">
+                            <div>
+                                <h4 className="text-xl font-bold text-white mb-4">Getting Started</h4>
+                                <p className="text-zinc-300 leading-relaxed mb-4">
+                                    The Fortuna Dashboard is your command center. Access it at <code className="bg-white/10 px-1 rounded">/dashboard</code> to manage your server's economy settings, shop items, and administrative logs.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="bg-black/20 p-4 rounded-lg border border-white/5">
+                                        <strong className="text-violet-400 block mb-1">Config & Settings</strong>
+                                        <p className="text-sm text-zinc-400">Customize currency symbols, starting balances, and cooldowns.</p>
+                                    </div>
+                                    <div className="bg-black/20 p-4 rounded-lg border border-white/5">
+                                        <strong className="text-violet-400 block mb-1">Shop Management</strong>
+                                        <p className="text-sm text-zinc-400">Create custom items, set prices, and manage stock easily.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <h4 className="text-lg font-bold text-white">Key Features</h4>
+                                <ul className="space-y-3 text-zinc-300">
+                                    <li className="flex gap-3">
+                                        <span className="text-violet-400 font-bold">1.</span>
+                                        <span><strong>Income Settings:</strong> Adjust how much money users earn from chatting, working, or begging.</span>
+                                    </li>
+                                    <li className="flex gap-3">
+                                        <span className="text-violet-400 font-bold">2.</span>
+                                        <span><strong>Admin Logs:</strong> View a detailed history of all economy transactions (add-money, transfers, shop purchases) to catch exploiters.</span>
+                                    </li>
+                                    <li className="flex gap-3">
+                                        <span className="text-violet-400 font-bold">3.</span>
+                                        <span><strong>Casino Drops:</strong> Schedule random money drops in specific channels to engage your community.</span>
+                                    </li>
+                                    <li className="flex gap-3">
+                                        <span className="text-violet-400 font-bold">4.</span>
+                                        <span><strong>Robbery Limits:</strong> Set maximum steal amounts and fail rates to keep the economy balanced.</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </GlassCard>
+                    </section>
+
+                    {/* FAQ */}
+                    <section id="faq">
+                        <SectionHeader icon={<HelpCircle />} title="Frequently Asked Questions" />
+                        <div className="space-y-4">
+                            <FAQItem
+                                question="How do I add custom items to the shop?"
+                                answer="Go to the Dashboard > Shop > Create Item. You can set the name, price, description, and even require specific roles to buy it."
+                            />
+                            <FAQItem
+                                question="Can I reset the economy?"
+                                answer="Yes, but be careful! Use the '!reset-economy' command or the 'Dangerous Actions' section in the Dashboard. This cannot be undone."
+                            />
+                            <FAQItem
+                                question="Why aren't my users earning money from chatting?"
+                                answer="Check your 'Chat Money' settings in the Dashboard. Ensure the feature is enabled and that you haven't set the cooldown too high. Also, check if the bot has permission to view the channels."
+                            />
+                            <FAQItem
+                                question="What is 'Stress' and how does it work?"
+                                answer="Stress increases when you work too hard without resting. If it reaches 100%, your character might suffer consequences (like death or hospital bills). Use '!relax' to lower it."
+                            />
+                            <FAQItem
+                                question="How do I verify premium status?"
+                                answer="Premium is linked to your Discord account. Once purchased, simply run '!premium' in your server to activate the perks."
+                            />
+                        </div>
+                    </section>
+
                     {/* Closing */}
                     <section className="pt-20 border-t border-white/10 text-center">
                         <h3 className="text-2xl font-bold text-white mb-6">Ready to explore?</h3>
@@ -299,9 +375,9 @@ export default function DocsPage() {
                     </section>
 
                 </div>
-            </div>
+            </div >
             <Footer />
-        </main>
+        </main >
     );
 }
 
@@ -312,5 +388,14 @@ function GameTile({ name, cmd, desc }: { name: string, cmd: string, desc: string
             <code className="text-xs text-violet-400 bg-black/30 px-1 py-0.5 rounded mb-2 inline-block">{cmd}</code>
             <p className="text-xs text-zinc-400">{desc}</p>
         </div>
+    );
+}
+
+function FAQItem({ question, answer }: { question: string, answer: string }) {
+    return (
+        <GlassCard className="p-6">
+            <h4 className="font-bold text-white mb-2">{question}</h4>
+            <p className="text-sm text-zinc-300">{answer}</p>
+        </GlassCard>
     );
 }

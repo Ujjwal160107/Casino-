@@ -58,6 +58,7 @@ export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
                         <div className="flex items-center gap-6">
                             <div className="hidden md:flex items-center gap-6">
                                 <Link href="/docs" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">Documentation</Link>
+                                <Link href="/changelog" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">Changelog</Link>
                                 <Link href="/team" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">Team</Link>
                             </div>
                             <div className="h-4 w-[1px] bg-white/10 hidden md:block"></div>
