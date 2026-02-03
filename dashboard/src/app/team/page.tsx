@@ -3,6 +3,7 @@
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { Footer } from "@/components/Footer";
 import { Github, Twitter, Linkedin, MessageCircle, Code, Palette, Cpu } from "lucide-react";
 
 export default function TeamPage() {
@@ -62,6 +63,7 @@ export default function TeamPage() {
 
                 </div>
             </section>
+            <Footer />
         </main>
     );
 }

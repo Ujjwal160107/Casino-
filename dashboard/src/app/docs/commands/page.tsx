@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { LandingNavbar } from "@/components/LandingNavbar";
+import { Footer } from "@/components/Footer";
 import { SectionHeader, CommandCard, NavGroup, NavLink } from "@/components/docs/SharedDocs";
 import { Shield, CreditCard, ShoppingBag, Dna, Briefcase, GraduationCap, TrendingUp, Settings, ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -234,6 +235,7 @@ export default function CommandsPage() {
 
                 </div>
             </div>
+            <Footer />
         </main>
     );
 }

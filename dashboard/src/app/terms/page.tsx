@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { LandingNavbar } from "@/components/LandingNavbar";
+import { Footer } from "@/components/Footer";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Scale, Shield, AlertTriangle, ScrollText, Ban, Gavel, FileSignature, CheckCircle } from "lucide-react";
 

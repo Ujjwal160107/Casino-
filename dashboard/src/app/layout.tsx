@@ -5,7 +5,7 @@ import { Providers } from "@/components/Providers";
 import { Toaster } from "sonner";
 import { CursorSpotlight } from "@/components/CursorSpotlight";
 import { AmbientBackground } from "@/components/AmbientBackground";
-import { Footer } from "@/components/Footer";
+
 
 const inter = Inter({
   variable: "--font-inter",
@@ -42,7 +42,6 @@ export default function RootLayout({
           <AmbientBackground />
           <CursorSpotlight />
           {children}
-          <Footer />
           <Toaster position="top-right" theme="dark" richColors />
         </Providers>
       </body>

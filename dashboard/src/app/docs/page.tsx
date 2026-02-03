@@ -6,6 +6,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { NavGroup, NavLink, SectionHeader } from "@/components/docs/SharedDocs";
 import { Shield, Book, UserPlus, Briefcase, GraduationCap, TrendingUp, HelpCircle, Link as LinkIcon, Star, Dna, ShoppingBag, Landmark, Heart, Swords } from "lucide-react";
 import Link from "next/link";
+import { Footer } from "@/components/Footer";
 import { useState } from "react";
 
 export default function DocsPage() {
@@ -299,6 +300,7 @@ export default function DocsPage() {
 
                 </div>
             </div>
+            <Footer />
         </main>
     );
 }
