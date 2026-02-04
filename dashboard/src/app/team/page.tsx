@@ -36,7 +36,7 @@ export default function TeamPage() {
 
             {/* Team Grid */}
             <div className="max-w-[1400px] mx-auto px-6 pb-32 grid grid-cols-1 lg:grid-cols-12 gap-12">
-                <div className="col-span-2">
+                <div className="hidden lg:block col-span-2">
                     <GeneralSidebar />
                 </div>
 

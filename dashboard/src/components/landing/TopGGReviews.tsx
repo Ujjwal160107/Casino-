@@ -106,7 +106,7 @@ export function TopGGReviews() {
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -20, scale: 0.95 }}
                             transition={{ duration: 0.5, ease: "easeOut" }}
-                            className="bg-zinc-900/80 backdrop-blur-md border border-white/10 rounded-2xl p-6 md:p-8 max-w-2xl w-full shadow-xl shadow-yellow-900/5 relative"
+                            className="bg-zinc-900/90 md:bg-zinc-900/80 md:backdrop-blur-md border border-white/10 rounded-2xl p-6 md:p-8 max-w-2xl w-full shadow-xl shadow-yellow-900/5 relative"
                         >
                             {/* Quote Icon */}
                             <div className="absolute top-4 left-4 text-white/5">

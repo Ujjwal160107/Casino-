@@ -7,6 +7,7 @@ import { LayoutDashboard, Menu, X, LogOut, User } from "lucide-react";
 import { useState, useEffect } from "react";
 import { GlassCard } from "./ui/GlassCard";
 import Image from "next/image";
+import { MobileSidebar } from "./MobileSidebar";
 
 interface LandingNavbarProps {
     user?: {
@@ -135,13 +136,27 @@ export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
                                 )
                             )}
                             <button
-                                className="px-6 py-2 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold text-sm hover:brightness-110 transition-all shadow-lg hover:shadow-indigo-500/25 cursor-pointer"
+                                className="px-6 py-2 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold text-sm hover:brightness-110 transition-all shadow-lg hover:shadow-indigo-500/25 cursor-pointer hidden md:block"
                             >
                                 Premium
+                            </button>
+
+                            {/* Mobile Menu Toggle */}
+                            <button
+                                onClick={() => setMobileMenuOpen(true)}
+                                className="md:hidden p-2 text-zinc-300 hover:text-white transition-colors"
+                            >
+                                <Menu size={24} />
                             </button>
                         </div>
                     </div>
                 </GlassCard>
+
+                <MobileSidebar
+                    isOpen={mobileMenuOpen}
+                    onClose={() => setMobileMenuOpen(false)}
+                    user={user}
+                />
             </div >
         </motion.nav >
     );

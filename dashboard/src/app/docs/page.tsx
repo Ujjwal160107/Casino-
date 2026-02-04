@@ -39,7 +39,7 @@ export default function DocsPage() {
 
             <div className="max-w-[1400px] mx-auto px-6 pb-32 grid grid-cols-1 lg:grid-cols-12 gap-12">
                 {/* General Sidebar (Left) */}
-                <div className="col-span-2">
+                <div className="hidden lg:block col-span-2">
                     <GeneralSidebar />
                 </div>
 
