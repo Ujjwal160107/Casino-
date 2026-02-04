@@ -4,6 +4,7 @@ import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Footer } from "@/components/Footer";
+import { GeneralSidebar } from "@/components/GeneralSidebar";
 import { Github, Twitter, Linkedin, MessageCircle, Code, Palette, Cpu } from "lucide-react";
 
 export default function TeamPage() {
@@ -34,35 +35,40 @@ export default function TeamPage() {
             </section>
 
             {/* Team Grid */}
-            <section className="px-6 pb-32">
-                <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-
-                    <TeamMemberCard
-                        name="BEAST"
-                        role="Lead Developer"
-                        image="/team/beast.png"
-                        desc="Architect of Fortuna's core systems. Beast ensures high resilience, security, and scalability under load, powering the entire ecosystem."
-                        delay={0.2}
-                    />
-
-                    <TeamMemberCard
-                        name="RACHIT"
-                        role="Developer"
-                        image="/team/rachit.png"
-                        desc="Bridging complex logic and user experience. Rachit optimizes game mechanics and squashes bugs for fluid, responsive interactions."
-                        delay={0.3}
-                    />
-
-                    <TeamMemberCard
-                        name="LAKSHAY"
-                        role="Creativity & Development Head"
-                        image="/team/lakshay.png"
-                        desc="Leading the vision for Fortuna's aesthetic and feel. Lakshay ensures every feature is refined, intuitive, and visually stunning."
-                        delay={0.4}
-                    />
-
+            <div className="max-w-[1400px] mx-auto px-6 pb-32 grid grid-cols-1 lg:grid-cols-12 gap-12">
+                <div className="col-span-2">
+                    <GeneralSidebar />
                 </div>
-            </section>
+
+                <div className="col-span-1 lg:col-span-10">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <TeamMemberCard
+                            name="BEAST"
+                            role="Lead Developer"
+                            image="/team/beast.png"
+                            desc="Architect of Fortuna's core systems. Beast ensures high resilience, security, and scalability under load, powering the entire ecosystem."
+                            delay={0.2}
+                        />
+
+                        <TeamMemberCard
+                            name="RACHIT"
+                            role="Developer"
+                            image="/team/rachit.png"
+                            desc="Bridging complex logic and user experience. Rachit optimizes game mechanics and squashes bugs for fluid, responsive interactions."
+                            delay={0.3}
+                        />
+
+                        <TeamMemberCard
+                            name="LAKSHAY"
+                            role="Creativity & Development Head"
+                            image="/team/lakshay.png"
+                            desc="Leading the vision for Fortuna's aesthetic and feel. Lakshay ensures every feature is refined, intuitive, and visually stunning."
+                            delay={0.4}
+                        />
+                    </div>
+                </div>
+            </div>
+
             <Footer />
         </main>
     );
