@@ -505,14 +505,14 @@ export function ShopItemEditor({ guildId, item, roles, onClose }: ShopItemEditor
                             <div className={`w-10 h-6 rounded-full p-1 transition-colors ${formData.showInInventory ? "bg-primary" : "bg-zinc-800"}`} onClick={() => handleChange("showInInventory", !formData.showInInventory)}>
                                 <div className={`w-4 h-4 bg-white rounded-full transition-transform ${formData.showInInventory ? "translate-x-4" : ""}`} />
                             </div>
-                            <span className="text-xs font-bold text-zinc-500 group-hover:text-white transition-colors uppercase">Show in Inventory</span>
+                            <span className="text-xs font-bold text-white group-hover:text-white transition-colors uppercase">Show in Inventory</span>
                         </label>
 
                         <label className="flex items-center gap-2 cursor-pointer group">
                             <div className={`w-10 h-6 rounded-full p-1 transition-colors ${formData.usable ? "bg-primary" : "bg-zinc-800"}`} onClick={() => handleChange("usable", !formData.usable)}>
                                 <div className={`w-4 h-4 bg-white rounded-full transition-transform ${formData.usable ? "translate-x-4" : ""}`} />
                             </div>
-                            <span className="text-xs font-bold text-zinc-500 group-hover:text-white transition-colors uppercase">Usable Item</span>
+                            <span className="text-xs font-bold text-white group-hover:text-white transition-colors uppercase">Usable Item</span>
                         </label>
                     </div>
 

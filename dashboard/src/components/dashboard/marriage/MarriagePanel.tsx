@@ -102,7 +102,7 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Marriage Cost */}
                 <div className="space-y-2">
-                    <label className="text-xs uppercase tracking-wider font-bold text-zinc-500 flex items-center gap-1">
+                    <label className="text-xs uppercase tracking-wider font-bold text-white flex items-center gap-1">
                         <Coins size={12} /> Marriage Cost
                     </label>
                     <div className="relative">
@@ -121,7 +121,7 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
 
                 {/* Divorce Cost */}
                 <div className="space-y-2">
-                    <label className="text-xs uppercase tracking-wider font-bold text-zinc-500 flex items-center gap-1">
+                    <label className="text-xs uppercase tracking-wider font-bold text-white flex items-center gap-1">
                         <HeartCrack size={12} /> Divorce Cost
                     </label>
                     <div className="relative">
@@ -140,7 +140,7 @@ export function MarriagePanel({ guildId, initialConfig }: MarriagePanelProps) {
 
                 {/* Cooldown */}
                 <div className="space-y-2">
-                    <label className="text-xs uppercase tracking-wider font-bold text-zinc-500 flex items-center gap-1">
+                    <label className="text-xs uppercase tracking-wider font-bold text-white flex items-center gap-1">
                         <Clock size={12} /> Remarry Cooldown
                     </label>
                     <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-2">

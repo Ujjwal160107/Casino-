@@ -32,7 +32,7 @@ export default function PolicyPage() {
                     <p className="mt-4 text-sm text-zinc-500">Effective Date: February 3, 2026</p>
                 </div>
             </section>
-            <Footer />
+
             <div className="max-w-4xl mx-auto px-6 pb-32 space-y-8">
 
                 <GlassCard className="p-8">
@@ -166,6 +166,7 @@ export default function PolicyPage() {
                 </PolicySection>
 
             </div>
+            <Footer />
 
         </main>
     );

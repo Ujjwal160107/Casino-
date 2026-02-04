@@ -51,7 +51,7 @@ export function QuestEditor({ guildId, initialData }: QuestEditorProps) {
             {/* Config Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div className="space-y-2">
-                    <label className="text-xs text-zinc-500 font-bold uppercase">Completion Reward</label>
+                    <label className="text-xs text-white font-bold uppercase">Completion Reward</label>
                     <input
                         type="number"
                         min={0}

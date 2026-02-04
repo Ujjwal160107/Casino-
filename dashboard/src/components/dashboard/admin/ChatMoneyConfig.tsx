@@ -59,7 +59,7 @@ export function ChatMoneyConfig({ guildId, config }: ChatMoneyConfigProps) {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Min Amount</label>
+                        <label className="text-sm font-medium text-white">Min Amount</label>
                         <input
                             type="number"
                             value={formData.min === 0 ? "" : formData.min}
@@ -68,7 +68,7 @@ export function ChatMoneyConfig({ guildId, config }: ChatMoneyConfigProps) {
                         />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Max Amount</label>
+                        <label className="text-sm font-medium text-white">Max Amount</label>
                         <input
                             type="number"
                             value={formData.max === 0 ? "" : formData.max}
@@ -88,7 +88,7 @@ export function ChatMoneyConfig({ guildId, config }: ChatMoneyConfigProps) {
                 </div>
 
                 <div className="space-y-4 pt-4 border-t border-white/5">
-                    <label className="text-sm font-medium text-zinc-400">Allowed Channels</label>
+                    <label className="text-sm font-medium text-white">Allowed Channels</label>
                     <p className="text-xs text-zinc-500 mb-2">If empty, chat money works in ALL channels.</p>
 
                     <div className="flex gap-2">
