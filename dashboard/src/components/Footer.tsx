@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MessageCircle, Instagram } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 
 export function Footer() {
     return (
@@ -51,7 +51,7 @@ export function Footer() {
                         <h3 className="text-white font-bold mb-4">Connect</h3>
                         <ul className="space-y-2">
                             <FooterLink href="https://discord.gg/Y5P44UCH2Y">Discord</FooterLink>
-                            <FooterLink href="https://instagram.com/fortuna_bot">Instagram</FooterLink>
+
                         </ul>
                     </div>
 
