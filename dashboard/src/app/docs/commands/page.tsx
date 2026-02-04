@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { Footer } from "@/components/Footer";
 import { SectionHeader, CommandCard, NavGroup, NavLink } from "@/components/docs/SharedDocs";
+import { GeneralSidebar } from "@/components/GeneralSidebar";
 import { Shield, CreditCard, ShoppingBag, Dna, Briefcase, GraduationCap, TrendingUp, Settings, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -32,24 +33,14 @@ export default function CommandsPage() {
                 </div>
             </section>
 
-            <div className="max-w-7xl mx-auto px-6 pb-32 grid grid-cols-1 lg:grid-cols-4 gap-12">
-                {/* Sidebar */}
-                <div className="hidden lg:block col-span-1">
-                    <div className="sticky top-32 space-y-8 max-h-[calc(100vh-10rem)] overflow-y-auto pr-2 custom-scrollbar">
-                        <NavGroup title="Categories">
-                            <NavLink href="#economy">Economy</NavLink>
-                            <NavLink href="#games">Games</NavLink>
-                            <NavLink href="#life">Life & Career</NavLink>
-                            <NavLink href="#education">Education</NavLink>
-                            <NavLink href="#shop">Shop & Items</NavLink>
-                            <NavLink href="#stocks">Stocks & Crypto</NavLink>
-                            <NavLink href="#admin">Admin Settings</NavLink>
-                        </NavGroup>
-                    </div>
+            <div className="max-w-[1400px] mx-auto px-6 pb-32 grid grid-cols-1 lg:grid-cols-12 gap-12">
+                {/* General Sidebar (Left) */}
+                <div className="col-span-2">
+                    <GeneralSidebar />
                 </div>
 
-                {/* Content */}
-                <div className="col-span-1 lg:col-span-3 space-y-16">
+                {/* Content (Center) */}
+                <div className="col-span-1 lg:col-span-8 space-y-16">
 
                     {/* Economy */}
                     <section id="economy">
@@ -234,8 +225,24 @@ export default function CommandsPage() {
                     </section>
 
                 </div>
+
+
+                {/* Categories Sidebar (Right) */}
+                <div className="hidden lg:block col-span-2">
+                    <div className="sticky top-32 space-y-8 max-h-[calc(100vh-10rem)] overflow-y-auto pr-2 custom-scrollbar">
+                        <NavGroup title="Categories">
+                            <NavLink href="#economy">Economy</NavLink>
+                            <NavLink href="#games">Games</NavLink>
+                            <NavLink href="#life">Life & Career</NavLink>
+                            <NavLink href="#education">Education</NavLink>
+                            <NavLink href="#shop">Shop & Items</NavLink>
+                            <NavLink href="#stocks">Stocks & Crypto</NavLink>
+                            <NavLink href="#admin">Admin Settings</NavLink>
+                        </NavGroup>
+                    </div>
+                </div>
             </div>
             <Footer />
-        </main>
+        </main >
     );
 }

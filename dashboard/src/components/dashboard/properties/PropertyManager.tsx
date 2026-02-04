@@ -116,25 +116,25 @@ export function PropertyManager({ guildId, initialProperties }: PropertyManagerP
 
                             <div className="space-y-3 text-sm">
                                 <div className="flex items-center justify-between py-2 border-t border-white/5">
-                                    <span className="text-zinc-500 flex items-center gap-2">
+                                    <span className="text-white flex items-center gap-2">
                                         <Home size={14} /> Price
                                     </span>
                                     <span className="font-mono text-yellow-500">{property.basePrice.toLocaleString("en-US")}</span>
                                 </div>
                                 <div className="flex items-center justify-between py-2 border-t border-white/5">
-                                    <span className="text-zinc-500 flex items-center gap-2">
+                                    <span className="text-white flex items-center gap-2">
                                         <BarChart2 size={14} /> Income
                                     </span>
                                     <span className="font-mono text-green-400">+{property.incomePerCycle.toLocaleString("en-US")}</span>
                                 </div>
                                 <div className="flex items-center justify-between py-2 border-t border-white/5">
-                                    <span className="text-zinc-500 flex items-center gap-2">
+                                    <span className="text-white flex items-center gap-2">
                                         <Clock size={14} /> Cycle
                                     </span>
                                     <span className="text-white">{property.incomeCycleHours} Hours</span>
                                 </div>
                                 <div className="flex items-center justify-between py-2 border-t border-white/5">
-                                    <span className="text-zinc-500 flex items-center gap-2">
+                                    <span className="text-white flex items-center gap-2">
                                         <Users size={14} /> Max/User
                                     </span>
                                     <span className="text-white">{property.maxPerUser}</span>

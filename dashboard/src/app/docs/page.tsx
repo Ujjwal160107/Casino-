@@ -7,6 +7,7 @@ import { NavGroup, NavLink, SectionHeader } from "@/components/docs/SharedDocs";
 import { Shield, Book, UserPlus, Briefcase, GraduationCap, TrendingUp, HelpCircle, Link as LinkIcon, Star, Dna, ShoppingBag, Landmark, Heart, Swords, Layout } from "lucide-react";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { GeneralSidebar } from "@/components/GeneralSidebar";
 import { useState } from "react";
 
 export default function DocsPage() {
@@ -36,41 +37,14 @@ export default function DocsPage() {
                 </div>
             </section>
 
-            <div className="max-w-7xl mx-auto px-6 pb-32 grid grid-cols-1 lg:grid-cols-4 gap-12">
-                {/* Sidebar Navigation */}
-                <div className="hidden lg:block col-span-1">
-                    <div className="sticky top-32 space-y-8 max-h-[calc(100vh-10rem)] overflow-y-auto pr-2 custom-scrollbar">
-                        <NavGroup title="Basics">
-                            <NavLink href="#intro">Introduction</NavLink>
-                            <NavLink href="#dailies">Earning Money</NavLink>
-                            <NavLink href="#banking">Bank & Finance</NavLink>
-                        </NavGroup>
-                        <NavGroup title="Life & Career">
-                            <NavLink href="#education">Education</NavLink>
-                            <NavLink href="#jobs">Carreer & Jobs</NavLink>
-                            <NavLink href="#family">Marriage & Family</NavLink>
-                        </NavGroup>
-                        <NavGroup title="Assets">
-                            <NavLink href="#inventory">Inventory & Market</NavLink>
-                            <NavLink href="#stocks">Stock Market</NavLink>
-                            <NavLink href="#properties">Properties</NavLink>
-                        </NavGroup>
-                        <NavGroup title="Entertainment">
-                            <NavLink href="#games">Casino Games</NavLink>
-                            <NavLink href="#chicken">Chicken Training</NavLink>
-                        </NavGroup>
-                        <NavGroup title="Reference">
-                            <Link href="/docs/commands" className="text-violet-400 hover:text-violet-300 font-bold flex items-center gap-2 py-1">
-                                <LinkIcon size={14} /> Full Command List
-                            </Link>
-                            <NavLink href="#dashboard-guide">Dashboard Guide</NavLink>
-                            <NavLink href="#faq">FAQ</NavLink>
-                        </NavGroup>
-                    </div>
+            <div className="max-w-[1400px] mx-auto px-6 pb-32 grid grid-cols-1 lg:grid-cols-12 gap-12">
+                {/* General Sidebar (Left) */}
+                <div className="col-span-2">
+                    <GeneralSidebar />
                 </div>
 
-                {/* Main Content */}
-                <div className="col-span-1 lg:col-span-3 space-y-20">
+                {/* Main Content (Center) */}
+                <div className="col-span-1 lg:col-span-8 space-y-20">
 
                     {/* Introduction */}
                     <section id="intro">
@@ -374,6 +348,38 @@ export default function DocsPage() {
                         </Link>
                     </section>
 
+                </div>
+
+                {/* Docs Navigation (Right) */}
+                <div className="hidden lg:block col-span-2">
+                    <div className="sticky top-32 space-y-8 max-h-[calc(100vh-10rem)] overflow-y-auto pr-2 custom-scrollbar">
+                        <NavGroup title="Basics">
+                            <NavLink href="#intro">Introduction</NavLink>
+                            <NavLink href="#dailies">Earning Money</NavLink>
+                            <NavLink href="#banking">Bank & Finance</NavLink>
+                        </NavGroup>
+                        <NavGroup title="Life & Career">
+                            <NavLink href="#education">Education</NavLink>
+                            <NavLink href="#jobs">Carreer & Jobs</NavLink>
+                            <NavLink href="#family">Marriage & Family</NavLink>
+                        </NavGroup>
+                        <NavGroup title="Assets">
+                            <NavLink href="#inventory">Inventory & Market</NavLink>
+                            <NavLink href="#stocks">Stock Market</NavLink>
+                            <NavLink href="#properties">Properties</NavLink>
+                        </NavGroup>
+                        <NavGroup title="Entertainment">
+                            <NavLink href="#games">Casino Games</NavLink>
+                            <NavLink href="#chicken">Chicken Training</NavLink>
+                        </NavGroup>
+                        <NavGroup title="Reference">
+                            <Link href="/docs/commands" className="text-violet-400 hover:text-violet-300 font-bold flex items-center gap-2 py-1">
+                                <LinkIcon size={14} /> Full Command List
+                            </Link>
+                            <NavLink href="#dashboard-guide">Dashboard Guide</NavLink>
+                            <NavLink href="#faq">FAQ</NavLink>
+                        </NavGroup>
+                    </div>
                 </div>
             </div >
             <Footer />
