@@ -66,8 +66,10 @@ export function BackgroundParticles() {
 
         const init = () => {
             particles = [];
-            const particleCount = window.innerWidth < 768 ? 20 : 50; // Reduce particles on mobile
-            for (let i = 0; i < particleCount; i++) {
+            // Completely disable on mobile (< 768px)
+            if (window.innerWidth < 768) return;
+
+            for (let i = 0; i < 50; i++) {
                 particles.push(new Particle());
             }
         };
@@ -75,6 +77,9 @@ export function BackgroundParticles() {
         const animate = () => {
             if (!ctx) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Skip animation loop if no particles (i.e. on mobile)
+            if (particles.length === 0) return;
 
             particles.forEach((particle) => {
                 particle.update();
