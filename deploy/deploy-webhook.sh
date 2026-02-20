@@ -13,10 +13,13 @@
 #  Usage (systemd): see deploy-webhook.service
 # =============================================================
 
-set -euo pipefail
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")"
 
 PORT="${DEPLOY_PORT:-9000}"
-APP_DIR="${APP_DIR:-/root/Casino-}"
+APP_DIR="${APP_DIR:-/root/app}"
 LOG_FILE="${LOG_FILE:-/var/log/casino-deploy.log}"
 DEPLOY_SECRET="${DEPLOY_SECRET:?DEPLOY_SECRET environment variable is required}"
 
@@ -109,11 +112,12 @@ handle_request() {
     do_deploy &
 }
 
-# Export functions for socat subshell
-export -f handle_request do_deploy log
-export APP_DIR LOG_FILE DEPLOY_SECRET
-
-log "🎧 Webhook listener starting on port $PORT..."
-
-# Listen forever — socat forks a bash subshell for each connection
-socat TCP-LISTEN:"$PORT",reuseaddr,fork SYSTEM:"bash -c handle_request"
+# --- Entrypoint ---
+# When socat calls this script with --handle, process the HTTP request.
+# Otherwise, start the socat listener.
+if [ "${1:-}" = "--handle" ]; then
+    handle_request
+else
+    log "🎧 Webhook listener starting on port $PORT..."
+    socat TCP-LISTEN:"$PORT",reuseaddr,fork EXEC:"$SCRIPT_PATH --handle"
+fi
