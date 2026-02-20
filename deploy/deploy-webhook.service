@@ -5,19 +5,19 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/Casino-
-ExecStart=/root/Casino-/deploy/deploy-webhook.sh
+WorkingDirectory=/root/app
+ExecStart=/root/app/deploy/deploy-webhook.sh
 Restart=always
 RestartSec=5
 
 # Environment — set your secret here
 Environment=DEPLOY_SECRET=CHANGE_ME_TO_A_STRONG_SECRET
 Environment=DEPLOY_PORT=9000
-Environment=APP_DIR=/root/Casino-
+Environment=APP_DIR=/root/app
 Environment=LOG_FILE=/var/log/casino-deploy.log
 
 # Load .env for Node/Prisma commands
-EnvironmentFile=-/root/Casino-/.env
+EnvironmentFile=-/root/app/.env
 
 [Install]
 WantedBy=multi-user.target
