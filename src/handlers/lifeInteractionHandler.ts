@@ -376,7 +376,8 @@ async function handleButton(interaction: ButtonInteraction) {
                 jobXp: { increment: xpGain },
                 jobStress: Math.min(100, (userData.jobStress || 0) + stressGain), // Cap at 100
                 shiftsWorked: { increment: 1 },
-                lastShift: new Date()
+                lastShift: new Date(),
+                jobFailStreak: success ? 0 : undefined // Reset fail streak on success
             }
         });
 
@@ -395,11 +396,13 @@ async function handleButton(interaction: ButtonInteraction) {
             }
         }
 
-        // Demotion
+        // Demotion (check on failure — uses 3-strike system)
         if (xpGain < 0) {
-            const demoCheck = await checkDemotion({ ...userData, jobXp: userData.jobXp + xpGain });
+            const demoCheck = await checkDemotion(userData);
             if (demoCheck.demoted) {
                 msg += `\n\n🚨 **DEMOTED** to ${demoCheck.prevJob?.title}`;
+            } else if (demoCheck.msg) {
+                msg += `\n\n${demoCheck.msg}`;
             }
         }
 
@@ -763,7 +766,8 @@ async function handleButton(interaction: ButtonInteraction) {
                     jobXp: { increment: 10 },
                     jobStress: { increment: 5 }, // +5 Stress on success
                     jobStreak: newStreak,
-                    lastShift: new Date()
+                    lastShift: new Date(),
+                    jobFailStreak: 0 // Reset fail streak on success
                 }
             });
 
@@ -854,13 +858,15 @@ async function handleButton(interaction: ButtonInteraction) {
                 }
             });
 
-            // Check Demotion (using updated XP estimate)
-            const demoCheck = await checkDemotion({ ...userData, jobXp: Math.max(0, userData.jobXp - 5) });
+            // Check Demotion (uses 3-strike consecutive failure system)
+            const demoCheck = await checkDemotion(userData);
 
             let desc = `You messed up the task!\n\n**Correct Answer:** ${game.answer}\n\n**Penalty:**\n- No Pay\n- **-5 Job XP**\n- **+10 Stress**\n\nCome back in **${cooldownSeconds > 0 ? formatDuration(cooldownMs) : "a moment"}**.`;
 
             if (demoCheck.demoted) {
                 desc += `\n\n${Mascot.Emotes.Alert} **DEMOTED!**\n${demoCheck.msg}`;
+            } else if (demoCheck.msg) {
+                desc += `\n\n${demoCheck.msg}`;
             }
 
             const failEmbed = new EmbedBuilder()

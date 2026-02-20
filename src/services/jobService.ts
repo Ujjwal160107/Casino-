@@ -242,39 +242,45 @@ export async function checkPromotion(user: any, guildId?: string): Promise<{ eli
 }
 
 /**
- * Checks if a user should be demoted due to low XP.
- * Triggered on shift failure.
+ * Checks if a user should be demoted due to consecutive shift failures.
+ * Demotion happens after 3 consecutive failures, only for higher-level jobs.
+ * Intern / entry-level jobs (no reqJobId) are immune to demotion.
  */
-export async function checkDemotion(user: any): Promise<{ demoted: boolean; prevJob: JobDefinition | null; msg: string }> {
-    if (!user.jobId) return { demoted: false, prevJob: null, msg: "" };
+export async function checkDemotion(user: any): Promise<{ demoted: boolean; prevJob: JobDefinition | null; msg: string; failStreak: number }> {
+    if (!user.jobId) return { demoted: false, prevJob: null, msg: "", failStreak: 0 };
 
     const currentJob = JOBS.find(j => j.id === user.jobId);
-    if (!currentJob) return { demoted: false, prevJob: null, msg: "" };
+    if (!currentJob) return { demoted: false, prevJob: null, msg: "", failStreak: 0 };
 
-    const reqXp = currentJob.reqXp || 0;
+    // Increment the consecutive fail streak
+    const newFailStreak = (user.jobFailStreak || 0) + 1;
 
-    // Buffer: You only get demoted if you drop 10 XP *below* the requirement.
-    // e.g. Req 50. If you have 49, warning. If you have 40, demotion.
-    if (user.jobXp < reqXp - 10) {
-        // Demote!
-        if (currentJob.reqJobId) {
-            const prevJob = JOBS.find(j => j.id === currentJob.reqJobId);
-            if (prevJob) {
-                // Perform Demotion
-                await prisma.user.update({
-                    where: { id: user.id },
-                    data: { jobId: prevJob.id }
-                });
-                return { demoted: true, prevJob, msg: `You have been **demoted** to **${prevJob.title}** due to poor performance.` };
-            }
-        } else {
-            // Fired? Or just stay at lowest level?
-            // If no prev job (Intern), maybe fired? Let's just keep them as intern but reset XP to 0 or something.
-            // For now, no demotion from Intern.
+    // Update fail streak in DB
+    await prisma.user.update({
+        where: { id: user.id },
+        data: { jobFailStreak: newFailStreak }
+    });
+
+    // Only demote from higher posts (jobs that have a prerequisite job)
+    if (!currentJob.reqJobId) {
+        // Entry-level / Intern — no demotion, just track streak
+        return { demoted: false, prevJob: null, msg: `⚠️ Failed shift streak: **${newFailStreak}/3**`, failStreak: newFailStreak };
+    }
+
+    // Demote after 3 consecutive failures
+    if (newFailStreak >= 3) {
+        const prevJob = JOBS.find(j => j.id === currentJob.reqJobId);
+        if (prevJob) {
+            // Perform Demotion & reset fail streak
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { jobId: prevJob.id, jobFailStreak: 0 }
+            });
+            return { demoted: true, prevJob, msg: `You have been **demoted** to **${prevJob.title}** after **3 consecutive failures**.`, failStreak: 0 };
         }
     }
 
-    return { demoted: false, prevJob: null, msg: "" };
+    return { demoted: false, prevJob: null, msg: `⚠️ Failed shift streak: **${newFailStreak}/3** — one more and you'll be demoted!`, failStreak: newFailStreak };
 }
 
 export async function reduceJobStress(userId: string, guildId: string, activity: "gym" | "sports" | "meditation") {
