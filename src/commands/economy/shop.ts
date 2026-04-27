@@ -20,7 +20,7 @@ import { fmtCurrency } from "../../utils/format";
 import { logToChannel } from "../../utils/discordLogger";
 import { Mascot } from "../../config/branding";
 
-const ITEMS_PER_PAGE = 3;
+const ITEMS_PER_PAGE = 5;
 const SHOP_ACCENT_COLOR = 0x9B59B6;
 
 function formatAmount(amount: number) {
