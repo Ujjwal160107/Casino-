@@ -1,85 +1,181 @@
 import {
-  Message,
-  EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  Colors,
   ComponentType,
+  ContainerBuilder,
   GuildMember,
+  Message,
+  MessageFlags,
+  SectionBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
   TextChannel,
-  ButtonInteraction,
-  CacheType
+  TextDisplayBuilder,
 } from "discord.js";
 import { getShopItems, buyItem, getUserInventory } from "../../services/shopService";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { fmtCurrency } from "../../utils/format";
-import { successEmbed, errorEmbed } from "../../utils/embed";
 import { logToChannel } from "../../utils/discordLogger";
+import { Mascot } from "../../config/branding";
 
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 3;
+const SHOP_ACCENT_COLOR = 0x9B59B6;
 
-import { Mascot, getEmoteUrl } from "../../config/branding";
+function formatAmount(amount: number) {
+  return amount.toLocaleString("en-US");
+}
 
-function renderShopPage(items: any[], page: number, totalPages: number, currencyEmoji: string) {
-  const start = (page - 1) * ITEMS_PER_PAGE;
+function v2Container(title: string, body: string, accentColor = SHOP_ACCENT_COLOR) {
+  return new ContainerBuilder()
+    .setAccentColor(accentColor)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`**${title}**`),
+      new TextDisplayBuilder().setContent(body),
+    );
+}
+
+function getShopTotalPages(items: any[]) {
+  return Math.max(1, Math.ceil(items.length / ITEMS_PER_PAGE));
+}
+
+function buildShopContainer(items: any[], page: number, totalPages: number, currencyEmoji: string, disabled = false) {
+  const safePage = Math.min(Math.max(page, 1), Math.max(totalPages, 1));
+  const start = (safePage - 1) * ITEMS_PER_PAGE;
   const currentItems = items.slice(start, start + ITEMS_PER_PAGE);
+  const container = new ContainerBuilder()
+    .setAccentColor(SHOP_ACCENT_COLOR)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## ${Mascot.Name} Shop\n> Browse server items and buy directly from the buttons.\n> Prices use this server's configured currency.`,
+      ),
+    )
+    .addSeparatorComponents(
+      new SeparatorBuilder()
+        .setDivider(true)
+        .setSpacing(SeparatorSpacingSize.Small),
+    );
 
-
-
-  const embed = new EmbedBuilder()
-    .setTitle(`Shop`)
-    .setColor(Mascot.Colors.Base as any)
-    .setFooter({ text: `${Mascot.Name} • Page ${page}/${totalPages} • Use buttons to buy` + "\u3000".repeat(25) });
-
-  const url = getEmoteUrl(Mascot.Emotes.Money);
-  if (url) embed.setThumbnail(url);
-
-  if (currentItems.length > 0) {
-    currentItems.forEach((item, index) => {
-      const itemNumber = (page - 1) * ITEMS_PER_PAGE + index + 1;
-      const name = `${itemNumber}. ${item.name} — ${fmtCurrency(item.price, currencyEmoji)}`;
-      const value = `${item.description || "No description"}` + "\u3000".repeat(20);
-      embed.addFields({ name, value, inline: false });
-    });
-  } else {
-    embed.setDescription("No items available.");
+  if (currentItems.length === 0) {
+    return container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("No items available."),
+    );
   }
 
-  const buyRow = new ActionRowBuilder<ButtonBuilder>();
   currentItems.forEach((item, index) => {
-    buyRow.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`shop_buy_${item.id}`)
-        .setLabel(`${(page - 1) * ITEMS_PER_PAGE + index + 1}`)
-        .setStyle(ButtonStyle.Success)
-        .setEmoji("🛒")
+    container.addSectionComponents(
+      new SectionBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`### ${start + index + 1}. ${item.name}`),
+          new TextDisplayBuilder().setContent(item.description || "No description"),
+          new TextDisplayBuilder().setContent(`Price: **${currencyEmoji} ${formatAmount(item.price)}**`),
+        )
+        .setButtonAccessory(
+          new ButtonBuilder()
+            .setCustomId(`shop_buy_${item.id}`)
+            .setLabel("Buy")
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(disabled),
+        ),
     );
+
+    if (index < currentItems.length - 1) {
+      container.addSeparatorComponents(
+        new SeparatorBuilder()
+          .setDivider(true)
+          .setSpacing(SeparatorSpacingSize.Small),
+      );
+    }
   });
 
-  const navRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId("shop_prev").setLabel("Previous").setStyle(ButtonStyle.Secondary).setDisabled(page <= 1),
-    new ButtonBuilder().setCustomId("shop_next").setLabel("Next").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages)
+  return container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`Page ${safePage}/${totalPages} - Use \`shop buy <item name>\` to purchase by name.`),
   );
+}
 
-  const components = currentItems.length > 0 ? [buyRow, navRow] : [navRow];
-  return { embed, components };
+function buildShopNavigationRow(page: number, totalPages: number, disabled = false) {
+  const safeTotalPages = Math.max(1, totalPages);
+  const safePage = Math.min(Math.max(page, 1), safeTotalPages);
+
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId("shop_page_first_1")
+      .setLabel("First")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled || safePage <= 1),
+    new ButtonBuilder()
+      .setCustomId(`shop_page_prev_${Math.max(1, safePage - 1)}`)
+      .setLabel("Prev")
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(disabled || safePage <= 1),
+    new ButtonBuilder()
+      .setCustomId(`shop_page_next_${Math.min(safeTotalPages, safePage + 1)}`)
+      .setLabel("Next")
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(disabled || safePage >= safeTotalPages),
+    new ButtonBuilder()
+      .setCustomId(`shop_page_last_${safeTotalPages}`)
+      .setLabel("Last")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled || safePage >= safeTotalPages),
+  );
+}
+
+async function sendEffectMessages(target: Message | any, results: any[]) {
+  if (!results || results.length === 0) return;
+
+  const customMessages = results.filter((r: any) => r.type === "CUSTOM_MESSAGE");
+  const otherEffects = results.filter((r: any) => r.type !== "CUSTOM_MESSAGE");
+
+  for (const msgEffect of customMessages) {
+    if ("followUp" in target) {
+      await target.followUp({
+        components: [v2Container("Item Effect", msgEffect.message, 0xF1C40F)],
+        flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+      });
+    } else if ("send" in target.channel) {
+      await (target.channel as TextChannel).send({
+        components: [v2Container("Item Effect", msgEffect.message, 0xF1C40F)],
+        flags: MessageFlags.IsComponentsV2,
+      });
+    }
+  }
+
+  if (otherEffects.length > 0) {
+    const effectMsg = otherEffects.map((r: any) => r.message).join("\n");
+    if ("followUp" in target) {
+      await target.followUp({
+        components: [v2Container("Item Effects", effectMsg, 0xF1C40F)],
+        flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+      });
+    } else if ("send" in target.channel) {
+      await (target.channel as TextChannel).send({
+        components: [v2Container("Item Effects", effectMsg, 0xF1C40F)],
+        flags: MessageFlags.IsComponentsV2,
+      });
+    }
+  }
 }
 
 export async function handleShop(message: Message, args: string[]) {
   try {
     const config = await getGuildConfig(message.guildId!);
-    const emoji = config.currencyEmoji;
+    const emoji = config.currencyEmoji || Mascot.Emotes.Blackcoin;
     const sub = args[0]?.toLowerCase();
 
     if (sub === "buy") {
       const itemName = args.slice(1).join(" ");
-      if (!itemName) return message.reply(`Usage: \`${config.prefix}shop buy <item name>\``);
+      if (!itemName) {
+        return message.reply({
+          components: [v2Container("Shop Purchase", `Usage: \`${config.prefix}shop buy <item name>\``)],
+          flags: MessageFlags.IsComponentsV2,
+        });
+      }
 
       try {
         await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
-        if (!message.member) return; // Should be in guild
+        if (!message.member) return;
         const { item, results } = await buyItem(message.guildId!, message.author.id, itemName, message.member);
 
         if (item.roleId && message.guild) {
@@ -95,60 +191,57 @@ export async function handleShop(message: Message, args: string[]) {
           color: 0x00FF00
         });
 
-        await message.reply({ embeds: [successEmbed(message.author, "Purchase Successful", `You bought **${item.name}**!`)] });
+        await message.reply({
+          components: [v2Container("Purchase Successful", `You bought **${item.name}**!`, 0x2ECC71)],
+          flags: MessageFlags.IsComponentsV2,
+        });
 
-        if (results && results.length > 0) {
-          // SPLIT EFFECTS: Separate Custom Messages from other effects
-          const customMessages = results.filter(r => (r.type as string) === "CUSTOM_MESSAGE");
-          const otherEffects = results.filter(r => (r.type as string) !== "CUSTOM_MESSAGE");
-
-          // 1. Send each Custom Message in its own embed
-          for (const msgEffect of customMessages) {
-            const msgEmbed = new EmbedBuilder()
-              .setColor(Colors.Gold)
-              .setDescription(msgEffect.message);
-
-            if ('send' in message.channel) {
-              await (message.channel as TextChannel).send({ embeds: [msgEmbed] });
-            }
-          }
-
-          // 2. Aggregate other effects into one summary embed
-          if (otherEffects.length > 0) {
-            const effectMsg = otherEffects.map(r => r.message).join("\n");
-            const effectEmbed = new EmbedBuilder()
-              .setColor(Colors.Gold)
-              .setDescription(effectMsg);
-
-            if ('send' in message.channel) {
-              await (message.channel as TextChannel).send({ embeds: [effectEmbed] });
-            }
-          }
-        }
+        await sendEffectMessages(message, results);
         return;
       } catch (err) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Failed", (err as Error).message)] });
+        return message.reply({
+          components: [v2Container("Purchase Failed", (err as Error).message, 0xE74C3C)],
+          flags: MessageFlags.IsComponentsV2,
+        });
       }
     }
 
     if (sub === "inv" || sub === "inventory") {
       const inv = await getUserInventory(message.author.id, message.guildId!);
-      if (inv.length === 0) return message.reply("Your inventory is empty.");
-      const desc = inv.map(i => `• **${i.shopItem.name}** (x${i.amount})`).join("\n");
-      const embed = new EmbedBuilder().setTitle(`${message.author.username}'s Inventory`).setColor(Colors.Blue).setDescription(desc || "Empty");
-      return message.reply({ embeds: [embed] });
+      if (inv.length === 0) {
+        return message.reply({
+          components: [v2Container("Inventory", "Your inventory is empty.")],
+          flags: MessageFlags.IsComponentsV2,
+        });
+      }
+
+      const desc = inv.map(i => `**${i.shopItem.name}** (x${i.amount})`).join("\n");
+      return message.reply({
+        components: [v2Container(`${message.author.username}'s Inventory`, desc)],
+        flags: MessageFlags.IsComponentsV2,
+      });
     }
 
     const allItems = await getShopItems(message.guildId!);
-    if (allItems.length === 0) return message.reply({ embeds: [errorEmbed(message.author, "Shop Empty", "No items are currently for sale.")] });
+    if (allItems.length === 0) {
+      return message.reply({
+        components: [v2Container("Shop Empty", "No items are currently for sale.", 0xE74C3C)],
+        flags: MessageFlags.IsComponentsV2,
+      });
+    }
 
     allItems.sort((a, b) => a.price - b.price);
 
     let currentPage = 1;
-    const totalPages = Math.ceil(allItems.length / ITEMS_PER_PAGE);
+    const totalPages = getShopTotalPages(allItems);
 
-    const ui = renderShopPage(allItems, currentPage, totalPages, emoji);
-    const sentMessage = await message.reply({ embeds: [ui.embed], components: ui.components });
+    const sentMessage = await message.reply({
+      components: [
+        buildShopContainer(allItems, currentPage, totalPages, emoji),
+        buildShopNavigationRow(currentPage, totalPages),
+      ],
+      flags: MessageFlags.IsComponentsV2,
+    });
 
     const collector = sentMessage.createMessageComponentCollector({
       componentType: ComponentType.Button,
@@ -157,25 +250,31 @@ export async function handleShop(message: Message, args: string[]) {
     });
 
     collector.on("collect", async (interaction) => {
-      if (interaction.customId === "shop_prev") {
-        currentPage--;
-        const newUI = renderShopPage(allItems, currentPage, totalPages, emoji);
-        await interaction.update({ embeds: [newUI.embed], components: newUI.components });
+      if (interaction.customId.startsWith("shop_page_")) {
+        const customIdParts = interaction.customId.split("_");
+        currentPage = parseInt(customIdParts[customIdParts.length - 1] || "1", 10) || 1;
+        await interaction.update({
+          components: [
+            buildShopContainer(allItems, currentPage, totalPages, emoji),
+            buildShopNavigationRow(currentPage, totalPages),
+          ],
+          flags: MessageFlags.IsComponentsV2,
+        });
         return;
       }
-      if (interaction.customId === "shop_next") {
-        currentPage++;
-        const newUI = renderShopPage(allItems, currentPage, totalPages, emoji);
-        await interaction.update({ embeds: [newUI.embed], components: newUI.components });
-        return;
-      }
+
       if (interaction.customId.startsWith("shop_buy_")) {
         const itemId = interaction.customId.replace("shop_buy_", "");
         const item = allItems.find(i => i.id === itemId);
-        if (!item) return interaction.reply({ content: "Item not found.", ephemeral: true });
+        if (!item) {
+          return interaction.reply({
+            components: [v2Container("Item Not Found", "Item not found.", 0xE74C3C)],
+            flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+          });
+        }
 
         try {
-          await interaction.deferReply({ ephemeral: true });
+          await interaction.deferReply({ flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2 });
           await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
           const { item: bought, results } = await buyItem(interaction.guildId!, interaction.user.id, itemId, interaction.member as GuildMember, true);
 
@@ -195,37 +294,26 @@ export async function handleShop(message: Message, args: string[]) {
             color: 0x00FF00
           });
 
-          await interaction.editReply({ content: `${Mascot.Emotes.Accept} Purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**!` });
+          await interaction.editReply({
+            components: [
+              v2Container(
+                "Purchase Successful",
+                `Purchased **${bought.name}** for **${fmtCurrency(bought.price, emoji)}**!`,
+                0x2ECC71,
+              ),
+            ],
+          });
 
-          if (results && results.length > 0) {
-            // SPLIT EFFECTS: Separate Custom Messages from other effects
-            const customMessages = results.filter((r: any) => r.type === "CUSTOM_MESSAGE");
-            const otherEffects = results.filter((r: any) => r.type !== "CUSTOM_MESSAGE");
-
-            // 1. Send each Custom Message in its own embed
-            for (const msgEffect of customMessages) {
-              const msgEmbed = new EmbedBuilder()
-                .setColor(Colors.Gold)
-                .setDescription(msgEffect.message);
-
-              await interaction.followUp({ embeds: [msgEmbed], ephemeral: true });
-            }
-
-            // 2. Aggregate other effects into one summary embed
-            if (otherEffects.length > 0) {
-              const effectMsg = otherEffects.map((r: any) => r.message).join("\n");
-              const effectEmbed = new EmbedBuilder()
-                .setColor(Colors.Gold)
-                .setDescription(effectMsg);
-
-              await interaction.followUp({ embeds: [effectEmbed], ephemeral: true });
-            }
-          }
+          await sendEffectMessages(interaction, results);
         } catch (err) {
+          const errorContainer = v2Container("Purchase Failed", (err as Error).message, 0xE74C3C);
           if (interaction.deferred || interaction.replied) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} Error: ${(err as Error).message}` });
+            await interaction.editReply({ components: [errorContainer] });
           } else {
-            await interaction.reply({ content: `${Mascot.Emotes.Fail} Error: ${(err as Error).message}`, ephemeral: true });
+            await interaction.reply({
+              components: [errorContainer],
+              flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+            });
           }
         }
       }
@@ -233,14 +321,23 @@ export async function handleShop(message: Message, args: string[]) {
 
     collector.on("end", () => {
       try {
-        const finalUI = renderShopPage(allItems, currentPage, totalPages, emoji);
-        finalUI.components.forEach(row => row.components.forEach(c => c.setDisabled(true)));
-        sentMessage.edit({ components: finalUI.components }).catch(() => { });
+        sentMessage.edit({
+          components: [
+            buildShopContainer(allItems, currentPage, totalPages, emoji, true),
+            buildShopNavigationRow(currentPage, totalPages, true),
+          ],
+          flags: MessageFlags.IsComponentsV2,
+        }).catch(() => { });
       } catch { }
     });
 
   } catch (err) {
     console.error("handleShop error:", err);
-    try { await message.reply("Failed to load shop."); } catch { }
+    try {
+      await message.reply({
+        components: [v2Container("Shop Error", "Failed to load shop.", 0xE74C3C)],
+        flags: MessageFlags.IsComponentsV2,
+      });
+    } catch { }
   }
 }
