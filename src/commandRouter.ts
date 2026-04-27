@@ -176,6 +176,9 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     const { allowed, reason } = await checkCommandPermission(message, normalized);
     if (!allowed) {
       if (reason === "This channel is not a designated Casino Channel.") {
+        if (["properties", "realestate", "estate"].includes(normalized)) {
+          return propertiesHandler(message, args);
+        }
         return;
       }
       return message.reply({
