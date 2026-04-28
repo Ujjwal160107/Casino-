@@ -1,15 +1,50 @@
-import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ButtonInteraction, User as DiscordUser } from "discord.js";
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  ContainerBuilder,
+  EmbedBuilder,
+  Message,
+  MessageFlags,
+  SectionBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  User as DiscordUser,
+} from "discord.js";
 import prisma from "../../utils/prisma";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency } from "../../utils/format";
-import { Mascot, getEmoteUrl } from "../../config/branding";
+import { Mascot } from "../../config/branding";
 import { getJob, getJobPay } from "../../services/jobService";
 import { getPortfolio } from "../../services/stockService";
-import { PropertyService } from '../../services/propertyService';
+import { PropertyService } from "../../services/propertyService";
 
-export async function getProfileEmbed(targetUser: DiscordUser, guildId: string): Promise<EmbedBuilder> {
-  // 1. Fetch Comprehensive Data
+const PROFILE_ACCENT_COLOR = 0x9B59B6;
+
+function separator() {
+  return new SeparatorBuilder()
+    .setDivider(true)
+    .setSpacing(SeparatorSpacingSize.Small);
+}
+
+function trimBlock(value: string, maxLength = 900) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - 3)}...`;
+}
+
+function textContainer(title: string, body: string, color = PROFILE_ACCENT_COLOR) {
+  return new ContainerBuilder()
+    .setAccentColor(color)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`**${title}**`),
+      new TextDisplayBuilder().setContent(body),
+    );
+}
+
+export async function getProfileContainer(targetUser: DiscordUser, guildId: string, displayName = targetUser.username): Promise<ContainerBuilder> {
   let userDb = await prisma.user.findUnique({
     where: { discordId_guildId: { discordId: targetUser.id, guildId } },
     include: {
@@ -18,8 +53,8 @@ export async function getProfileEmbed(targetUser: DiscordUser, guildId: string):
       loans: true,
       degrees: { include: { degree: true } },
       inventory: { include: { shopItem: true } },
-      workLogs: false
-    }
+      workLogs: false,
+    },
   });
 
   if (!userDb) {
@@ -32,34 +67,27 @@ export async function getProfileEmbed(targetUser: DiscordUser, guildId: string):
         loans: true,
         degrees: { include: { degree: true } },
         inventory: { include: { shopItem: true } },
-        workLogs: false
-      }
+        workLogs: false,
+      },
     });
     if (!userDb) throw new Error("Failed to initialize user.");
   }
 
   const config = await getGuildConfig(guildId);
-  const emoji = config.currencyEmoji;
+  const emoji = config.currencyEmoji || Mascot.Emotes.Blackcoin;
 
-  // 2. Financials
   const walletBal = userDb.wallet?.balance || 0;
   const bankBal = userDb.bank?.balance || 0;
   const loanDebt = userDb.loans.reduce((sum, loan) => sum + (loan.status === "ACTIVE" ? loan.totalRepayment : 0), 0);
 
-  // Stock Portfolio
   const portfolio = await getPortfolio(guildId, targetUser.id);
-  let stockValue = 0;
-  if (portfolio) {
-    stockValue = portfolio.holdings.reduce((sum, h) => sum + (h.stock.currentPrice * h.quantity), 0);
-  }
+  const stockValue = portfolio
+    ? portfolio.holdings.reduce((sum, h) => sum + (h.stock.currentPrice * h.quantity), 0)
+    : 0;
 
-  // Inventory Value
   const invValue = userDb.inventory.reduce((sum, item) => sum + (item.shopItem.price * item.amount), 0);
-
-  // Net Worth
   const netWorth = walletBal + bankBal + stockValue + invValue - loanDebt;
 
-  // 3. Career & Education
   let jobDisplay = "Unemployed";
   let salaryDisplay = "0";
   if (userDb.jobId) {
@@ -71,10 +99,9 @@ export async function getProfileEmbed(targetUser: DiscordUser, guildId: string):
     }
   }
 
-  const degrees = userDb.degrees.map(d => d.degree.name).join("\n") || "No Degrees";
+  const degrees = userDb.degrees.map((d) => `- ${d.degree.name}`).join("\n") || "- No Degrees";
 
-  // 4. Chicken Stats
-  const chickenItem = userDb.inventory.find(i => i.shopItem.name.toLowerCase() === "chicken");
+  const chickenItem = userDb.inventory.find((i) => i.shopItem.name.toLowerCase() === "chicken");
   let chickenDisplay = "No Chicken";
   if (chickenItem) {
     const meta = (chickenItem.meta as any) || {};
@@ -84,55 +111,61 @@ export async function getProfileEmbed(targetUser: DiscordUser, guildId: string):
     chickenDisplay = `${Mascot.Emotes.Chicken} **${name}** (Lvl ${level} | ${wins} Wins)`;
   }
 
-  // 5. Property Stats
   const ownedProperties = await PropertyService.getOwnedProperties(targetUser.id, guildId);
   const propertyCount = ownedProperties.length;
   const totalPropertyIncome = ownedProperties.reduce((sum, p) => sum + p.property.incomePerCycle, 0);
 
-  // 6. Construct Embed
-  return new EmbedBuilder()
-    .setColor(Mascot.Colors.Base as any)
-    .setTitle(`${Mascot.Emotes.Success} User Profile: ${targetUser.username}`)
-    .setThumbnail(targetUser.displayAvatarURL())
-    .setDescription(`Credit Score: **${userDb.creditScore}**`)
-    .addFields(
-      {
-        name: `${Mascot.Emotes.MoneyBag} Wealth`,
-        value: `
-**Wallet:** ${fmtCurrency(walletBal, emoji)}
-**Bank:** ${fmtCurrency(bankBal, emoji)}
-**Stocks:** ${fmtCurrency(stockValue, emoji)}
-**Net Worth:** ${fmtCurrency(netWorth, emoji)}
-`,
-        inline: true
-      },
-      {
-        name: `${Mascot.Emotes.JobWorking} Career`,
-        value: `
-**Job:** ${jobDisplay}
-**Salary:** ${salaryDisplay}/shift
-**Shifts:** ${userDb.shiftsWorked}
-**Stress:** ${userDb.jobStress}%
-`,
-        inline: true
-      },
-      {
-        name: `${Mascot.Emotes.Graduate} Education`,
-        value: degrees,
-        inline: false
-      },
-      {
-        name: `${Mascot.Emotes.Graph} Assets & Liabilities`,
-        value: `
-**Inventory Value:** ${fmtCurrency(invValue, emoji)}
-**Active Debt:** ${fmtCurrency(loanDebt, emoji)}
-**Properties:** ${propertyCount} (Inc: ${fmtCurrency(totalPropertyIncome, emoji)})
-**Chicken:** ${chickenDisplay}
-`,
-        inline: false
-      }
+  return new ContainerBuilder()
+    .setAccentColor(PROFILE_ACCENT_COLOR)
+    .addSectionComponents(
+      new SectionBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Success} ${displayName}'s Profile`),
+          new TextDisplayBuilder().setContent(`Credit Score: **${userDb.creditScore}**`),
+          new TextDisplayBuilder().setContent("A snapshot of your entire life so far."),
+        )
+        .setThumbnailAccessory((thumbnail) =>
+          thumbnail
+            .setURL(targetUser.displayAvatarURL({ size: 256 }))
+            .setDescription(`${targetUser.username}'s avatar`),
+        ),
     )
-    .setFooter({ text: `${Mascot.Name} System • ID: ${targetUser.id}` });
+    .addSeparatorComponents(separator())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `### ${Mascot.Emotes.MoneyBag} Wealth\n` +
+        `**Wallet:** ${fmtCurrency(walletBal, emoji)}\n` +
+        `**Bank:** ${fmtCurrency(bankBal, emoji)}\n` +
+        `**Stocks:** ${fmtCurrency(stockValue, emoji)}\n` +
+        `**Net Worth:** ${fmtCurrency(netWorth, emoji)}`,
+      ),
+    )
+    .addSeparatorComponents(separator())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `### ${Mascot.Emotes.JobWorking} Career\n` +
+        `**Job:** ${jobDisplay}\n` +
+        `**Salary:** ${salaryDisplay}/shift\n` +
+        `**Shifts:** ${userDb.shiftsWorked}\n` +
+        `**Stress:** ${userDb.jobStress}%`,
+      ),
+    )
+    .addSeparatorComponents(separator())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `### ${Mascot.Emotes.Graph} Assets & Liabilities\n` +
+        `**Inventory Value:** ${fmtCurrency(invValue, emoji)}\n` +
+        `**Active Debt:** ${fmtCurrency(loanDebt, emoji)}\n` +
+        `**Properties:** ${propertyCount} (Income: ${fmtCurrency(totalPropertyIncome, emoji)})\n` +
+        `**Chicken:** ${chickenDisplay}`,
+      ),
+    )
+    .addSeparatorComponents(separator())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `### ${Mascot.Emotes.Graduate} Education\n${trimBlock(degrees)}`,
+      ),
+    );
 }
 
 export async function handleProfile(message: Message, args: string[]) {
@@ -140,39 +173,64 @@ export async function handleProfile(message: Message, args: string[]) {
   const guildId = message.guildId!;
 
   try {
-    const embed = await getProfileEmbed(targetUser, guildId);
+    const targetMember = await message.guild?.members.fetch(targetUser.id).catch(() => null);
+    const displayName = targetMember?.displayName || targetUser.globalName || targetUser.username;
+    const container = await getProfileContainer(targetUser, guildId, displayName);
 
-    // Interactive Buttons
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId("prof_refresh").setLabel("Refresh").setStyle(ButtonStyle.Secondary).setEmoji("🔄")
+      new ButtonBuilder()
+        .setCustomId("prof_refresh")
+        .setLabel("Refresh")
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji("🔄"),
     );
 
-    const reply = await message.reply({ embeds: [embed], components: [row] });
+    const reply = await message.reply({
+      components: [container, row],
+      flags: MessageFlags.IsComponentsV2,
+    });
 
-    // Refresh Collector
     const collector = reply.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
 
     collector.on("collect", async (i) => {
-      // Allow only the original command author to control? Or maybe the target user too?
-      // Usually author.
-      if (i.user.id !== message.author.id) return i.reply({ content: "Not your session.", ephemeral: true });
+      if (i.user.id !== message.author.id) {
+        return i.reply({
+          components: [textContainer("Profile Session", "Not your session.", 0xE74C3C)],
+          flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+        });
+      }
 
       if (i.customId === "prof_refresh") {
         try {
-          const newEmbed = await getProfileEmbed(targetUser, guildId);
-          await i.update({ embeds: [newEmbed] });
-        } catch (err) {
-          await i.reply({ content: "Failed to refresh.", ephemeral: true });
+          const newContainer = await getProfileContainer(targetUser, guildId, displayName);
+          await i.update({
+            components: [newContainer, row],
+            flags: MessageFlags.IsComponentsV2,
+          });
+        } catch {
+          await i.reply({
+            components: [textContainer("Refresh Failed", "Failed to refresh profile.", 0xE74C3C)],
+            flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+          });
         }
       }
     });
 
     collector.on("end", () => {
-      reply.edit({ components: [] }).catch(() => { });
+      reply.edit({
+        components: [container],
+        flags: MessageFlags.IsComponentsV2,
+      }).catch(() => { });
     });
-
   } catch (e: any) {
     console.error("Profile Error:", e);
-    message.reply({ embeds: [new EmbedBuilder().setColor("Red").setTitle("Error").setDescription("Failed to load profile.")] });
+    message.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor("Red")
+          .setTitle("Error")
+          .setDescription("Failed to load profile."),
+      ],
+    });
   }
 }
