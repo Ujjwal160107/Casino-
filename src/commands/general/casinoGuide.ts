@@ -1,79 +1,245 @@
 import {
     Message,
-    EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
     ComponentType,
-    AttachmentBuilder
+    AttachmentBuilder,
+    ContainerBuilder,
+    MediaGalleryBuilder,
+    MediaGalleryItemBuilder,
+    MessageFlags,
+    SectionBuilder,
+    SeparatorBuilder,
+    SeparatorSpacingSize,
+    TextDisplayBuilder,
 } from "discord.js";
 import * as path from "path";
 import { Mascot } from "../../config/branding";
+import { getGuildConfig } from "../../services/guildConfigService";
 import { CHERRY, BANANA, GRAPES, MELON, BELL, GEM, SEVEN } from "../games/slots";
+
+const CASINO_ACCENT_COLOR = 0x9B59B6;
+const CASINO_BANNER_NAME = "casino_banner.png";
+const CASINO_BANNER_URL = `attachment://${CASINO_BANNER_NAME}`;
+const ROULETTE_GUIDE_NAME = "roulette_guide.png";
+const ROULETTE_GUIDE_URL = `attachment://${ROULETTE_GUIDE_NAME}`;
+const GUIDES_PER_PAGE = 5;
+
+type GuideListItem = {
+    customId: string;
+    label: string;
+    emoji: string;
+    style: ButtonStyle;
+    title: string;
+    description: string;
+};
+
+function separator() {
+    return new SeparatorBuilder()
+        .setDivider(true)
+        .setSpacing(SeparatorSpacingSize.Small);
+}
+
+function buildGuideContainer(title: string, body: string, accentColor = CASINO_ACCENT_COLOR, imageUrl?: string, imageDescription?: string) {
+    const container = new ContainerBuilder()
+        .setAccentColor(accentColor)
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`## ${title}`),
+        )
+        .addSeparatorComponents(separator())
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(body),
+        );
+
+    if (imageUrl) {
+        container.addSeparatorComponents(separator());
+        container.addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems(
+                new MediaGalleryItemBuilder()
+                    .setURL(imageUrl)
+                    .setDescription(imageDescription || title),
+            ),
+        );
+    }
+
+    return container;
+}
+
+function buildCasinoHomeContainer(
+    prefix: string,
+    guides: GuideListItem[],
+    page = 1,
+) {
+    const totalPages = getGuideTotalPages(guides);
+    const safePage = Math.min(Math.max(page, 1), totalPages);
+    const startIndex = (safePage - 1) * GUIDES_PER_PAGE;
+    const visibleGuides = guides.slice(startIndex, startIndex + GUIDES_PER_PAGE);
+    const container = new ContainerBuilder()
+        .setAccentColor(CASINO_ACCENT_COLOR)
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+                `## ${Mascot.Emotes.Casino} ${Mascot.Name} Casino\n` +
+                `> Pick a game guide below from its own row.\n` +
+                `> Use buttons for quick help, then run the listed commands when you're ready to play.`,
+            ),
+        )
+        .addSeparatorComponents(separator())
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`### ${Mascot.Emotes.Cards} Game Guides`),
+        );
+
+    visibleGuides.forEach((guide, index) => {
+        container.addSectionComponents(
+            new SectionBuilder()
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`### ${startIndex + index + 1}. ${guide.title}`),
+                    new TextDisplayBuilder().setContent(`${guide.description}\nCommand: \`${guideCommandPreview(prefix, guide.customId)}\``),
+                )
+                .setButtonAccessory(
+                    new ButtonBuilder()
+                        .setCustomId(guide.customId)
+                        .setLabel(guide.label)
+                        .setStyle(guide.style)
+                        .setEmoji(guide.emoji),
+                ),
+        );
+
+        if (index < visibleGuides.length - 1) {
+            container.addSeparatorComponents(separator());
+        }
+    });
+
+    return container
+        .addSeparatorComponents(separator())
+        .addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems(
+                new MediaGalleryItemBuilder()
+                    .setURL(CASINO_BANNER_URL)
+                    .setDescription(`${Mascot.Name} casino banner`),
+            ),
+        )
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`Page ${safePage}/${totalPages}`),
+        );
+}
+
+function getGuideTotalPages(guides: GuideListItem[]) {
+    return Math.max(1, Math.ceil(guides.length / GUIDES_PER_PAGE));
+}
+
+function guideCommandPreview(prefix: string, customId: string) {
+    switch (customId) {
+        case "guide_blackjack": return `${prefix}blackjack <amount>`;
+        case "guide_roulette": return `${prefix}roulette <amount> <choice>`;
+        case "guide_slots": return `${prefix}slots <amount>`;
+        case "guide_coinflip": return `${prefix}coinflip <amount> <h|t>`;
+        case "guide_cockfight": return `${prefix}cockfight <amount>`;
+        case "guide_feed": return `${prefix}feed`;
+        case "guide_russianroulette": return `${prefix}russianroulette <amount>`;
+        default: return `${prefix}casino`;
+    }
+}
+
+function buildGuidePageNavigationRow(page: number, totalPages: number, disabled = false) {
+    const safeTotalPages = Math.max(1, totalPages);
+    const safePage = Math.min(Math.max(page, 1), safeTotalPages);
+
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`casino_guide_page_prev_${Math.max(1, safePage - 1)}`)
+            .setLabel("Prev")
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(disabled || safePage <= 1),
+        new ButtonBuilder()
+            .setCustomId(`casino_guide_page_next_${Math.min(safeTotalPages, safePage + 1)}`)
+            .setLabel("Next")
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(disabled || safePage >= safeTotalPages),
+    );
+}
 
 export async function handleCasinoGuide(message: Message) {
     const bannerPath = path.join(process.cwd(), "src", "assets", "casino_banner.png");
-    const attachment = new AttachmentBuilder(bannerPath, { name: "casino_banner.png" });
+    const attachment = new AttachmentBuilder(bannerPath, { name: CASINO_BANNER_NAME });
+    const guildConfig = await getGuildConfig(message.guildId!);
+    const prefix = guildConfig.prefix || "!";
 
-    const mainEmbed = new EmbedBuilder()
-        .setTitle(`${Mascot.Emotes.Casino} Fortuna's Casino - Game Guides`)
-        .setDescription(
-            `Welcome to **Fortuna's Casino**! ${Mascot.Emotes.Success}\n\n` +
-            `Select a game below to learn how to play and increase your chances of winning!\n\n` +
-            `${Mascot.Emotes.Cards} Each game has unique rules and strategies\n` +
-            `${Mascot.Emotes.Dices} Practice makes perfect!\n` +
-            `${Mascot.Emotes.Seven} Good luck and gamble responsibly!`
-        )
-        .setColor(Mascot.Colors.Base as any)
-        .setImage("attachment://casino_banner.png")
-        .setFooter({ text: "Click any button below to view game guides" });
+    const guideItems: GuideListItem[] = [
+        {
+            customId: "guide_blackjack",
+            label: "Blackjack",
+            emoji: Mascot.Emotes.Bj,
+            style: ButtonStyle.Primary,
+            title: `${Mascot.Emotes.Bj} Blackjack`,
+            description: "Beat the dealer by getting close to 21 without busting.",
+        },
+        {
+            customId: "guide_roulette",
+            label: "Roulette",
+            emoji: Mascot.Emotes.Dices,
+            style: ButtonStyle.Primary,
+            title: `${Mascot.Emotes.Dices} Roulette`,
+            description: "Predict the wheel result with number, color, range, dozen, or column bets.",
+        },
+        {
+            customId: "guide_slots",
+            label: "Slots",
+            emoji: Mascot.Emotes.Seven,
+            style: ButtonStyle.Primary,
+            title: `${Mascot.Emotes.Seven} Slots`,
+            description: "Spin three reels and match symbols for multiplier payouts.",
+        },
+        {
+            customId: "guide_coinflip",
+            label: "Coinflip",
+            emoji: Mascot.Emotes.Blackcoin,
+            style: ButtonStyle.Primary,
+            title: `${Mascot.Emotes.Blackcoin} Coinflip`,
+            description: "Choose heads or tails for a fast 50/50 double-or-nothing bet.",
+        },
+        {
+            customId: "guide_cockfight",
+            label: "Cockfight",
+            emoji: Mascot.Emotes.Chicken,
+            style: ButtonStyle.Primary,
+            title: `${Mascot.Emotes.Chicken} Cockfight`,
+            description: "Battle with rooster stats, upgrades, and arena wagers.",
+        },
+        {
+            customId: "guide_feed",
+            label: "Feed",
+            emoji: Mascot.Emotes.Banana,
+            style: ButtonStyle.Primary,
+            title: `${Mascot.Emotes.Banana} Feed`,
+            description: "Boost your rooster before fights by improving its combat stats.",
+        },
+        {
+            customId: "guide_russianroulette",
+            label: "Russian Roulette",
+            emoji: Mascot.Emotes.Gun,
+            style: ButtonStyle.Primary,
+            title: `${Mascot.Emotes.Gun} Russian Roulette`,
+            description: "High-risk survival betting with one dangerous chamber.",
+        },
+    ];
+    let currentPage = 1;
+    const totalGuidePages = getGuideTotalPages(guideItems);
 
-    const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-            .setCustomId("guide_blackjack")
-            .setLabel("Blackjack")
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji(Mascot.Emotes.Bj),
-        new ButtonBuilder()
-            .setCustomId("guide_roulette")
-            .setLabel("Roulette")
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji(Mascot.Emotes.Dices),
-        new ButtonBuilder()
-            .setCustomId("guide_slots")
-            .setLabel("Slots")
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji(Mascot.Emotes.Seven),
-        new ButtonBuilder()
-            .setCustomId("guide_coinflip")
-            .setLabel("Coinflip")
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji(Mascot.Emotes.Blackcoin)
-    );
-
-    const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-            .setCustomId("guide_cockfight")
-            .setLabel("Cockfight")
-            .setStyle(ButtonStyle.Success)
-            .setEmoji(Mascot.Emotes.Chicken),
-        new ButtonBuilder()
-            .setCustomId("guide_feed")
-            .setLabel("Feed")
-            .setStyle(ButtonStyle.Success)
-            .setEmoji(Mascot.Emotes.Banana),
-        new ButtonBuilder()
-            .setCustomId("guide_russianroulette")
-            .setLabel("Russian Roulette")
-            .setStyle(ButtonStyle.Danger)
-            .setEmoji(Mascot.Emotes.Gun)
-    );
-
-    const sent = await message.reply({
-        embeds: [mainEmbed],
-        files: [attachment],
-        components: [row1, row2]
-    });
+    let sent;
+    try {
+        sent = await message.reply({
+            components: [
+                buildCasinoHomeContainer(prefix, guideItems, currentPage),
+                buildGuidePageNavigationRow(currentPage, totalGuidePages),
+            ],
+            files: [attachment],
+            flags: MessageFlags.IsComponentsV2,
+        });
+    } catch (err) {
+        console.error("Failed to send casino guide V2 panel:", err);
+        return message.reply("Casino guide could not be rendered. Check the bot logs for the Discord API validation error.");
+    }
 
     const collector = sent.createMessageComponentCollector({
         componentType: ComponentType.Button,
@@ -82,14 +248,26 @@ export async function handleCasinoGuide(message: Message) {
     });
 
     collector.on("collect", async (interaction) => {
-        let guideEmbed: EmbedBuilder;
+        let guideContainer: ContainerBuilder;
+
+        if (interaction.customId.startsWith("casino_guide_page_")) {
+            const customIdParts = interaction.customId.split("_");
+            currentPage = parseInt(customIdParts[customIdParts.length - 1] || "1", 10) || 1;
+
+            await interaction.update({
+                components: [
+                    buildCasinoHomeContainer(prefix, guideItems, currentPage),
+                    buildGuidePageNavigationRow(currentPage, totalGuidePages),
+                ],
+                flags: MessageFlags.IsComponentsV2,
+            });
+            return;
+        }
 
         switch (interaction.customId) {
             case "guide_blackjack":
-                guideEmbed = new EmbedBuilder()
-                    .setTitle(`${Mascot.Emotes.Bj} Blackjack - How to Play`)
-                    .setColor(Mascot.Colors.Base as any)
-                    .setDescription(
+                guideContainer = buildGuideContainer(
+                    `${Mascot.Emotes.Bj} Blackjack - How to Play`,
                         `**Objective:** Beat the dealer by getting as close to 21 as possible without going over.\n\n` +
                         `**Card Values:**\n` +
                         `${Mascot.Emotes.Cards} Number cards (2-10) = Face value\n` +
@@ -109,19 +287,17 @@ export async function handleCasinoGuide(message: Message) {
                         `**Tips:**\n` +
                         `${Mascot.Emotes.Think} Stand on 17 or higher\n` +
                         `${Mascot.Emotes.Think} Hit on 11 or lower\n` +
-                        `${Mascot.Emotes.Think} Watch the dealer's visible card!`
-                    )
-                    .setFooter({ text: "Command: ,blackjack <amount> or ,bj <amount>" });
+                        `${Mascot.Emotes.Think} Watch the dealer's visible card!\n\n` +
+                        `**Command:** \`${prefix}blackjack <amount>\` or \`${prefix}bj <amount>\``
+                );
                 break;
 
             case "guide_roulette":
                 const roulBannerPath = path.join(process.cwd(), "src", "assets", "roulette_guide.png");
-                const roulAttachment = new AttachmentBuilder(roulBannerPath, { name: "roulette_guide.png" });
+                const roulAttachment = new AttachmentBuilder(roulBannerPath, { name: ROULETTE_GUIDE_NAME });
 
-                guideEmbed = new EmbedBuilder()
-                    .setTitle(`Roulette - How to Play`)
-                    .setColor(Mascot.Colors.Base as any)
-                    .setDescription(
+                guideContainer = buildGuideContainer(
+                    `Roulette - How to Play`,
                         `**Objective:** Predict where the ball will land on the roulette wheel.\n\n` +
                         `**Payout Multipliers:**\n` +
                         `[x36] Single Number\n` +
@@ -137,19 +313,23 @@ export async function handleCasinoGuide(message: Message) {
                         `4. The wheel spins and determines the winner!\n\n` +
                         `**Special Rules:**\n` +
                         `- Landing on **0** wins only if you bet on it specifically.\n` +
-                        `- Multiple bets can be placed on different outcomes.`
-                    )
-                    .setImage("attachment://roulette_guide.png")
-                    .setFooter({ text: "Command: ,bet <amount> <choice> or ,roulette <amount> <choice>" });
+                        `- Multiple bets can be placed on different outcomes.\n\n` +
+                        `**Command:** \`${prefix}bet <amount> <choice>\` or \`${prefix}roulette <amount> <choice>\``,
+                    CASINO_ACCENT_COLOR,
+                    ROULETTE_GUIDE_URL,
+                    "Roulette guide board",
+                );
 
-                await interaction.reply({ embeds: [guideEmbed], files: [roulAttachment], ephemeral: true });
-                return; // Return early as we handled the reply manually due to file attachment
+                await interaction.reply({
+                    components: [guideContainer],
+                    files: [roulAttachment],
+                    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+                });
+                return;
 
             case "guide_slots":
-                guideEmbed = new EmbedBuilder()
-                    .setTitle(`${Mascot.Emotes.Seven} Slots - How to Play`)
-                    .setColor(Mascot.Colors.Base as any)
-                    .setDescription(
+                guideContainer = buildGuideContainer(
+                    `${Mascot.Emotes.Seven} Slots - How to Play`,
                         `**Objective:** Match 3 symbols in a row to win!\n\n` +
                         `**Symbols & Payouts:**\n` +
                         `${SEVEN} ${SEVEN} ${SEVEN} - **20x** Payout\n` +
@@ -169,16 +349,14 @@ export async function handleCasinoGuide(message: Message) {
                         `**Tips:**\n` +
                         `${Mascot.Emotes.Think} Slots are pure luck - no strategy needed\n` +
                         `${Mascot.Emotes.Think} Set a budget and stick to it\n` +
-                        `${Mascot.Emotes.Think} Chase the jackpot, but gamble responsibly!`
-                    )
-                    .setFooter({ text: "Command: ,slots <amount>" });
+                        `${Mascot.Emotes.Think} Chase the jackpot, but gamble responsibly!\n\n` +
+                        `**Command:** \`${prefix}slots <amount>\``
+                );
                 break;
 
             case "guide_coinflip":
-                guideEmbed = new EmbedBuilder()
-                    .setTitle(`${Mascot.Emotes.Blackcoin} Coinflip - How to Play`)
-                    .setColor(Mascot.Colors.Base as any)
-                    .setDescription(
+                guideContainer = buildGuideContainer(
+                    `${Mascot.Emotes.Blackcoin} Coinflip - How to Play`,
                         `**Objective:** Predict whether the coin will land on Heads or Tails.\n\n` +
                         `**How to Play:**\n` +
                         `${Mascot.Emotes.Success} Choose your bet amount\n` +
@@ -195,16 +373,14 @@ export async function handleCasinoGuide(message: Message) {
                         `**Tips:**\n` +
                         `${Mascot.Emotes.Think} Simple 50/50 odds - perfect for beginners\n` +
                         `${Mascot.Emotes.Think} Quick and easy way to double your money\n` +
-                        `${Mascot.Emotes.Think} Past flips don't affect future results!`
-                    )
-                    .setFooter({ text: "Command: ,coinflip <amount> <h|t> or ,cf <amount> <h|t>" });
+                        `${Mascot.Emotes.Think} Past flips don't affect future results!\n\n` +
+                        `**Command:** \`${prefix}coinflip <amount> <h|t>\` or \`${prefix}cf <amount> <h|t>\``
+                );
                 break;
 
             case "guide_cockfight":
-                guideEmbed = new EmbedBuilder()
-                    .setTitle(`${Mascot.Emotes.Chicken} Cockfight - How to Play`)
-                    .setColor(Mascot.Colors.Base as any)
-                    .setDescription(
+                guideContainer = buildGuideContainer(
+                    `${Mascot.Emotes.Chicken} Cockfight - How to Play`,
                         `**Objective:** Battle your rooster against opponents and win the fight!\n\n` +
                         `**How to Play:**\n` +
                         `${Mascot.Emotes.Success} Purchase a rooster from the Server Store (\`,store\`)\n` +
@@ -223,16 +399,14 @@ export async function handleCasinoGuide(message: Message) {
                         `**Tips:**\n` +
                         `${Mascot.Emotes.Think} Train and upgrade your rooster regularly\n` +
                         `${Mascot.Emotes.Think} Feed your rooster to boost performance\n` +
-                        `${Mascot.Emotes.Think} Higher level roosters dominate the arena!`
-                    )
-                    .setFooter({ text: "Commands: ,cockfight <amount> | ,cockstore | ,feed" });
+                        `${Mascot.Emotes.Think} Higher level roosters dominate the arena!\n\n` +
+                        `**Commands:** \`${prefix}cockfight <amount>\` | \`${prefix}cockstore\` | \`${prefix}feed\``
+                );
                 break;
 
             case "guide_feed":
-                guideEmbed = new EmbedBuilder()
-                    .setTitle(`${Mascot.Emotes.Banana} Feed - How to Play`)
-                    .setColor(Mascot.Colors.Base as any)
-                    .setDescription(
+                guideContainer = buildGuideContainer(
+                    `${Mascot.Emotes.Banana} Feed - How to Play`,
                         `**Objective:** Feed your rooster to improve its stats for cockfights!\n\n` +
                         `**How to Play:**\n` +
                         `${Mascot.Emotes.Success} Own a rooster (purchase from \`,cockstore\`)\n` +
@@ -251,16 +425,14 @@ export async function handleCasinoGuide(message: Message) {
                         `**Tips:**\n` +
                         `${Mascot.Emotes.Think} Well-fed roosters win more fights\n` +
                         `${Mascot.Emotes.Think} Feed regularly to keep stats high\n` +
-                        `${Mascot.Emotes.Think} Investment in feeding pays off in victories!`
-                    )
-                    .setFooter({ text: "Command: ,feed" });
+                        `${Mascot.Emotes.Think} Investment in feeding pays off in victories!\n\n` +
+                        `**Command:** \`${prefix}feed\``
+                );
                 break;
 
             case "guide_russianroulette":
-                guideEmbed = new EmbedBuilder()
-                    .setTitle(`${Mascot.Emotes.Gun} Russian Roulette - How to Play`)
-                    .setColor("#E74C3C")
-                    .setDescription(
+                guideContainer = buildGuideContainer(
+                    `${Mascot.Emotes.Gun} Russian Roulette - How to Play`,
                         `**Objective:** Survive the deadly game of chance!\n\n` +
                         `**How to Play:**\n` +
                         `${Mascot.Emotes.Alert} Place your bet to join the game\n` +
@@ -282,21 +454,31 @@ export async function handleCasinoGuide(message: Message) {
                         `**Tips:**\n` +
                         `${Mascot.Emotes.Think} Not for the faint of heart\n` +
                         `${Mascot.Emotes.Think} Only bet what you can afford to lose\n` +
-                        `${Mascot.Emotes.Think} Luck is your only ally here!`
-                    )
-                    .setFooter({ text: "Command: ,russianroulette <amount> or ,rr <amount>" });
+                        `${Mascot.Emotes.Think} Luck is your only ally here!\n\n` +
+                        `**Command:** \`${prefix}russianroulette <amount>\` or \`${prefix}rr <amount>\``,
+                    0xE74C3C,
+                );
                 break;
 
             default:
                 return;
         }
 
-        await interaction.reply({ embeds: [guideEmbed], ephemeral: true });
+        await interaction.reply({
+            components: [guideContainer],
+            flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+        });
     });
 
     collector.on("end", async () => {
         try {
-            await sent.edit({ components: [] });
+            await sent.edit({
+                components: [
+                    buildCasinoHomeContainer(prefix, guideItems, currentPage),
+                    buildGuidePageNavigationRow(currentPage, totalGuidePages, true),
+                ],
+                flags: MessageFlags.IsComponentsV2,
+            });
         } catch {
             // Message might be deleted
         }
