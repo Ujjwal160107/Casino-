@@ -1,104 +1,255 @@
-import { Message, EmbedBuilder, AttachmentBuilder } from "discord.js";
+import {
+    AttachmentBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ContainerBuilder,
+    MediaGalleryBuilder,
+    MediaGalleryItemBuilder,
+    Message,
+    MessageFlags,
+    SectionBuilder,
+    SeparatorBuilder,
+    SeparatorSpacingSize,
+    TextDisplayBuilder,
+} from "discord.js";
 import { getAllStocks, getPortfolio, buyStock, sellStock, initStocks } from "../../services/stockService";
-import { fmtCurrency, fmtAmount } from "../../utils/format";
+import { fmtCurrency } from "../../utils/format";
 import { getGuildConfig } from "../../services/guildConfigService";
-import { Mascot, getEmoteUrl } from "../../config/branding";
-import { errorEmbed, successEmbed } from "../../utils/embed";
+import { Mascot } from "../../config/branding";
+
+const STOCK_ACCENT_COLOR = 0x9B59B6;
+const STOCK_BANNER_NAME = "stock_market.jpg";
+const STOCK_BANNER_URL = `attachment://${STOCK_BANNER_NAME}`;
+
+function separator() {
+    return new SeparatorBuilder()
+        .setDivider(true)
+        .setSpacing(SeparatorSpacingSize.Small);
+}
+
+function textContainer(title: string, body: string, color = STOCK_ACCENT_COLOR) {
+    return new ContainerBuilder()
+        .setAccentColor(color)
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**${title}**`),
+            new TextDisplayBuilder().setContent(body),
+        );
+}
+
+function riskLabel(volatility: number) {
+    if (volatility > 20) return `${Mascot.Emotes.Alert} Extreme Risk`;
+    if (volatility > 10) return `${Mascot.Emotes.Alert} High Risk`;
+    if (volatility > 5) return `${Mascot.Emotes.Graph} Moderate`;
+    return `${Mascot.Emotes.Accept} Stable`;
+}
+
+function buildMarketContainer(stocks: Awaited<ReturnType<typeof getAllStocks>>, emoji: string, prefix: string) {
+    const container = new ContainerBuilder()
+        .setAccentColor(STOCK_ACCENT_COLOR)
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+                `## ${Mascot.Emotes.GraphUp} Global Stock Market\n` +
+                `> Market prices refresh on this server's stock timer.\n` +
+                `> Buy low, sell high, and keep an eye on volatility.`,
+            ),
+        )
+        .addSeparatorComponents(separator());
+
+    stocks.forEach((stock, index) => {
+        const trend = stock.currentPrice >= stock.basePrice ? Mascot.Emotes.GraphUp : Mascot.Emotes.GraphDown;
+        const change = stock.currentPrice - stock.basePrice;
+        const changeText = change >= 0
+            ? `+${fmtCurrency(change, emoji)} vs base`
+            : `-${fmtCurrency(Math.abs(change), emoji)} vs base`;
+
+        container.addSectionComponents(
+            new SectionBuilder()
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`### ${trend} ${stock.symbol} - ${stock.name}`),
+                    new TextDisplayBuilder().setContent(
+                        `**Price:** ${fmtCurrency(stock.currentPrice, emoji)}\n` +
+                        `**Risk:** ${riskLabel(stock.volatility)} (${stock.volatility}% volatility)\n` +
+                        `**Movement:** ${changeText}`,
+                    ),
+                )
+                .setButtonAccessory(
+                    new ButtonBuilder()
+                        .setCustomId(`stock_info_${stock.symbol}`)
+                        .setLabel(stock.symbol)
+                        .setStyle(ButtonStyle.Secondary)
+                        .setEmoji(trend)
+                        .setDisabled(true),
+                ),
+        );
+
+        if (index < stocks.length - 1) {
+            container.addSeparatorComponents(separator());
+        }
+    });
+
+    return container
+        .addSeparatorComponents(separator())
+        .addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems(
+                new MediaGalleryItemBuilder()
+                    .setURL(STOCK_BANNER_URL)
+                    .setDescription("Stock market banner"),
+            ),
+        )
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+                `Use \`${prefix}stock buy <symbol> <qty>\`, \`${prefix}stock sell <symbol> <qty>\`, or \`${prefix}stock portfolio\`.`,
+            ),
+        );
+}
+
+async function buildPortfolioContainer(guildId: string, discordId: string, username: string, emoji: string) {
+    const pf = await getPortfolio(guildId, discordId);
+    if (!pf || pf.holdings.length === 0) {
+        return textContainer("Portfolio Empty", "You don't own any stocks.", 0xE74C3C);
+    }
+
+    let totalValue = 0;
+    let totalCost = 0;
+
+    const container = new ContainerBuilder()
+        .setAccentColor(STOCK_ACCENT_COLOR)
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Graph} Stock Portfolio: ${username}`),
+        )
+        .addSeparatorComponents(separator());
+
+    pf.holdings.forEach((holding, index) => {
+        const value = holding.stock.currentPrice * holding.quantity;
+        const cost = holding.avgBuyPrice * holding.quantity;
+        totalValue += value;
+        totalCost += cost;
+
+        const pnl = value - cost;
+        const pnlIcon = pnl >= 0 ? Mascot.Emotes.GraphUp : Mascot.Emotes.GraphDown;
+        const pnlText = pnl >= 0 ? `+${fmtCurrency(pnl, emoji)}` : `-${fmtCurrency(Math.abs(pnl), emoji)}`;
+
+        container.addSectionComponents(
+            new SectionBuilder()
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`### ${pnlIcon} ${holding.stock.symbol} - ${holding.stock.name}`),
+                    new TextDisplayBuilder().setContent(
+                        `**Shares:** ${holding.quantity}\n` +
+                        `**Current:** ${fmtCurrency(holding.stock.currentPrice, emoji)} | **Avg:** ${fmtCurrency(holding.avgBuyPrice, emoji)}\n` +
+                        `**Value:** ${fmtCurrency(value, emoji)} (${pnlText})`,
+                    ),
+                )
+                .setButtonAccessory(
+                    new ButtonBuilder()
+                        .setCustomId(`stock_holding_${holding.stock.symbol}`)
+                        .setLabel(holding.stock.symbol)
+                        .setStyle(ButtonStyle.Secondary)
+                        .setEmoji(pnlIcon)
+                        .setDisabled(true),
+                ),
+        );
+
+        if (index < pf.holdings.length - 1) {
+            container.addSeparatorComponents(separator());
+        }
+    });
+
+    const totalPnl = totalValue - totalCost;
+    const totalPnlText = totalPnl >= 0 ? `+${fmtCurrency(totalPnl, emoji)}` : `-${fmtCurrency(Math.abs(totalPnl), emoji)}`;
+
+    return container
+        .addSeparatorComponents(separator())
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+                `**Total Value:** ${fmtCurrency(totalValue, emoji)}\n` +
+                `**Total Profit/Loss:** ${totalPnlText}`,
+            ),
+        );
+}
 
 export async function handleStock(message: Message, args: string[]) {
-    // Ensure stocks exist (lazy init per guild)
     if (!message.guildId) return;
     await initStocks(message.guildId);
 
     const sub = args[0]?.toLowerCase();
-    const config = await getGuildConfig(message.guildId!);
-    const emoji = config.currencyEmoji;
+    const config = await getGuildConfig(message.guildId);
+    const emoji = config.currencyEmoji || Mascot.Emotes.Blackcoin;
     const prefix = config.prefix || "!";
 
     if (sub === "buy") {
         const symbol = args[1];
         const qty = parseInt(args[2]);
-        if (!symbol || isNaN(qty)) return message.reply(`Usage: \`${prefix}stock buy <symbol> <quantity>\``);
+        if (!symbol || isNaN(qty)) {
+            return message.reply({
+                components: [textContainer("Stock Purchase", `Usage: \`${prefix}stock buy <symbol> <quantity>\``)],
+                flags: MessageFlags.IsComponentsV2,
+            });
+        }
 
         try {
             const res = await buyStock(message.guildId, message.author.id, symbol, qty);
             return message.reply({
-                embeds: [successEmbed(message.author, "Stock Purchased", `Bought **${res.newQty - (res.newQty - qty)}x ${res.stock.symbol}** for **${fmtCurrency(res.cost, emoji)}**.\nYou now own ${res.newQty}.`)]
+                components: [
+                    textContainer(
+                        "Stock Purchased",
+                        `Bought **${qty}x ${res.stock.symbol}** for **${fmtCurrency(res.cost, emoji)}**.\nYou now own **${res.newQty}** shares.`,
+                        0x2ECC71,
+                    ),
+                ],
+                flags: MessageFlags.IsComponentsV2,
             });
         } catch (e: any) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Purchase Failed", e.message)] });
+            return message.reply({
+                components: [textContainer("Purchase Failed", e.message, 0xE74C3C)],
+                flags: MessageFlags.IsComponentsV2,
+            });
         }
     }
 
     if (sub === "sell") {
         const symbol = args[1];
         const qty = parseInt(args[2]);
-        if (!symbol || isNaN(qty)) return message.reply(`Usage: \`${prefix}stock sell <symbol> <quantity>\``);
+        if (!symbol || isNaN(qty)) {
+            return message.reply({
+                components: [textContainer("Stock Sale", `Usage: \`${prefix}stock sell <symbol> <quantity>\``)],
+                flags: MessageFlags.IsComponentsV2,
+            });
+        }
 
         try {
             const res = await sellStock(message.guildId, message.author.id, symbol, qty);
-            const profitStr = res.profit >= 0 ? `+${fmtCurrency(res.profit, emoji)}` : `-${fmtCurrency(Math.abs(res.profit), emoji)}`;
+            const profitText = res.profit >= 0 ? `+${fmtCurrency(res.profit, emoji)}` : `-${fmtCurrency(Math.abs(res.profit), emoji)}`;
             return message.reply({
-                embeds: [successEmbed(message.author, "Stock Sold", `Sold **${qty}x ${res.stock.symbol}** for **${fmtCurrency(res.value, emoji)}**.\nProfit/Loss: **${profitStr}**.`)]
+                components: [
+                    textContainer(
+                        "Stock Sold",
+                        `Sold **${qty}x ${res.stock.symbol}** for **${fmtCurrency(res.value, emoji)}**.\nProfit/Loss: **${profitText}**.`,
+                        0x2ECC71,
+                    ),
+                ],
+                flags: MessageFlags.IsComponentsV2,
             });
         } catch (e: any) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Sale Failed", e.message)] });
+            return message.reply({
+                components: [textContainer("Sale Failed", e.message, 0xE74C3C)],
+                flags: MessageFlags.IsComponentsV2,
+            });
         }
     }
 
     if (sub === "portfolio" || sub === "port") {
-        const pf = await getPortfolio(message.guildId, message.author.id);
-        if (!pf || pf.holdings.length === 0) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Portfolio Empty", "You don't own any stocks.")] });
-        }
-
-        let totalValue = 0;
-        let totalCost = 0;
-
-        const lines = pf.holdings.map(h => {
-            const val = h.stock.currentPrice * h.quantity;
-            const cost = h.avgBuyPrice * h.quantity;
-            totalValue += val;
-            totalCost += cost;
-
-            const pnl = val - cost;
-            const pnlIcon = pnl >= 0 ? Mascot.Emotes.Graph : Mascot.Emotes.GraphDown;
-            const pnlStr = pnl >= 0 ? `+${fmtCurrency(pnl, emoji)}` : `-${fmtCurrency(Math.abs(pnl), emoji)}`;
-
-            return `**${h.stock.symbol}**: ${h.quantity} shares @ ${fmtCurrency(h.stock.currentPrice, emoji)} (Avg: ${h.avgBuyPrice})\nValue: **${fmtCurrency(val, emoji)}** (${pnlIcon} ${pnlStr})`;
+        return message.reply({
+            components: [await buildPortfolioContainer(message.guildId, message.author.id, message.author.username, emoji)],
+            flags: MessageFlags.IsComponentsV2,
         });
-
-        const totalPnl = totalValue - totalCost;
-        const totalPnlStr = totalPnl >= 0 ? `+${fmtCurrency(totalPnl, emoji)}` : `-${fmtCurrency(Math.abs(totalPnl), emoji)}`;
-
-        const embed = new EmbedBuilder()
-            .setTitle(`📊 Stock Portfolio: ${message.author.username}`)
-            .setDescription(`**Total Value:** ${fmtCurrency(totalValue, emoji)}\n**Total Profit:** ${totalPnlStr}\n\n${lines.join("\n\n")}`)
-            .setColor(Mascot.Colors.Base as any);
-
-        return message.reply({ embeds: [embed] });
     }
 
-    // Default: Show Market (Per Guild)
     const stocks = await getAllStocks(message.guildId);
-    const file = new AttachmentBuilder("./src/assets/stock_market.jpg");
+    const file = new AttachmentBuilder("./src/assets/stock_market.jpg", { name: STOCK_BANNER_NAME });
 
-    const desc = stocks.map(s => {
-        // Trend arrow based on price vs base logic (simplified)
-        // Or if we stored 'lastPrice' we could do real trend.
-        // For now, if price > base = Green, else Red
-        const trend = s.currentPrice >= s.basePrice ? Mascot.Emotes.Graph : Mascot.Emotes.GraphDown;
-        const volatility = s.volatility > 10 ? `${Mascot.Emotes.Alert} High Risk` : `${Mascot.Emotes.Accept} Stable`;
-
-        return `**${s.symbol}** (${s.name}) - ${trend} **${fmtCurrency(s.currentPrice, emoji)}**\n*${volatility}*`;
-    }).join("\n\n");
-
-    const embed = new EmbedBuilder()
-        .setTitle(`📈 Global Stock Market`)
-        .setDescription(`Market updates every 10 minutes.\n\n${desc}`)
-        .setColor(Mascot.Colors.Base as any)
-        .setImage("attachment://stock_market.jpg")
-        .setFooter({ text: `Use ${prefix}stock buy <symbol> <qty> to invest.` });
-
-    message.reply({ embeds: [embed], files: [file] });
+    return message.reply({
+        components: [buildMarketContainer(stocks, emoji, prefix)],
+        files: [file],
+        flags: MessageFlags.IsComponentsV2,
+    });
 }
