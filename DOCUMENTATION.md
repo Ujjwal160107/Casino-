@@ -40,7 +40,7 @@ A: Use `!education` to enroll in a degree. Higher intelligence and degrees unloc
 A: Did you get robbed? Check `!balance` to see if your money is in your bank. If the server admin reset the economy, all balances are wiped.
 
 **Q: How do I report a bug?**
-A: Join our **[Support Server](https://discord.gg/Y5P44UCH2Y)** and open a ticket.
+A: Join our **[Support Server](https://discord.gg/sK66U3vx6S)** and open a ticket.
 
 ---
 
@@ -136,4 +136,4 @@ A: Join our **[Support Server](https://discord.gg/Y5P44UCH2Y)** and open a ticke
 
 Need help? Found a bug? Want to suggest a feature?
 
-**[Join our Discord Support Server](https://discord.gg/Y5P44UCH2Y)**
+**[Join our Discord Support Server](https://discord.gg/sK66U3vx6S)**

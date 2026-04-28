@@ -47,6 +47,7 @@ import { handleManageShop } from "./commands/admin/manageShop";
 import { handleCasinoBan } from "./commands/admin/casinoBan";
 import { handleCasinoUnban } from "./commands/admin/casinoUnban";
 import { handleCasinoBanList } from "./commands/admin/casinoBanList";
+import { handleGlobalAnnouncementPreview, handleGlobalAnnouncementSend } from "./commands/admin/globalAnnouncement";
 import { handleSetGameCooldown } from "./commands/admin/setGameCooldown";
 import { handleSetLogChannel } from "./commands/admin/setLogChannel";
 import { handleChatMoneyConfig } from "./commands/admin/chatMoneyConfig";
@@ -487,6 +488,16 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "ban-list":
     case "banlist":
       return handleCasinoBanList(message, args);
+    case "global-announcement-preview":
+    case "globalannouncementpreview":
+    case "fortuna-global-preview":
+    case "fortunaglobalpreview":
+      return handleGlobalAnnouncementPreview(message);
+    case "global-announcement-send":
+    case "globalannouncementsend":
+    case "fortuna-global-send":
+    case "fortunaglobalsend":
+      return handleGlobalAnnouncementSend(message);
     case "bm":
     case "market":
     case "black-market":
