@@ -37,14 +37,17 @@ model User {
   bets        Bet[]
   inventory   Inventory[] // Relation to Inventory items
   
-  lastDaily   DateTime?
-  lastWeekly  DateTime?
-  lastMonthly DateTime?
-  lastVote    DateTime?
-  lastVoteReminder DateTime?
-  voteReminder Boolean @default(true)
-
-  createdAt   DateTime @default(now())
+    lastDaily   DateTime?
+    lastWeekly  DateTime?
+    lastMonthly DateTime?
+    lastVote    DateTime?
+    lastVoteReminder DateTime?
+    voteReminder Boolean @default(true)
+    globalAnnouncementFormFilled Boolean? @default(false)
+    globalAnnouncementReminderDate DateTime?
+    globalAnnouncementReminderCount Int? @default(0)
+  
+    createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
 

@@ -1,6 +1,8 @@
 import "dotenv/config"; import fs from "fs"; import path from "path"; import { Client, GatewayIntentBits, Partials, REST, Routes, ChatInputCommandInteraction, Interaction, ActivityType } from "discord.js"; import prisma from "./utils/prisma"; import { routeMessage } from "./commandRouter"; import { getGuildConfig } from "./services/guildConfigService"; import { safeInteractionReply } from "./utils/interactionHelpers"; import { initEmojiRegistry, listEmojiKeys } from "./utils/emojiRegistry"; import { setupChatMoneyListener } from "./listeners/chatMoneyListener"; import { setupCasinoDropListener } from "./listeners/casinoDropListener"; import { handleBankInteraction } from "./handlers/bankInteractionHandler"; import { handleMarketInteraction } from "./handlers/marketInteractionHandler"; import { handleInventoryInteraction } from "./handlers/inventoryInteractionHandler"; import { CasinoDropService } from "./services/casinoDropService";
 import { guildDeleteListener } from "./listeners/guildDeleteListener";
 import { guildCreateListener } from "./listeners/guildCreateListener";
+import { Mascot } from "./config/branding";
+import { handleGlobalEconomyReminderInteraction, maybeSendGlobalEconomyReminder } from "./services/globalEconomyReminderService";
 import { initScheduler } from "./scheduler"; const slashCommands = new Map<string, any>(); const slashData: any[] = []; const slashDir = path.join(__dirname, "commands", "slash"); if (fs.existsSync(slashDir)) { for (const file of fs.readdirSync(slashDir)) { if (!file.endsWith(".ts") && !file.endsWith(".js")) continue; const mod = require(path.join(slashDir, file)); if (mod && mod.data && mod.execute) { slashCommands.set(mod.data.name, mod); slashData.push(mod.data.toJSON()); console.log(`Loaded slash command: ${mod.data.name}`); } } } else { console.log("No slash commands directory found; skipping slash load."); } const token = process.env.DISCORD_TOKEN; if (!token) { console.error("DISCORD_TOKEN is missing in your .env"); process.exit(1); } const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers], partials: [Partials.Channel], }); client.once("ready", async () => {
   console.log(`✅ Logged in as ${client.user?.tag}`);
   client.user?.setActivity("!casino", { type: ActivityType.Playing });
@@ -30,6 +32,9 @@ import { initScheduler } from "./scheduler"; const slashCommands = new Map<strin
     }
     if (id.startsWith("casino_drop_claim_")) {
       return await CasinoDropService.handleClaim(interaction as any);
+    }
+    if (id === "global_economy_form_filled") {
+      return await handleGlobalEconomyReminderInteraction(interaction as any);
     }
   } catch (err) { console.error("Interaction error:", err); await safeInteractionReply(interaction, { content: "Internal error while processing interaction.", ephemeral: true }); }
 }); client.on("messageCreate", async (message) => {
@@ -65,7 +70,7 @@ import { initScheduler } from "./scheduler"; const slashCommands = new Map<strin
             }
           }
 
-          const supportLink = "https://discord.gg/Y5P44UCH2Y";
+          const supportLink = Mascot.Links.Support;
           const cmdLink = "http://fortunabot.dev/docs/commands";
           return message.reply(`**Need Help?**\nView all commands: <${cmdLink}>\nJoin support: ${supportLink}\nOr use \`${prefix}help\` to start!`);
         } else {
@@ -84,6 +89,9 @@ import { initScheduler } from "./scheduler"; const slashCommands = new Map<strin
       // routeMessage internally uses .slice(1), so we prepend a mock 1-char prefix.
       (message as any).content = "!" + contentToProcess;
       await routeMessage(client, message, prefix);
+      await maybeSendGlobalEconomyReminder(message, contentToProcess).catch((err) => {
+        console.error("Global economy reminder error:", err);
+      });
     } finally {
       (message as any).content = originalContent;
     }
