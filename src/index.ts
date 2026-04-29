@@ -5,7 +5,7 @@ import { Mascot } from "./config/branding";
 import { handleGlobalEconomyReminderInteraction, maybeSendGlobalEconomyReminder } from "./services/globalEconomyReminderService";
 import { initScheduler } from "./scheduler"; const slashCommands = new Map<string, any>(); const slashData: any[] = []; const slashDir = path.join(__dirname, "commands", "slash"); if (fs.existsSync(slashDir)) { for (const file of fs.readdirSync(slashDir)) { if (!file.endsWith(".ts") && !file.endsWith(".js")) continue; const mod = require(path.join(slashDir, file)); if (mod && mod.data && mod.execute) { slashCommands.set(mod.data.name, mod); slashData.push(mod.data.toJSON()); console.log(`Loaded slash command: ${mod.data.name}`); } } } else { console.log("No slash commands directory found; skipping slash load."); } const token = process.env.DISCORD_TOKEN; if (!token) { console.error("DISCORD_TOKEN is missing in your .env"); process.exit(1); } const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers], partials: [Partials.Channel], }); client.once("ready", async () => {
   console.log(`✅ Logged in as ${client.user?.tag}`);
-  client.user?.setActivity("!casino", { type: ActivityType.Playing });
+  client.user?.setActivity("Did you check out the recent alert?", { type: ActivityType.Playing });
   try { await prisma.$connect(); console.log("📦 Prisma connected"); } catch (err) { console.error("Prisma connection failed:", err); process.exit(1); } await initEmojiRegistry(client); console.log("Emoji registry keys:", listEmojiKeys().slice(0, 200));
   setupChatMoneyListener(client);
   setupCasinoDropListener(client);
