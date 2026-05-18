@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
@@ -13,14 +14,15 @@ import {
   TextDisplayBuilder,
   User as DiscordUser,
 } from "discord.js";
+import fs from "fs";
+import path from "path";
 import prisma from "../../utils/prisma";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency } from "../../utils/format";
 import { Mascot } from "../../config/branding";
 import { getJob, getJobPay } from "../../services/jobService";
-import { getPortfolio } from "../../services/stockService";
-import { PropertyService } from "../../services/propertyService";
+import { getCardSummary } from "../../services/creditCardService";
 
 const PROFILE_ACCENT_COLOR = 0x9B59B6;
 
@@ -44,13 +46,68 @@ function textContainer(title: string, body: string, color = PROFILE_ACCENT_COLOR
     );
 }
 
-export async function getProfileContainer(targetUser: DiscordUser, guildId: string, displayName = targetUser.username): Promise<ContainerBuilder> {
+function formatCardTier(tier: string) {
+  return tier
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+const CARD_ASSET_NAMES: Record<string, string> = {
+  STARTER: "starter_card",
+  GOLD: "gold_card",
+  PLATINUM: "platinum_card",
+  BLACK: "black_card",
+};
+
+function resolveCardAsset(tier: string) {
+  const baseName = CARD_ASSET_NAMES[tier.toUpperCase()];
+  if (!baseName) return null;
+
+  const assetDir = path.resolve(__dirname, "../../assets");
+  const filePath = [".png", ".jpg", ".jpeg", ".webp", ".gif"]
+    .map((ext) => path.join(assetDir, `${baseName}${ext}`))
+    .find((candidate) => fs.existsSync(candidate));
+
+  if (!filePath) return null;
+  return {
+    filePath,
+    attachmentName: `${baseName}${path.extname(filePath)}`,
+  };
+}
+
+async function getProfilePortfolioValue(discordId: string) {
+  const portfolio = await prisma.portfolio.findUnique({
+    where: { userId: discordId },
+    include: { holdings: { include: { stock: true } } },
+  });
+
+  return portfolio
+    ? portfolio.holdings.reduce((sum, holding) => sum + (holding.stock.currentPrice * holding.quantity), 0)
+    : 0;
+}
+
+async function getProfilePropertySummary(discordId: string) {
+  const ownedProperties = await prisma.ownedProperty.findMany({
+    where: { userId: discordId },
+    include: { property: true },
+  });
+
+  return {
+    propertyCount: ownedProperties.length,
+    propertyNames: ownedProperties.map((op) => op.property.name),
+  };
+}
+
+export async function getProfilePayload(targetUser: DiscordUser, guildId: string, displayName = targetUser.username): Promise<{ container: ContainerBuilder; files: AttachmentBuilder[] }> {
   let userDb = await prisma.user.findUnique({
-    where: { discordId_guildId: { discordId: targetUser.id, guildId } },
+    where: { discordId: targetUser.id },
     include: {
       wallet: true,
       bank: true,
       loans: true,
+      currentEducation: { include: { degree: true } },
       degrees: { include: { degree: true } },
       inventory: { include: { shopItem: true } },
       workLogs: false,
@@ -60,11 +117,12 @@ export async function getProfileContainer(targetUser: DiscordUser, guildId: stri
   if (!userDb) {
     await ensureUserAndWallet(targetUser.id, guildId, targetUser.username);
     userDb = await prisma.user.findUnique({
-      where: { discordId_guildId: { discordId: targetUser.id, guildId } },
+      where: { discordId: targetUser.id },
       include: {
         wallet: true,
         bank: true,
         loans: true,
+        currentEducation: { include: { degree: true } },
         degrees: { include: { degree: true } },
         inventory: { include: { shopItem: true } },
         workLogs: false,
@@ -75,17 +133,15 @@ export async function getProfileContainer(targetUser: DiscordUser, guildId: stri
 
   const config = await getGuildConfig(guildId);
   const emoji = config.currencyEmoji || Mascot.Emotes.Blackcoin;
+  const cardSummary = await getCardSummary(targetUser.id);
 
   const walletBal = userDb.wallet?.balance || 0;
   const bankBal = userDb.bank?.balance || 0;
   const loanDebt = userDb.loans.reduce((sum, loan) => sum + (loan.status === "ACTIVE" ? loan.totalRepayment : 0), 0);
 
-  const portfolio = await getPortfolio(guildId, targetUser.id);
-  const stockValue = portfolio
-    ? portfolio.holdings.reduce((sum, h) => sum + (h.stock.currentPrice * h.quantity), 0)
-    : 0;
+  const stockValue = await getProfilePortfolioValue(targetUser.id);
 
-  const invValue = userDb.inventory.reduce((sum, item) => sum + (item.shopItem.price * item.amount), 0);
+  const invValue = userDb.inventory.reduce((sum, item) => sum + ((item.shopItem?.price ?? 0) * item.amount), 0);
   const netWorth = walletBal + bankBal + stockValue + invValue - loanDebt;
 
   let jobDisplay = "Unemployed";
@@ -101,7 +157,7 @@ export async function getProfileContainer(targetUser: DiscordUser, guildId: stri
 
   const degrees = userDb.degrees.map((d) => `- ${d.degree.name}`).join("\n") || "- No Degrees";
 
-  const chickenItem = userDb.inventory.find((i) => i.shopItem.name.toLowerCase() === "chicken");
+  const chickenItem = userDb.inventory.find((i) => i.shopItem?.name.toLowerCase() === "chicken");
   let chickenDisplay = "No Chicken";
   if (chickenItem) {
     const meta = (chickenItem.meta as any) || {};
@@ -111,11 +167,31 @@ export async function getProfileContainer(targetUser: DiscordUser, guildId: stri
     chickenDisplay = `${Mascot.Emotes.Chicken} **${name}** (Lvl ${level} | ${wins} Wins)`;
   }
 
-  const ownedProperties = await PropertyService.getOwnedProperties(targetUser.id, guildId);
-  const propertyCount = ownedProperties.length;
-  const totalPropertyIncome = ownedProperties.reduce((sum, p) => sum + p.property.incomePerCycle, 0);
+  const RIFLE_PRIORITY_PROFILE = ["legendary rifle", "sniper rifle", "iron rifle", "wooden rifle"];
+  let rifleDisplay = "None";
+  for (const rName of RIFLE_PRIORITY_PROFILE) {
+    const found = userDb.inventory.find((i) => i.shopItem?.name.toLowerCase() === rName);
+    if (found) { rifleDisplay = found.shopItem!.name; break; }
+  }
 
-  return new ContainerBuilder()
+  const { propertyCount, propertyNames } = await getProfilePropertySummary(targetUser.id);
+  const propertyDisplay = propertyNames.length > 0 ? propertyNames.join(", ") : "None";
+  const cardDisplay = cardSummary.card
+    ? [
+      `**Tier:** ${formatCardTier(cardSummary.card.tier)}`,
+      `**Status:** ${cardSummary.card.status}`,
+      `**Balance:** ${fmtCurrency(cardSummary.card.currentBalance, emoji)}`,
+      `**Statement:** ${fmtCurrency(cardSummary.card.statementBalance, emoji)}`,
+      cardSummary.card.dueAt ? `**Due:** <t:${Math.floor(cardSummary.card.dueAt.getTime() / 1000)}:R>` : null,
+    ].filter(Boolean).join("\n")
+    : "No Fortuna Card owned";
+  const files: AttachmentBuilder[] = [];
+  const cardAsset = cardSummary.card ? resolveCardAsset(cardSummary.card.tier) : null;
+  const cardText = new TextDisplayBuilder().setContent(
+    `### ${Mascot.Emotes.Credit} Fortuna Card\n${cardDisplay}`,
+  );
+
+  const container = new ContainerBuilder()
     .setAccentColor(PROFILE_ACCENT_COLOR)
     .addSectionComponents(
       new SectionBuilder()
@@ -153,19 +229,56 @@ export async function getProfileContainer(targetUser: DiscordUser, guildId: stri
     .addSeparatorComponents(separator())
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
+        `### ${Mascot.Emotes.Meditation} Stress\n` +
+        `**Job Stress:** ${userDb.jobStress}/100\n` +
+        `**Education Stress:** ${userDb.currentEducation ? `${userDb.currentEducation.stress}/100 (${userDb.currentEducation.degree.name})` : "Not enrolled"}`,
+      ),
+    )
+    .addSeparatorComponents(separator())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
         `### ${Mascot.Emotes.Graph} Assets & Liabilities\n` +
         `**Inventory Value:** ${fmtCurrency(invValue, emoji)}\n` +
         `**Active Debt:** ${fmtCurrency(loanDebt, emoji)}\n` +
-        `**Properties:** ${propertyCount} (Income: ${fmtCurrency(totalPropertyIncome, emoji)})\n` +
+        `**Rifle:** ${rifleDisplay}\n` +
+        `**Properties (${propertyCount}):** ${propertyDisplay}\n` +
         `**Chicken:** ${chickenDisplay}`,
       ),
-    )
+    );
+
+  container.addSeparatorComponents(separator());
+
+  if (cardAsset && cardSummary.card) {
+    container.addSectionComponents(
+      new SectionBuilder()
+        .addTextDisplayComponents(cardText)
+        .setThumbnailAccessory((thumbnail) =>
+          thumbnail
+            .setURL(`attachment://${cardAsset.attachmentName}`)
+            .setDescription(`${formatCardTier(cardSummary.card!.tier)} card`),
+        ),
+    );
+  } else {
+    container.addTextDisplayComponents(cardText);
+  }
+
+  container
     .addSeparatorComponents(separator())
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `### ${Mascot.Emotes.Graduate} Education\n${trimBlock(degrees)}`,
       ),
     );
+
+  if (cardAsset && cardSummary.card) {
+    files.push(new AttachmentBuilder(cardAsset.filePath, { name: cardAsset.attachmentName }));
+  }
+
+  return { container, files };
+}
+
+export async function getProfileContainer(targetUser: DiscordUser, guildId: string, displayName = targetUser.username): Promise<ContainerBuilder> {
+  return (await getProfilePayload(targetUser, guildId, displayName)).container;
 }
 
 export async function handleProfile(message: Message, args: string[]) {
@@ -175,7 +288,7 @@ export async function handleProfile(message: Message, args: string[]) {
   try {
     const targetMember = await message.guild?.members.fetch(targetUser.id).catch(() => null);
     const displayName = targetMember?.displayName || targetUser.globalName || targetUser.username;
-    const container = await getProfileContainer(targetUser, guildId, displayName);
+    const payload = await getProfilePayload(targetUser, guildId, displayName);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
@@ -186,7 +299,8 @@ export async function handleProfile(message: Message, args: string[]) {
     );
 
     const reply = await message.reply({
-      components: [container, row],
+      components: [payload.container, row],
+      files: payload.files,
       flags: MessageFlags.IsComponentsV2,
     });
 
@@ -202,9 +316,10 @@ export async function handleProfile(message: Message, args: string[]) {
 
       if (i.customId === "prof_refresh") {
         try {
-          const newContainer = await getProfileContainer(targetUser, guildId, displayName);
+          const newPayload = await getProfilePayload(targetUser, guildId, displayName);
           await i.update({
-            components: [newContainer, row],
+            components: [newPayload.container, row],
+            files: newPayload.files,
             flags: MessageFlags.IsComponentsV2,
           });
         } catch {
@@ -218,7 +333,7 @@ export async function handleProfile(message: Message, args: string[]) {
 
     collector.on("end", () => {
       reply.edit({
-        components: [container],
+        components: [payload.container],
         flags: MessageFlags.IsComponentsV2,
       }).catch(() => { });
     });

@@ -36,7 +36,7 @@ export async function initStocks(guildId: string) {
  */
 export async function updateMarket() {
     // 1. Get all guilds that have stocks (optimization: could fetch all configs, but let's go by stocks)
-    // Actually, simpler to iterate all GuildConfigs that we have recorded? 
+    // Actually, simpler to iterate guild settings that we have recorded?
     // Or just distinct guildIds from Stock. 
     // Let's use groupBy to get active guildIds.
 

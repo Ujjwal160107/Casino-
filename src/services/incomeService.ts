@@ -1,31 +1,40 @@
 import prisma from "../utils/prisma";
 import { checkDynamicCooldown } from "../utils/cooldown";
-import { getGuildConfig } from "./guildConfigService";
 import { getWalletById } from "./walletService";
+import { GRINDING_COMMANDS, MAX_SAFE_BALANCE } from "../utils/economyConfig";
 
 function rand(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 export async function getIncomeConfigOrDefault(guildId: string | null, commandKey: string) {
-  if (!guildId) {
-    return { minPay: 10, maxPay: 50, cooldown: 60, successPct: 100, failPenaltyPct: 50 };
-  }
-  const cfg = await prisma.incomeConfig.findUnique({
-    where: { guildId_commandKey: { guildId, commandKey } }
-  });
-  if (cfg) {
+  if (commandKey === "beg" || commandKey === "slut") {
+    const config = GRINDING_COMMANDS[commandKey];
     return {
-      minPay: cfg.minPay,
-      maxPay: cfg.maxPay,
-      cooldown: cfg.cooldown,
-      successPct: cfg.successPct ?? 100,
-      failPenaltyPct: cfg.failPenaltyPct ?? 50,
-      successMessages: cfg.successMessages || [],
-      failMessages: cfg.failMessages || []
+      minPay: config.payoutMin,
+      maxPay: config.payoutMax,
+      cooldown: config.cooldownSeconds,
+      successPct: Math.round(config.winRate * 100),
+      failPenaltyPct: 0,
+      successMessages: [],
+      failMessages: []
     };
   }
-  return { minPay: 10, maxPay: 50, cooldown: 60, successPct: 100, failPenaltyPct: 50 };
+
+  if (commandKey === "crime") {
+    const config = GRINDING_COMMANDS.crime;
+    return {
+      minPay: config.payoutMin,
+      maxPay: config.payoutMax,
+      cooldown: config.cooldownSeconds,
+      successPct: Math.round(config.winRate * 100),
+      failPenaltyPct: 50,
+      successMessages: [],
+      failMessages: []
+    };
+  }
+
+  return { minPay: 10, maxPay: 50, cooldown: 60, successPct: 100, failPenaltyPct: 50, successMessages: [], failMessages: [] };
 }
 
 const executeTx = async <T>(fn: () => Promise<T>, retries = 3): Promise<T> => {
@@ -101,12 +110,9 @@ export async function runIncomeCommand({
   }
 
   if (guildId) {
-    const guildConfig = await getGuildConfig(guildId);
-    if (guildConfig.walletLimit) {
-      const wallet = await getWalletById(walletId);
-      if (wallet && wallet.balance + amount > guildConfig.walletLimit) {
-        throw new Error(`Wallet limit of ${guildConfig.walletLimit} reached. Cannot earn more.`);
-      }
+    const wallet = await getWalletById(walletId);
+    if (wallet && wallet.balance + amount > MAX_SAFE_BALANCE) {
+      throw new Error(`Wallet limit of ${MAX_SAFE_BALANCE} reached. Cannot earn more.`);
     }
   }
 

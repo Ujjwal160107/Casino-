@@ -1,29 +1,50 @@
-import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from "discord.js";
+import {
+    Message,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ContainerBuilder,
+    MessageFlags,
+    SectionBuilder,
+    SeparatorBuilder,
+    SeparatorSpacingSize,
+    TextDisplayBuilder
+} from "discord.js";
 import { JOBS, getJob, getJobPaySync } from "../../services/jobService";
-import { Mascot, getEmoteUrl } from "../../config/branding";
+import { Mascot } from "../../config/branding";
 import prisma from "../../utils/prisma";
 import { fmtCurrency } from "../../utils/format";
 import { getGuildConfig } from "../../services/guildConfigService";
+
+function hexColorToNumber(color: unknown, fallback = 0x9B59B6) {
+    if (typeof color === "number") return color;
+    if (typeof color === "string") {
+        const normalized = color.replace("#", "");
+        const parsed = Number.parseInt(normalized, 16);
+        if (!Number.isNaN(parsed)) return parsed;
+    }
+    return fallback;
+}
 
 export async function handleWork(message: Message) {
     if (!message.guild) return;
     const config = await getGuildConfig(message.guild.id);
 
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: message.author.id, guildId: message.guild.id } }
+        where: { discordId: message.author.id }
     });
 
     if (!user) return;
 
-    // 1. Unemployed View
     if (!user.jobId) {
-        const embed = new EmbedBuilder()
-            .setTitle("Employment Status: Unemployed")
-            .setDescription(`You currently do not have a job.\nUse \`${config?.prefix || "!"}jobs\` to browse available careers and apply!`)
-            .setColor("#95A5A6") // Grey
-            .setThumbnail("https://media.discordapp.net/attachments/1093496077363421256/1149712711102713886/interview.png"); // Generic placeholder or none
+        const container = new ContainerBuilder()
+            .setAccentColor(0x95A5A6)
+            .addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.JobWorking} Employment Status`),
+                new TextDisplayBuilder().setContent(`**Position:** Unemployed\nUse \`${config?.prefix || "!"}jobs\` to browse available careers and apply.`)
+            );
 
-        return message.reply({ embeds: [embed] });
+        return message.reply({ components: [container], flags: MessageFlags.IsComponentsV2 });
     }
 
     // 2. Employed View
@@ -51,29 +72,37 @@ export async function handleWork(message: Message) {
         promoText = `Next Promotion: **${nextLevelJob.title}**\nProgress: ${makeProgressBar(progress)} (${user.shiftsWorked}/${shiftsReq} shifts)`;
     }
 
-    const embed = new EmbedBuilder()
-        .setAuthor({ name: `${message.author.username}'s Job Dashboard`, iconURL: message.author.displayAvatarURL() })
-        .setTitle(`${job.emoji} ${job.title}`)
-        .setDescription(`**Position:** ${job.title}\n**Sector:** ${capitalize(job.sector)}`)
-        .setColor(Mascot.Colors.Base as any)
-        .addFields(
-            { name: "Salary", value: fmtCurrency(getJobPaySync(job, config), config?.currencyEmoji), inline: true },
-            { name: "Shifts Worked", value: user.shiftsWorked.toString(), inline: true },
-            { name: "XP", value: user.jobXp.toString(), inline: true },
-            { name: `${getStressColor(user.jobStress ?? 0)} Stress`, value: `${user.jobStress ?? 0}/100`, inline: true },
-            { name: "Career Progress", value: promoText }
+    const container = new ContainerBuilder()
+        .setAccentColor(hexColorToNumber(Mascot.Colors.Base))
+        .addSectionComponents(
+            new SectionBuilder()
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`## ${job.emoji} ${job.title}`),
+        new TextDisplayBuilder().setContent(`**Sector:** ${capitalize(job.sector)}\n**Level:** ${job.level}\n**Pay:** ${fmtCurrency(getJobPaySync(job), config?.currencyEmoji)}/shift`)
+                )
+                .setThumbnailAccessory((thumbnail) =>
+                    thumbnail
+                        .setURL(message.author.displayAvatarURL({ size: 256 }))
+                        .setDescription(`${message.author.username}'s avatar`)
+                )
         )
-        .setFooter({ text: "Use the buttons below to work or manage employment." });
-
-    const thumb = getEmoteUrl(Mascot.Emotes.JobWorking);
-    if (thumb) embed.setThumbnail(thumb);
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+                `### Shift Status\n` +
+                `**Shifts Worked:** ${user.shiftsWorked}\n` +
+                `**XP:** ${user.jobXp}\n` +
+                `**Stress:** ${getStressColor(user.jobStress ?? 0)} ${user.jobStress ?? 0}/100`
+            ),
+            new TextDisplayBuilder().setContent(`### Career Progress\n${promoText}`)
+        );
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId("work_shift").setLabel("Start Shift").setStyle(ButtonStyle.Success).setEmoji(Mascot.Emotes.JobWorking),
         new ButtonBuilder().setCustomId("work_resign").setLabel("Resign").setStyle(ButtonStyle.Danger)
     );
 
-    message.reply({ embeds: [embed], components: [row] });
+    message.reply({ components: [container, row], flags: MessageFlags.IsComponentsV2 });
 }
 
 function makeProgressBar(pct: number) {

@@ -33,7 +33,7 @@ export async function handleRemoveItem(message: Message, args: string[]) {
     }
 
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: targetId, guildId: message.guildId! } },
+        where: { discordId: targetId },
         include: {
             inventory: {
                 include: { shopItem: true }
@@ -81,7 +81,7 @@ export async function handleRemoveItem(message: Message, args: string[]) {
 
     if (removeEverything) {
         const count = await prisma.inventory.deleteMany({
-            where: { userId: user.id }
+            where: { userId: user.discordId }
         });
 
         await logToChannel(message.client, {

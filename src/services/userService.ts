@@ -1,6 +1,7 @@
 import prisma from "../utils/prisma";
 import { redisService } from "./redisService";
-import { User, Wallet, Degree, UserDegree, Job, UserEducation } from "@prisma/client";
+import { User, Wallet, Degree, UserDegree, UserEducation } from "@prisma/client";
+import { STARTING_WALLET_BALANCE } from "../utils/economyConfig";
 
 // Define a type that includes commonly used relations
 export type UserWithRelations = User & {
@@ -11,8 +12,32 @@ export type UserWithRelations = User & {
 
 const CACHE_TTL = 300; // 5 minutes
 
-export async function getUser(userId: string, guildId: string): Promise<UserWithRelations | null> {
-    const key = `user:${guildId}:${userId}`;
+function hydrateDates(obj: any): any {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj !== 'object') return obj;
+
+    if (Array.isArray(obj)) {
+        return obj.map(v => hydrateDates(v));
+    }
+
+    for (const key of Object.keys(obj)) {
+        const value = obj[key];
+        if (typeof value === 'string') {
+            // Heuristic: Key ends in At/Time/Date and looks like a valid date
+            const isDateKey = key.endsWith('At') || key.endsWith('Time') || key.endsWith('Date');
+            // Also check specifically for known fields if heuristic is risky, but for this app it's safely consistent.
+            if (isDateKey && !isNaN(Date.parse(value))) {
+                obj[key] = new Date(value);
+            }
+        } else if (typeof value === 'object') {
+            hydrateDates(value);
+        }
+    }
+    return obj;
+}
+
+export async function getUser(discordId: string, _guildId: string): Promise<UserWithRelations | null> {
+    const key = `user:${discordId}`;
 
     // 1. Try Cache
     const cached = await redisService.get<UserWithRelations>(key);
@@ -20,33 +45,9 @@ export async function getUser(userId: string, guildId: string): Promise<UserWith
         return hydrateDates(cached);
     } // End of cache check
 
-    function hydrateDates(obj: any): any {
-        if (obj === null || obj === undefined) return obj;
-        if (typeof obj !== 'object') return obj;
-
-        if (Array.isArray(obj)) {
-            return obj.map(v => hydrateDates(v));
-        }
-
-        for (const key of Object.keys(obj)) {
-            const value = obj[key];
-            if (typeof value === 'string') {
-                // Heuristic: Key ends in At/Time/Date and looks like a valid date
-                const isDateKey = key.endsWith('At') || key.endsWith('Time') || key.endsWith('Date');
-                // Also check specifically for known fields if heuristic is risky, but for this app it's safely consistent.
-                if (isDateKey && !isNaN(Date.parse(value))) {
-                    obj[key] = new Date(value);
-                }
-            } else if (typeof value === 'object') {
-                hydrateDates(value);
-            }
-        }
-        return obj;
-    }
-
     // 2. Fetch from DB
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
+        where: { discordId },
         include: {
             wallet: true,
             degrees: { include: { degree: true } },
@@ -65,23 +66,19 @@ export async function getUser(userId: string, guildId: string): Promise<UserWith
 /**
  * Invalidate user cache. Call this after ANY update to user/wallet/inventory.
  */
-export async function invalidateUserCache(userId: string, guildId: string) {
-    const key = `user:${guildId}:${userId}`;
+export async function invalidateUserCache(discordId: string, _guildId: string) {
+    const key = `user:${discordId}`;
     await redisService.del(key);
 }
 
-export async function createUser(discordId: string, guildId: string, username: string) {
-    const config = await prisma.guildConfig.findUnique({ where: { guildId } });
-    const startMoney = config?.startMoney || 1000;
-
+export async function createUser(discordId: string, _guildId: string, username: string) {
     return await prisma.user.create({
         data: {
             discordId,
-            guildId,
             username,
             wallet: {
                 create: {
-                    balance: startMoney
+                    balance: STARTING_WALLET_BALANCE
                 }
             }
         },

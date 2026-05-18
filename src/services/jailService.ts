@@ -1,16 +1,13 @@
 import prisma from "../utils/prisma";
-import { getGuildConfig } from "./guildConfigService";
-import { ensureUserAndWallet } from "./walletService";
-import { getWalletById } from "./walletService";
+import { DEFAULT_JAIL_FINE, DEFAULT_JAIL_TIME_SECONDS } from "../utils/economyConfig";
 
-export async function jailUser(userId: string, guildId: string, durationSeconds?: number) {
-    const config = await getGuildConfig(guildId);
-    const time = durationSeconds ?? config.jailTime; // Default from config
+export async function jailUser(discordId: string, _guildId: string, durationSeconds?: number) {
+    const time = durationSeconds ?? DEFAULT_JAIL_TIME_SECONDS;
 
     const releaseTime = new Date(Date.now() + time * 1000);
 
     await prisma.user.update({
-        where: { id: userId },
+        where: { discordId },
         data: {
             isJailed: true,
             jailReleaseTime: releaseTime
@@ -20,9 +17,9 @@ export async function jailUser(userId: string, guildId: string, durationSeconds?
     return releaseTime;
 }
 
-export async function releaseUser(userId: string) {
+export async function releaseUser(discordId: string) {
     await prisma.user.update({
-        where: { id: userId },
+        where: { discordId },
         data: {
             isJailed: false,
             jailReleaseTime: null
@@ -30,9 +27,9 @@ export async function releaseUser(userId: string) {
     });
 }
 
-export async function checkJailStatus(userId: string): Promise<{ isJailed: boolean; releaseTime: Date | null }> {
+export async function checkJailStatus(discordId: string): Promise<{ isJailed: boolean; releaseTime: Date | null }> {
     const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { discordId },
         select: { isJailed: true, jailReleaseTime: true }
     });
 
@@ -42,19 +39,18 @@ export async function checkJailStatus(userId: string): Promise<{ isJailed: boole
 
     // Check if time expired
     if (user.jailReleaseTime && new Date() > user.jailReleaseTime) {
-        await releaseUser(userId);
+        await releaseUser(discordId);
         return { isJailed: false, releaseTime: null };
     }
 
     return { isJailed: true, releaseTime: user.jailReleaseTime };
 }
 
-export async function payBail(userId: string, guildId: string): Promise<{ success: boolean; message: string }> {
-    const config = await getGuildConfig(guildId);
-    const fine = config.jailFine;
+export async function payBail(discordId: string, _guildId: string): Promise<{ success: boolean; message: string }> {
+    const fine = DEFAULT_JAIL_FINE;
 
     const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { discordId },
         include: { wallet: true }
     });
 
@@ -85,7 +81,7 @@ export async function payBail(userId: string, guildId: string): Promise<{ succes
                     }
                 }),
                 prisma.user.update({
-                    where: { id: userId },
+                    where: { discordId },
                     data: { isJailed: false, jailReleaseTime: null }
                 })
             ]);

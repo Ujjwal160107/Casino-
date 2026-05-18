@@ -1,5 +1,10 @@
 import { GameConfig, EquipmentSlot } from "../config/gameConfig";
-import { GuildConfig } from "@prisma/client";
+
+type GameLimitConfig = {
+    gameBetLimits?: Record<string, { min?: number; max?: number }> | null;
+    minBet?: number | null;
+    maxBet?: number | null;
+};
 
 export interface StatBonus {
     str: number;
@@ -120,12 +125,29 @@ export function getWinChance(myScore: number, enemyScore: number): number {
     return (myScore / total) * 100;
 }
 
-export function getGameBetLimits(config: GuildConfig, gameKey: string): { min: number, max: number } {
+const V2_DEFAULT_MIN_BET = 10_000;
+const V2_DEFAULT_MAX_BET = 1_000_000;
+
+const V2_GAME_MAX_BETS: Record<string, number> = {
+    coinflip: 500_000,
+    slots: 750_000,
+    blackjack: 1_000_000,
+    roulette: 1_000_000,
+    roulette_v1: 1_000_000,
+    russian_roulette: 750_000,
+    rr: 750_000,
+    cockfight: 1_000_000,
+    chicken: 1_000_000
+};
+
+export function getGameBetLimits(config: GameLimitConfig, gameKey: string): { min: number, max: number } {
     const limits = (config.gameBetLimits as any) || {};
     const gameLimits = limits[gameKey] || {};
 
-    const globalMin = config.minBet || 100;
-    const globalMax = config.maxBet || 100000;
+    const schemaOldMin = 100;
+    const schemaOldMax = 100000;
+    const globalMin = config.minBet && config.minBet !== schemaOldMin ? config.minBet : V2_DEFAULT_MIN_BET;
+    const globalMax = config.maxBet && config.maxBet !== schemaOldMax ? config.maxBet : (V2_GAME_MAX_BETS[gameKey] ?? V2_DEFAULT_MAX_BET);
 
     const min = typeof gameLimits.min === "number" ? gameLimits.min : globalMin;
     let max = (typeof gameLimits.max === "number" && gameLimits.max !== 0) ? gameLimits.max : globalMax;

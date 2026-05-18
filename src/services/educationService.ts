@@ -2,113 +2,113 @@ import prisma from "../utils/prisma";
 import { Mascot } from "../config/branding";
 import { getGuildConfig } from "./guildConfigService";
 import { invalidateUserCache } from "./userService";
+import { DEGREE_PRICES, RELAX_OPTIONS } from "../utils/economyConfig";
+import { chargeCardPurchaseTx } from "./creditCardService";
+import { applyRelaxOption } from "./relaxService";
 
 export async function checkAndSeedDegrees(guildId: string) {
-    // 1. High School (Foundation)
-    let hs = await prisma.degree.findFirst({ where: { guildId, name: "High School Diploma" } });
+    const upsertDegree = async (
+        name: string,
+        data: {
+            type: string;
+            tuitionPerSem: number;
+            minIntelligence: number;
+            intelligenceBoost: number;
+            incomeMulti: number;
+            requiredDegreeId?: string | null;
+        },
+        aliases: string[] = []
+    ) => {
+        let degree = await prisma.degree.findFirst({ where: { guildId, OR: [{ name }, ...aliases.map(alias => ({ name: alias }))] } });
+        const payload = {
+            name,
+            type: data.type,
+            totalSemesters: 1,
+            passGpa: 6.0,
+            tuitionPerSem: data.tuitionPerSem,
+            intelligenceBoost: data.intelligenceBoost,
+            incomeMulti: data.incomeMulti,
+            minIntelligence: data.minIntelligence,
+            requiredDegreeId: data.requiredDegreeId ?? null
+        };
 
-    if (hs) {
-        // Enforce the new scale on existing record
-        hs = await prisma.degree.update({
-            where: { id: hs.id },
-            data: { passGpa: 6.0, intelligenceBoost: 1, type: "HS", totalSemesters: 1 }
-        });
-    } else {
-        hs = await prisma.degree.create({
-            data: { guildId, name: "High School Diploma", type: "HS", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 0, intelligenceBoost: 1 }
-        });
-    }
+        if (degree) {
+            return prisma.degree.update({ where: { id: degree.id }, data: payload });
+        }
 
-    // 2. Community College
-    let trade = await prisma.degree.findFirst({ where: { guildId, name: "Trade License (Plumbing)" } });
-    if (trade) {
-        await prisma.degree.update({
-            where: { id: trade.id },
-            data: { passGpa: 6.0, intelligenceBoost: 1, minIntelligence: 2, totalSemesters: 1 }
-        });
-    } else {
-        await prisma.degree.create({
-            data: { guildId, name: "Trade License (Plumbing)", type: "TRADE", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 500, intelligenceBoost: 1, incomeMulti: 0.2, minIntelligence: 2, requiredDegreeId: hs!.id }
-        });
-    }
+        return prisma.degree.create({ data: { guildId, ...payload } });
+    };
 
-    // 3. Bachelors (CS)
-    let bsCS = await prisma.degree.findFirst({ where: { guildId, name: "BS Computer Science" } });
-    if (bsCS) {
-        bsCS = await prisma.degree.update({
-            where: { id: bsCS.id },
-            data: { passGpa: 6.0, intelligenceBoost: 2, minIntelligence: 5, totalSemesters: 1 }
-        });
-    } else {
-        bsCS = await prisma.degree.create({
-            data: { guildId, name: "BS Computer Science", type: "BACHELORS", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 5000, intelligenceBoost: 2, incomeMulti: 0.5, minIntelligence: 5, requiredDegreeId: hs!.id }
-        });
-    }
+    const hs = await upsertDegree("High School Diploma", {
+        type: "HS",
+        tuitionPerSem: DEGREE_PRICES.highSchoolDiploma,
+        minIntelligence: 0,
+        intelligenceBoost: 1,
+        incomeMulti: 0.1
+    });
 
-    // Bachelors (Arts)
-    let baArts = await prisma.degree.findFirst({ where: { guildId, name: "BA Fine Arts" } });
-    if (baArts) {
-        await prisma.degree.update({
-            where: { id: baArts.id },
-            data: { passGpa: 6.0, intelligenceBoost: 1, minIntelligence: 4, totalSemesters: 1 }
-        });
-    } else {
-        await prisma.degree.create({
-            data: { guildId, name: "BA Fine Arts", type: "BACHELORS", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 4000, intelligenceBoost: 1, incomeMulti: 0.3, minIntelligence: 4, requiredDegreeId: hs!.id }
-        });
-    }
+    await upsertDegree("Trade License (Plumbing)", {
+        type: "TRADE",
+        tuitionPerSem: DEGREE_PRICES.tradeLicense,
+        minIntelligence: 2,
+        intelligenceBoost: 1,
+        incomeMulti: 0.2,
+        requiredDegreeId: hs.id
+    }, ["Trade License"]);
 
-    // 5. MBBS (New)
-    let mbbs = await prisma.degree.findFirst({ where: { guildId, name: "MBBS" } });
-    if (mbbs) {
-        mbbs = await prisma.degree.update({
-            where: { id: mbbs.id },
-            data: { passGpa: 6.0, intelligenceBoost: 3, minIntelligence: 6, incomeMulti: 1.5, totalSemesters: 1 }
-        });
-    } else {
-        mbbs = await prisma.degree.create({
-            data: { guildId, name: "MBBS", type: "MBBS", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 8000, intelligenceBoost: 3, incomeMulti: 1.5, minIntelligence: 6, requiredDegreeId: hs!.id }
-        });
-    }
+    await upsertDegree("BA Fine Arts", {
+        type: "BACHELORS",
+        tuitionPerSem: DEGREE_PRICES.baFineArts,
+        minIntelligence: 4,
+        intelligenceBoost: 2,
+        incomeMulti: 0.5,
+        requiredDegreeId: hs.id
+    }, ["Bachelor of Business / Finance"]);
 
-    // 6. Med School (MD)
-    const md = await prisma.degree.findFirst({ where: { guildId, name: "Doctor of Medicine (MD)" } });
-    if (md) {
-        await prisma.degree.update({
-            where: { id: md.id },
-            data: { passGpa: 6.0, intelligenceBoost: 5, minIntelligence: 8, requiredDegreeId: mbbs.id, totalSemesters: 1 }
-        });
-    } else {
-        await prisma.degree.create({
-            data: { guildId, name: "Doctor of Medicine (MD)", type: "MD", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 15000, intelligenceBoost: 5, incomeMulti: 2.5, minIntelligence: 8, requiredDegreeId: mbbs.id }
-        });
-    }
+    await upsertDegree("BS Computer Science", {
+        type: "BACHELORS",
+        tuitionPerSem: DEGREE_PRICES.bsComputerScience,
+        minIntelligence: 5,
+        intelligenceBoost: 2,
+        incomeMulti: 0.5,
+        requiredDegreeId: hs.id
+    });
 
-    // 7. Law (LLB)
-    let llb = await prisma.degree.findFirst({ where: { guildId, name: "Bachelor of Laws (LLB)" } });
-    if (llb) {
-        llb = await prisma.degree.update({
-            where: { id: llb.id },
-            data: { passGpa: 6.0, intelligenceBoost: 3, minIntelligence: 6, incomeMulti: 1.5, totalSemesters: 1 }
-        });
-    } else {
-        llb = await prisma.degree.create({
-            data: { guildId, name: "Bachelor of Laws (LLB)", type: "LLB", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 8000, intelligenceBoost: 3, incomeMulti: 1.5, minIntelligence: 6, requiredDegreeId: hs!.id }
-        });
-    }
+    const llb = await upsertDegree("Bachelor of Laws (LLB)", {
+        type: "LLB",
+        tuitionPerSem: DEGREE_PRICES.llb,
+        minIntelligence: 6,
+        intelligenceBoost: 3,
+        incomeMulti: 1.2,
+        requiredDegreeId: hs.id
+    }, ["LLB"]);
 
-    // 8. Law (LLM)
-    const llm = await prisma.degree.findFirst({ where: { guildId, name: "Master of Laws (LLM)" } });
-    if (llm) {
-        await prisma.degree.update({
-            where: { id: llm.id },
-            data: { passGpa: 6.0, intelligenceBoost: 5, minIntelligence: 8, requiredDegreeId: llb.id, totalSemesters: 1 }
-        });
-    } else {
-        await prisma.degree.create({
-            data: { guildId, name: "Master of Laws (LLM)", type: "LLM", totalSemesters: 1, passGpa: 6.0, tuitionPerSem: 15000, intelligenceBoost: 5, incomeMulti: 2.5, minIntelligence: 8, requiredDegreeId: llb.id }
-        });
-    }
+    const mbbs = await upsertDegree("MBBS", {
+        type: "MBBS",
+        tuitionPerSem: DEGREE_PRICES.mbbs,
+        minIntelligence: 6,
+        intelligenceBoost: 3,
+        incomeMulti: 1.5,
+        requiredDegreeId: hs.id
+    });
+
+    await upsertDegree("Master of Laws (LLM)", {
+        type: "LLM",
+        tuitionPerSem: DEGREE_PRICES.llm,
+        minIntelligence: 8,
+        intelligenceBoost: 5,
+        incomeMulti: 2.0,
+        requiredDegreeId: llb.id
+    }, ["LLM"]);
+
+    await upsertDegree("Doctor of Medicine (MD) / Ph.D.", {
+        type: "PHD",
+        tuitionPerSem: DEGREE_PRICES.mdPhd,
+        minIntelligence: 8,
+        intelligenceBoost: 5,
+        incomeMulti: 2.5,
+        requiredDegreeId: mbbs.id
+    }, ["MD / PhD", "Doctor of Medicine (MD)"]);
 }
 
 export async function getDegrees(guildId: string) {
@@ -120,12 +120,12 @@ export async function getDegrees(guildId: string) {
     return prisma.degree.findMany({ where: { guildId }, include: { requiredDegree: true }, orderBy: { minIntelligence: 'asc' } });
 }
 
-export async function enroll(userId: string, guildId: string, degreeId: string) {
+export async function enroll(userId: string, guildId: string, degreeId: string, paymentMethod: "wallet" | "card" = "wallet") {
     const degree = await prisma.degree.findUnique({ where: { id: degreeId } });
     if (!degree) throw new Error("Degree not found.");
 
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
+        where: { discordId: userId },
         include: { wallet: true, currentEducation: true, degrees: true }
     });
     if (!user) throw new Error("User not found.");
@@ -148,20 +148,27 @@ export async function enroll(userId: string, guildId: string, degreeId: string) 
         if (!hasPrereq) throw new Error("Missing prerequisite degree.");
     }
 
-    // Pay Tuition (First Sem)
-    if (user.wallet!.balance < degree.tuitionPerSem) {
+    if (paymentMethod === "wallet" && (!user.wallet || user.wallet.balance < degree.tuitionPerSem)) {
         throw new Error(`Insufficient funds for Degree Fee (${degree.tuitionPerSem}).`);
     }
 
     const result = await prisma.$transaction(async (tx) => {
-        await tx.wallet.update({
-            where: { id: user.wallet!.id },
-            data: { balance: { decrement: degree.tuitionPerSem } }
-        });
+        if (paymentMethod === "card") {
+            await chargeCardPurchaseTx(tx, user.discordId, Math.floor(degree.tuitionPerSem), {
+                kind: "degree_tuition",
+                degreeId: degree.id,
+                degreeName: degree.name
+            });
+        } else {
+            await tx.wallet.update({
+                where: { id: user.wallet!.id },
+                data: { balance: { decrement: degree.tuitionPerSem } }
+            });
+        }
 
         return tx.userEducation.create({
             data: {
-                userId: user.id,
+                userId: user.discordId,
                 degreeId: degree.id,
                 currentSemester: 1,
                 currentGpa: 0.0, // Start fresh (0-10 scale)
@@ -177,7 +184,7 @@ export async function enroll(userId: string, guildId: string, degreeId: string) 
 
 export async function study(userId: string, guildId: string, bonusGpa: number = 0) {
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
+        where: { discordId: userId },
         include: { currentEducation: { include: { degree: true } } }
     });
 
@@ -191,7 +198,7 @@ export async function study(userId: string, guildId: string, bonusGpa: number = 
 
     // Check for Textbooks in Inventory
     const inventory = await prisma.inventory.findMany({
-        where: { userId: user.id, guildId, shopItem: { itemType: "UNI_BOOK" } },
+        where: { userId: user.discordId, shopItem: { itemType: "UNI_BOOK" } },
         include: { shopItem: true }
     });
 
@@ -295,7 +302,7 @@ export async function study(userId: string, guildId: string, bonusGpa: number = 
 
 export async function takeExam(userId: string, guildId: string): Promise<{ success: boolean; msg: string; finalGpa?: number }> {
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
+        where: { discordId: userId },
         include: { currentEducation: { include: { degree: true } } }
     });
 
@@ -310,7 +317,7 @@ export async function takeExam(userId: string, guildId: string): Promise<{ succe
     await prisma.activeEffect.deleteMany({ where: { expiresAt: { lt: new Date() } } });
 
     const boostEffect = await prisma.activeEffect.findFirst({
-        where: { userId: user.id, guildId, effectType: "EXAM_BOOST" }
+        where: { userId: user.discordId, effectType: "EXAM_BOOST" }
     });
 
     const boost = boostEffect ? boostEffect.value : 0;
@@ -334,9 +341,9 @@ export async function takeExam(userId: string, guildId: string): Promise<{ succe
     await prisma.$transaction([
         prisma.userEducation.delete({ where: { id: edu.id } }),
         prisma.userDegree.upsert({
-            where: { userId_degreeId: { userId: user.id, degreeId: deg.id } },
+            where: { userId_degreeId: { userId: user.discordId, degreeId: deg.id } },
             create: {
-                userId: user.id,
+                userId: user.discordId,
                 degreeId: deg.id,
                 finalGpa: edu.currentGpa
             },
@@ -356,7 +363,7 @@ export async function takeExam(userId: string, guildId: string): Promise<{ succe
 
 export async function claimScholarship(userId: string, guildId: string, milestone: number) {
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
+        where: { discordId: userId },
         include: { currentEducation: { include: { degree: true } }, wallet: true }
     });
 
@@ -389,7 +396,7 @@ export async function claimScholarship(userId: string, guildId: string, mileston
 
 export async function dropout(userId: string, guildId: string) {
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
+        where: { discordId: userId },
         include: { currentEducation: { include: { degree: true } } }
     });
 
@@ -409,59 +416,32 @@ export async function dropout(userId: string, guildId: string) {
 
 export async function reduceStress(userId: string, guildId: string, activity: "sports" | "gym" | "meditation") {
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
-        include: { currentEducation: { include: { degree: true } }, wallet: true }
+        where: { discordId: userId },
+        include: { currentEducation: true }
     });
 
     if (!user || !user.currentEducation) throw new Error("You are not enrolled.");
 
-    const edu = user.currentEducation;
-    const config = await getGuildConfig(guildId);
-
-    // Education Stress Reduction costs (Configurable)
-    let cost = 50;
-    if (activity === "sports") cost = config.eduSportsCost ?? 75;
-    if (activity === "gym") cost = config.eduGymCost ?? 50;
-    if (activity === "meditation") cost = config.eduMeditationCost ?? 25;
-
-    if (user.wallet!.balance < cost) {
-        throw new Error(`You need **${cost}** coins to go to the ${activity}.`);
-    }
-
-    let reduction = 0;
-    switch (activity) {
-        case "sports": reduction = 25; break;
-        case "gym": reduction = 20; break;
-        case "meditation": reduction = 15; break;
-    }
-
-    const newStress = Math.max(0, edu.stress - reduction);
-
-    const result = await prisma.$transaction([
-        prisma.wallet.update({
-            where: { id: user.wallet!.id },
-            data: { balance: { decrement: cost } }
-        }),
-        prisma.userEducation.update({
-            where: { id: edu.id },
-            data: { stress: newStress }
-        })
-    ]);
+    const optionByLegacyActivity = {
+        sports: "quick_break",
+        gym: "gym_session",
+        meditation: "meditation_retreat",
+    } as const;
+    const result = await applyRelaxOption(userId, user.username, optionByLegacyActivity[activity]);
 
     await invalidateUserCache(userId, guildId);
 
     return {
-        newStress,
-        cost,
-        msg: `**${activity.charAt(0).toUpperCase() + activity.slice(1)}** relieved your stress! Stress: **${edu.stress}** -> **${newStress}** (-${reduction}). Paid **${cost}**.`
+        newStress: result.educationStress ?? 0,
+        cost: result.cost,
+        msg: `**${result.option.name}** relieved your stress! Education Stress: **${result.previousEducationStress}** -> **${result.educationStress}**. Paid **${result.cost}**.`
     };
 }
 
 export async function getStressCost(userId: string, guildId: string, activity: "sports" | "gym" | "meditation" = "gym") {
-    const config = await getGuildConfig(guildId);
-    if (activity === "sports") return config.eduSportsCost ?? 75;
-    if (activity === "gym") return config.eduGymCost ?? 50;
-    if (activity === "meditation") return config.eduMeditationCost ?? 25;
+    if (activity === "sports") return RELAX_OPTIONS.quick_break.cost;
+    if (activity === "gym") return RELAX_OPTIONS.gym_session.cost;
+    if (activity === "meditation") return RELAX_OPTIONS.meditation_retreat.cost;
 
-    return 0;
+    return RELAX_OPTIONS.gym_session.cost;
 }

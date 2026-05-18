@@ -2,13 +2,13 @@
 import { Message, EmbedBuilder } from "discord.js";
 import { PropertyService } from "../../services/propertyService";
 import { Mascot } from "../../config/branding";
+import { DEVELOPER_ONLY_COMMAND_MESSAGE, isBotDeveloper } from "../../utils/developerAccess";
 
 export const managePropertyHandler = async (message: Message, args: string[]) => {
-    // Check for admin permissions
-    if (!message.member?.permissions.has("Administrator")) {
+    if (!isBotDeveloper(message.author.id)) {
         const errorEmbed = new EmbedBuilder()
             .setTitle(`${Mascot.Emotes.Fail} Access Denied`)
-            .setDescription("You need Administrator permissions to use this command.")
+            .setDescription(DEVELOPER_ONLY_COMMAND_MESSAGE)
             .setColor("#FF0000"); // Red
         return message.reply({ embeds: [errorEmbed] });
     }

@@ -6,6 +6,7 @@ import { getGuildConfig } from "../../services/guildConfigService";
 import { calculateTotalStats, calculateCombatScore, getWinChance } from "../../utils/gameUtils";
 import { GameConfig } from "../../config/gameConfig";
 import { Mascot } from "../../config/branding";
+import { ensureUserAndWallet } from "../../services/walletService";
 
 const EMOJI_CHICKEN = GameConfig.Emojis.Chicken;
 const EMOJI_XP = GameConfig.Emojis.XpFull;
@@ -125,11 +126,11 @@ async function handleName(message: Message, args: string[]) {
 
     if (!shopItem) return message.reply("Chicken item not configured in shop.");
 
-    const userDb = await prisma.user.findFirst({ where: { discordId: user.id, guildId } });
+    const userDb = await prisma.user.findUnique({ where: { discordId: user.id } });
     if (!userDb) return message.reply("User not found.");
 
     const inventoryItem = await prisma.inventory.findUnique({
-        where: { userId_shopItemId: { userId: userDb.id, shopItemId: shopItem.id } }
+        where: { userId_shopItemId: { userId: userDb.discordId, shopItemId: shopItem.id } }
     });
 
     if (!inventoryItem || inventoryItem.amount < 1) {
@@ -186,9 +187,7 @@ async function handleView(message: Message, args: string[]) {
 
     try {
         const config = await getGuildConfig(guildId);
-        const userData = await prisma.user.findUnique({
-            where: { discordId_guildId: { discordId: user.id, guildId } }
-        });
+        const userData = await prisma.user.findUnique({ where: { discordId: user.id } });
 
         if (!userData) {
             return message.reply({ embeds: [errorEmbed(user, "Error", "User not found.")] });
@@ -203,7 +202,7 @@ async function handleView(message: Message, args: string[]) {
         }
 
         const inventoryItem = await prisma.inventory.findUnique({
-            where: { userId_shopItemId: { userId: userData.id, shopItemId: shopItem.id } }
+            where: { userId_shopItemId: { userId: userData.discordId, shopItemId: shopItem.id } }
         });
 
         if (!inventoryItem) {
@@ -326,7 +325,7 @@ async function handleView(message: Message, args: string[]) {
                     if (i.customId === "train_speedup") {
                         try {
                             await prisma.$transaction(async (tx) => {
-                                const u = await tx.user.findUnique({ where: { id: userData.id }, include: { wallet: true } });
+                                const u = await tx.user.findUnique({ where: { discordId: userData.discordId }, include: { wallet: true } });
                                 if (!u || (u.wallet?.balance || 0) < speedUpCost) {
                                     throw new Error("Insufficient funds");
                                 }
@@ -412,7 +411,7 @@ async function handleView(message: Message, args: string[]) {
                     if (i.customId === "chicken_heal") {
                         try {
                             await prisma.$transaction(async (tx) => {
-                                const u = await tx.user.findUnique({ where: { id: userData.id }, include: { wallet: true } });
+                                const u = await tx.user.findUnique({ where: { discordId: userData.discordId }, include: { wallet: true } });
                                 if (!u || (u.wallet?.balance || 0) < healCost) {
                                     throw new Error("Insufficient funds");
                                 }
@@ -631,7 +630,7 @@ async function handleTrain(message: Message, args: string[]) {
             // Re-check funds transactionally
             try {
                 await prisma.$transaction(async (tx) => {
-                    const u = await tx.user.findUnique({ where: { id: inv.userId }, include: { wallet: true } });
+                    const u = await tx.user.findUnique({ where: { discordId: inv.userId }, include: { wallet: true } });
                     if (!u || !u.wallet || u.wallet.balance < cost) {
                         throw new Error("Insufficient funds.");
                     }
@@ -715,9 +714,6 @@ async function handleTrain(message: Message, args: string[]) {
 }
 
 async function getUserId(discordId: string, guildId: string): Promise<string> {
-    let user = await prisma.user.findUnique({ where: { discordId_guildId: { discordId, guildId } } });
-    if (!user) { // Should exist if they have a chicken, but safe check
-        user = await prisma.user.create({ data: { discordId, guildId, username: "Unknown", wallet: { create: {} }, bank: { create: {} } } });
-    }
-    return user.id;
+    const user = await ensureUserAndWallet(discordId, guildId, "Unknown");
+    return user.discordId;
 }

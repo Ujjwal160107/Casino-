@@ -1,54 +1,38 @@
 import prisma from "../utils/prisma";
-import { getGuildConfig } from "./guildConfigService";
+import { MAX_SAFE_BALANCE, STARTING_WALLET_BALANCE } from "../utils/economyConfig";
 
-const userIdCache = new Map<string, string>();
-
-export async function ensureUserAndWallet(discordId: string, guildId: string, username: string) {
-  const cacheKey = `${discordId}-${guildId}`;
-
-  // Always try to find existing user first to avoid unnecessary write locks (upsert)
+export async function ensureUserAndWallet(discordId: string, _guildId: string, username: string) {
   let user = await prisma.user.findUnique({
-    where: { discordId_guildId: { discordId, guildId } },
+    where: { discordId },
     include: { wallet: true }
   });
 
   if (user) {
-    // If user exists but has no wallet (shouldn't happen often), create it
     if (!user.wallet) {
-      const config = await getGuildConfig(guildId);
       user = await prisma.user.update({
-        where: { id: user.id },
+        where: { discordId },
         data: {
-          wallet: { create: { balance: config.startMoney } }
+          wallet: { create: { balance: STARTING_WALLET_BALANCE } }
         },
         include: { wallet: true }
       });
     }
-    userIdCache.set(cacheKey, user.id);
     return user;
   }
 
-  // Only reach here if user really doesn't exist
-  const config = await getGuildConfig(guildId);
-
-  user = await prisma.user.upsert({
-    where: { discordId_guildId: { discordId, guildId } },
-    update: { username },
-    create: {
+  return prisma.user.create({
+    data: {
       discordId,
-      guildId,
       username,
-      wallet: { create: { balance: config.startMoney } }
+      wallet: { create: { balance: STARTING_WALLET_BALANCE } }
     },
     include: { wallet: true }
   });
-  userIdCache.set(cacheKey, user.id);
-  return user;
 }
 
-export async function getWalletByDiscord(discordId: string, guildId: string) {
+export async function getWalletByDiscord(discordId: string, _guildId: string) {
   const user = await prisma.user.findUnique({
-    where: { discordId_guildId: { discordId, guildId } },
+    where: { discordId },
     include: { wallet: true }
   });
   return user?.wallet ?? null;
@@ -60,12 +44,9 @@ export async function getWalletById(walletId: string) {
 
 export async function depositToWallet(walletId: string, amount: number, meta: any = {}, earned = false, guildId?: string) {
   if (guildId) {
-    const config = await getGuildConfig(guildId);
-    if (config.walletLimit) {
-      const wallet = await prisma.wallet.findUnique({ where: { id: walletId } });
-      if (wallet && wallet.balance + amount > config.walletLimit) {
-        throw new Error(`Wallet limit of ${config.walletLimit} reached.`);
-      }
+    const wallet = await prisma.wallet.findUnique({ where: { id: walletId } });
+    if (wallet && wallet.balance + amount > MAX_SAFE_BALANCE) {
+      throw new Error(`Wallet limit of ${MAX_SAFE_BALANCE} reached.`);
     }
   }
   await prisma.$transaction([
@@ -100,7 +81,7 @@ export async function transferMoney(fromDiscordId: string, toDiscordId: string, 
   if (fromDiscordId === toDiscordId) throw new Error("Cannot transfer to self.");
 
   const fromUser = await prisma.user.findUnique({
-    where: { discordId_guildId: { discordId: fromDiscordId, guildId } },
+    where: { discordId: fromDiscordId },
     include: { wallet: true }
   });
 
@@ -109,11 +90,8 @@ export async function transferMoney(fromDiscordId: string, toDiscordId: string, 
 
   const toUser = await ensureUserAndWallet(toDiscordId, guildId, "UnknownUser");
 
-  const config = await getGuildConfig(guildId);
-  if (config.walletLimit) {
-    if (toUser.wallet!.balance + amount > config.walletLimit) {
-      throw new Error(`Recipient's wallet is full (Max: ${config.walletLimit}).`);
-    }
+  if (toUser.wallet!.balance + amount > MAX_SAFE_BALANCE) {
+    throw new Error(`Recipient's wallet is full (Max: ${MAX_SAFE_BALANCE}).`);
   }
 
   await prisma.$transaction([
@@ -122,4 +100,112 @@ export async function transferMoney(fromDiscordId: string, toDiscordId: string, 
     prisma.wallet.update({ where: { id: toUser.wallet!.id }, data: { balance: { increment: amount } } }),
     prisma.transaction.create({ data: { walletId: toUser.wallet!.id, amount: amount, type: "transfer_recv", meta: { from: fromDiscordId } } })
   ]);
+}
+
+export async function addBalance(discordId: string, username: string, amount: number, type = "income", meta: any = {}, earned = true) {
+  if (amount <= 0) throw new Error("Amount must be positive.");
+
+  return prisma.$transaction(async (tx) => {
+    let user = await tx.user.findUnique({
+      where: { discordId },
+      include: { wallet: true }
+    });
+
+    if (!user) {
+      user = await tx.user.create({
+        data: {
+          discordId,
+          username,
+          wallet: { create: { balance: 0 } }
+        },
+        include: { wallet: true }
+      });
+    }
+
+    if (!user.wallet) {
+      user = await tx.user.update({
+        where: { discordId },
+        data: { wallet: { create: { balance: 0 } } },
+        include: { wallet: true }
+      });
+    }
+
+    const availableSpace = Math.max(0, MAX_SAFE_BALANCE - user.wallet!.balance);
+    const appliedAmount = Math.min(amount, availableSpace);
+    const capped = appliedAmount < amount;
+
+    if (appliedAmount > 0) {
+      await tx.wallet.update({
+        where: { id: user.wallet!.id },
+        data: { balance: { increment: appliedAmount } }
+      });
+
+      await tx.transaction.create({
+        data: {
+          walletId: user.wallet!.id,
+          amount: appliedAmount,
+          type,
+          meta: { ...meta, requestedAmount: amount, capped },
+          isEarned: earned
+        }
+      });
+    }
+
+    return {
+      walletId: user.wallet!.id,
+      previousBalance: user.wallet!.balance,
+      newBalance: user.wallet!.balance + appliedAmount,
+      requestedAmount: amount,
+      appliedAmount,
+      capped
+    };
+  });
+}
+
+export async function removeBalance(discordId: string, amount: number, type = "remove", meta: any = {}) {
+  if (amount <= 0) throw new Error("Amount must be positive.");
+
+  return prisma.$transaction(async (tx) => {
+    const user = await tx.user.findUnique({
+      where: { discordId },
+      include: { wallet: true }
+    });
+
+    if (!user || !user.wallet) {
+      return {
+        walletId: null,
+        previousBalance: 0,
+        newBalance: 0,
+        requestedAmount: amount,
+        removedAmount: 0
+      };
+    }
+
+    const removedAmount = Math.min(amount, user.wallet.balance);
+
+    if (removedAmount > 0) {
+      await tx.wallet.update({
+        where: { id: user.wallet.id },
+        data: { balance: { decrement: removedAmount } }
+      });
+
+      await tx.transaction.create({
+        data: {
+          walletId: user.wallet.id,
+          amount: -removedAmount,
+          type,
+          meta: { ...meta, requestedAmount: amount },
+          isEarned: false
+        }
+      });
+    }
+
+    return {
+      walletId: user.wallet.id,
+      previousBalance: user.wallet.balance,
+      newBalance: user.wallet.balance - removedAmount,
+      requestedAmount: amount,
+      removedAmount
+    };
+  });
 }

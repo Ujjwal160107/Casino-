@@ -11,7 +11,7 @@ import {
 } from "discord.js";
 import path from "path";
 import { ensureUserAndWallet } from "../../services/walletService";
-import { placeBetWithTransaction, placeBetFallback } from "../../services/gameService";
+import { placeBetWithTransaction } from "../../services/gameService";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { successEmbed, errorEmbed } from "../../utils/embed";
@@ -21,6 +21,7 @@ import { emojiInline } from "../../utils/emojiRegistry";
 import { Mascot } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { updateQuestProgress } from "../../services/questService";
+import { checkLuckyCoin } from "../../services/shopBuffs";
 
 export async function handleRouletteMenu(message: Message) {
   const config = await getGuildConfig(message.guildId!);
@@ -56,10 +57,13 @@ export async function handleRouletteMenu(message: Message) {
   const sent = await message.reply({ embeds: [embed], components: [row], files: [attachment] });
   const collector = sent.createMessageComponentCollector({
     componentType: ComponentType.Button,
-    time: 60_000,
-    filter: (i) => i.user.id === message.author.id
+    time: 60_000
   });
   collector.on("collect", async (i: ButtonInteraction) => {
+    if (i.user.id !== message.author.id) {
+      await i.reply({ content: "This game isn't yours.", ephemeral: true });
+      return;
+    }
     if (i.customId === "roul_guide") {
       const bannerPath = path.join(process.cwd(), "src", "assets", "roulette_guide.png");
       const guideAttachment = new AttachmentBuilder(bannerPath, { name: "roulette_guide.png" });
@@ -135,6 +139,8 @@ export async function handleBet(message: Message, args: string[]) {
     return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You don't have enough money in your wallet.")] });
   }
 
+  const luckyCoinMult = await checkLuckyCoin(message.author.id);
+
   // SPIN ANIMATION
   const spinTime = config.rouletteSpinTime || 3;
   const eCasino = "<a:casino:1445732641545654383>";
@@ -200,16 +206,18 @@ export async function handleBet(message: Message, args: string[]) {
       return message.reply({ embeds: [errorEmbed(message.author, "Invalid Choice", "Bet on `red`, `black`, `odd`, `even`, `1-12`, `13-24`, `25-36`, `1st`, `2nd`, `3rd`, `1-18`, `19-36`, or a number `0-36`.")] });
     }
   }
-  let payout = didWin ? Math.floor(amount * multiplier) : 0;
-  let actualPayout = payout;
-  try {
-    actualPayout = await placeBetWithTransaction(user.id, user.wallet!.id, "roulette_v1", amount, choiceRaw, didWin, payout, message.guildId!);
-  } catch (e) {
-    actualPayout = await placeBetFallback(user.wallet!.id, user.id, "roulette_v1", amount, choiceRaw, didWin, payout, message.guildId!);
-  }
-  payout = actualPayout;
-  await updateQuestProgress(user.id, "GAMBLE").catch(console.error);
-  if (didWin) await updateQuestProgress(user.id, "WIN_ROULETTE").catch(console.error);
+  let payout = await placeBetWithTransaction(
+    user.discordId,
+    user.wallet!.id,
+    "roulette",
+    amount,
+    choiceRaw,
+    didWin,
+    didWin ? Math.floor(amount * multiplier * luckyCoinMult) : 0,
+    message.guildId!
+  );
+  await updateQuestProgress(user.discordId, "GAMBLE").catch(console.error);
+  if (didWin) await updateQuestProgress(user.discordId, "WIN_ROULETTE").catch(console.error);
 
   // Cleanup spinning message
   await spinMsg.delete().catch(() => { });

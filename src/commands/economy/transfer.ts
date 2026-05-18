@@ -27,16 +27,21 @@ export async function handleTransfer(message: Message, args: string[]) {
       return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please enter a valid positive number for the amount.")] });
     }
     try {
-      await transferAnyFunds(sender.wallet!.id, toId, amount, message.author.id, message.guildId ?? undefined);
+      const taxResult = await transferAnyFunds(sender.wallet!.id, toId, amount, message.author.id, message.guildId ?? undefined);
 
       await logToChannel(message.client, {
         guild: message.guild!,
         type: "ECONOMY",
         title: "Transfer",
-        description: `**From:** <@${sender.discordId}>\n**To:** <@${toId}>\n**Amount:** ${fmtCurrency(amount, config.currencyEmoji)}`,
+        description: `**From:** <@${sender.discordId}>\n**To:** <@${toId}>\n**Amount:** ${fmtCurrency(amount, config.currencyEmoji)}\n**Tax:** ${taxResult.shielded ? "🛡️ Shielded" : fmtCurrency(taxResult.taxPaid, config.currencyEmoji)}\n**Received:** ${fmtCurrency(taxResult.net, config.currencyEmoji)}`,
         color: 0x00FFFF
       });
-      return message.reply({ embeds: [successEmbed(message.author, "Transfer Successful", `Transferred **${fmtAmount(amount)}** to <@${toId}>.`)] });
+
+      const taxLine = taxResult.shielded
+        ? "Tax: 🛡️ Shielded"
+        : `Transfer Tax (5%): -${fmtCurrency(taxResult.taxPaid)} | Recipient receives: ${fmtCurrency(taxResult.net)}`;
+
+      return message.reply({ embeds: [successEmbed(message.author, "Transfer Successful", `Sent **${fmtAmount(amount)}** to <@${toId}>.\n${taxLine}`)] });
     } catch (err) {
       return message.reply({ embeds: [errorEmbed(message.author, "Transfer Failed", (err as Error).message)] });
     }

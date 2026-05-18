@@ -10,9 +10,10 @@ import { PropertyService } from "../services/propertyService";
 import {
     buildPropertiesMarketContainer,
     buildPropertiesNavigationRow,
+    buildPropertyBuyRow,
     getPropertiesTotalPages,
-    propertyBannerAttachment,
 } from "../commands/economy/properties";
+import { AttachmentBuilder } from "discord.js";
 
 const EPHEMERAL_COMPONENTS_V2_FLAGS = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
 
@@ -41,36 +42,44 @@ async function handleButton(interaction: ButtonInteraction) {
 
     try {
         if (customId.startsWith("property_page_")) {
+            await interaction.deferUpdate();
             const customIdParts = customId.split("_");
             const page = parseInt(customIdParts[customIdParts.length - 1] || "1", 10) || 1;
             const config = await getGuildConfig(guildId);
             const properties = await PropertyService.getAllProperties(guildId);
+            const totalPages = getPropertiesTotalPages(properties);
+            const files: AttachmentBuilder[] = [];
             const container = buildPropertiesMarketContainer(properties, {
                 currencyEmoji: config.currencyEmoji || Mascot.Emotes.Blackcoin,
                 prefix: config.prefix || "!",
                 page,
-            });
-            const navigationRow = buildPropertiesNavigationRow(getPropertiesTotalPages(properties), page);
+            }, files);
+            const buyRow = buildPropertyBuyRow(properties, page);
+            const navigationRow = buildPropertiesNavigationRow(totalPages, page);
+            const components: any[] = [container];
+            if (properties.length > 0) components.push(buyRow);
+            if (totalPages > 1) components.push(navigationRow);
 
-            await interaction.update({
-                components: [container, navigationRow],
-                files: properties.length > 0 ? [propertyBannerAttachment()] : [],
+            await interaction.editReply({
+                components,
+                files,
                 flags: MessageFlags.IsComponentsV2,
             });
         }
         else if (customId === "cancel_property_buy") {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
             const container = simplePropertyContainer(
                 "Property Purchase Cancelled",
                 "No property purchase was made.",
                 0x9B59B6,
             );
-
-            await interaction.reply({
+            await interaction.editReply({
                 components: [container],
-                flags: EPHEMERAL_COMPONENTS_V2_FLAGS,
+                flags: MessageFlags.IsComponentsV2,
             });
         }
         else if (customId.startsWith("buy_property_")) {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
             const key = customId.replace("buy_property_", "").toLowerCase();
             const result = await PropertyService.buyProperty(user.id, guildId, key);
             const container = simplePropertyContainer(
@@ -78,10 +87,9 @@ async function handleButton(interaction: ButtonInteraction) {
                 result.message,
                 result.success ? 0x2ECC71 : 0xE74C3C,
             );
-
-            await interaction.reply({
+            await interaction.editReply({
                 components: [container],
-                flags: EPHEMERAL_COMPONENTS_V2_FLAGS,
+                flags: MessageFlags.IsComponentsV2,
             });
         }
         else if (customId === "market_home") {
@@ -254,35 +262,17 @@ async function handleButton(interaction: ButtonInteraction) {
         }
 
     } catch (err: any) {
-        if (
-            customId.startsWith("buy_property_")
-            || customId.startsWith("property_page_")
-            || customId === "cancel_property_buy"
-        ) {
-            const container = simplePropertyContainer(
-                "Property Error",
-                `Error: ${err.message}`,
-                0xE74C3C,
-            );
-
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({
-                    components: [container],
-                    flags: EPHEMERAL_COMPONENTS_V2_FLAGS,
-                });
-            } else {
-                await interaction.followUp({
-                    components: [container],
-                    flags: EPHEMERAL_COMPONENTS_V2_FLAGS,
-                });
-            }
-            return;
-        }
-
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: `${Mascot.Emotes.Fail} Error: ${err.message}`, ephemeral: true });
+        const errContainer = simplePropertyContainer("Error", `${err.message}`, 0xE74C3C);
+        if (interaction.deferred || interaction.replied) {
+            await interaction.followUp({
+                components: [errContainer],
+                flags: EPHEMERAL_COMPONENTS_V2_FLAGS,
+            }).catch(() => {});
         } else {
-            await interaction.followUp({ content: `${Mascot.Emotes.Fail} Error: ${err.message}`, ephemeral: true });
+            await interaction.reply({
+                components: [errContainer],
+                flags: EPHEMERAL_COMPONENTS_V2_FLAGS,
+            }).catch(() => {});
         }
     }
 }

@@ -15,15 +15,12 @@ datasource db {
 // Models adapted for MongoDB (ObjectId fields).
 
 model User {
-  id          String @id @default(auto()) @map("_id") @db.ObjectId
-  discordId   String
-  guildId     String
-  
-  @@unique([discordId, guildId]) // User is unique per Guild
+  discordId   String @id @map("_id")
   username    String
 
   wallet      Wallet?
   bank        Bank?
+  creditCard  CreditCard?
 
   creditScore Int @default(500)
   
@@ -58,7 +55,6 @@ model User {
 
   loans       Loan[]
   isLoanBanned Boolean @default(false)
-  isCasinoAdmin Boolean @default(false)
   investments Investment[]
   listings    MarketListing[]
   activeEffects ActiveEffect[]
@@ -83,7 +79,6 @@ model User {
   shiftsWorked Int      @default(0)
 
   lastShift   DateTime?
-  lastChatMoney DateTime?
 
   // Life Sim Relations
   workLogs    WorkLog[]
@@ -101,25 +96,90 @@ model User {
   // Jail System
   isJailed        Boolean  @default(false)
   jailReleaseTime DateTime?
+
+  // Hunt / Zoo System
+  lastZooClaim    DateTime?
+  caughtAnimals   CaughtAnimal[]
 }
 
 model WorkLog {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  guildId   String
-  userId    String   @db.ObjectId
-  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [discordId])
   jobId     String
   shiftType String   // e.g., "button", "typing"
   success   Boolean
-  earnings  Int
+  earnings  Float
   createdAt DateTime @default(now())
+}
+
+model CreditCard {
+  id                    String   @id @default(auto()) @map("_id") @db.ObjectId
+  user                  User     @relation(fields: [userId], references: [discordId])
+  userId                String   @unique
+  tier                  String
+  status                String   @default("ACTIVE")
+  creditLimit           Int
+  currentBalance        Int      @default(0)
+  statementBalance      Int      @default(0)
+  minimumDue            Int      @default(0)
+  weeklyInterestPct     Int
+  weeklySpendCap        Int
+  weeklyWithdrawCap     Int
+  spentThisCycle        Int      @default(0)
+  withdrawnThisCycle    Int      @default(0)
+  paidThisCycle         Int      @default(0)
+  dueSatisfiedThisCycle Boolean  @default(false)
+  missStreak            Int      @default(0)
+  lastStatementAt       DateTime?
+  nextStatementAt       DateTime?
+  dueAt                 DateTime?
+  currentCycleKey       String?
+  lastPaymentAt         DateTime?
+  lastPaymentAmount     Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  transactions          CardTransaction[]
+  statements            CardStatement[]
+}
+
+model CardTransaction {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  card      CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  cardId    String     @db.ObjectId
+  type      String
+  amount    Int
+  cycleKey  String?
+  meta      Json?
+  createdAt DateTime   @default(now())
+}
+
+model CardStatement {
+  id                String     @id @default(auto()) @map("_id") @db.ObjectId
+  card              CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  cardId            String     @db.ObjectId
+  cycleKey          String
+  statementAt       DateTime
+  dueAt             DateTime
+  statementBalance  Int
+  minimumDue        Int
+  amountPaid        Int        @default(0)
+  interestCharged   Int        @default(0)
+  lateFeeCharged    Int        @default(0)
+  status            String     @default("OPEN")
+  scoreDeltaApplied Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@unique([cardId, cycleKey])
 }
 
 model Wallet {
   id           String        @id @default(auto()) @map("_id") @db.ObjectId
-  user         User          @relation(fields: [userId], references: [id])
-  userId       String        @unique @db.ObjectId
-  balance      Int           @default(0)
+  user         User          @relation(fields: [userId], references: [discordId])
+  userId       String        @unique
+  balance      Float         @default(0)
   transactions Transaction[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -129,7 +189,7 @@ model Transaction {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   wallet    Wallet   @relation(fields: [walletId], references: [id])
   walletId  String   @db.ObjectId
-  amount    Int
+  amount    Float
   type      String   // e.g.: income, admin_add, wallet_to_bank, bank_to_wallet, bet, payout, transfer_sent, transfer_recv
   meta      Json?
   isEarned  Boolean? @default(false)
@@ -140,39 +200,14 @@ model Transaction {
 
 model Bet {
   id        String      @id @default(auto()) @map("_id") @db.ObjectId
-  user      User        @relation(fields: [userId], references: [id])
-  userId    String      @db.ObjectId
+  user      User        @relation(fields: [userId], references: [discordId])
+  userId    String
   gameId    String
-  amount    Int
+  amount    Float
   choice    String?
   result    String?
-  payout    Int?
+  payout    Float?
   createdAt DateTime    @default(now())
-}
-
-model RoleIncome {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  guildId   String
-  roleId    String
-  amount    Int 
-  cooldown  Int       @default(86400) // Default 24 hours
-  incomeType String   @default("COLLECTIBLE") // COLLECTIBLE, AUTOMATIC
-  createdAt DateTime  @default(now())
-
-  claims    RoleIncomeClaim[]
-  
-  @@unique([guildId, roleId])
-}
-
-model RoleIncomeClaim {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId       String   @db.ObjectId
-  roleIncomeId String   @db.ObjectId
-  claimedAt    DateTime @default(now())
-  
-  roleIncome   RoleIncome @relation(fields: [roleIncomeId], references: [id])
-
-  @@unique([userId, roleIncomeId]) // One claim record per user/role pair (we update claimedAt)
 }
 
 model Job {
@@ -180,8 +215,8 @@ model Job {
   guildId     String
   key         String @unique
   name        String
-  minPay      Int
-  maxPay      Int
+  minPay      Float
+  maxPay      Float
   successRate Float?
   cooldown    Int
   minIntelligence Int @default(0) // Requirement
@@ -198,7 +233,7 @@ model ShopItem {
   guildId      String
   name         String
   description  String   @default("No description")
-  price        Int
+  price        Float
   stock        Int      @default(-1) // -1 = unlimited
   roleId       String?  // Deprecated, use effects instead
   
@@ -229,11 +264,10 @@ model ShopItem {
 // FIX: Added 'user' relation field to match 'inventory' in User model
 model Inventory {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  guildId     String
   
   // This relation connects back to the User model
-  user        User     @relation(fields: [userId], references: [id])
-  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [discordId])
+  userId      String
   
   shopItem    ShopItem @relation(fields: [shopItemId], references: [id], onDelete: Cascade)
   shopItemId  String   @db.ObjectId
@@ -258,37 +292,19 @@ model Audit {
 
 model Bank {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  user      User     @relation(fields: [userId], references: [id])
-  userId    String   @unique @db.ObjectId
-  balance   Int      @default(0)
+  user      User     @relation(fields: [userId], references: [discordId])
+  userId    String   @unique
+  balance   Float    @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model IncomeConfig {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  guildId        String
-  commandKey     String   
-  minPay         Int
-  maxPay         Int
-  cooldown       Int      
-  successPct     Int?     @default(100)
-  failPenaltyPct Int?     @default(50)
-  successMessages String[] @default([])
-  failMessages    String[] @default([])
-  createdAt      DateTime @default(now())
-
-  @@unique([guildId, commandKey])
-}
-
-
-
 model Loan {
   id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  user           User     @relation(fields: [userId], references: [id])
-  userId         String   @db.ObjectId
-  amount         Int
-  totalRepayment Int      // Principal + Interest
+  user           User     @relation(fields: [userId], references: [discordId])
+  userId         String
+  amount         Float
+  totalRepayment Float    // Principal + Interest
   interestRate   Int      // Stored as percentage (e.g., 5 for 5%)
   dueDate        DateTime
   status         String   // ACTIVE, PAID, DEFAULTED
@@ -298,10 +314,10 @@ model Loan {
 
 model Investment {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  user         User     @relation(fields: [userId], references: [id])
-  userId       String   @db.ObjectId
+  user         User     @relation(fields: [userId], references: [discordId])
+  userId       String
   type         String   // FD, RD
-  amount       Int
+  amount       Float
   interestRate Int      // Stored as percentage
   startDate    DateTime @default(now())
   maturityDate DateTime
@@ -314,122 +330,18 @@ model Investment {
   updatedAt    DateTime @updatedAt
 }
 
-model GuildConfig {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  guildId       String   @unique
-  currencyName  String   @default("Coins")
-  currencyEmoji String   @default("🪙")
-  startMoney    Int      @default(1000)
-  transferTax   Int      @default(0)
-  incomeTax     Int      @default(0)
-  bankLimit     Int?     @default(1000000)
-  walletLimit   Int?
-  interestRate  Int      @default(0) // Logic for savings account interest
-  prefix        String   @default("!")
-  
-  // Configs
-  robSuccessPct  Int      @default(60)
-  robFinePct     Int      @default(20)
-  robCooldown    Int      @default(300)
-  robImmuneRoles String[] @default([])
-  dropExpiration Int      @default(60) // Seconds before a drop expires
-
-  // Marriage Config
-  marriageEnabled   Boolean @default(true)
-  marriageCost      Int     @default(0)
-  divorceCost       Int     @default(0)
-  marriageCooldown  Int     @default(0) 
-
-  jailFine       Int      @default(1000)
-  jailTime       Int      @default(600) // Seconds
-  
-  minBet         Int      @default(100)
-  maxBet         Int?     @default(100000)
-  gameBetLimits  Json?    @default("{}") // { "blackjack": { "min": 100, "max": 5000 }, ... }
-  cockfightBetTime Int    @default(60)
-  chickenTrainBaseCost Int @default(500)
-  chickenTrainMultiplier Float @default(0.5)
-  chickenHealCost Int      @default(500)
-  
-  studyCooldown   Int      @default(300) // Seconds
-
-  // Stress Relief Costs
-  gymCost        Int @default(500)
-  meditationCost Int @default(250)
-  sportsCost     Int @default(750)
-
-  // Education Stress Relief Costs
-  eduGymCost        Int @default(50)
-  eduMeditationCost Int @default(25)
-  eduSportsCost     Int @default(75)
-
-  // Banking System Configs
-  loanInterestRate Int      @default(5)
-  fdInterestRate   Int      @default(10)
-  rdInterestRate   Int      @default(8)
-  stockRefreshRate Int      @default(600) // Default 10 minutes (in seconds)
-  loanMaxAmount    Int?     // If null, dynamic based on credit score
-
-  marketTax        Int      @default(5) // % tax on black market sales
-
-  creditConfig     Json?    @default("[]") // Array of { minScore: number, maxLoan: number, maxDays: number }
-  creditScoreReward Int     @default(10)   // Score gained on on-time repayment
-  creditScorePenalty Int    @default(20)   // Score lost on late repayment
-  maxCreditScore    Int      @default(2000)
-  maxActiveLoans    Int      @default(1)    // Max simultaneous active loans per user
-  minCreditScore    Int      @default(0)    // Minimum credit score floor
-
-  gameCooldowns    Json?    @default("{}") // e.g. {"slots": 30, "bj": 10}
-  rouletteSpinTime Int      @default(3)
-
-  logChannelId     String?  // Channel ID for audit logs
-  disabledCommands String[] @default([])
-
-  // Advanced Permissions
-  casinoChannels    String[] @default([]) // Whitelisted channels
-
-
-
-  // Chat Money Config
-  chatMoneyEnabled   Boolean  @default(false)
-  chatMoneyChannels  String[] @default([]) // Array of allowed channel IDs
-  chatMoneyInterval  Int      @default(60) // Seconds
-  chatMoneyMin       Int      @default(10)
-  chatMoneyMax       Int      @default(50)
-
-  // Reward Configs
-  dailyAmount   Int      @default(1000)
-  weeklyAmount  Int      @default(5000)
-  monthlyAmount Int      @default(20000)
-
-  // Quest Configs
-  questPay      Int      @default(2500)
-
-
-  // Job System Configs
-  jobSectorBasePay    Json?    @default("{}") // { "tech": 1000 }
-  jobLevelMultipliers Json?    @default("{}") // { "Intern": 1.0 }
-  
-  // New Job Configs
-  jobCooldown         Int      @default(3600) // Seconds
-
-  jobShiftReqs        Json?    @default("{}") // { "tech_junior": 20 }
-  jobRelaxControllers Json?    @default("{}") // { "gym": 500, "meditation": 250, "sports": 750 }
-
-  // Vote Config
-  voteReward    Int      @default(5000)
-
+model GuildSettings {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId   String   @unique
+  prefix    String   @default("!")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  deletedAt DateTime? 
 }
 
 model MarketListing {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  guildId     String
-  seller      User     @relation(fields: [sellerId], references: [id])
-  sellerId    String   @db.ObjectId
+  seller      User     @relation(fields: [sellerId], references: [discordId])
+  sellerId    String
   
   // Snapshotted item details (in case ShopItem changes or deleted)
   // But ideally we link to ShopItem to show image/details dynamically.
@@ -441,7 +353,7 @@ model MarketListing {
   propertyId  String?   @db.ObjectId
   
   amount      Int
-  totalPrice  Int      // Price for the whole batch
+  totalPrice  Float    // Price for the whole batch
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -449,9 +361,8 @@ model MarketListing {
 
 model ActiveEffect {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  user       User     @relation(fields: [userId], references: [id])
-  userId     String   @db.ObjectId
-  guildId    String
+  user       User     @relation(fields: [userId], references: [discordId])
+  userId     String
   
   effectType String   // LUCK_BOOST, etc.
   value      Float    // Multiplier value or amount
@@ -462,21 +373,6 @@ model ActiveEffect {
   
   @@index([userId, expiresAt])
 }
-
-model CommandPermission {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  guildId   String
-  command   String   // The command name or "ALL"
-  targetType String  // USER, ROLE, CHANNEL
-  targetId  String   // The Discord ID
-  action    String   // ALLOW, DENY
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([guildId, command, targetType, targetId]) // prevent duplicate rules
-}
-
-
 
 // --- ADVANCED EDUCATION SYSTEM ---
 
@@ -495,7 +391,7 @@ model Degree {
   passGpa         Float    @default(2.0)
   
   // Financial
-  tuitionPerSem   Int      @default(1000)
+  tuitionPerSem   Float    @default(1000)
   
   // Perks (Passive)
   intelligenceBoost Int    @default(0) // Permanent stat boost on completion
@@ -516,8 +412,8 @@ model Degree {
 
 model UserEducation {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  user            User     @relation(fields: [userId], references: [id])
-  userId          String   @unique @db.ObjectId // Can only be enrolled in one at a time? Yes for now.
+  user            User     @relation(fields: [userId], references: [discordId])
+  userId          String   @unique // Can only be enrolled in one at a time? Yes for now.
   
   degree          Degree   @relation(fields: [degreeId], references: [id])
   degreeId        String   @db.ObjectId
@@ -541,8 +437,8 @@ model UserEducation {
 
 model UserDegree {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  user            User     @relation(fields: [userId], references: [id])
-  userId          String   @db.ObjectId
+  user            User     @relation(fields: [userId], references: [discordId])
+  userId          String
   
   degree          Degree   @relation(fields: [degreeId], references: [id])
   degreeId        String   @db.ObjectId
@@ -567,35 +463,36 @@ model Property {
   description String
   
   // Pricing mechanics
-  basePrice   Int
-  price       Int      // Current system price (fluctuates)
+  basePrice   Float
+  price       Float    // Current system price (fluctuates)
   totalSold   Int      @default(0) // Impacts price fluctuation
   
-  incomePerCycle Int
+  incomePerCycle Float
   incomeCycleHours Int @default(24)
   imageUrl    String? // Can be overridden, otherwise uses banner
   
   maxPerUser  Int      @default(1)
   isPublic    Boolean  @default(true) // For admin toggling
+  meta        Json?    // e.g. { "maxAnimals": 5 } for zoo properties
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   owners      OwnedProperty[]
   listings    MarketListing[] // Relations
-  
+
   @@unique([guildId, key])
 }
 
 model OwnedProperty {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  user        User     @relation(fields: [userId], references: [id])
-  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [discordId])
+  userId      String
   
   property    Property @relation(fields: [propertyId], references: [id])
   propertyId  String   @db.ObjectId
   
-  purchasedPrice Int     // To track ROI
+  purchasedPrice Float   // To track ROI
   purchasedAt DateTime @default(now())
   lastCollected DateTime @default(now())
   
@@ -607,9 +504,9 @@ model Stock {
   guildId      String
   symbol       String
   name         String
-  currentPrice Int
+  currentPrice Float
   volatility   Int      @default(5) // Max percentage change per update
-  basePrice    Int      @default(100) // Reference for resets/crashes
+  basePrice    Float    @default(100) // Reference for resets/crashes
   lastUpdate   DateTime @default(now())
   
   updatedAt    DateTime @updatedAt
@@ -621,8 +518,8 @@ model Stock {
 
 model Portfolio {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  user         User     @relation(fields: [userId], references: [id])
-  userId       String   @unique @db.ObjectId
+  user         User     @relation(fields: [userId], references: [discordId])
+  userId       String   @unique
   
   holdings     StockHolding[]
   
@@ -639,7 +536,7 @@ model StockHolding {
   stockId      String    @db.ObjectId
   
   quantity     Int
-  avgBuyPrice  Int       // Average price paid per share (for profit calc)
+  avgBuyPrice  Float     // Average price paid per share (for profit calc)
   
   updatedAt    DateTime  @updatedAt
 
@@ -649,16 +546,16 @@ model StockHolding {
 model Marriage {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   
-  spouse1   User     @relation("Spouse1", fields: [spouse1Id], references: [id])
-  spouse1Id String   @db.ObjectId
+  spouse1   User     @relation("Spouse1", fields: [spouse1Id], references: [discordId])
+  spouse1Id String
   
-  spouse2   User     @relation("Spouse2", fields: [spouse2Id], references: [id])
-  spouse2Id String   @db.ObjectId
+  spouse2   User     @relation("Spouse2", fields: [spouse2Id], references: [discordId])
+  spouse2Id String
   
   marriedAt DateTime @default(now())
   
   affection Int      @default(0)
-  jointBalance Int   @default(0)
+  jointBalance Float @default(0)
   
   @@unique([spouse1Id]) // User can only be spouse1 once
   @@unique([spouse2Id]) // User can only be spouse2 once
@@ -667,51 +564,35 @@ model Marriage {
 
 model DailyQuest {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  guildId       String
-  user          User     @relation(fields: [userId], references: [id])
-  userId        String   @db.ObjectId
-  
+  user          User     @relation(fields: [userId], references: [discordId])
+  userId        String
+
   dayKey        String   // Format: "YYYY-MM-DD"
-  
+
   // Storing tasks as JSON to allow flexibility in task types
   // e.g. [{ type: "WORK", target: 3, progress: 1, completed: false, description: "Work 3 times" }]
-  tasks         Json     
-  
+  tasks         Json
+
   completed     Boolean  @default(false) // All tasks completed
   rewardClaimed Boolean  @default(false)
-  
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   @@unique([userId, dayKey])
 }
 
-model CasinoDropConfig {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  guildId     String
-  channelId   String
-  
-  type        String   // SCHEDULED, INTERVAL, MESSAGE_COUNT, RANDOM, MANUAL
-  
-  // Configuration Values
-  scheduleTime String? // For SCHEDULED (e.g., "13:00")
-  interval     Int?    // For INTERVAL (minutes)
-  minInterval  Int?    // For RANDOM (minutes)
-  maxInterval  Int?    // For RANDOM (minutes)
-  messageCount Int?    // For MESSAGE_COUNT
-  
-  // Drop content
-  minAmount    Int
-  maxAmount    Int
-  currency     String  @default("Coins")
-  expiration   Int     @default(60) // Seconds before drop expires
-  
-  // State
-  lastDropAt   DateTime?
-  messageCounter Int      @default(0)
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+// --- HUNT / ZOO SYSTEM ---
 
-  @@index([guildId, type])
+model CaughtAnimal {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  discordId      String
+  animalKey      String
+  partsAvailable Json     // string[] of remaining part keys
+  inZoo          Boolean  @default(false)
+  caughtAt       DateTime @default(now())
+  user           User     @relation(fields: [discordId], references: [discordId])
+
+  @@index([discordId])
 }
+

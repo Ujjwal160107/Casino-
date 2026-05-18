@@ -34,7 +34,7 @@ export async function handleSetMoney(message: Message, args: string[]) {
     const target = await ensureUserAndWallet(discordId, message.guildId!, "Unknown");
 
     if (targetType === "bank") {
-        const bank = await ensureBankForUser(target.id);
+        const bank = await ensureBankForUser(target.discordId, "Unknown");
         const oldBalance = bank.balance;
         const [_, updatedBank] = await prisma.$transaction([
             prisma.transaction.create({
@@ -53,7 +53,7 @@ export async function handleSetMoney(message: Message, args: string[]) {
             prisma.audit.create({
                 data: {
                     guildId: message.guildId ?? undefined,
-                    userId: target.id,
+                    userId: target.discordId,
                     type: "admin_set_money",
                     meta: { amount, oldBalance, target: "bank", by: message.author.id }
                 }
@@ -91,7 +91,7 @@ export async function handleSetMoney(message: Message, args: string[]) {
             prisma.audit.create({
                 data: {
                     guildId: message.guildId ?? undefined,
-                    userId: target.id,
+                    userId: target.discordId,
                     type: "admin_set_money",
                     meta: { amount, oldBalance, target: "wallet", by: message.author.id }
                 }

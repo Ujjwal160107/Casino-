@@ -10,7 +10,7 @@ const POLICE_EMOTE = "<:fortuna_police:1457053051582939237>";
 export async function handleJail(message: Message) {
     const user = await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
 
-    const status = await checkJailStatus(user.id);
+    const status = await checkJailStatus(user.discordId);
 
     if (!status.isJailed) {
         return message.reply({
@@ -45,7 +45,7 @@ export async function handleJail(message: Message) {
 
 export async function handleBail(message: Message) {
     const user = await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
-    const status = await checkJailStatus(user.id);
+    const status = await checkJailStatus(user.discordId);
 
     if (!status.isJailed) {
         return message.reply({
@@ -53,7 +53,7 @@ export async function handleBail(message: Message) {
         });
     }
 
-    const result = await payBail(user.id, message.guildId!);
+    const result = await payBail(user.discordId, message.guildId!);
 
     if (result.success) {
         return message.reply({

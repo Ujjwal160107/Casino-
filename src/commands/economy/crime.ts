@@ -1,92 +1,98 @@
-import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
-import prisma from "../../utils/prisma";
-import { getGuildConfig } from "../../services/guildConfigService";
-import { ensureUserAndWallet } from "../../services/walletService";
-import { jailUser } from "../../services/jailService";
-import { checkDynamicCooldown } from "../../utils/cooldown";
-import { getIncomeConfigOrDefault } from "../../services/incomeService";
-import { fmtCurrency, formatDuration } from "../../utils/format";
+import { Message } from "discord.js";
+import { GRINDING_COMMANDS } from "../../utils/economyConfig";
+import { checkCooldown, formatDiscordRelativeTime, setCooldown } from "../../services/cooldownService";
+import { addBalance, removeBalance } from "../../services/walletService";
+import { checkLuckyCoin } from "../../services/shopBuffs";
+import { addCrimeHeat, getHeatLevel } from "../../services/taxService";
+import { TAX_CONFIG } from "../../utils/economyConfig";
 import { errorEmbed, successEmbed } from "../../utils/embed";
+import { fmtCurrency } from "../../utils/format";
 
-const CRIME_EMOTE = "<:fortuna_criminal:1457054253771264276>";
-const POLICE_EMOTE = "<:fortuna_police:1457053051582939237>";
-
-const CRIMES = [
-    { text: "robbed a convenience store", risk: 30, min: 500, max: 2000 },
-    { text: "hacked an ATM", risk: 40, min: 1000, max: 3000 },
-    { text: "smuggled illegal goods", risk: 50, min: 2000, max: 5000 },
-    { text: "stole a car", risk: 60, min: 3000, max: 7000 },
-    { text: "robbed a bank", risk: 80, min: 10000, max: 50000 }
+const CRIME_WIN_MESSAGES = [
+    "You cracked a luxury safe and escaped with **{amount}**.",
+    "You ran a counterfeit coupon empire and cleared **{amount}**.",
+    "You lifted a briefcase from the wrong VIP and found **{amount}** inside.",
+    "You hacked a shady terminal and skimmed **{amount}**.",
+    "You made the perfect getaway and pocketed **{amount}**."
 ];
 
+const CRIME_FINE_MESSAGES = [
+    "You tripped an alarm and paid **{amount}** to make the problem disappear.",
+    "You got caught on camera and settled it for **{amount}**.",
+    "Security had receipts. The fine cost you **{amount}**.",
+    "Your getaway plan collapsed and cleanup cost **{amount}**.",
+    "The job went sideways. Damage control drained **{amount}**."
+];
+
+const CRIME_LOSS_MESSAGES = [
+    "You found the vault, but it was already empty.",
+    "You dressed for the heist and forgot the plan.",
+    "You panicked at the worst possible moment and ran.",
+    "The target was too hot, so you walked away with nothing.",
+    "You spent the night casing the place and learned absolutely nothing useful."
+];
+
+function randomInt(min: number, max: number) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randomMessage(messages: string[], amount?: number) {
+    const message = messages[Math.floor(Math.random() * messages.length)];
+    return amount === undefined ? message : message.replace("{amount}", fmtCurrency(amount));
+}
+
 export async function handleCrime(message: Message) {
-    const user = await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
+    const config = GRINDING_COMMANDS.crime;
+    const cooldown = await checkCooldown(message.author.id, config.commandName);
 
-    if (user.isJailed) {
+    if (cooldown.active && cooldown.expiresAt) {
         return message.reply({
-            embeds: [errorEmbed(message.author, "You are in Jail!", "You cannot commit crimes while in jail.")]
+            embeds: [errorEmbed(message.author, "Cooldown Active", `You can commit another crime ${formatDiscordRelativeTime(cooldown.expiresAt)}.`)]
         });
     }
 
-    const config = await getGuildConfig(message.guildId!);
-    const incomeConfig = await getIncomeConfigOrDefault(message.guildId!, "crime");
-
-    // Legacy cooldown key used simple format, but setIncomeCooldown uses command-specific logic. 
-    // We'll stick to a simple key for crime but use the configurable duration.
-    const cooldownKey = `crime:${message.guildId}:${message.author.id}`;
-    const cooldownTime = incomeConfig.cooldown;
-
-    const remaining = checkDynamicCooldown(cooldownKey, cooldownTime);
-    if (remaining > 0) {
+    const reserved = await setCooldown(message.author.id, config.commandName, config.cooldownSeconds);
+    if (reserved.active && reserved.expiresAt) {
         return message.reply({
-            embeds: [errorEmbed(message.author, "Cool Down", `You must wait **${formatDuration(remaining * 1000)}** before committing another crime.`)]
+            embeds: [errorEmbed(message.author, "Cooldown Active", `You can commit another crime ${formatDiscordRelativeTime(reserved.expiresAt)}.`)]
         });
     }
 
-    // Pick a random crime scenario
-    const scenario = CRIMES[Math.floor(Math.random() * CRIMES.length)];
+    const won = Math.random() < config.winRate;
 
-    // Risk calculation using Dashboard Config
-    // If config.successPct is set (e.g. 60%), we succeed if roll <= 60.
-    // We ignore the hardcoded scenario risk to allow dashboard control.
-    const roll = Math.random() * 100;
+    if (won) {
+        const luckyCoinMult = await checkLuckyCoin(message.author.id);
+        const amount = Math.floor(randomInt(config.payoutMin, config.payoutMax) * luckyCoinMult);
+        const result = await addBalance(message.author.id, message.author.username, amount, "crime_income", { command: "crime" }, true);
+        const capNotice = result.capped ? "\n\nYour wallet hit the global safety cap, so part of this payout was withheld." : "";
 
-    // We use <= because successPct is "Success Rate" (e.g. 75 means 75% success)
-    if (roll <= incomeConfig.successPct) {
-        // Success - Use Dashboard Configured Payouts
-        const amount = Math.floor(Math.random() * (incomeConfig.maxPay - incomeConfig.minPay + 1)) + incomeConfig.minPay;
-
-        await prisma.wallet.update({
-            where: { id: user.wallet!.id },
-            data: { balance: { increment: amount } }
-        });
+        await addCrimeHeat(message.author.id);
+        const heat = await getHeatLevel(message.author.id);
 
         const embed = successEmbed(
             message.author,
-            `${CRIME_EMOTE} Crime Successful`,
-            `You **${scenario.text}** and got away with **${fmtCurrency(amount, config.currencyEmoji)}**!`
-        );
-        embed.setThumbnail("https://cdn.discordapp.com/emojis/1457054253771264276.png"); // Using emote ID as image if possible, or just ignore if it's external.
-        // Actually Discord emote IDs can be used as URLs: https://cdn.discordapp.com/emojis/<id>.png
+            "Crime Successful",
+            `${randomMessage(CRIME_WIN_MESSAGES, result.appliedAmount)}${capNotice}`
+        ).addFields({ name: "Global Wallet", value: fmtCurrency(result.newBalance), inline: true });
 
-        return message.reply({ embeds: [embed] });
-
-    } else {
-        // Failure -> Jail
-        const releaseTime = await jailUser(user.id, message.guildId!);
-        const fine = config.jailFine;
-
-        const embed = new EmbedBuilder()
-            .setTitle(`${POLICE_EMOTE} BUSTED!`)
-            .setDescription(`You tried to **${scenario.text}** but the police caught you!`)
-            .addFields(
-                { name: "Sentence", value: `You have been sent to jail.\nReleases: <t:${Math.floor(releaseTime.getTime() / 1000)}:R>`, inline: true },
-                { name: "Bail", value: `${fmtCurrency(fine, config.currencyEmoji)}`, inline: true }
-            )
-            .setColor(0xFF0000)
-            .setThumbnail("https://cdn.discordapp.com/emojis/1457053051582939237.png")
-            .setFooter({ text: `Use ${config.prefix}bail to pay your way out or wait it out.` });
+        if (heat >= TAX_CONFIG.raidHeatThreshold * 0.7) {
+            embed.addFields({ name: "🌡️ Heat", value: "Your activity is drawing attention...", inline: true });
+        }
 
         return message.reply({ embeds: [embed] });
     }
+
+    const fine = randomInt(config.fineMin, config.fineMax);
+    const result = await removeBalance(message.author.id, fine, "crime_fine", { command: "crime" });
+    const baseDescription = result.removedAmount > 0
+        ? randomMessage(CRIME_FINE_MESSAGES, result.removedAmount)
+        : randomMessage(CRIME_LOSS_MESSAGES);
+    const description = result.removedAmount < fine
+        ? `${baseDescription}\n\nYou could not cover the full ${fmtCurrency(fine)} penalty, so your wallet was drained to zero.`
+        : baseDescription;
+
+    const embed = errorEmbed(message.author, "Crime Failed", description)
+        .addFields({ name: "Global Wallet", value: fmtCurrency(result.newBalance), inline: true });
+
+    return message.reply({ embeds: [embed] });
 }

@@ -1,6 +1,6 @@
 
 import prisma from "../utils/prisma";
-import { GuildConfig, MarketListing, ShopItem, User, Property } from "@prisma/client";
+import { MarketListing, ShopItem, User, Property } from "@prisma/client";
 import { getGuildConfig } from "./guildConfigService";
 import { ensureBankForUser } from "./bankService";
 

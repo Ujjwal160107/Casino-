@@ -50,7 +50,7 @@ export async function handleRemoveMoney(message: Message, args: string[]) {
     let removeAmount = 0;
     let newBal = 0;
     if (type === "bank") {
-      const bank = await prisma.bank.findUnique({ where: { userId: user.id } });
+      const bank = await prisma.bank.findUnique({ where: { userId: user.discordId } });
       const currentBal = bank?.balance || 0;
       if (isAllAmount) {
         removeAmount = currentBal;
@@ -64,7 +64,7 @@ export async function handleRemoveMoney(message: Message, args: string[]) {
         removeAmount = 0;
       }
       if (removeAmount > 0) {
-        newBal = await removeMoneyFromBank(user.id, removeAmount);
+        newBal = await removeMoneyFromBank(user.discordId, removeAmount);
       } else {
         newBal = currentBal;
       }

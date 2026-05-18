@@ -1,170 +1,98 @@
-import { Message, EmbedBuilder, Colors, AttachmentBuilder } from "discord.js";
-import { getEmoteUrl } from "../../config/branding";
-import { ensureUserAndWallet } from "../../services/walletService";
-import { runIncomeCommand } from "../../services/incomeService";
-import { getGuildConfig } from "../../services/guildConfigService";
-import { successEmbed, errorEmbed, baseEmbed } from "../../utils/embed";
+import { Message } from "discord.js";
+import { GRINDING_COMMANDS } from "../../utils/economyConfig";
+import { checkCooldown, formatDiscordRelativeTime, setCooldown } from "../../services/cooldownService";
+import { addBalance } from "../../services/walletService";
+import { checkLuckyCoin } from "../../services/shopBuffs";
+import { errorEmbed, successEmbed } from "../../utils/embed";
 import { fmtCurrency } from "../../utils/format";
-import { logToChannel } from "../../utils/discordLogger";
-import { Mascot } from "../../config/branding";
-import path from "path";
 
-const BEG_MESSAGES = [
-  "A sketchy looking dude gave you **{amount}** because he thought you were one of his dealers.",
-  "You found **{amount}** on the floor provided by the government.",
-  "A nice old lady gave you **{amount}** and called you 'sweetie'.",
-  "You did a backflip for **{amount}**. Worth it.",
-  "Someone mistook you for a trash can and threw **{amount}** at you.",
-  "You sang a song so bad they paid you **{amount}** to stop.",
-  "You found **{amount}** in a fountain. Dreams do come true.",
-  "A pigeon dropped **{amount}** on your head. Lucky?",
-  "You begged for hours and finally got **{amount}**. Time is money?",
-  "A time traveler gave you **{amount}** and said 'invest in doge'."
+type GrindCommand = "beg" | "slut";
+
+const BEG_WIN_MESSAGES = [
+  "A stranger took pity on your dramatic sidewalk speech and handed you **{amount}**.",
+  "You played the world's saddest song and earned **{amount}**.",
+  "You held up a cardboard sign with premium font choices and made **{amount}**.",
+  "Someone paid you **{amount}** to stop explaining your life story.",
+  "You found a generous crowd and walked away with **{amount}**."
 ];
 
-const BEG_FAIL_MESSAGES = [
-  "You begged a cop and he fined you **{amount}** for loitering.",
-  "Someone stole your begging cup. You lost **{amount}** replacing it.",
-  "You tripped and dropped **{amount}** into a sewer.",
-  "A stray dog peed on your leg. You spent **{amount}** on soap.",
-  "You tried to beg from a statue. Passersby laughed and stole **{amount}**.",
-  "You asked a mime for money. He invisibly robbed you of **{amount}**.",
-  "You begged the wrong mafia boss. You paid **{amount}** for 'protection'."
+const BEG_LOSS_MESSAGES = [
+  "You begged with confidence, but everyone walked past.",
+  "You picked the wrong street and made absolutely nothing.",
+  "Your performance was moving, but apparently not wallet-moving.",
+  "Someone gave you advice instead of coins. Tragic.",
+  "You rattled the cup. The cup rattled back empty."
 ];
 
-const SLUT_MESSAGES = [
-  "You did 'favors' for a stranger and earned **{amount}**.",
-  "You posted feet pics and made **{amount}**.",
-  "You sold your bath water for **{amount}**. Weirdo.",
-  "You danced on a mailbox and someone threw **{amount}** at you.",
+const SLUT_WIN_MESSAGES = [
   "You worked the corner and made **{amount}**.",
-  "You let someone call you 'mommy' for an hour and earned **{amount}**.",
-  "You streamed on OnlyFans for 10 minutes and made **{amount}**.",
-  "You sold a jar of your farts for **{amount}**. Capitalism, baby.",
-  "You dated a discord mod and he gave you **{amount}** for Nitro.",
-  "You wore a maid outfit to Walmart and strangers gave you **{amount}**.",
-  "You sold your used socks to a sniffing enthusiast for **{amount}**.",
-  "You whispered 'UWU' in a stranger's ear and they paid you **{amount}** to leave.",
-  "You accidentally became a sugar baby and got **{amount}** allowance.",
-  "You sold 'premium' snaps that were just pictures of your elbow for **{amount}**.",
-  "You pretended to be an e-girl and scammed a simp for **{amount}**."
+  "You sold premium attention and collected **{amount}**.",
+  "You flirted like rent was due and earned **{amount}**.",
+  "You made questionable choices with excellent margins: **{amount}**.",
+  "You turned charm into cash and walked away with **{amount}**."
 ];
 
-const SLUT_FAIL_MESSAGES = [
-  "You tried to seduce a cop and got fined **{amount}**.",
-  "Your 'client' ran off without paying. You lost **{amount}** on cab fare.",
-  "You broke a heel running from the shame. Replacement cost: **{amount}**.",
-  "You got caught by your mom! She took **{amount}** as punishment."
+const SLUT_LOSS_MESSAGES = [
+  "You got all dressed up and nobody booked.",
+  "Your client vanished before payment. Brutal.",
+  "You tried to sell mystique, but the market was closed.",
+  "You fumbled the pitch and made nothing.",
+  "You learned that confidence is not legal tender."
 ];
 
+function randomInt(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
-function getRandomMessage(messages: string[], amount: string): string {
-  const msg = messages[Math.floor(Math.random() * messages.length)];
-  return msg.replace("{amount}", amount);
+function randomMessage(messages: string[], amount?: number) {
+  const message = messages[Math.floor(Math.random() * messages.length)];
+  return amount === undefined ? message : message.replace("{amount}", fmtCurrency(amount));
 }
 
 export async function handleIncome(message: Message) {
   const [cmd] = message.content.slice(1).split(/\s+/);
-  const commandKey = cmd.toLowerCase();
+  const commandKey = cmd.toLowerCase() as GrindCommand;
 
-  if (!["work", "beg", "slut"].includes(commandKey)) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Unknown", "Use: !work, !beg or !slut")] });
+  if (!["beg", "slut"].includes(commandKey)) {
+    return message.reply({ embeds: [errorEmbed(message.author, "Unknown", "Use: !beg or !slut")] });
   }
 
-  const config = await getGuildConfig(message.guildId!);
-  const emoji = config.currencyEmoji;
-  const user = await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
+  const config = GRINDING_COMMANDS[commandKey];
+  const cooldown = await checkCooldown(message.author.id, config.commandName);
 
-  try {
-    const res = await runIncomeCommand({
-      commandKey,
-      discordId: message.author.id,
-      guildId: message.guildId ?? null,
-      userId: user.id,
-      walletId: user.wallet!.id
+  if (cooldown.active && cooldown.expiresAt) {
+    return message.reply({
+      embeds: [errorEmbed(message.author, "Cooldown Active", `You can use \`${commandKey}\` again ${formatDiscordRelativeTime(cooldown.expiresAt)}.`)]
     });
-
-    if (res.success) {
-      await logToChannel(message.client, {
-        guild: message.guild!,
-        type: "ECONOMY",
-        title: `Income Success (${commandKey})`,
-        description: `**User:** ${message.author.tag}\n**Amount:** ${fmtCurrency(res.amount, emoji)}`,
-        color: 0x00FF00
-      });
-
-      let description = `You earned **${fmtCurrency(res.amount, emoji)}**!`;
-
-      // Use custom messages if available, otherwise fallback
-      if (res.messages && res.messages.success && res.messages.success.length > 0) {
-        description = getRandomMessage(res.messages.success, fmtCurrency(res.amount, emoji));
-      } else if (commandKey === "beg") {
-        description = getRandomMessage(BEG_MESSAGES, fmtCurrency(res.amount, emoji));
-      } else if (commandKey === "slut") {
-        description = getRandomMessage(SLUT_MESSAGES, fmtCurrency(res.amount, emoji));
-      }
-
-      const branded = successEmbed(message.author, `${commandKey.toUpperCase()} SUCCESS`, description);
-
-      const files: AttachmentBuilder[] = [];
-
-      if (commandKey === "beg") {
-        const thumbPath = path.join(process.cwd(), "src", "assets", "beg_thumbnail.png");
-        const attachment = new AttachmentBuilder(thumbPath, { name: "beg_thumbnail.png" });
-        files.push(attachment);
-        branded.setThumbnail("attachment://beg_thumbnail.png");
-      } else {
-        const moneyUrl = getEmoteUrl(Mascot.Emotes.Money);
-        if (moneyUrl) branded.setThumbnail(moneyUrl);
-      }
-
-      return message.reply({ embeds: [branded], files });
-
-    } else {
-      await logToChannel(message.client, {
-        guild: message.guild!,
-        type: "ECONOMY",
-        title: `Income Failed (${commandKey})`,
-        description: `**User:** ${message.author.tag}\n**Penalty:** ${fmtCurrency(Math.abs(res.amount), emoji)}`,
-        color: 0xFF0000
-      });
-
-      let description = `You lost **${fmtCurrency(Math.abs(res.amount), emoji)}**!`;
-
-      // Use custom messages if available, otherwise fallback
-      if (res.messages && res.messages.fail && res.messages.fail.length > 0) {
-        description = getRandomMessage(res.messages.fail, fmtCurrency(Math.abs(res.amount), emoji));
-      } else if (commandKey === "beg") {
-        description = getRandomMessage(BEG_FAIL_MESSAGES, fmtCurrency(Math.abs(res.amount), emoji));
-      } else if (commandKey === "slut") {
-        description = getRandomMessage(SLUT_FAIL_MESSAGES, fmtCurrency(Math.abs(res.amount), emoji));
-      }
-
-      const branded = errorEmbed(message.author, `${commandKey.toUpperCase()} FAILED`, description);
-
-      const files: AttachmentBuilder[] = [];
-
-      if (commandKey === "beg") {
-        const thumbPath = path.join(process.cwd(), "src", "assets", "beg_thumbnail.png");
-        const attachment = new AttachmentBuilder(thumbPath, { name: "beg_thumbnail.png" });
-        files.push(attachment);
-        branded.setThumbnail("attachment://beg_thumbnail.png");
-      }
-
-      return message.reply({
-        embeds: [branded],
-        files
-      });
-    }
-  } catch (err) {
-    // Cooldown or other errors
-    const isCooldown = (err as Error).message.toLowerCase().includes("wait");
-    if (isCooldown) {
-      const branded = errorEmbed(message.author, "Cooldown Active", (err as Error).message);
-      const angryUrl = getEmoteUrl(Mascot.Emotes.Angry);
-      if (angryUrl) branded.setThumbnail(angryUrl);
-      return message.reply({ embeds: [branded] });
-    }
-    return message.reply({ embeds: [errorEmbed(message.author, "Error", (err as Error).message)] });
   }
+
+  const reserved = await setCooldown(message.author.id, config.commandName, config.cooldownSeconds);
+  if (reserved.active && reserved.expiresAt) {
+    return message.reply({
+      embeds: [errorEmbed(message.author, "Cooldown Active", `You can use \`${commandKey}\` again ${formatDiscordRelativeTime(reserved.expiresAt)}.`)]
+    });
+  }
+
+  const won = Math.random() < config.winRate;
+
+  if (!won) {
+    const failMessages = commandKey === "beg" ? BEG_LOSS_MESSAGES : SLUT_LOSS_MESSAGES;
+    return message.reply({
+      embeds: [errorEmbed(message.author, `${commandKey.toUpperCase()} FAILED`, randomMessage(failMessages))]
+    });
+  }
+
+  const luckyCoinMult = await checkLuckyCoin(message.author.id);
+  const amount = Math.floor(randomInt(config.payoutMin, config.payoutMax) * luckyCoinMult);
+  const result = await addBalance(message.author.id, message.author.username, amount, `${commandKey}_income`, { command: commandKey }, true);
+  const winMessages = commandKey === "beg" ? BEG_WIN_MESSAGES : SLUT_WIN_MESSAGES;
+  const capNotice = result.capped ? "\n\nYour wallet hit the global safety cap, so part of this payout was withheld." : "";
+
+  const embed = successEmbed(
+    message.author,
+    `${commandKey.toUpperCase()} SUCCESS`,
+    `${randomMessage(winMessages, result.appliedAmount)}${capNotice}`
+  ).addFields({ name: "Wallet", value: fmtCurrency(result.newBalance), inline: true });
+
+  return message.reply({ embeds: [embed] });
 }

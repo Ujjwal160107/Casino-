@@ -1,141 +1,212 @@
 import prisma, { runWithRetry } from "../utils/prisma";
 import { PrismaClient } from "@prisma/client";
-import { getGuildConfig } from "./guildConfigService";
+import { MAX_SAFE_BALANCE } from "../utils/economyConfig";
 
-export async function ensureBankForUser(userIdOrDiscordId: string, guildId?: string, username?: string) {
-  let userId = userIdOrDiscordId;
+export async function ensureBankForUser(userIdOrDiscordId: string, username = "UnknownUser") {
+  const discordId = userIdOrDiscordId;
 
-  // If input is Discord ID (not ObjectId)
-  if (!userIdOrDiscordId.match(/^[0-9a-fA-F]{24}$/)) {
-    if (!guildId) throw new Error("Guild ID required for bank creation by Discord ID.");
-
-    let user = await prisma.user.findUnique({
-      where: { discordId_guildId: { discordId: userIdOrDiscordId, guildId } }
+  return prisma.$transaction(async (tx) => {
+    let user = await tx.user.findUnique({
+      where: { discordId },
+      include: { bank: true, wallet: true }
     });
 
-    // Create user if not found and username provided
     if (!user) {
-      if (!username) throw new Error("User not found and username not provided for creation.");
-
-      // Fetch default Start Money
-      const config = await getGuildConfig(guildId);
-
-      user = await prisma.user.create({
+      user = await tx.user.create({
         data: {
-          discordId: userIdOrDiscordId,
-          guildId,
+          discordId,
           username,
-          wallet: {
-            create: {
-              balance: config.startMoney
-            }
-          }
-        }
+          wallet: { create: { balance: 0 } },
+          bank: { create: { balance: 0 } }
+        },
+        include: { bank: true, wallet: true }
       });
     }
-    userId = user.id;
-  }
 
-  const bank = await prisma.bank.findUnique({ where: { userId } });
-  if (bank) return bank;
-
-  return prisma.bank.create({ data: { userId, balance: 0 } });
-}
-export async function depositToBank(walletId: string, userId: string, amount: number, guildId: string) {
-  if (amount <= 0) throw new Error("Amount must be greater than 0.");
-  const bank = await ensureBankForUser(userId);
-  const config = await getGuildConfig(guildId);
-  let depositAmount = amount;
-  if (config.bankLimit) {
-    const space = config.bankLimit - bank.balance;
-    if (space <= 0) {
-      throw new Error(`Bank limit of ${config.bankLimit} reached.`);
+    if (!user.bank) {
+      user = await tx.user.update({
+        where: { discordId },
+        data: { bank: { create: { balance: 0 } } },
+        include: { bank: true, wallet: true }
+      });
     }
-    if (depositAmount > space) {
-      depositAmount = space;
-    }
-  }
-  const wallet = await prisma.wallet.findUnique({ where: { id: walletId } });
-  if (!wallet) throw new Error("Wallet not found.");
-  if (wallet.balance < depositAmount) throw new Error("Insufficient wallet balance.");
 
-  await runWithRetry(async (tx: PrismaClient) => {
-    await tx.$transaction([
-      // FIX: Update balances FIRST to acquire exclusive locks and avoid deadlocks
-      tx.wallet.update({ where: { id: walletId }, data: { balance: { decrement: depositAmount } } }),
-      tx.bank.update({ where: { id: bank.id }, data: { balance: { increment: depositAmount } } }),
-      // Record transaction after updates
-      tx.transaction.create({ data: { walletId, amount: -depositAmount, type: "wallet_to_bank", meta: { toBank: true }, isEarned: false } }),
-      tx.audit.create({ data: { userId: wallet.userId, type: "bank_deposit", meta: { amount: depositAmount } } })
-    ]);
+    if (!user.wallet) {
+      await tx.user.update({
+        where: { discordId },
+        data: { wallet: { create: { balance: 0 } } }
+      });
+    }
+
+    return user.bank!;
   });
-  return { bank, actualAmount: depositAmount };
 }
 
-export async function withdrawFromBank(walletId: string, userId: string, amount: number, guildId?: string) {
+export async function ensureBankingUser(discordId: string, username = "UnknownUser") {
+  return prisma.$transaction(async (tx) => {
+    let user = await tx.user.findUnique({
+      where: { discordId },
+      include: { wallet: true, bank: true }
+    });
+
+    if (!user) {
+      return tx.user.create({
+        data: {
+          discordId,
+          username,
+          wallet: { create: { balance: 0 } },
+          bank: { create: { balance: 0 } }
+        },
+        include: { wallet: true, bank: true }
+      });
+    }
+
+    if (!user.wallet || !user.bank) {
+      user = await tx.user.update({
+        where: { discordId },
+        data: {
+          ...(!user.wallet ? { wallet: { create: { balance: 0 } } } : {}),
+          ...(!user.bank ? { bank: { create: { balance: 0 } } } : {})
+        },
+        include: { wallet: true, bank: true }
+      });
+    }
+
+    return user;
+  });
+}
+
+export async function depositToBank(walletId: string, userId: string, amount: number) {
   if (amount <= 0) throw new Error("Amount must be greater than 0.");
 
-  const bank = await ensureBankForUser(userId);
-  if (bank.balance < amount) throw new Error("Insufficient funds in bank.");
+  return runWithRetry(async (tx: PrismaClient) => {
+    return tx.$transaction(async (trx) => {
+      const wallet = await trx.wallet.findUnique({ where: { id: walletId } });
+      if (!wallet) throw new Error("Wallet not found.");
+      if (wallet.userId !== userId) throw new Error("Wallet does not belong to this user.");
+      if (wallet.balance < amount) throw new Error("Insufficient wallet balance.");
 
-  // Check Wallet Limit
-  const wallet = await prisma.wallet.findUnique({ where: { id: walletId } });
-  if (!wallet) throw new Error("Wallet not found.");
+      const bank = await trx.bank.upsert({
+        where: { userId },
+        update: {},
+        create: { userId, balance: 0 }
+      });
 
-  if (guildId) {
-    const config = await getGuildConfig(guildId);
-    if (config.walletLimit && wallet.balance + amount > config.walletLimit) {
-      throw new Error(`Cannot withdraw. Wallet limit of ${config.walletLimit} would be exceeded.`);
-    }
-  }
+      const availableSpace = Math.max(0, MAX_SAFE_BALANCE - bank.balance);
+      const actualAmount = Math.min(amount, availableSpace);
+      if (actualAmount <= 0) throw new Error("Bank balance is at the safety cap.");
 
-  await runWithRetry(async (tx: PrismaClient) => {
-    await tx.$transaction([
-      // FIX: Update balances FIRST to acquire exclusive locks and avoid deadlocks
-      tx.wallet.update({
-        where: { id: walletId },
-        data: { balance: { increment: amount } }
-      }),
-      tx.bank.update({
-        where: { id: bank.id },
-        data: { balance: { decrement: amount } }
-      }),
-      // Record transaction after updates
-      tx.transaction.create({
+      const [updatedWallet, updatedBank] = await Promise.all([
+        trx.wallet.update({
+          where: { id: walletId },
+          data: { balance: { decrement: actualAmount } }
+        }),
+        trx.bank.update({
+          where: { id: bank.id },
+          data: { balance: { increment: actualAmount } }
+        })
+      ]);
+
+      await trx.transaction.create({
         data: {
           walletId,
-          amount,
-          type: "bank_to_wallet",
-          meta: { fromBank: bank.id },
+          amount: -actualAmount,
+          type: "wallet_to_bank",
+          meta: { toBank: true, requestedAmount: amount, capped: actualAmount < amount },
           isEarned: false
         }
-      }),
-      tx.audit.create({
-        data: {
-          userId,
-          type: "bank_withdraw",
-          meta: { amount }
-        }
-      })
-    ]);
-  });
+      });
 
-  return bank;
+      await trx.audit.create({
+        data: { userId, type: "bank_deposit", meta: { amount: actualAmount, requestedAmount: amount } }
+      });
+
+      return { bank: updatedBank, wallet: updatedWallet, actualAmount, capped: actualAmount < amount };
+    });
+  });
 }
-export async function getBankByUserId(userId: string) { return prisma.bank.findUnique({ where: { userId } }); }
+
+export async function withdrawFromBank(walletId: string, userId: string, amount: number) {
+  if (amount <= 0) throw new Error("Amount must be greater than 0.");
+
+  return runWithRetry(async (tx: PrismaClient) => {
+    return tx.$transaction(async (trx) => {
+      const wallet = await trx.wallet.findUnique({ where: { id: walletId } });
+      if (!wallet) throw new Error("Wallet not found.");
+      if (wallet.userId !== userId) throw new Error("Wallet does not belong to this user.");
+
+      const bank = await trx.bank.findUnique({ where: { userId } });
+      if (!bank) throw new Error("Bank account not found.");
+      if (bank.balance < amount) throw new Error("Insufficient funds in bank.");
+
+      const availableSpace = Math.max(0, MAX_SAFE_BALANCE - wallet.balance);
+      const actualAmount = Math.min(amount, availableSpace);
+      if (actualAmount <= 0) throw new Error("Wallet balance is at the safety cap.");
+
+      const [updatedWallet, updatedBank] = await Promise.all([
+        trx.wallet.update({
+          where: { id: walletId },
+          data: { balance: { increment: actualAmount } }
+        }),
+        trx.bank.update({
+          where: { id: bank.id },
+          data: { balance: { decrement: actualAmount } }
+        })
+      ]);
+
+      await trx.transaction.create({
+        data: {
+          walletId,
+          amount: actualAmount,
+          type: "bank_to_wallet",
+          meta: { fromBank: bank.id, requestedAmount: amount, capped: actualAmount < amount },
+          isEarned: false
+        }
+      });
+
+      await trx.audit.create({
+        data: { userId, type: "bank_withdraw", meta: { amount: actualAmount, requestedAmount: amount } }
+      });
+
+      return { bank: updatedBank, wallet: updatedWallet, actualAmount, capped: actualAmount < amount };
+    });
+  });
+}
+
+export async function getBankByUserId(userId: string) {
+  return prisma.bank.findUnique({ where: { userId } });
+}
 
 export async function removeMoneyFromBank(userId: string, amount: number) {
-  const bank = await ensureBankForUser(userId);
-  if (bank.balance < amount) throw new Error("Insufficient bank funds.");
-  const wallet = await prisma.wallet.findUnique({ where: { userId } });
-  if (!wallet) throw new Error("Wallet not found (DB Error).");
+  if (amount <= 0) throw new Error("Amount must be greater than 0.");
 
-  const [updatedBank] = await runWithRetry(async (tx: PrismaClient) => {
-    return await tx.$transaction([
-      // FIX: Update first
-      tx.bank.update({ where: { userId }, data: { balance: { decrement: amount } } }),
-      tx.transaction.create({ data: { walletId: wallet.id, amount: -amount, type: "admin_remove_bank", meta: { by: "admin" }, isEarned: false } })
-    ]);
+  const result = await runWithRetry(async (tx: PrismaClient) => {
+    return tx.$transaction(async (trx) => {
+      const bank = await trx.bank.findUnique({ where: { userId } });
+      if (!bank) throw new Error("Bank account not found.");
+      if (bank.balance < amount) throw new Error("Insufficient bank funds.");
+
+      const wallet = await trx.wallet.findUnique({ where: { userId } });
+      if (!wallet) throw new Error("Wallet not found.");
+
+      const updatedBank = await trx.bank.update({
+        where: { userId },
+        data: { balance: { decrement: amount } }
+      });
+
+      await trx.transaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: -amount,
+          type: "admin_remove_bank",
+          meta: { by: "admin" },
+          isEarned: false
+        }
+      });
+
+      return updatedBank;
+    });
   });
-  return updatedBank.balance;
+
+  return result.balance;
 }

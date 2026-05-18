@@ -12,7 +12,7 @@ export async function handleDropout(message: Message) {
 
     try {
         const user = await prisma.user.findUnique({
-            where: { discordId_guildId: { discordId: message.author.id, guildId: message.guild.id } },
+            where: { discordId: message.author.id },
             include: { currentEducation: { include: { degree: true } } }
         });
 

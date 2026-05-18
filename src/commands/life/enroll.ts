@@ -25,7 +25,7 @@ export async function handleEnroll(message: Message, args: string[]) {
         }
 
         const user = await prisma.user.findUnique({
-            where: { discordId_guildId: { discordId: message.author.id, guildId: message.guild.id } },
+            where: { discordId: message.author.id },
             include: { currentEducation: { include: { degree: true } } }
         });
 
@@ -55,6 +55,12 @@ export async function handleEnroll(message: Message, args: string[]) {
                 .setLabel("Confirm Payment")
                 .setStyle(ButtonStyle.Success)
                 .setEmoji(Mascot.Emotes.Success)
+            ,
+            new ButtonBuilder()
+                .setCustomId(`enroll_confirm_${degree.id}_${message.author.id}_card`)
+                .setLabel("Pay With Card")
+                .setStyle(ButtonStyle.Primary)
+                .setEmoji("💳")
         );
 
         message.reply({ embeds: [embed], components: [row] }); // Note: Attachment handling for footer icon needs thought, or just remove attachment ref if not attaching.

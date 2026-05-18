@@ -4,6 +4,9 @@ import { applyItemEffects, ItemEffect, ItemEffectResult } from "./effectService"
 import { logToChannel } from "../utils/discordLogger";
 import { Colors } from "discord.js";
 import { Mascot } from "../config/branding";
+import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG } from "../utils/shopCatalog";
+import { RIFLE_PRIORITY } from "../utils/animalCatalog";
+import { redisService } from "./redisService";
 
 export async function resetShop(guildId: string, category: string = "GENERAL") {
   return prisma.shopItem.deleteMany({
@@ -102,24 +105,21 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
   if (item.stock !== -1 && item.stock <= 0) throw new Error("Out of stock.");
 
   const res = await prisma.$transaction(async (tx) => {
-    const user = await tx.user.findUnique({
-      where: { discordId_guildId: { discordId: userId, guildId } },
+    const user = await (tx.user.findUnique as any)({
+      where: { discordId: userId },
       include: { wallet: true, bank: true }
     });
 
     if (!user || !user.wallet || user.wallet.balance < item.price) {
-      throw new Error(`You need ${item.price} coins to buy this.`);
+      throw new Error(`You need ${item.price.toLocaleString("en-US")} coins to buy this.`);
     }
 
-    // --- REQUIREMENTS CHECK ---
     const reqs = (item.requirements as any) || {};
 
-    // 1. Minimum Balance
     if (reqs.balance && user.wallet.balance < reqs.balance) {
       throw new Error(`You need a wallet balance of ${reqs.balance} to buy this.`);
     }
 
-    // 2. Minimum Net Worth (Wallet + Bank)
     if (reqs.netWorth) {
       const netWorth = user.wallet.balance + (user.bank?.balance || 0);
       if (netWorth < reqs.netWorth) {
@@ -127,7 +127,6 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       }
     }
 
-    // 3. Required Roles (Allow List)
     if (reqs.roles && reqs.roles.length > 0) {
       if (!member) throw new Error("Could not verify role requirements.");
       const hasRole = reqs.roles.some((roleId: string) => member.roles.cache.has(roleId));
@@ -136,7 +135,6 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       }
     }
 
-    // 4. Deny Roles (Block List)
     if (reqs.denyRoles && reqs.denyRoles.length > 0) {
       if (member) {
         const hasDenyRole = reqs.denyRoles.some((roleId: string) => member.roles.cache.has(roleId));
@@ -146,23 +144,14 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       }
     }
 
-    // 5. Required Items
     if (reqs.items && reqs.items.length > 0) {
-      // Need to check inventory
-      // Use filtered check to avoid fetching everything?
-      // Or just fetch specific items?
-      // Let's simplify and fetch user's inventory count for these items.
-      // reqs.items is array of NAMES or IDs? The editor saves NAMES (string input). 
-      // Logic: Find ShopItem by name -> Check Inventory.
-      // This is expensive if loop.
-      // Alternative: Fetch all user inventory and check names.
       const userInv = await tx.inventory.findMany({
-        where: { userId: user.id },
+        where: { userId: user.discordId },
         include: { shopItem: true }
       });
 
       for (const reqItemName of reqs.items) {
-        const hasItem = userInv.some(i => i.shopItem.name.toLowerCase() === reqItemName.toLowerCase() && i.amount > 0);
+        const hasItem = userInv.some((i: any) => i.shopItem.name.toLowerCase() === reqItemName.toLowerCase() && i.amount > 0);
         if (!hasItem) {
           throw new Error(`You need the item "**${reqItemName}**" to buy this.`);
         }
@@ -171,10 +160,9 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
 
     let metaData: any = {};
 
-    // CHECK: Limit "Chicken" to 1 per person & Generate Trait
     if (item.name.toLowerCase() === "chicken") {
       const existingInfo = await tx.inventory.findUnique({
-        where: { userId_shopItemId: { userId: user.id, shopItemId: item.id } }
+        where: { userId_shopItemId: { userId: user.discordId, shopItemId: item.id } }
       });
       if (existingInfo && existingInfo.amount >= 1) {
         throw new Error("You can only hold 1 Chicken at a time!");
@@ -207,12 +195,10 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       });
     }
 
-    // Always add to inventory
     await tx.inventory.upsert({
-      where: { userId_shopItemId: { userId: user.id, shopItemId: item.id } },
+      where: { userId_shopItemId: { userId: user.discordId, shopItemId: item.id } },
       create: {
-        guildId,
-        userId: user.id,
+        userId: user.discordId,
         shopItemId: item.id,
         amount: 1,
         meta: metaData
@@ -230,11 +216,41 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       }
     });
 
-    // Extract "On Buy" effects to return them, DO NOT apply them inside transaction to wait for Discord API
     const buyEffects = ((item.effects as any) || []).filter((e: any) => e.trigger === "BUY");
 
     return { item, buyEffects };
   });
+
+  // If user just bought a rifle upgrade, clear the hunt cooldown so the new tier takes effect immediately
+  const purchasedRifleName = res.item.name.toLowerCase();
+  const purchasedRifleIndex = RIFLE_PRIORITY.indexOf(purchasedRifleName as any);
+  if (purchasedRifleIndex !== -1) {
+    try {
+      const redis = redisService.getInstance();
+      const huntKey = `hunt:${userId}`;
+      const existing = await redis.ttl(huntKey);
+      if (existing > 0) {
+        // Only clear if user already owns a worse rifle (lower priority = higher index in RIFLE_PRIORITY)
+        const inventory = await prisma.inventory.findMany({
+          where: { userId },
+          include: { shopItem: true },
+        });
+        const ownedRifleNames = inventory
+          .filter((i) => i.shopItem.category === "HUNT" && i.shopItem.itemType === "EQUIPMENT")
+          .map((i) => i.shopItem.name.toLowerCase());
+        const bestOwnedIndex = Math.min(...ownedRifleNames.map((n) => {
+          const idx = RIFLE_PRIORITY.indexOf(n as any);
+          return idx === -1 ? 999 : idx;
+        }));
+        // purchased rifle is better (lower index) than whatever set the cooldown → reset
+        if (purchasedRifleIndex < bestOwnedIndex) {
+          await redis.del(huntKey);
+        }
+      }
+    } catch {
+      // Non-critical
+    }
+  }
 
   // Apply Effects AFTER transaction creates the purchase
   // This prevents transaction timeouts if Discord API is slow (e.g. giving roles)
@@ -256,27 +272,17 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
 }
 
 export async function useItem(userId: string, guildId: string, itemName: string, member?: GuildMember) {
-  // 1. Check Inventory FIRST to ensure we find the item the user actually has.
-  //    This fixes issues where shop items might be hidden/renamed but user still owns them.
-  const user = await prisma.user.findUnique({
-    where: { discordId_guildId: { discordId: userId, guildId } }
+  const user = await (prisma.user.findUnique as any)({
+    where: { discordId: userId }
   });
 
   if (!user) throw new Error("User not found.");
 
-  // We find the inventory item by finding ANY item in their inventory that matches the name
-  // This is a bit tricky because we store shopItemId, not name in inventory.
-  // So we fetch their inventory and filter in JS (safest) or search shopItems first?
-  // Search shopItems first is standard, but if "item not found" is the error, maybe `getShopItemByName` failing?
-  // Let's try to find the item in their inventory directly if possible.
-
-  // 1. Fetch Inventory with DETERMINISTIC sorting (Alphabetical)
-  // This matches !inv and allows "use by number" to work consistently.
   const inventoryItems = await prisma.inventory.findMany({
-    where: { userId: user.id },
+    where: { userId: user.discordId },
     include: { shopItem: true },
     orderBy: { shopItem: { name: 'asc' } }
-  });
+  }) as any[];
 
   let targetInvItem;
 
@@ -357,23 +363,78 @@ export async function useItem(userId: string, guildId: string, itemName: string,
   return { item, results };
 }
 
-export async function getUserInventory(discordId: string, guildId: string) {
-  const user = await prisma.user.findUnique({
-    where: { discordId_guildId: { discordId, guildId } }
-  });
-
-  if (!user) return [];
-
+export async function getUserInventory(discordId: string, _guildId?: string) {
   return prisma.inventory.findMany({
-    where: {
-      guildId,
-      userId: user.id
-    },
+    where: { userId: discordId },
     include: { shopItem: true },
-    orderBy: {
-      shopItem: {
-        name: 'asc'
-      }
-    }
+    orderBy: { shopItem: { name: 'asc' } }
+  }) as any;
+}
+
+const seededGuilds = new Set<string>();
+
+export async function seedGeneralShop(guildId: string) {
+  if (seededGuilds.has(guildId)) return;
+  seededGuilds.add(guildId);
+
+  const existing = await prisma.shopItem.findMany({
+    where: { guildId, category: "GENERAL" },
+    select: { name: true },
+  });
+  const existingNames = new Set(existing.map(e => e.name.toLowerCase()));
+
+  const toCreate = GENERAL_SHOP_CATALOG.filter(
+    item => !existingNames.has(item.name.toLowerCase())
+  );
+
+  if (toCreate.length === 0) return;
+
+  await prisma.shopItem.createMany({
+    data: toCreate.map(item => ({
+      guildId,
+      name: item.name,
+      price: item.price,
+      description: item.description,
+      stock: -1,
+      itemType: item.itemType,
+      effects: item.effects as any,
+      consumable: item.consumable,
+      usable: item.usable,
+      category: item.category,
+    })),
+  });
+}
+
+const seededHuntGuilds = new Set<string>();
+
+export async function seedHuntShop(guildId: string) {
+  if (seededHuntGuilds.has(guildId)) return;
+  seededHuntGuilds.add(guildId);
+
+  const existing = await prisma.shopItem.findMany({
+    where: { guildId, category: "HUNT" },
+    select: { name: true },
+  });
+  const existingNames = new Set(existing.map(e => e.name.toLowerCase()));
+
+  const toCreate = HUNT_SHOP_CATALOG.filter(
+    item => !existingNames.has(item.name.toLowerCase())
+  );
+
+  if (toCreate.length === 0) return;
+
+  await prisma.shopItem.createMany({
+    data: toCreate.map(item => ({
+      guildId,
+      name: item.name,
+      price: item.price,
+      description: item.description,
+      stock: -1,
+      itemType: item.itemType,
+      effects: item.effects as any,
+      consumable: item.consumable,
+      usable: item.usable,
+      category: item.category,
+    })),
   });
 }

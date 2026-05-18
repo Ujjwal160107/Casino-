@@ -1,11 +1,11 @@
-import { Message, EmbedBuilder, Colors, User } from "discord.js";
+import { Message, EmbedBuilder, Colors } from "discord.js";
 import { ensureUserAndWallet } from "../../services/walletService";
-import { placeBetWithTransaction, placeBetFallback } from "../../services/gameService";
+import { creditGamePayout, debitGameBet } from "../../services/gameService";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
-import { successEmbed, errorEmbed } from "../../utils/embed";
+import { errorEmbed } from "../../utils/embed";
 import { Mascot } from "../../config/branding";
-import prisma from "../../utils/prisma";
+import { getGameBetLimits } from "../../utils/gameUtils";
 
 // --- Types ---
 interface RRPlayer {
@@ -51,14 +51,23 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
         if (isNaN(bet) || bet <= 0) {
             return message.reply({ embeds: [errorEmbed(message.author, "Invalid Bet", "Please specify a valid bet amount.")] });
         }
+        const { min, max } = getGameBetLimits(config, "russian_roulette");
+        if (bet < min) {
+            return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Russian Roulette is **${fmtCurrency(min, currency)}**.`)] });
+        }
+        if (bet > max) {
+            return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Russian Roulette is **${fmtCurrency(max, currency)}**.`)] });
+        }
         if (user.wallet!.balance < bet) {
             return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You can't afford this bet.")] });
         }
 
-        // Deduct money immediately (Escrow)
-        await prisma.wallet.update({
-            where: { id: user.wallet!.id },
-            data: { balance: { decrement: bet } }
+        await debitGameBet(user.wallet!.id, bet, {
+            game: "russian_roulette",
+            betAmount: bet,
+            guildId: message.guildId!,
+            channelId: message.channelId,
+            choice: "host"
         });
 
         // Create Lobby
@@ -115,10 +124,13 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
             return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", `You need **${fmtCurrency(lobby.betAmount, currency)}** to join.`)] });
         }
 
-        // Deduct
-        await prisma.wallet.update({
-            where: { id: user.wallet!.id },
-            data: { balance: { decrement: lobby.betAmount } }
+        await debitGameBet(user.wallet!.id, lobby.betAmount, {
+            game: "russian_roulette",
+            betAmount: lobby.betAmount,
+            guildId: message.guildId!,
+            channelId: message.channelId,
+            messageId: lobby.message?.id,
+            choice: "join"
         });
 
         lobby.players.push({ id: message.author.id, username: message.author.username, walletId: user.wallet!.id });
@@ -165,9 +177,14 @@ async function cancelGame(channelId: string, message: Message, reason: string) {
 
     // Refunds
     for (const p of lobby.players) {
-        await prisma.wallet.update({
-            where: { id: p.walletId },
-            data: { balance: { increment: lobby.betAmount } }
+        await creditGamePayout(p.walletId, lobby.betAmount, "game_refund", {
+            game: "russian_roulette",
+            betAmount: lobby.betAmount,
+            payout: lobby.betAmount,
+            result: "cancelled",
+            guildId: message.guildId!,
+            channelId,
+            messageId: lobby.message?.id
         });
     }
 
@@ -256,12 +273,26 @@ async function startGame(channelId: string, message: Message) {
         const winAmount = Math.floor(pot / winners.length);
 
         for (const w of winners) {
-            await prisma.wallet.update({
-                where: { id: w.walletId },
-                data: { balance: { increment: winAmount } }
+            await creditGamePayout(w.walletId, winAmount, "game_win", {
+                game: "russian_roulette",
+                betAmount: lobby.betAmount,
+                payout: winAmount,
+                result: "survived",
+                guildId: message.guildId!,
+                channelId,
+                messageId: lobby.message?.id
             });
-            // Audit Log? Maybe later.
         }
+
+        await creditGamePayout(deadPlayer.walletId, 0, "game_loss", {
+            game: "russian_roulette",
+            betAmount: lobby.betAmount,
+            payout: 0,
+            result: "eliminated",
+            guildId: message.guildId!,
+            channelId,
+            messageId: lobby.message?.id
+        });
 
         // LOGGING
         await import("../../utils/discordLogger").then(({ logToChannel }) => {

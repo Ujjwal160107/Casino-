@@ -97,9 +97,9 @@ export async function maybeSendGlobalEconomyReminder(message: Message, commandCo
 
   const user = await ensureUserAndWallet(message.author.id, message.guildId, message.author.tag);
   const fullUser = await prisma.user.findUnique({
-    where: { discordId_guildId: { discordId: message.author.id, guildId: message.guildId } },
+    where: { discordId: message.author.id },
     select: {
-      id: true,
+      discordId: true,
       globalAnnouncementFormFilled: true,
       globalAnnouncementReminderDate: true,
       globalAnnouncementReminderCount: true,
@@ -116,7 +116,7 @@ export async function maybeSendGlobalEconomyReminder(message: Message, commandCo
   if (reminderCount >= REMINDER_LIMIT_PER_DAY) return;
 
   await prisma.user.update({
-    where: { id: user.id },
+    where: { discordId: user.discordId },
     data: {
       globalAnnouncementReminderDate: today,
       globalAnnouncementReminderCount: reminderCount + 1,
@@ -130,13 +130,13 @@ export async function handleGlobalEconomyReminderInteraction(interaction: Button
   if (!interaction.guildId) {
     return interaction.reply({
       content: "This reminder can only be updated inside a server.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
   await ensureUserAndWallet(interaction.user.id, interaction.guildId, interaction.user.tag);
   await prisma.user.update({
-    where: { discordId_guildId: { discordId: interaction.user.id, guildId: interaction.guildId } },
+    where: { discordId: interaction.user.id },
     data: {
       globalAnnouncementFormFilled: true,
       globalAnnouncementReminderDate: getUtcDayStart(),

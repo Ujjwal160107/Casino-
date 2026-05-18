@@ -1,11 +1,25 @@
-import { Interaction, ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Message, TextChannel } from "discord.js";
-import { enroll, claimScholarship, reduceStress, getStressCost, dropout } from "../services/educationService";
+import { Interaction, ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Message, TextChannel, MessageFlags, ContainerBuilder, TextDisplayBuilder } from "discord.js";
+import { enroll, claimScholarship, dropout } from "../services/educationService";
 import { getGuildConfig } from "../services/guildConfigService";
 import { fmtCurrency, formatDuration } from "../utils/format";
 import { Mascot, getEmoteUrl } from "../config/branding";
 import prisma from "../utils/prisma";
 import { logToChannel } from "../utils/discordLogger";
 import { updateQuestProgress } from "../services/questService";
+import { applyRelaxOption, getRelaxSnapshot } from "../services/relaxService";
+import { buildRelaxDashboard } from "../commands/life/relax";
+import { checkCounterfeitKit } from "../services/shopBuffs";
+
+function textContainer(title: string, body: string, color = 0x2ECC71) {
+    return new ContainerBuilder()
+        .setAccentColor(color)
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**${title}**`),
+            new TextDisplayBuilder().setContent(body),
+        );
+}
+
+const activeRelaxSelections = new Set<string>();
 
 export async function handleLifeInteraction(interaction: Interaction) {
     if (interaction.isButton()) {
@@ -25,6 +39,7 @@ async function handleButton(interaction: ButtonInteraction) {
         // Backwards compatibility handling or robust parsing
         const degreeId = parts[2];
         const targetUserId = parts[3];
+        const paymentMethod = parts[4] === "card" ? "card" : "wallet";
 
         if (targetUserId && targetUserId !== user.id) {
             return interaction.reply({ content: `${Mascot.Emotes.Fail} This interaction is not for you.`, ephemeral: true });
@@ -33,20 +48,78 @@ async function handleButton(interaction: ButtonInteraction) {
         await interaction.deferReply({ ephemeral: false });
 
         try {
-            const result = await enroll(user.id, guild.id, degreeId);
+            const result = await enroll(user.id, guild.id, degreeId, paymentMethod);
             const config = await getGuildConfig(guild.id);
 
             const embed = new EmbedBuilder()
                 .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
                 .setTitle(`${Mascot.Emotes.Accept} Enrollment Successful`)
                 .setDescription(`You have successfully enrolled in **${result.degree.name}**!`)
-                .addFields({ name: "Tuition Paid", value: fmtCurrency(result.degree.tuitionPerSem, config.currencyEmoji) })
+                .addFields(
+                    { name: "Tuition Paid", value: fmtCurrency(result.degree.tuitionPerSem, config.currencyEmoji) },
+                    { name: "Payment Method", value: paymentMethod === "card" ? "Fortuna Card" : "Wallet" }
+                )
                 .setColor("#2ECC71");
 
             await interaction.editReply({ embeds: [embed] });
 
         } catch (err: any) {
             await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Enrollment Failed**: ${err.message}` });
+        }
+    }
+    else if (customId.startsWith("relax:")) {
+        const [, ownerId, optionId] = customId.split(":");
+        if (ownerId !== user.id) {
+            return interaction.reply({
+                components: [textContainer("Relax Session", "This relax dashboard belongs to someone else.", 0xE74C3C)],
+                flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+            });
+        }
+
+        await interaction.deferUpdate();
+
+        const lockKey = `${user.id}:${optionId}`;
+        if (activeRelaxSelections.has(lockKey)) {
+            return interaction.editReply({
+                components: [textContainer("Relax In Progress", "Your relax activity is already being processed.", 0xF1C40F)],
+                flags: MessageFlags.IsComponentsV2,
+            });
+        }
+
+        try {
+            activeRelaxSelections.add(lockKey);
+            const result = await applyRelaxOption(user.id, user.username, optionId);
+            const config = await getGuildConfig(guild.id);
+            const dashboard = await buildRelaxDashboard(user.id, guild.id, user.username);
+
+            dashboard.container.addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(
+                    `**${Mascot.Emotes.Accept} ${result.option.name} complete.**\n` +
+                    `Paid ${fmtCurrency(result.cost, config.currencyEmoji)}.\n` +
+                    `Wallet: ${fmtCurrency(result.previousWalletBalance, config.currencyEmoji)} -> ${fmtCurrency(result.walletBalance, config.currencyEmoji)}\n` +
+                    `Job Stress: ${result.previousJobStress}/100 -> ${result.jobStress}/100\n` +
+                    `Education Stress: ${result.previousEducationStress === null ? "Not enrolled" : `${result.previousEducationStress}/100 -> ${result.educationStress}/100`}`,
+                ),
+            );
+
+            await interaction.editReply({
+                components: [dashboard.container],
+                flags: MessageFlags.IsComponentsV2,
+            });
+        } catch (err: any) {
+            const snapshot = await getRelaxSnapshot(user.id, user.username);
+            await interaction.editReply({
+                components: [
+                    textContainer(
+                        "Relax Failed",
+                        `${Mascot.Emotes.Fail} ${err.message}\n\nWallet: ${fmtCurrency(snapshot.walletBalance)}\nJob Stress: ${snapshot.jobStress}/100\nEducation Stress: ${snapshot.hasEducation ? `${snapshot.educationStress}/100` : "Not enrolled"}`,
+                        0xE74C3C,
+                    ),
+                ],
+                flags: MessageFlags.IsComponentsV2,
+            });
+        } finally {
+            activeRelaxSelections.delete(lockKey);
         }
     }
     else if (customId.startsWith("claim_scholarship_")) {
@@ -68,134 +141,33 @@ async function handleButton(interaction: ButtonInteraction) {
             await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Claim Failed**: ${err.message}` });
         }
     }
-    else if (customId.startsWith("edu_stress_")) {
-        const activity = customId.replace("edu_stress_", "") as "sports" | "gym" | "meditation";
+    else if (customId.startsWith("edu_stress_") || customId.startsWith("stress_") || customId.startsWith("confirm_edu_stress_") || customId.startsWith("confirm_stress_")) {
+        const activity = customId.split("_").pop() || "gym";
+        const optionByLegacyActivity: Record<string, string> = {
+            sports: "quick_break",
+            gym: "gym_session",
+            meditation: "meditation_retreat",
+        };
+        const optionId = optionByLegacyActivity[activity] ?? "gym_session";
 
-        // Check if stress is already 0
-        const userData = await prisma.user.findUnique({
-            where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
-            include: { currentEducation: true }
+        await interaction.deferUpdate().catch(async () => {
+            if (!interaction.replied && !interaction.deferred) await interaction.deferReply({ ephemeral: true });
         });
 
-        if (userData?.currentEducation && userData.currentEducation.stress <= 0) {
-            return interaction.reply({
-                content: `${Mascot.Emotes.Think} You are currently stress free! Why not try studying instead?`,
-                ephemeral: true
+        try {
+            await applyRelaxOption(user.id, user.username, optionId);
+            const dashboard = await buildRelaxDashboard(user.id, guild.id, user.username);
+            await interaction.editReply({
+                components: [dashboard.container],
+                embeds: [],
+                flags: MessageFlags.IsComponentsV2,
             });
-        }
-
-        await interaction.deferReply({ ephemeral: true });
-
-        try {
-            const cost = await getStressCost(user.id, guild.id, activity);
-            const config = await getGuildConfig(guild.id);
-
-            const embed = new EmbedBuilder()
-                .setTitle(`Confirm ${activity.charAt(0).toUpperCase() + activity.slice(1)} (Education)`)
-                .setDescription(`Do you want to spend **${fmtCurrency(cost, config.currencyEmoji)}** to reduce your **Education Stress**?`)
-                .setColor("#3498DB");
-
-            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder().setCustomId(`confirm_edu_stress_${activity}`).setLabel("Confirm").setStyle(ButtonStyle.Success).setEmoji(Mascot.Emotes.Accept),
-                new ButtonBuilder().setCustomId("cancel_stress").setLabel("Cancel").setStyle(ButtonStyle.Danger).setEmoji(Mascot.Emotes.Decline)
-            );
-
-            await interaction.editReply({ embeds: [embed], components: [row] });
         } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Error**: ${err.message}` });
-        }
-    }
-    else if (customId.startsWith("confirm_edu_stress_")) {
-        const activity = customId.replace("confirm_edu_stress_", "") as "sports" | "gym" | "meditation";
-        await interaction.deferUpdate();
-
-        try {
-            const config = await getGuildConfig(guild.id);
-            const res = await reduceStress(user.id, guild.id, activity);
-
-            const embed = new EmbedBuilder()
-                .setTitle("Stress Relieved (Education)")
-                .setDescription(`**${activity.charAt(0).toUpperCase() + activity.slice(1)}** relieved your stress!\nStress: **${res.newStress}/100** (-${res.newStress < 0 ? 0 : 15})\nPaid: **${fmtCurrency(res.cost, config.currencyEmoji)}**`) // Note: generic calc for display, real val used logic
-                // Actually the service returns the new stress and msg.
-                .setDescription(res.msg)
-                .setColor("#2ECC71");
-
-            await interaction.editReply({ embeds: [embed], components: [] });
-        } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Activity Failed**: ${err.message}`, components: [] });
-        }
-    }
-    else if (customId.startsWith("stress_")) {
-        const activity = customId.replace("stress_", "") as "sports" | "gym" | "meditation";
-
-        // Check if stress is already 0
-        const userData = await prisma.user.findUnique({
-            where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
-            include: { currentEducation: true }
-        });
-
-        if (userData?.currentEducation && userData.currentEducation.stress <= 0) {
-            const embed = new EmbedBuilder()
-                .setTitle(`${Mascot.Emotes.Think} No Stress Detected`)
-                .setDescription("You are currently stress free! Why not try studying instead?")
-                .setColor("#2ECC71");
-
-            const thumbUrl = getEmoteUrl(Mascot.Emotes.Think);
-            if (thumbUrl) embed.setThumbnail(thumbUrl);
-
-            return interaction.reply({ embeds: [embed], ephemeral: true });
-        }
-
-        await interaction.deferReply({ ephemeral: true });
-
-        try {
-            const cost = await getStressCost(user.id, guild.id, activity);
-            const config = await getGuildConfig(guild.id);
-
-            const embed = new EmbedBuilder()
-                .setTitle(`Confirm ${activity.charAt(0).toUpperCase() + activity.slice(1)}`)
-                .setDescription(`Do you want to spend **${fmtCurrency(cost, config.currencyEmoji)}** to reduce stress?`)
-                .setColor("#3498DB");
-
-            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder().setCustomId(`confirm_stress_${activity}`).setLabel("Confirm").setStyle(ButtonStyle.Success).setEmoji(Mascot.Emotes.Accept),
-                new ButtonBuilder().setCustomId("cancel_stress").setLabel("Cancel").setStyle(ButtonStyle.Danger).setEmoji(Mascot.Emotes.Decline)
-            );
-
-            await interaction.editReply({ embeds: [embed], components: [row] });
-        } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Error**: ${err.message}` });
-        }
-    }
-    else if (customId.startsWith("confirm_stress_")) {
-        const activity = customId.replace("confirm_stress_", "") as "sports" | "gym" | "meditation";
-
-        // Defer update to replace the confirmation message
-        await interaction.deferUpdate();
-
-        try {
-            const { reduceJobStress } = require("../services/jobService");
-            const config = await getGuildConfig(guild.id); // Fetch config for currency
-            const res = await reduceJobStress(user.id, guild.id, activity);
-
-            let thumb = "";
-            switch (activity) {
-                case "sports": thumb = Mascot.Emotes.Sports; break;
-                case "gym": thumb = Mascot.Emotes.Gym; break;
-                case "meditation": thumb = Mascot.Emotes.Meditation; break;
-            }
-
-            const embed = new EmbedBuilder()
-                .setTitle("Stress Relieved")
-                .setDescription(`**${activity.charAt(0).toUpperCase() + activity.slice(1)}** relieved your stress!\nStress: **${res.newStress}/100** (-${res.reduction})\nPaid: **${fmtCurrency(res.cost, config.currencyEmoji)}**`)
-                .setColor("#2ECC71");
-
-            const thumbUrl = getEmoteUrl(thumb);
-            if (thumbUrl) embed.setThumbnail(thumbUrl);
-
-            await interaction.editReply({ embeds: [embed], components: [] });
-        } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Activity Failed**: ${err.message}`, components: [] });
+            await interaction.editReply({
+                components: [textContainer("Relax Failed", `${Mascot.Emotes.Fail} ${err.message}`, 0xE74C3C)],
+                embeds: [],
+                flags: MessageFlags.IsComponentsV2,
+            });
         }
     }
     else if (customId === "cancel_stress") {
@@ -245,7 +217,7 @@ async function handleButton(interaction: ButtonInteraction) {
         await interaction.deferUpdate();
         try {
             await prisma.user.update({
-                where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
+                where: { discordId: user.id },
                 data: { jobId: null, jobXp: 0, shiftsWorked: 0, lastShift: null }
             });
 
@@ -302,7 +274,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
         const config = await getGuildConfig(guild.id);
         const userData = await prisma.user.findUnique({
-            where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
+            where: { discordId: user.id },
             include: { wallet: true }
         });
 
@@ -370,7 +342,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
         // Apply to DB
         await prisma.user.update({
-            where: { id: userData.id },
+            where: { discordId: userData.discordId },
             data: {
                 wallet: { update: { balance: { increment: earnings } } },
                 jobXp: { increment: xpGain },
@@ -512,7 +484,7 @@ async function handleButton(interaction: ButtonInteraction) {
         const { getWorkGame } = require("../services/minigameService");
 
         const userData = await prisma.user.findUnique({
-            where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
+            where: { discordId: user.id },
             include: { wallet: true }
         });
         if (!userData || !userData.jobId) {
@@ -540,8 +512,7 @@ async function handleButton(interaction: ButtonInteraction) {
         // Check Active Effects (Permanent Buffs)
         const activeEffects = await prisma.activeEffect.findMany({
             where: {
-                userId: userData.id,
-                guildId: guild.id,
+                userId: userData.discordId,
                 effectType: { in: ["COOLDOWN_REDUCTION", "PAY_MULTIPLIER"] },
                 OR: [
                     { expiresAt: { gt: new Date() } },
@@ -578,7 +549,7 @@ async function handleButton(interaction: ButtonInteraction) {
             if (Math.random() < 0.5) {
                 // BURNOUT!
                 await prisma.user.update({
-                    where: { id: userData.id },
+                    where: { discordId: userData.discordId },
                     data: {
                         lastShift: new Date(),
                         jobStress: { increment: 5 } // Even more stress
@@ -746,6 +717,10 @@ async function handleButton(interaction: ButtonInteraction) {
             const streakBonus = Math.floor(amount * (streakBonusPct / 100));
             amount += streakBonus;
 
+            // Apply Counterfeit Kit buff if active
+            const counterfeitMult = await checkCounterfeitKit(user.id);
+            if (counterfeitMult > 1) amount = Math.floor(amount * counterfeitMult);
+
             // Check Wallet Limit (Double check before payout)
             let walletFull = false;
             // userData.wallet is available from the earlier fetch (if we passed it down, but we are in the same scope?
@@ -759,7 +734,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
             // Update User
             await prisma.user.update({
-                where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
+                where: { discordId: user.id },
                 data: {
                     wallet: { update: { balance: { increment: amount } } },
                     shiftsWorked: { increment: 1 },
@@ -775,6 +750,10 @@ async function handleButton(interaction: ButtonInteraction) {
             // We use the UPDATED jobXp (add 10 to current)
             const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + 10, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
 
+            // Apply income tax on work shift payout
+            const { applyIncomeTax } = await import("../services/taxService");
+            const workTax = walletFull ? { net: 0, taxPaid: 0, shielded: false } : await applyIncomeTax(user.id, amount);
+
             let earningsText = `${fmtCurrency(amount, config?.currencyEmoji)}\n(Base Pay + ${streakBonusPct}% Streak Bonus)`;
             if (walletFull) {
                 earningsText = `~~${fmtCurrency(amount, config?.currencyEmoji)}~~ 0\n(⚠️ Wallet Limit Reached)`;
@@ -785,6 +764,13 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setTitle(`${Mascot.Emotes.JobWorking} Shift Complete`)
                 .setDescription(`Great work! You finished your shift as a **${job.title}**.\n\n**Earnings:** ${earningsText}\n\n**XP Gained:** +10\n**Stress:** +5`)
                 .setColor("#2ECC71");
+
+            if (!walletFull) {
+                winEmbed.addFields(workTax.shielded
+                    ? { name: "Tax", value: "🛡️ Shielded", inline: true }
+                    : { name: "Tax (8%)", value: `-${fmtCurrency(workTax.taxPaid, config?.currencyEmoji)}`, inline: true }
+                );
+            }
 
             if (newStreak > 1) {
                 winEmbed.addFields({ name: "Job Streak", value: `${newStreak} Days`, inline: true });
@@ -813,8 +799,7 @@ async function handleButton(interaction: ButtonInteraction) {
             // Create Work Log
             await prisma.workLog.create({
                 data: {
-                    guildId: guild.id,
-                    userId: userData.id, // Use internal DB ID
+                    userId: userData.discordId,
                     jobId: userData.jobId!,
                     shiftType: game.type,
                     success: true,
@@ -839,7 +824,7 @@ async function handleButton(interaction: ButtonInteraction) {
             });
 
             // Update Quest Progress
-            await updateQuestProgress(userData.id, "WORK").catch(console.error);
+            await updateQuestProgress(userData.discordId, "WORK").catch(console.error);
 
             if (userMessage) {
                 await (userMessage as Message).reply({ embeds: [winEmbed], components: rows });
@@ -850,7 +835,7 @@ async function handleButton(interaction: ButtonInteraction) {
         } else {
             // FAILED
             await prisma.user.update({
-                where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
+                where: { discordId: user.id },
                 data: {
                     lastShift: new Date(), // Trigger cooldown
                     jobXp: { decrement: 5 }, // -5 XP
@@ -881,8 +866,7 @@ async function handleButton(interaction: ButtonInteraction) {
             // Create Work Log
             await prisma.workLog.create({
                 data: {
-                    guildId: guild.id,
-                    userId: userData.id,
+                    userId: userData.discordId,
                     jobId: userData.jobId!,
                     shiftType: game.type,
                     success: false,

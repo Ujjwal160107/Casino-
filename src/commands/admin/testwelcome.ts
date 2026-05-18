@@ -1,10 +1,11 @@
 import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, TextChannel } from "discord.js";
 import { Mascot } from "../../config/branding";
+import { DEVELOPER_ONLY_COMMAND_MESSAGE, isBotDeveloper } from "../../utils/developerAccess";
 
 export async function handleTestWelcome(message: Message) {
     // Basic Admin Check (Optional, but good practice even for debug)
-    if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
-        return message.reply("❌ You need Administrator permissions to run this test.");
+    if (!isBotDeveloper(message.author.id)) {
+        return message.reply(DEVELOPER_ONLY_COMMAND_MESSAGE);
     }
 
     const guild = message.guild!;

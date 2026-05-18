@@ -10,7 +10,7 @@ export async function handleJailInteraction(interaction: Interaction) {
     await interaction.deferReply({ ephemeral: true });
 
     const user = await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
-    const status = await checkJailStatus(user.id);
+    const status = await checkJailStatus(user.discordId);
 
     if (!status.isJailed) {
         return interaction.editReply({
@@ -18,7 +18,7 @@ export async function handleJailInteraction(interaction: Interaction) {
         });
     }
 
-    const result = await payBail(user.id, interaction.guildId!);
+    const result = await payBail(user.discordId, interaction.guildId!);
 
     if (result.success) {
         return interaction.editReply({

@@ -4,32 +4,68 @@ import {
     ButtonBuilder,
     ButtonStyle,
     ContainerBuilder,
-    MediaGalleryBuilder,
-    MediaGalleryItemBuilder,
     Message,
     MessageFlags,
     SectionBuilder,
     SeparatorBuilder,
     SeparatorSpacingSize,
     TextDisplayBuilder,
+    ThumbnailBuilder,
 } from "discord.js";
-import { Property } from "@prisma/client";
-import { PropertyService } from "../../services/propertyService";
+import fs from "fs";
+import path from "path";
+import {
+    PropertyService,
+    seedGlobalProperties,
+    collectIncome,
+    REGULAR_PROPERTY_CATALOG,
+    ZOO_KEYS,
+} from "../../services/propertyService";
+import { ZOO_CAPACITY } from "../../utils/animalCatalog";
+import { fmtCurrency, fmtAmount } from "../../utils/format";
 import { Mascot } from "../../config/branding";
 import { getGuildConfig } from "../../services/guildConfigService";
+import { Property } from "@prisma/client";
 
 const PROPERTY_ACCENT_COLOR = 0x9B59B6;
-const PROPERTY_BANNER_NAME = "property-banner.png";
-const PROPERTY_BANNER_URL = `attachment://${PROPERTY_BANNER_NAME}`;
-const PROPERTY_BANNER_PATH = "./assets/property_banner.png";
 const PROPERTIES_PER_PAGE = 3;
+
+const PROPERTY_ASSET_MAP: Record<string, string> = {
+  shack:      "shack",
+  apartment:  "apartment",
+  house:      "house",
+  mansion:    "mansion",
+  island:     "private island",
+  mini_zoo:   "mini zoo",
+  city_zoo:   "city zoo",
+  world_zoo:  "world zoo",
+};
+
+function resolvePropertyAsset(key: string): { filePath: string; attachmentName: string } | null {
+  const assetName = PROPERTY_ASSET_MAP[key];
+  if (!assetName) return null;
+  const assetDirs = [
+    path.resolve(process.cwd(), "src", "assets"),
+    path.resolve(process.cwd(), "assets"),
+  ];
+  for (const dir of assetDirs) {
+    const filePath = [".png", ".jpg", ".jpeg", ".webp"]
+      .map((ext) => path.join(dir, `${assetName}${ext}`))
+      .find((f) => fs.existsSync(f));
+    if (filePath) {
+      const safeName = assetName.replace(/\s+/g, "_");
+      return { filePath, attachmentName: `prop_${safeName}${path.extname(filePath)}` };
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function formatAmount(amount: number) {
     return amount.toLocaleString("en-US");
-}
-
-export function propertyBannerAttachment() {
-    return new AttachmentBuilder(PROPERTY_BANNER_PATH, { name: PROPERTY_BANNER_NAME });
 }
 
 export function getPropertiesTotalPages(properties: Property[]) {
@@ -64,21 +100,35 @@ export function buildPropertiesNavigationRow(totalPages: number, page = 1) {
     );
 }
 
+function buildTextOnlyContainer(title: string, body: string, accentColor = PROPERTY_ACCENT_COLOR) {
+    return new ContainerBuilder()
+        .setAccentColor(accentColor)
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**${title}**`),
+            new TextDisplayBuilder().setContent(body),
+        );
+}
+
+// ---------------------------------------------------------------------------
+// Properties Market Container (with regular/zoo sections)
+// ---------------------------------------------------------------------------
+
 export function buildPropertiesMarketContainer(
     properties: Property[],
     options: { currencyEmoji: string; prefix: string; page?: number },
+    files: AttachmentBuilder[],
 ) {
     const totalPages = getPropertiesTotalPages(properties);
     const page = Math.min(Math.max(options.page ?? 1, 1), totalPages);
     const startIndex = (page - 1) * PROPERTIES_PER_PAGE;
     const visibleProperties = properties.slice(startIndex, startIndex + PROPERTIES_PER_PAGE);
     const hasProperties = properties.length > 0;
-    const currencyEmoji = options.currencyEmoji;
+
     const container = new ContainerBuilder()
         .setAccentColor(PROPERTY_ACCENT_COLOR)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
-                `## ${Mascot.Name} Real Estate Market\n> Invest in properties to earn passive income and grow your net worth!\n> Prices fluctuate based on market demand.`,
+                `## Real Estate Market\nInvest in properties to earn passive income and grow your net worth.`,
             ),
         )
         .addSeparatorComponents(
@@ -94,21 +144,38 @@ export function buildPropertiesMarketContainer(
     }
 
     visibleProperties.forEach((property, index) => {
-        container.addSectionComponents(
-                new SectionBuilder()
-                    .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`### ${startIndex + index + 1}. ${property.name} (${property.key})`),
-                        new TextDisplayBuilder().setContent(
-                            `Base: **${currencyEmoji} ${formatAmount(property.basePrice)}**\nIncome: **${currencyEmoji} ${formatAmount(property.incomePerCycle)}**/${property.incomeCycleHours}h\nSold: ${property.totalSold}`,
-                    ),
-                )
-                .setButtonAccessory(
-                    new ButtonBuilder()
-                        .setCustomId(`buy_property_${property.key}`)
-                        .setLabel(`Price: ${formatAmount(property.price)}`)
-                        .setStyle(ButtonStyle.Success),
+        const isZoo = ZOO_KEYS.has(property.key);
+        const capacity = isZoo ? ZOO_CAPACITY[property.key] : null;
+
+        const incomeLabel = isZoo
+            ? `Capacity: **${capacity} animal types** | Income from zoo animals`
+            : `Income/24h: **${fmtCurrency(property.incomePerCycle * Math.floor(24 / property.incomeCycleHours))}**`;
+
+        const typeLabel = isZoo ? "Zoo Property" : "Regular Property";
+
+        const section = new SectionBuilder()
+            .addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(
+                    `### ${property.name}\n-# ${typeLabel}`,
                 ),
-        );
+                new TextDisplayBuilder().setContent(
+                    `Price: **${fmtCurrency(property.price)}**\n${incomeLabel}`,
+                ),
+            );
+
+        const asset = resolvePropertyAsset(property.key);
+        if (asset) {
+            section.setThumbnailAccessory(
+                new ThumbnailBuilder()
+                    .setURL(`attachment://${asset.attachmentName}`)
+                    .setDescription(property.name),
+            );
+            if (!files.find(f => (f as any).name === asset.attachmentName)) {
+                files.push(new AttachmentBuilder(asset.filePath, { name: asset.attachmentName }));
+            }
+        }
+
+        container.addSectionComponents(section);
 
         if (index < visibleProperties.length - 1) {
             container.addSeparatorComponents(
@@ -119,70 +186,247 @@ export function buildPropertiesMarketContainer(
         }
     });
 
-    container
-        .addMediaGalleryComponents(
-            new MediaGalleryBuilder().addItems(
-                new MediaGalleryItemBuilder()
-                    .setURL(PROPERTY_BANNER_URL)
-                    .setDescription(`${Mascot.Name} real estate market banner`),
-            ),
-        );
+    container.addSeparatorComponents(
+        new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
+    );
 
-    return container
-        .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(
-                `Page ${page}/${totalPages} - Use \`${options.prefix}buy-property <key>\` to purchase`,
-            ),
-        );
+    container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+            `-# Page ${page}/${totalPages} — click a Buy button below to purchase`,
+        ),
+    );
+
+    return container;
 }
 
-function buildPropertyContainer(property: Property, currencyEmoji: string) {
-    return new ContainerBuilder()
+export function buildPropertyBuyRow(properties: Property[], page: number) {
+    const totalPages = getPropertiesTotalPages(properties);
+    const safePage = Math.min(Math.max(page, 1), totalPages);
+    const startIndex = (safePage - 1) * PROPERTIES_PER_PAGE;
+    const visible = properties.slice(startIndex, startIndex + PROPERTIES_PER_PAGE);
+    const row = new ActionRowBuilder<ButtonBuilder>();
+    visible.forEach((property) => {
+        const isZoo = ZOO_KEYS.has(property.key);
+        row.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`buy_property_${property.key}`)
+                .setLabel(`Buy ${property.name}`)
+                .setStyle(isZoo ? ButtonStyle.Primary : ButtonStyle.Success),
+        );
+    });
+    return row;
+}
+
+// ---------------------------------------------------------------------------
+// My Properties Container
+// ---------------------------------------------------------------------------
+
+function buildMyPropertiesContainer(
+    owned: Awaited<ReturnType<typeof PropertyService.getOwnedProperties>>,
+    currencyEmoji: string,
+    prefix: string,
+): ContainerBuilder {
+    const container = new ContainerBuilder()
         .setAccentColor(PROPERTY_ACCENT_COLOR)
         .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(`**${property.name}**`),
+            new TextDisplayBuilder().setContent(`## 🏘️ Your Property Portfolio`),
         )
         .addSeparatorComponents(
-            new SeparatorBuilder()
-                .setDivider(true)
-                .setSpacing(SeparatorSpacingSize.Small),
-        )
-        .addSectionComponents(
-            new SectionBuilder()
-                .addTextDisplayComponents(
-                    new TextDisplayBuilder().setContent(`**Price:** ${formatAmount(property.price)} ${currencyEmoji}`),
-                    new TextDisplayBuilder().setContent(`**Rent Income:** ${formatAmount(property.incomePerCycle)} ${currencyEmoji}`),
-                    new TextDisplayBuilder().setContent(`**Collection Cycle:** Every ${property.incomeCycleHours} hours`),
-                )
-                .setButtonAccessory(
-                    new ButtonBuilder()
-                        .setCustomId(`buy_property_${property.key}`)
-                        .setLabel(`Price: ${formatAmount(property.price)}`)
-                        .setStyle(ButtonStyle.Success),
-                ),
-        )
-        .addActionRowComponents(
-            new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`buy_property_${property.key}`)
-                    .setLabel("Buy Property")
-                    .setStyle(ButtonStyle.Success),
-                new ButtonBuilder()
-                    .setCustomId("cancel_property_buy")
-                    .setLabel("Cancel")
-                    .setStyle(ButtonStyle.Secondary),
-            ),
+            new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
         );
+
+    const regularOwned = owned.filter((o) => !ZOO_KEYS.has(o.property.key));
+    const zooOwned = owned.filter((o) => ZOO_KEYS.has(o.property.key));
+
+    // Regular properties section
+    if (regularOwned.length > 0) {
+        container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**🏠 Regular Properties (${regularOwned.length})**`),
+        );
+
+        regularOwned.slice(0, 5).forEach((ownedProperty, index) => {
+            const property = ownedProperty.property;
+            const income24h = property.incomePerCycle * Math.floor(24 / property.incomeCycleHours);
+
+            if (index > 0) {
+                container.addSeparatorComponents(
+                    new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small),
+                );
+            }
+
+            container.addSectionComponents(
+                new SectionBuilder()
+                    .addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(`**${property.name}**`),
+                        new TextDisplayBuilder().setContent(
+                            `Paid: ${fmtCurrency(ownedProperty.purchasedPrice)} | Value: ${fmtCurrency(property.price)}\nIncome/24h: **${fmtCurrency(income24h)}**`,
+                        ),
+                    )
+                    .setButtonAccessory(
+                        new ButtonBuilder()
+                            .setCustomId(`sell_property_${property.key}`)
+                            .setLabel("Sell")
+                            .setStyle(ButtonStyle.Danger),
+                    ),
+            );
+        });
+    }
+
+    // Zoo properties section
+    if (zooOwned.length > 0) {
+        if (regularOwned.length > 0) {
+            container.addSeparatorComponents(
+                new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
+            );
+        }
+
+        container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**🦁 Zoo Properties (${zooOwned.length})**`),
+        );
+
+        zooOwned.forEach((ownedProperty, index) => {
+            const property = ownedProperty.property;
+            const capacity = ZOO_CAPACITY[property.key] ?? "?";
+
+            if (index > 0) {
+                container.addSeparatorComponents(
+                    new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small),
+                );
+            }
+
+            container.addSectionComponents(
+                new SectionBuilder()
+                    .addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(`**${property.name}**`),
+                        new TextDisplayBuilder().setContent(
+                            `Paid: ${fmtCurrency(ownedProperty.purchasedPrice)} | Value: ${fmtCurrency(property.price)}\nCapacity: **${capacity} animal slots** | Use \`!zoo\` to manage`,
+                        ),
+                    )
+                    .setButtonAccessory(
+                        new ButtonBuilder()
+                            .setCustomId(`sell_property_${property.key}`)
+                            .setLabel("Sell")
+                            .setStyle(ButtonStyle.Danger),
+                    ),
+            );
+        });
+    }
+
+    container.addSeparatorComponents(
+        new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
+    );
+    container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+            `Use \`${prefix}sell-property <key>\` to sell a property back for ~75% of its current value.`,
+        ),
+    );
+
+    return container;
 }
 
-function buildTextOnlyContainer(title: string, body: string, accentColor = PROPERTY_ACCENT_COLOR) {
-    return new ContainerBuilder()
-        .setAccentColor(accentColor)
-        .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(`**${title}**`),
-            new TextDisplayBuilder().setContent(body),
+// ---------------------------------------------------------------------------
+// Collect Receipt Container
+// ---------------------------------------------------------------------------
+
+function buildCollectReceiptContainer(
+    result: Awaited<ReturnType<typeof collectIncome>>,
+): ContainerBuilder {
+    const container = new ContainerBuilder().setAccentColor(0x2ECC71);
+
+    if (result.nothingReady) {
+        let nextText = "Check back later.";
+        const soonest = [result.nextPropertyCollect, result.nextZooCollect]
+            .filter((d): d is Date => d !== null)
+            .sort((a, b) => a.getTime() - b.getTime())[0];
+
+        if (soonest) {
+            const ts = Math.floor(soonest.getTime() / 1000);
+            nextText = `Nothing is ready yet. Earliest collection: <t:${ts}:R>`;
+        }
+
+        container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`## 🏠 Income Collected\n\n${nextText}`),
         );
+        return container;
+    }
+
+    let headerContent = `## 🏠 Income Collected`;
+    container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(headerContent),
+    );
+    container.addSeparatorComponents(
+        new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
+    );
+
+    // Regular properties breakdown
+    if (result.propertyBreakdown.length > 0) {
+        const propertyLines = result.propertyBreakdown
+            .map((entry) => `  ${entry.name}: **+${fmtCurrency(entry.income)}**`)
+            .join("\n");
+
+        container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+                `**🏠 Regular Properties** (+${fmtCurrency(result.propertyTotal)})\n${propertyLines}`,
+            ),
+        );
+    }
+
+    // Zoo income breakdown
+    if (result.zooBreakdown.length > 0) {
+        if (result.propertyBreakdown.length > 0) {
+            container.addSeparatorComponents(
+                new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small),
+            );
+        }
+
+        // Group by rarity for a cleaner display
+        const rarityGroups: Record<string, { count: number; total: number }> = {};
+        for (const entry of result.zooBreakdown) {
+            if (!rarityGroups[entry.rarity]) {
+                rarityGroups[entry.rarity] = { count: 0, total: 0 };
+            }
+            rarityGroups[entry.rarity].count++;
+            rarityGroups[entry.rarity].total += entry.income;
+        }
+
+        const zooLines = Object.entries(rarityGroups)
+            .map(([rarity, { count, total }]) => `  ${count}x ${rarity}: **+${fmtCurrency(total)}**`)
+            .join("\n");
+
+        container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+                `**🦁 Zoo Income** (+${fmtCurrency(result.zooTotal)})\n${zooLines}`,
+            ),
+        );
+    }
+
+    container.addSeparatorComponents(
+        new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
+    );
+
+    // Grand total and next collection timestamps
+    const totalLine = `**Total Collected: ${fmtCurrency(result.grandTotal)}**`;
+    const lines: string[] = [totalLine];
+
+    if (result.nextPropertyCollect) {
+        const ts = Math.floor(result.nextPropertyCollect.getTime() / 1000);
+        lines.push(`Next property collection: <t:${ts}:R>`);
+    }
+    if (result.nextZooCollect) {
+        const ts = Math.floor(result.nextZooCollect.getTime() / 1000);
+        lines.push(`Next zoo collection: <t:${ts}:R>`);
+    }
+
+    container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(lines.join("\n")),
+    );
+
+    return container;
 }
+
+// ---------------------------------------------------------------------------
+// Handler: !properties [subcommand]
+// ---------------------------------------------------------------------------
 
 export const propertiesHandler = async (message: Message, args: string[]) => {
     const subCommand = args[0]?.toLowerCase();
@@ -191,24 +435,22 @@ export const propertiesHandler = async (message: Message, args: string[]) => {
     const prefix = guildConfig.prefix || "!";
     const currencyEmoji = guildConfig.currencyEmoji || Mascot.Emotes.Blackcoin;
 
-    if (!subCommand) {
-        const properties = await PropertyService.getAllProperties(guildId);
-        const container = buildPropertiesMarketContainer(properties, { currencyEmoji, prefix });
-        const navigationRow = buildPropertiesNavigationRow(getPropertiesTotalPages(properties));
-
+    // ---- !properties collect ----
+    if (subCommand === "collect") {
         try {
-            return await message.reply({
-                components: [container, navigationRow],
-                files: properties.length > 0 ? [propertyBannerAttachment()] : [],
+            const result = await collectIncome(message.author.id, guildId);
+            const container = buildCollectReceiptContainer(result);
+            return message.reply({
+                components: [container],
                 flags: MessageFlags.IsComponentsV2,
             });
         } catch (err) {
-            console.error("Failed to send properties V2 market:", err);
+            console.error("collectIncome error:", err);
             return message.reply({
                 components: [
                     buildTextOnlyContainer(
-                        "Real Estate Market",
-                        "The property market could not be rendered. Check the bot logs for the Discord API validation error.",
+                        "Collection Failed",
+                        "Something went wrong while collecting income. Please try again.",
                         0xE74C3C,
                     ),
                 ],
@@ -216,7 +458,49 @@ export const propertiesHandler = async (message: Message, args: string[]) => {
             });
         }
     }
+
+    // ---- !properties mine ----
+    if (subCommand === "mine") {
+        return myPropertiesHandler(message);
+    }
+
+    // ---- !properties (market, default) ----
+    await seedGlobalProperties(guildId);
+    const properties = await PropertyService.getAllProperties(guildId);
+    const totalPages = getPropertiesTotalPages(properties);
+    const files: AttachmentBuilder[] = [];
+    const container = buildPropertiesMarketContainer(properties, { currencyEmoji, prefix }, files);
+    const buyRow = buildPropertyBuyRow(properties, 1);
+    const navigationRow = buildPropertiesNavigationRow(totalPages);
+
+    const components: any[] = [container];
+    if (properties.length > 0) components.push(buyRow);
+    if (totalPages > 1) components.push(navigationRow);
+
+    try {
+        return await message.reply({
+            components,
+            files,
+            flags: MessageFlags.IsComponentsV2,
+        });
+    } catch (err) {
+        console.error("Failed to send properties V2 market:", err);
+        return message.reply({
+            components: [
+                buildTextOnlyContainer(
+                    "Real Estate Market",
+                    "The property market could not be rendered. Check the bot logs for the Discord API validation error.",
+                    0xE74C3C,
+                ),
+            ],
+            flags: MessageFlags.IsComponentsV2,
+        });
+    }
 };
+
+// ---------------------------------------------------------------------------
+// Handler: !buy-property <key>
+// ---------------------------------------------------------------------------
 
 export const buyPropertyHandler = async (message: Message, args: string[]) => {
     const guildConfig = await getGuildConfig(message.guildId!);
@@ -235,6 +519,9 @@ export const buyPropertyHandler = async (message: Message, args: string[]) => {
         });
     }
 
+    // Seed first so the property exists
+    await seedGlobalProperties(message.guildId!);
+
     const result = await PropertyService.buyProperty(message.author.id, message.guildId!, key);
 
     return message.reply({
@@ -248,6 +535,10 @@ export const buyPropertyHandler = async (message: Message, args: string[]) => {
         flags: MessageFlags.IsComponentsV2,
     });
 };
+
+// ---------------------------------------------------------------------------
+// Handler: !sell-property <key>
+// ---------------------------------------------------------------------------
 
 export const sellPropertyHandler = async (message: Message, args: string[]) => {
     const guildConfig = await getGuildConfig(message.guildId!);
@@ -280,6 +571,10 @@ export const sellPropertyHandler = async (message: Message, args: string[]) => {
     });
 };
 
+// ---------------------------------------------------------------------------
+// Handler: !my-properties
+// ---------------------------------------------------------------------------
+
 export const myPropertiesHandler = async (message: Message) => {
     const guildConfig = await getGuildConfig(message.guildId!);
     const prefix = guildConfig.prefix || "!";
@@ -298,52 +593,37 @@ export const myPropertiesHandler = async (message: Message) => {
         });
     }
 
-    const components = owned.slice(0, 5).map((ownedProperty) => {
-        const property = ownedProperty.property;
-        return new ContainerBuilder()
-            .setAccentColor(PROPERTY_ACCENT_COLOR)
-            .addTextDisplayComponents(
-                new TextDisplayBuilder().setContent(`**${property.name}**`),
-            )
-            .addSeparatorComponents(
-                new SeparatorBuilder()
-                    .setDivider(true)
-                    .setSpacing(SeparatorSpacingSize.Small),
-            )
-            .addSectionComponents(
-                new SectionBuilder()
-                    .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`**Purchase Price:** ${formatAmount(ownedProperty.purchasedPrice)} ${currencyEmoji}`),
-                        new TextDisplayBuilder().setContent(`**Current Value:** ${formatAmount(property.price)} ${currencyEmoji}`),
-                        new TextDisplayBuilder().setContent(`**Rent Income:** ${formatAmount(property.incomePerCycle)} ${currencyEmoji}`),
-                    )
-                    .setButtonAccessory(
-                        new ButtonBuilder()
-                            .setCustomId(`buy_property_${property.key}`)
-                            .setLabel("Owned")
-                            .setStyle(ButtonStyle.Secondary)
-                            .setDisabled(true),
-                    ),
-            );
-    });
+    const container = buildMyPropertiesContainer(owned, currencyEmoji, prefix);
 
     return message.reply({
-        components,
+        components: [container],
         flags: MessageFlags.IsComponentsV2,
     });
 };
 
-export const collectRentHandler = async (message: Message) => {
-    const result = await PropertyService.collectRent(message.author.id, message.guildId!);
+// ---------------------------------------------------------------------------
+// Handler: !collect-rent (legacy — redirects to collectIncome)
+// ---------------------------------------------------------------------------
 
-    return message.reply({
-        components: [
-            buildTextOnlyContainer(
-                result.success ? "Rent Collected" : "Rent Collection Failed",
-                result.message,
-                result.success ? 0x2ECC71 : 0xE74C3C,
-            ),
-        ],
-        flags: MessageFlags.IsComponentsV2,
-    });
+export const collectRentHandler = async (message: Message) => {
+    try {
+        const result = await collectIncome(message.author.id, message.guildId!);
+        const container = buildCollectReceiptContainer(result);
+        return message.reply({
+            components: [container],
+            flags: MessageFlags.IsComponentsV2,
+        });
+    } catch (err) {
+        console.error("collectRentHandler error:", err);
+        return message.reply({
+            components: [
+                buildTextOnlyContainer(
+                    "Collection Failed",
+                    "Something went wrong while collecting income. Please try again.",
+                    0xE74C3C,
+                ),
+            ],
+            flags: MessageFlags.IsComponentsV2,
+        });
+    }
 };

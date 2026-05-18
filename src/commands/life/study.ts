@@ -18,7 +18,7 @@ export async function handleStudy(message: Message) {
     const prefix = config.prefix || "!";
 
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: message.author.id, guildId: message.guild.id } },
+        where: { discordId: message.author.id },
         include: { currentEducation: true }
     });
 

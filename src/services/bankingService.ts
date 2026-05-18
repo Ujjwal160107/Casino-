@@ -1,220 +1,288 @@
-import { Client } from "discord.js";
-import prisma from "../utils/prisma";
-import { Loan, Investment, User, GuildConfig } from "@prisma/client";
-import { ensureBankForUser } from "./bankService";
-import { getGuildConfig } from "./guildConfigService";
-import { Mascot } from "../config/branding";
+import prisma, { runWithRetry } from "../utils/prisma";
+import { PrismaClient, Investment } from "@prisma/client";
+import { BANKING_CONFIG, MAX_SAFE_BALANCE } from "../utils/economyConfig";
 
-export function calculateCreditLimits(creditScore: number, config: any) {
-    const defaultTiers = [
-        { minScore: 0, maxLoan: 5000, maxDays: 3 },
-        { minScore: 500, maxLoan: 25000, maxDays: 7 },
-        { minScore: 800, maxLoan: 100000, maxDays: 14 }
-    ];
-    const tiers = (config.creditConfig as any[])?.length ? (config.creditConfig as any[]) : defaultTiers;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-    tiers.sort((a: any, b: any) => b.minScore - a.minScore);
-    const applicableTier = tiers.find((t: any) => creditScore >= t.minScore) || tiers[tiers.length - 1];
-
-    const maxLoan = config.loanMaxAmount || applicableTier.maxLoan;
+export function calculateCreditLimits(creditScore: number) {
+    const tiers = [...BANKING_CONFIG.defaultLoanTiers].sort((a, b) => b.minScore - a.minScore);
+    const applicableTier = tiers.find((tier) => creditScore >= tier.minScore) || tiers[tiers.length - 1];
 
     return {
-        maxLoan,
+        maxLoan: applicableTier.maxLoan,
         maxDays: applicableTier.maxDays,
         tier: applicableTier
     };
 }
 
-export async function applyForLoan(discordId: string, guildId: string, amount: number) {
+function clampCreditScore(score: number) {
+    return Math.min(Math.max(score, BANKING_CONFIG.minCreditScore), BANKING_CONFIG.maxCreditScore);
+}
+
+function calculateLoanRepayment(amount: number) {
+    const interestAmount = Math.floor(amount * (BANKING_CONFIG.loanInterestRate / 100));
+    return {
+        interestRate: BANKING_CONFIG.loanInterestRate,
+        interestAmount,
+        totalRepayment: amount + interestAmount
+    };
+}
+
+function calculateInvestmentPayout(investment: Pick<Investment, "amount" | "interestRate" | "type" | "startDate" | "maturityDate">) {
+    const durationDays = Math.max(1, Math.ceil((investment.maturityDate.getTime() - investment.startDate.getTime()) / DAY_MS));
+    const annualRate = investment.interestRate / 100;
+    const interest = investment.type === "RD"
+        ? Math.floor(investment.amount * annualRate * (durationDays / 365) * 0.5)
+        : Math.floor(investment.amount * annualRate * (durationDays / 365));
+
+    return {
+        durationDays,
+        interest,
+        payout: investment.amount + interest
+    };
+}
+
+export async function applyForLoan(discordId: string, amount: number) {
     if (amount <= 0) throw new Error("Loan amount must be positive.");
 
-    const user = await prisma.user.findUnique({ where: { discordId_guildId: { discordId, guildId } } });
-    if (!user) throw new Error("User not found.");
-    const userId = user.id;
-    await ensureBankForUser(userId);
+    return runWithRetry(async (tx: PrismaClient) => {
+        return tx.$transaction(async (trx) => {
+            const user = await trx.user.findUnique({
+                where: { discordId },
+                include: { bank: true, wallet: true }
+            });
+            if (!user) throw new Error("User not found.");
+            if (user.isLoanBanned) throw new Error("You are banned from taking loans.");
 
-    // Check Max Active Loans
-    const activeLoansCount = await prisma.loan.count({
-        where: { userId, status: "ACTIVE" }
-    });
-    const config = await getGuildConfig(guildId);
-    const maxActiveLoans = config.maxActiveLoans || 1;
-
-    if (activeLoansCount >= maxActiveLoans) {
-        throw new Error(`You have reached the limit of ${maxActiveLoans} active loan(s). Please repay one first.`);
-    }
-
-    const limits = calculateCreditLimits(user.creditScore, config);
-    if (amount > limits.maxLoan) {
-        throw new Error(`Loan denied. Your credit score (${user.creditScore}) limits you to a max loan of ${limits.maxLoan}.`);
-    }
-
-    const interestRate = config.loanInterestRate;
-    const interestAmount = Math.floor(amount * (interestRate / 100));
-    const totalRepayment = amount + interestAmount;
-    const dueDate = new Date(Date.now() + (limits.maxDays * 86400000));
-
-    await prisma.$transaction([
-        prisma.loan.create({
-            data: {
-                userId,
-                amount,
-                totalRepayment,
-                interestRate,
-                dueDate,
-                status: "ACTIVE"
+            const activeLoansCount = await trx.loan.count({
+                where: { userId: discordId, status: "ACTIVE" }
+            });
+            if (activeLoansCount >= BANKING_CONFIG.maxActiveLoans) {
+                throw new Error(`You have reached the limit of ${BANKING_CONFIG.maxActiveLoans} active loan(s). Please repay one first.`);
             }
-        }),
-        prisma.bank.update({
-            where: { userId },
-            data: { balance: { increment: amount } }
-        }),
-        prisma.transaction.create({
-            data: {
-                walletId: (await prisma.wallet.findUnique({ where: { userId } }))!.id,
-                amount: amount,
-                type: "loan_disbursal",
-                meta: { type: "loan", amount }
+
+            const limits = calculateCreditLimits(user.creditScore);
+            if (amount > limits.maxLoan) {
+                throw new Error(`Loan denied. Your credit score (${user.creditScore}) limits you to a max loan of ${limits.maxLoan}.`);
             }
-        })
-    ]);
 
-    return { amount, totalRepayment, dueDate, interestRate };
-}
+            const bank = user.bank ?? await trx.bank.create({ data: { userId: discordId, balance: 0 } });
+            const wallet = user.wallet ?? await trx.wallet.create({ data: { userId: discordId, balance: 0 } });
+            const availableSpace = Math.max(0, MAX_SAFE_BALANCE - bank.balance);
+            const disbursedAmount = Math.min(amount, availableSpace);
+            if (disbursedAmount <= 0) throw new Error("Bank balance is at the global safety cap.");
 
-export async function repayLoan(discordId: string, guildId: string, amount: number) {
-    const user = await prisma.user.findUnique({ where: { discordId_guildId: { discordId, guildId } } });
-    if (!user) throw new Error("User not found.");
-    const userId = user.id;
+            const repayment = calculateLoanRepayment(disbursedAmount);
+            const limitsForDisbursed = calculateCreditLimits(user.creditScore);
+            const dueDate = new Date(Date.now() + limitsForDisbursed.maxDays * DAY_MS);
 
-    const loan = await prisma.loan.findFirst({
-        where: { userId, status: "ACTIVE" },
-        orderBy: { createdAt: "asc" }
-    });
-    if (!loan) throw new Error("No active loan found.");
-
-    const config = await getGuildConfig(guildId);
-    const bank = await ensureBankForUser(discordId, guildId);
-
-    if (bank.balance < amount) {
-        throw new Error(`Insufficient bank balance. Please deposit money first using \`${config.prefix}deposit\`.`);
-    }
-
-    let newStatus = "ACTIVE";
-    let remaining = loan.totalRepayment - amount;
-    let payAmount = amount;
-
-    if (remaining <= 0) {
-        newStatus = "PAID";
-        payAmount = loan.totalRepayment;
-        remaining = 0;
-    }
-
-    const now = new Date();
-    const isOverdue = now > loan.dueDate;
-    let scoreChange = 0;
-
-    if (newStatus === "PAID") {
-        if (isOverdue) {
-            scoreChange = -(config.creditScorePenalty || 20);
-        } else {
-            scoreChange = (config.creditScoreReward || 10);
-        }
-    }
-
-    await prisma.$transaction([
-        prisma.bank.update({
-            where: { id: bank.id },
-            data: { balance: { decrement: payAmount } }
-        }),
-        prisma.loan.update({
-            where: { id: loan.id },
-            data: {
-                totalRepayment: remaining,
-                status: newStatus
-            }
-        }),
-        ...(scoreChange !== 0 ? [
-            prisma.user.update({
-                where: { id: userId },
+            const loan = await trx.loan.create({
                 data: {
-                    creditScore: {
-                        set: Math.min(Math.max((user.creditScore + scoreChange), 50), (config.maxCreditScore || 2000))
-                    }
+                    userId: discordId,
+                    amount: disbursedAmount,
+                    totalRepayment: repayment.totalRepayment,
+                    interestRate: repayment.interestRate,
+                    dueDate,
+                    status: "ACTIVE"
                 }
-            })
-        ] : [])
-    ]);
+            });
 
-    return { paid: payAmount, remaining, status: newStatus };
+            const updatedBank = await trx.bank.update({
+                where: { id: bank.id },
+                data: { balance: { increment: disbursedAmount } }
+            });
+
+            await trx.transaction.create({
+                data: {
+                    walletId: wallet.id,
+                    amount: disbursedAmount,
+                    type: "loan_disbursal",
+                    meta: { loanId: loan.id, requestedAmount: amount, capped: disbursedAmount < amount },
+                    isEarned: false
+                }
+            });
+
+            return {
+                loan,
+                bank: updatedBank,
+                amount: disbursedAmount,
+                requestedAmount: amount,
+                totalRepayment: repayment.totalRepayment,
+                interestRate: repayment.interestRate,
+                dueDate,
+                capped: disbursedAmount < amount
+            };
+        });
+    });
 }
 
-export async function createInvestment(discordId: string, guildId: string, type: "FD" | "RD", amount: number, durationDays: number) {
-    if (amount <= 0) throw new Error("Amount must be positive.");
-    const bank = await ensureBankForUser(discordId, guildId);
-    if (bank.balance < amount) throw new Error("Insufficient bank balance.");
+export async function repayLoan(discordId: string, amount: number) {
+    if (amount <= 0) throw new Error("Repayment amount must be positive.");
 
-    const user = await prisma.user.findUnique({ where: { discordId_guildId: { discordId, guildId } } });
-    if (!user) throw new Error("User not found.");
-    const userId = user.id;
+    return runWithRetry(async (tx: PrismaClient) => {
+        return tx.$transaction(async (trx) => {
+            const user = await trx.user.findUnique({
+                where: { discordId },
+                include: { bank: true, wallet: true }
+            });
+            if (!user) throw new Error("User not found.");
+            if (!user.bank) throw new Error("Bank account not found.");
 
-    const config = await getGuildConfig(guildId);
-    const interestRate = type === "FD" ? config.fdInterestRate : config.rdInterestRate;
+            const loan = await trx.loan.findFirst({
+                where: { userId: discordId, status: "ACTIVE" },
+                orderBy: { createdAt: "asc" }
+            });
+            if (!loan) throw new Error("No active loan found.");
 
-    const maturityDate = new Date();
-    maturityDate.setDate(maturityDate.getDate() + durationDays);
+            const payAmount = Math.min(amount, loan.totalRepayment);
+            if (user.bank.balance < payAmount) throw new Error("Insufficient bank balance.");
 
-    await prisma.$transaction([
-        prisma.bank.update({
-            where: { id: bank.id },
-            data: { balance: { decrement: amount } }
-        }),
-        prisma.investment.create({
-            data: {
-                userId,
-                type,
-                amount,
-                interestRate,
-                maturityDate,
-                status: "ACTIVE"
+            const remaining = Math.max(0, loan.totalRepayment - payAmount);
+            const newStatus = remaining === 0 ? "PAID" : "ACTIVE";
+            const isLate = new Date() > loan.dueDate;
+            const scoreDelta = newStatus === "PAID"
+                ? (isLate ? -BANKING_CONFIG.creditScorePenalty : BANKING_CONFIG.creditScoreReward)
+                : 0;
+
+            const updatedBank = await trx.bank.update({
+                where: { id: user.bank.id },
+                data: { balance: { decrement: payAmount } }
+            });
+
+            const updatedLoan = await trx.loan.update({
+                where: { id: loan.id },
+                data: {
+                    totalRepayment: remaining,
+                    status: newStatus
+                }
+            });
+
+            const updatedUser = scoreDelta === 0 ? user : await trx.user.update({
+                where: { discordId },
+                data: { creditScore: clampCreditScore(user.creditScore + scoreDelta) }
+            });
+
+            if (user.wallet) {
+                await trx.transaction.create({
+                    data: {
+                        walletId: user.wallet.id,
+                        amount: -payAmount,
+                        type: "loan_repayment",
+                        meta: { loanId: loan.id, remaining, status: newStatus, scoreDelta },
+                        isEarned: false
+                    }
+                });
             }
-        })
-    ]);
 
-    return { type, amount, interestRate, maturityDate };
+            return {
+                paid: payAmount,
+                remaining,
+                status: newStatus,
+                scoreDelta,
+                creditScore: updatedUser.creditScore,
+                bank: updatedBank,
+                loan: updatedLoan
+            };
+        });
+    });
 }
 
-export async function checkMaturedInvestments(discordId: string, guildId: string) {
-    const user = await prisma.user.findUnique({ where: { discordId_guildId: { discordId, guildId } } });
-    if (!user) return [];
-    const userId = user.id;
+export async function createInvestment(discordId: string, type: "FD" | "RD", amount: number, durationDays: number) {
+    if (amount <= 0) throw new Error("Amount must be positive.");
+    if (durationDays <= 0) throw new Error("Duration must be at least 1 day.");
 
+    return runWithRetry(async (tx: PrismaClient) => {
+        return tx.$transaction(async (trx) => {
+            const user = await trx.user.findUnique({
+                where: { discordId },
+                include: { bank: true }
+            });
+            if (!user) throw new Error("User not found.");
+            if (!user.bank) throw new Error("Bank account not found.");
+            if (user.bank.balance < amount) throw new Error("Insufficient bank balance.");
+
+            const interestRate = type === "FD" ? BANKING_CONFIG.fdInterestRate : BANKING_CONFIG.rdInterestRate;
+            const maturityDate = new Date(Date.now() + durationDays * DAY_MS);
+
+            const updatedBank = await trx.bank.update({
+                where: { id: user.bank.id },
+                data: { balance: { decrement: amount } }
+            });
+
+            const investment = await trx.investment.create({
+                data: {
+                    userId: discordId,
+                    type,
+                    amount,
+                    interestRate,
+                    maturityDate,
+                    status: "ACTIVE"
+                }
+            });
+
+            return { investment, bank: updatedBank, type, amount, interestRate, maturityDate };
+        });
+    });
+}
+
+export async function checkMaturedInvestments(discordId: string) {
     const investments = await prisma.investment.findMany({
         where: {
-            userId,
+            userId: discordId,
             status: "ACTIVE",
             maturityDate: { lte: new Date() }
         }
     });
 
     const results = [];
-    for (const inv of investments) {
-        const interest = Math.floor(inv.amount * (inv.interestRate / 100));
-        const payout = inv.amount + interest;
-
-        await prisma.$transaction([
-            prisma.investment.update({
-                where: { id: inv.id },
-                data: { status: "COMPLETED" }
-            }),
-            prisma.bank.update({
-                where: { userId: inv.userId },
-                data: { balance: { increment: payout } }
-            })
-        ]);
-        results.push({ id: inv.id, payout, type: inv.type, interest });
+    for (const investment of investments) {
+        results.push(await matureInvestment(investment.id));
     }
-    return results;
+    return results.filter(Boolean);
+}
+
+async function matureInvestment(investmentId: string) {
+    return runWithRetry(async (tx: PrismaClient) => {
+        return tx.$transaction(async (trx) => {
+            const investment = await trx.investment.findUnique({ where: { id: investmentId } });
+            if (!investment || investment.status !== "ACTIVE" || investment.maturityDate > new Date()) return null;
+
+            const bank = await trx.bank.upsert({
+                where: { userId: investment.userId },
+                update: {},
+                create: { userId: investment.userId, balance: 0 }
+            });
+
+            const calculated = calculateInvestmentPayout(investment);
+            const availableSpace = Math.max(0, MAX_SAFE_BALANCE - bank.balance);
+            const payout = Math.min(calculated.payout, availableSpace);
+            const interest = Math.max(0, payout - investment.amount);
+
+            const updatedInvestment = await trx.investment.update({
+                where: { id: investment.id },
+                data: { status: "COMPLETED" }
+            });
+
+            const updatedBank = payout > 0
+                ? await trx.bank.update({
+                    where: { id: bank.id },
+                    data: { balance: { increment: payout } }
+                })
+                : bank;
+
+            return {
+                id: investment.id,
+                type: investment.type,
+                principal: investment.amount,
+                interest,
+                payout,
+                durationDays: calculated.durationDays,
+                capped: payout < calculated.payout,
+                investment: updatedInvestment,
+                bank: updatedBank
+            };
+        });
+    });
 }
 
 export async function processAllInvestments() {
@@ -222,38 +290,29 @@ export async function processAllInvestments() {
         where: {
             status: "ACTIVE",
             maturityDate: { lte: new Date() }
-        }
+        },
+        select: { id: true }
     });
 
     let count = 0;
-    for (const inv of investments) {
-        const interest = Math.floor(inv.amount * (inv.interestRate / 100));
-        const payout = inv.amount + interest;
-
-        await prisma.$transaction([
-            prisma.investment.update({
-                where: { id: inv.id },
-                data: { status: "COMPLETED" }
-            }),
-            prisma.bank.update({
-                where: { userId: inv.userId },
-                data: { balance: { increment: payout } }
-            })
-        ]);
-        count++;
+    for (const investment of investments) {
+        const result = await matureInvestment(investment.id);
+        if (result) count++;
     }
     return count;
 }
 
-export async function getFinancialSummary(discordId: string, guildId: string) {
+export async function getFinancialSummary(discordId: string) {
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId, guildId } },
+        where: { discordId },
         include: { bank: true, wallet: true }
     });
 
     if (!user) {
         return {
             netWorth: 0,
+            walletBalance: 0,
+            bankBalance: 0,
             creditScore: 500,
             activeLoans: [],
             investments: [],
@@ -261,81 +320,110 @@ export async function getFinancialSummary(discordId: string, guildId: string) {
         };
     }
 
-    const activeLoans = await prisma.loan.findMany({
-        where: { userId: user.id, status: "ACTIVE" },
-        orderBy: { createdAt: "asc" }
-    });
+    const [activeLoans, investments] = await Promise.all([
+        prisma.loan.findMany({
+            where: { userId: discordId, status: "ACTIVE" },
+            orderBy: { createdAt: "asc" }
+        }),
+        prisma.investment.findMany({
+            where: { userId: discordId, status: "ACTIVE" },
+            orderBy: { maturityDate: "asc" }
+        })
+    ]);
 
-    const investments = await prisma.investment.findMany({ where: { userId: user.id, status: "ACTIVE" } });
-    const investmentValue = investments.reduce((sum, inv) => sum + inv.amount, 0);
+    const investmentValue = investments.reduce((sum, investment) => sum + investment.amount, 0);
+    const walletBalance = user.wallet?.balance || 0;
+    const bankBalance = user.bank?.balance || 0;
 
     return {
-        netWorth: (user.bank?.balance || 0) + (user.wallet?.balance || 0) + investmentValue,
+        netWorth: bankBalance + walletBalance + investmentValue,
+        walletBalance,
+        bankBalance,
         creditScore: user.creditScore,
         activeLoans,
         investments,
-        isLoanBanned: (user as any).isLoanBanned
+        isLoanBanned: user.isLoanBanned
     };
 }
 
-export async function processOverdueLoans(client: Client) {
+export async function processOverdueLoans() {
     const overdueLoans = await prisma.loan.findMany({
         where: {
             status: "ACTIVE",
             dueDate: { lt: new Date() }
-        }
+        },
+        select: { id: true }
     });
 
     let count = 0;
     for (const loan of overdueLoans) {
-        let user;
-        try {
-            user = await prisma.user.findUnique({ where: { id: loan.userId }, include: { bank: true, wallet: true } });
-        } catch (e) {
-            console.warn(`${Mascot.Emotes.Alert} Corrupt user data for loan ${loan.id}. Deleting loan to prevent loop crash.`);
-            await prisma.loan.delete({ where: { id: loan.id } }).catch(() => { });
-            continue;
-        }
-
-        if (!user) {
-            console.warn(`User not found for overdue loan ${loan.id}. Deleting loan & Skipping.`);
-            await prisma.loan.delete({ where: { id: loan.id } }).catch(() => { });
-            continue;
-        }
-
-        if (!user.guildId) {
-            console.warn(`User ${user.id} has no guildId. Deleting loan & Skipping loan processing.`);
-            await prisma.loan.delete({ where: { id: loan.id } }).catch(() => { });
-            continue;
-        }
-
-        const config = await getGuildConfig(user.guildId);
-        const penalty = config.creditScorePenalty || 20;
-        const minScore = 50;
-
-        await prisma.bank.update({
-            where: { userId: user.id },
-            data: { balance: { decrement: loan.totalRepayment } }
-        });
-
-        const newStatus = "PAID";
-        const newScore = Math.max(user.creditScore - penalty, minScore);
-
-        await prisma.$transaction([
-            prisma.loan.update({
-                where: { id: loan.id },
-                data: {
-                    status: newStatus,
-                    totalRepayment: 0
-                }
-            }),
-            prisma.user.update({
-                where: { id: user.id },
-                data: { creditScore: newScore }
-            })
-        ]);
-        count++;
-        console.log(`💸 Enforced repayment for ${user.username} (${user.discordId}). Deducted: ${loan.totalRepayment}, New Score: ${newScore}`);
+        const result = await processOverdueLoan(loan.id);
+        if (result) count++;
     }
     return count;
+}
+
+async function processOverdueLoan(loanId: string) {
+    return runWithRetry(async (tx: PrismaClient) => {
+        return tx.$transaction(async (trx) => {
+            const loan = await trx.loan.findUnique({ where: { id: loanId } });
+            if (!loan || loan.status !== "ACTIVE" || loan.dueDate >= new Date()) return null;
+
+            const user = await trx.user.findUnique({
+                where: { discordId: loan.userId },
+                include: { bank: true, wallet: true }
+            });
+            if (!user) {
+                await trx.loan.update({ where: { id: loan.id }, data: { status: "DEFAULTED" } });
+                return { loanId: loan.id, status: "DEFAULTED", collected: 0, scoreDelta: 0 };
+            }
+
+            const bank = user.bank ?? await trx.bank.create({ data: { userId: loan.userId, balance: 0 } });
+            const collected = Math.min(bank.balance, loan.totalRepayment);
+            const remaining = Math.max(0, loan.totalRepayment - collected);
+            const status = remaining === 0 ? "PAID" : "DEFAULTED";
+            const scoreDelta = -BANKING_CONFIG.creditScorePenalty;
+
+            if (collected > 0) {
+                await trx.bank.update({
+                    where: { id: bank.id },
+                    data: { balance: { decrement: collected } }
+                });
+            }
+
+            const updatedLoan = await trx.loan.update({
+                where: { id: loan.id },
+                data: {
+                    totalRepayment: remaining,
+                    status
+                }
+            });
+
+            const updatedUser = await trx.user.update({
+                where: { discordId: loan.userId },
+                data: { creditScore: clampCreditScore(user.creditScore + scoreDelta) }
+            });
+
+            if (user.wallet && collected > 0) {
+                await trx.transaction.create({
+                    data: {
+                        walletId: user.wallet.id,
+                        amount: -collected,
+                        type: "loan_overdue_collection",
+                        meta: { loanId: loan.id, remaining, status, scoreDelta },
+                        isEarned: false
+                    }
+                });
+            }
+
+            return {
+                loanId: loan.id,
+                status: updatedLoan.status,
+                collected,
+                remaining,
+                scoreDelta,
+                creditScore: updatedUser.creditScore
+            };
+        });
+    });
 }

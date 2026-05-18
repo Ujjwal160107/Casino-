@@ -13,8 +13,7 @@ import {
   TextDisplayBuilder,
 } from "discord.js";
 import { Mascot } from "../../config/branding";
-import { getGuildConfig } from "../../services/guildConfigService";
-import { BOT_OWNER_ID } from "../../services/permissionService";
+import { BOT_DEVELOPER_ID } from "../../utils/developerAccess";
 
 const FEEDBACK_FORM_URL = "https://forms.gle/sWAH2EyWVNhu3eYV7";
 const ANNOUNCEMENT_ACCENT_COLOR = 0x9B59B6;
@@ -96,32 +95,23 @@ function canPostToChannel(guild: Guild, channel: any) {
 async function findAnnouncementChannel(guild: Guild) {
   await guild.channels.fetch().catch(() => null);
 
-  const config = await getGuildConfig(guild.id);
-  const configuredCasinoChannels = config.casinoChannels.length;
-  for (const channelId of config.casinoChannels) {
-    const channel = await guild.channels.fetch(channelId).catch(() => null);
-    if (canPostToChannel(guild, channel)) {
-      return { channel: channel as any, source: "casino" as const, configuredCasinoChannels };
-    }
-  }
-
   const generalChannel = guild.channels.cache.find((channel: any) =>
     channel.name?.toLowerCase() === "general" && canPostToChannel(guild, channel),
   );
-  if (generalChannel) return { channel: generalChannel as any, source: "general" as const, configuredCasinoChannels };
+  if (generalChannel) return { channel: generalChannel as any, source: "general" as const };
 
   if (guild.systemChannel && canPostToChannel(guild, guild.systemChannel)) {
-    return { channel: guild.systemChannel, source: "system" as const, configuredCasinoChannels };
+    return { channel: guild.systemChannel, source: "system" as const };
   }
 
   const fallbackChannel = guild.channels.cache.find((channel: any) => canPostToChannel(guild, channel)) as any;
   return fallbackChannel
-    ? { channel: fallbackChannel, source: "fallback" as const, configuredCasinoChannels }
+    ? { channel: fallbackChannel, source: "fallback" as const }
     : null;
 }
 
 function isOwner(message: Message) {
-  return message.author.id === BOT_OWNER_ID;
+  return message.author.id === BOT_DEVELOPER_ID;
 }
 
 export async function handleGlobalAnnouncementPreview(message: Message) {
@@ -149,8 +139,6 @@ export async function handleGlobalAnnouncementSend(message: Message) {
     sent: 0,
     failed: 0,
     skipped: 0,
-    configuredCasinoServers: 0,
-    sentToCasinoChannels: 0,
     sentToGeneralChannels: 0,
     sentToSystemChannels: 0,
     sentToFallbackChannels: 0,
@@ -160,9 +148,7 @@ export async function handleGlobalAnnouncementSend(message: Message) {
   const formatProgress = (currentGuild?: string) =>
     `Servers found: **${results.totalServers}**\n` +
     `Processed: **${results.processed}/${results.totalServers}**\n` +
-    `Servers with casino channels configured: **${results.configuredCasinoServers}**\n` +
     `Sent: **${results.sent}**\n` +
-    `- Casino channel: **${results.sentToCasinoChannels}**\n` +
     `- General fallback: **${results.sentToGeneralChannels}**\n` +
     `- System fallback: **${results.sentToSystemChannels}**\n` +
     `- Other fallback: **${results.sentToFallbackChannels}**\n` +
@@ -200,20 +186,15 @@ export async function handleGlobalAnnouncementSend(message: Message) {
 
     try {
       const target = await findAnnouncementChannel(guild);
-      if (target?.configuredCasinoChannels) {
-        results.configuredCasinoServers += 1;
-      }
-
       if (!target) {
         results.skipped += 1;
-        results.failures.push(`${guild.name}: no sendable casino/general channel`);
+        results.failures.push(`${guild.name}: no sendable general/system/fallback channel`);
         results.processed += 1;
         continue;
       }
 
       await target.channel.send(buildAnnouncementPayload());
       results.sent += 1;
-      if (target.source === "casino") results.sentToCasinoChannels += 1;
       if (target.source === "general") results.sentToGeneralChannels += 1;
       if (target.source === "system") results.sentToSystemChannels += 1;
       if (target.source === "fallback") results.sentToFallbackChannels += 1;

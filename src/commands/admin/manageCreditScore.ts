@@ -28,7 +28,7 @@ export async function handleSetCreditScore(message: Message, args: string[]) {
         }
 
         const result = await prisma.user.updateMany({
-            where: { guildId: message.guildId! },
+            where: {},
             data: { creditScore: amount }
         });
 
@@ -61,7 +61,7 @@ export async function handleSetCreditScore(message: Message, args: string[]) {
 
     const user = await ensureUserAndWallet(targetUser.id, message.guildId!, targetUser.tag);
     const updatedUser = await prisma.user.update({
-        where: { id: user.id },
+        where: { discordId: user.discordId },
         data: { creditScore: amount }
     });
 

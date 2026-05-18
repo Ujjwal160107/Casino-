@@ -1,19 +1,25 @@
 import { Message } from "discord.js";
-import { getGuildConfig, updateGuildConfig } from "../../services/guildConfigService";
+import { PermissionFlagsBits } from "discord.js";
+import { getGuildSettings, updateGuildSettings } from "../../services/guildSettingsService";
 import { successEmbed, errorEmbed } from "../../utils/embed";
-import { canExecuteAdminCommand } from "../../utils/permissionUtils";
+import { isBotDeveloper } from "../../utils/developerAccess";
 
 export async function handleSetPrefix(message: Message, args: string[]) {
   try {
     if (!message.guild) return;
-    if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
+    const canManagePrefix = Boolean(
+      message.member &&
+      (isBotDeveloper(message.author.id) || message.member.permissions.has(PermissionFlagsBits.ManageGuild))
+    );
+
+    if (!canManagePrefix) {
       return message.reply({
-        embeds: [errorEmbed(message.author, "No Permission", "Admins or Bot Commanders only.")]
+        embeds: [errorEmbed(message.author, "No Permission", "You need Manage Server permission to update this server's prefix.")]
       });
     }
 
-    const config = await getGuildConfig(message.guild.id);
-    const currentPrefix = config.prefix || "!";
+    const settings = await getGuildSettings(message.guild.id);
+    const currentPrefix = settings.prefix || "!";
     const newPrefix = args[0];
 
     if (!newPrefix || newPrefix.length > 3) {
@@ -22,7 +28,7 @@ export async function handleSetPrefix(message: Message, args: string[]) {
       });
     }
 
-    await updateGuildConfig(message.guildId!, { prefix: newPrefix });
+    await updateGuildSettings(message.guildId!, { prefix: newPrefix });
     return message.reply({
       embeds: [successEmbed(message.author, "Prefix Updated", `New prefix set to **${newPrefix}**`)]
     });
