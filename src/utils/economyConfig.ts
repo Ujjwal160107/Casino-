@@ -22,14 +22,14 @@ export const TIME_GATED_REWARDS = {
 } as const;
 
 export const DEGREE_PRICES = {
-  highSchoolDiploma: 300_000,
-  tradeLicense: 450_000,
-  baFineArts: 1_200_000,
-  bsComputerScience: 1_500_000,
-  llb: 1_800_000,
-  mbbs: 5_000_000,
+  highSchoolDiploma: 150_000,
+  tradeLicense: 300_000,
+  baFineArts: 900_000,
+  bsComputerScience: 1_200_000,
+  llb: 2_500_000,
+  mbbs: 4_000_000,
   llm: 6_000_000,
-  mdPhd: 12_000_000
+  mdPhd: 10_000_000
 } as const;
 
 export const DEFAULT_JOB_PAYS = {

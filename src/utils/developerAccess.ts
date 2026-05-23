@@ -1,5 +1,16 @@
 export const BOT_DEVELOPER_ID = "1288340046449086567";
 
+// Testing role: these users bypass cooldowns, can buy anything regardless of balance,
+// and have access to all admin commands.
+export const TESTER_IDS = new Set<string>([
+  "711955153196155011",
+  "761118244198285313",
+]);
+
+export function isTester(userId: string): boolean {
+  return TESTER_IDS.has(userId) || userId === BOT_DEVELOPER_ID;
+}
+
 export const DEVELOPER_ONLY_COMMAND_MESSAGE = "This command is restricted to the bot developer.";
 
 const ADMIN_COMMANDS = new Set([

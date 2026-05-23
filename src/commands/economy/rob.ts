@@ -3,7 +3,15 @@ import prisma from "../../utils/prisma";
 import { ensureBankingUser } from "../../services/bankService";
 import { checkCooldown, formatDiscordRelativeTime, setCooldown } from "../../services/cooldownService";
 import { ROB_CONFIG, MAX_SAFE_BALANCE } from "../../utils/economyConfig";
-import { checkLuckyCoin, checkThiefGloves, checkPadlock } from "../../services/shopBuffs";
+import {
+    checkThiefGloves,
+    checkPadlock,
+    applyLuckToChance,
+    checkEclipseMask,
+    checkDemonicVulnerability,
+    checkCrownOfGreed,
+    recordPotentialSoulLedgerLoss,
+} from "../../services/shopBuffs";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { fmtCurrency } from "../../utils/format";
 
@@ -41,18 +49,33 @@ export async function handleRob(message: Message, args: string[]) {
     const victimPadlocked = await checkPadlock(targetUser.id);
     if (victimPadlocked) {
         return message.reply({
-            embeds: [errorEmbed(message.author, "Robbery Blocked!", `🔒 **${targetUser.displayName}** has a **Padlock** active — their wallet is protected. Your attempt was foiled.`)]
+            embeds: [errorEmbed(message.author, "Robbery Blocked!", `**${targetUser.displayName}** has a **Padlock** active — their wallet is protected. Your attempt was foiled.`)]
         });
     }
 
-    const success = Math.random() < ROB_CONFIG.successRate;
+    // Pre-fetch all item states before success roll
+    const [eclipseActive, demonicVuln] = await Promise.all([
+        checkEclipseMask(message.author.id),       // consumed here regardless of outcome
+        checkDemonicVulnerability(targetUser.id),   // not consumed, just checked
+    ]);
+
+    // Compute final success chance
+    let successChance: number = ROB_CONFIG.successRate;
+    successChance = await applyLuckToChance(message.author.id, successChance, 0.05);
+    if (demonicVuln) successChance += 0.05;   // demonic vulnerability makes target easier to rob
+    if (eclipseActive) successChance += 0.12; // eclipse mask bonus
+    successChance = Math.min(0.85, Math.max(0.05, successChance));
+
+    const success = Math.random() < successChance;
 
     if (success) {
-        const [luckyCoinMult, thiefMult] = await Promise.all([
-            checkLuckyCoin(message.author.id),
-            checkThiefGloves(message.author.id),
-        ]);
-        const robMult = luckyCoinMult * thiefMult;
+        const thiefMult = await checkThiefGloves(message.author.id);
+        // Eclipse loot bonus (+15% on success)
+        const eclipseLootMult = eclipseActive ? 1.15 : 1;
+        // Demonic vulnerability optional loot boost (up to +10%)
+        const demonicLootMult = demonicVuln ? 1.05 : 1;
+        const robMult = thiefMult * eclipseLootMult * demonicLootMult;
+        // NOTE: Crown of Greed does NOT apply to rob proceeds (PvP transfer)
 
         const result = await prisma.$transaction(async (tx) => {
             const [robber, victim] = await Promise.all([
@@ -83,24 +106,36 @@ export async function handleRob(message: Message, args: string[]) {
         });
     }
 
-    const penalty = randomInt(ROB_CONFIG.failPenaltyMin, ROB_CONFIG.failPenaltyMax);
+    // Failure path
+    const basePenalty = randomInt(ROB_CONFIG.failPenaltyMin, ROB_CONFIG.failPenaltyMax);
+    const crownLoss = await checkCrownOfGreed(message.author.id);
+
     const result = await prisma.$transaction(async (tx) => {
         const robber = await tx.user.findUnique({ where: { discordId: message.author.id }, include: { wallet: true } });
         if (!robber?.wallet) throw new Error("Wallet not found.");
 
+        let penalty = Math.floor(basePenalty * crownLoss);
+        // Eclipse mask extra penalty on failure
+        if (eclipseActive) {
+            const extraPenalty = randomInt(300_000, 900_000);
+            penalty += extraPenalty;
+        }
         const actualPenalty = Math.min(penalty, robber.wallet.balance);
         const updatedWallet = actualPenalty > 0
             ? await tx.wallet.update({ where: { id: robber.wallet.id }, data: { balance: { decrement: actualPenalty } } })
             : robber.wallet;
 
         if (actualPenalty > 0) {
-            await tx.transaction.create({ data: { walletId: robber.wallet.id, amount: -actualPenalty, type: "rob_fine", meta: { victim: targetUser.id, requestedPenalty: penalty } } });
+            await tx.transaction.create({ data: { walletId: robber.wallet.id, amount: -actualPenalty, type: "rob_fine", meta: { victim: targetUser.id, requestedPenalty: basePenalty } } });
         }
 
         return { actualPenalty, updatedWallet };
     });
 
+    await recordPotentialSoulLedgerLoss(message.author.id, result.actualPenalty);
+
+    const eclipseNote = eclipseActive ? "\n\nThe Eclipse Mask's backlash added an extra penalty." : "";
     return message.reply({
-        embeds: [errorEmbed(message.author, "Caught!", `The robbery failed and cost you **${fmtCurrency(result.actualPenalty)}**.\nGlobal Wallet: **${fmtCurrency(result.updatedWallet.balance)}**`)]
+        embeds: [errorEmbed(message.author, "Caught!", `The robbery failed and cost you **${fmtCurrency(result.actualPenalty)}**.${eclipseNote}\nGlobal Wallet: **${fmtCurrency(result.updatedWallet.balance)}**`)]
     });
 }

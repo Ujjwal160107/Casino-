@@ -23,6 +23,7 @@ import { fmtCurrency } from "../../utils/format";
 import { Mascot } from "../../config/branding";
 import { getJob, getJobPay } from "../../services/jobService";
 import { getCardSummary } from "../../services/creditCardService";
+import { getLuckBreakdown } from "../../services/shopBuffs";
 
 const PROFILE_ACCENT_COLOR = 0x9B59B6;
 
@@ -167,6 +168,10 @@ export async function getProfilePayload(targetUser: DiscordUser, guildId: string
     chickenDisplay = `${Mascot.Emotes.Chicken} **${name}** (Lvl ${level} | ${wins} Wins)`;
   }
 
+  const luckData = await getLuckBreakdown(targetUser.id);
+  const luckMod = luckData.total - 50;
+  const luckModText = luckMod > 0 ? ` (+${luckMod} active)` : luckMod < 0 ? ` (${luckMod} cursed)` : "";
+
   const RIFLE_PRIORITY_PROFILE = ["legendary rifle", "sniper rifle", "iron rifle", "wooden rifle"];
   let rifleDisplay = "None";
   for (const rName of RIFLE_PRIORITY_PROFILE) {
@@ -231,7 +236,8 @@ export async function getProfilePayload(targetUser: DiscordUser, guildId: string
       new TextDisplayBuilder().setContent(
         `### ${Mascot.Emotes.Meditation} Stress\n` +
         `**Job Stress:** ${userDb.jobStress}/100\n` +
-        `**Education Stress:** ${userDb.currentEducation ? `${userDb.currentEducation.stress}/100 (${userDb.currentEducation.degree.name})` : "Not enrolled"}`,
+        `**Education Stress:** ${userDb.currentEducation ? `${userDb.currentEducation.stress}/100 (${userDb.currentEducation.degree.name})` : "Not enrolled"}\n` +
+        `**Luck:** ${luckData.total}/100${luckModText}`,
       ),
     )
     .addSeparatorComponents(separator())

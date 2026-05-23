@@ -32,6 +32,7 @@ export interface WorkEvent {
             money?: number; // Multiplier of base pay
             stress: number;
         };
+        critical?: boolean; // Emergency Pager can intercept failure on critical choices
     }[];
 }
 
@@ -44,39 +45,8 @@ export interface JobAction {
     cooldown: number; // Seconds
 }
 
-export const WORK_EVENTS: WorkEvent[] = [
-    // TECH
-    {
-        id: "tech_crash", sector: "tech", title: "Server Crash!", description: "Production database is down! What do you do?",
-        choices: [
-            { label: "Hotfix in Prod", style: "danger", successChance: 40, successMsg: "You saved the day! Bonus!", failMsg: "You made it worse. Much worse.", outcome: { xp: 50, money: 2.0, stress: 20 } },
-            { label: "Follow Protocol", style: "primary", successChance: 90, successMsg: "Service restored safely.", failMsg: "It took too long.", outcome: { xp: 10, money: 1.0, stress: 5 } }
-        ]
-    },
-    {
-        id: "tech_bug", sector: "tech", title: "Critical Bug", description: "A user found a critical bug in your code.",
-        choices: [
-            { label: "Blame the User", style: "secondary", successChance: 10, successMsg: "They believed you!", failMsg: "HR wants a word.", outcome: { xp: 0, money: 0.5, stress: 30 } },
-            { label: "Fix it now", style: "success", successChance: 80, successMsg: "Bug squashed.", failMsg: "You introduced 3 new bugs.", outcome: { xp: 20, money: 1.1, stress: 10 } }
-        ]
-    },
-    // MEDICAL
-    {
-        id: "med_emergency", sector: "medical", title: "Emergency!", description: "A patient is crashing in the ER!",
-        choices: [
-            { label: "CPR", style: "danger", successChance: 60, successMsg: "Patient stabilized!", failMsg: "It was too late...", outcome: { xp: 100, money: 1.5, stress: 25 } },
-            { label: "Call Attending", style: "primary", successChance: 100, successMsg: "The senior doctor took over.", failMsg: "N/A", outcome: { xp: 5, money: 0.8, stress: 0 } }
-        ]
-    },
-    // BUSINESS
-    {
-        id: "biz_deal", sector: "business", title: "The Big Deal", description: "A client wants to close a risky deal.",
-        choices: [
-            { label: "Sign it!", style: "success", successChance: 50, successMsg: "Huge commission!", failMsg: "The company lost millions.", outcome: { xp: 50, money: 3.0, stress: 40 } },
-            { label: "Review first", style: "secondary", successChance: 90, successMsg: "Smart move. Safe deal.", failMsg: "Client walked away.", outcome: { xp: 15, money: 1.0, stress: 5 } }
-        ]
-    }
-];
+export { WORK_EVENTS } from "../data/workEvents";
+import { WORK_EVENTS as _WORK_EVENTS } from "../data/workEvents";
 
 export const JOB_ACTIONS: JobAction[] = [
     { id: "tech_hack", sector: "tech", label: "Hack Server", description: "Attempt to steal small crypto.", emoji: "💻", cooldown: 86400 },
@@ -85,10 +55,12 @@ export const JOB_ACTIONS: JobAction[] = [
     { id: "law_consult", sector: "legal", label: "Legal Consult", description: "Quick cash job.", emoji: "⚖️", cooldown: 21600 }
 ];
 
-export function getWorkEvent(sector: string): WorkEvent | null {
-    const events = WORK_EVENTS.filter(e => e.sector === sector || e.sector === "all");
-    if (events.length === 0) return null;
-    return events[Math.floor(Math.random() * events.length)];
+export function getWorkEvent(sector: string, recentIds: string[] = []): WorkEvent | null {
+    const matching = _WORK_EVENTS.filter(e => e.sector === sector || e.sector === "all");
+    if (matching.length === 0) return null;
+    const fresh = matching.filter((e: WorkEvent) => !recentIds.includes(e.id));
+    const pool = fresh.length > 0 ? fresh : matching;
+    return pool[Math.floor(Math.random() * pool.length)];
 }
 
 export function getJobAction(sector: string): JobAction | null {
@@ -139,6 +111,20 @@ export function getJobsBySector(sector: JobDefinition['sector']) {
 
 export function getJob(id: string) {
     return JOBS.find(j => j.id === id);
+}
+
+export const JOB_GEAR_REQUIREMENTS: Record<string, string> = {
+    tech:      "work_laptop",
+    medical:   "medical_kit",
+    business:  "business_briefcase",
+    legal:     "legal_case_file",
+    service:   "service_uniform",
+    trade:     "mechanic_toolkit",
+    freelance: "freelance_starter_pack",
+};
+
+export function getRequiredGearKey(sector: string): string | null {
+    return JOB_GEAR_REQUIREMENTS[sector] ?? null;
 }
 
 function normalizeJobLookup(value: string) {
@@ -236,6 +222,37 @@ export async function checkPromotion(user: any, _guildId?: string): Promise<{ el
     }
 
     return { eligible: false, nextJob, missingXp, missingShifts };
+}
+
+/**
+ * Returns the next job in the progression chain for a given jobId, or null if at the top.
+ */
+export function getNextJob(currentJobId: string): JobDefinition | null {
+    return JOBS.find(j => j.reqJobId === currentJobId) ?? null;
+}
+
+/**
+ * Returns checkPromotion result plus a human-readable progressText string.
+ */
+export async function getPromotionProgress(
+    user: { jobId?: string | null; jobXp: number; shiftsWorked: number },
+    guildId?: string
+): Promise<{ eligible: boolean; nextJob: JobDefinition | null; missingXp: number; missingShifts: number; progressText: string }> {
+    const result = await checkPromotion(user, guildId);
+    let progressText = "";
+    if (!result.nextJob) {
+        progressText = "At the top of your career path.";
+    } else if (result.eligible) {
+        progressText = `Ready for **${result.nextJob.title}**!`;
+    } else {
+        const parts: string[] = [];
+        if (result.missingXp > 0) parts.push(`${result.missingXp} XP`);
+        if (result.missingShifts > 0) parts.push(`${result.missingShifts} shifts`);
+        progressText = parts.length > 0
+            ? `Need: ${parts.join(", ")} → ${result.nextJob.title}`
+            : "Almost there.";
+    }
+    return { ...result, progressText };
 }
 
 /**

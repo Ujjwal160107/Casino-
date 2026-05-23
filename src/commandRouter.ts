@@ -55,7 +55,8 @@ import { handleZoo } from "./commands/games/zoo";
 import {
   DEVELOPER_ONLY_COMMAND_MESSAGE,
   isBotDeveloper,
-  isDeveloperOnlyCommand
+  isDeveloperOnlyCommand,
+  isTester,
 } from "./utils/developerAccess";
 
 const STORE_MOVED_MESSAGE = "This store has moved to the main shop system and is temporarily unavailable.";
@@ -214,7 +215,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
   if (user === "blocked") return;
 
   const developerOnlyCommand = isDeveloperOnlyCommand(normalized);
-  const botDeveloper = isBotDeveloper(message.author.id);
+  const botDeveloper = isBotDeveloper(message.author.id) || isTester(message.author.id);
 
   if (developerOnlyCommand && !botDeveloper) {
     return message.reply({

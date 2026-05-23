@@ -4,13 +4,14 @@ import { placeBetWithTransaction } from "../../services/gameService";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { successEmbed, errorEmbed } from "../../utils/embed";
-import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
+import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage, acquireActiveGameLock, releaseActiveGameLock } from "../../services/casinoCooldownService";
 import { formatDuration } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { updateQuestProgress } from "../../services/questService";
-import { checkLuckyCoin } from "../../services/shopBuffs";
+import { checkLuckyCoin, checkCrownOfGreed, recordPotentialSoulLedgerLoss } from "../../services/shopBuffs";
+// TODO: Luck integration for Blackjack — card logic is deterministic, not probability-based
 
 export type Card = { suit: string; rank: string; value: number };
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
@@ -139,23 +140,47 @@ export async function handleBlackjack(message: Message, args: string[]) {
     if (amount > max) {
         return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Blackjack is **${fmtCurrency(max, currencyEmoji)}**.`)] });
     }
-    const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
-    const cdSeconds = cooldowns["blackjack"] || 0;
-    if (cdSeconds > 0) {
-        const key = `game:blackjack:${message.guildId}:${message.author.id}`;
-        const remaining = checkCooldown(key, cdSeconds);
-        if (remaining > 0) {
-            const expire = getCooldownExpiry(key);
-            const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
-            return message.reply({ embeds: [errorEmbed(message.author, "Cooldown Active", `${Mascot.Emotes.Angry} Please wait <t:${ts}:R> before playing Blackjack again.`)] });
-        }
+    const cd = await checkCasinoCooldown("blackjack", message.author.id);
+    if (cd.active) {
+        const msg = cd.unavailable
+            ? "Casino cooldown service is temporarily unavailable. Try again soon."
+            : formatCasinoCooldownMessage("blackjack", cd.availableAtUnix!);
+        const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Cooldown Active", msg)] });
+        setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
+        return;
     }
+
     if (user.wallet!.balance < amount) {
         return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You don't have enough money.")] });
     }
 
+    // Active-game lock acquired AFTER all validation — so failed checks never lock the user out
+    const lockAcquired = await acquireActiveGameLock("blackjack", message.author.id);
+    if (!lockAcquired) {
+        const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Game In Progress", "You already have an active Blackjack game. Finish it first.")] });
+        setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
+        return;
+    }
+
     const luckyCoinMultiplier = await checkLuckyCoin(message.author.id);
     const hasLuckyCoin = luckyCoinMultiplier > 1;
+    const crownMult = await checkCrownOfGreed(message.author.id);
+
+    // Applies Crown of Greed to gross payout: boosts profit on win, increases stake on loss
+    function applyCrown(stake: number, grossPayout: number): { adjustedStake: number; adjustedPayout: number } {
+      if (grossPayout > stake) {
+        // Win: boost net profit portion
+        const netProfit = grossPayout - stake;
+        return { adjustedStake: stake, adjustedPayout: stake + Math.floor(netProfit * crownMult) };
+      } else if (grossPayout === stake) {
+        // Push: no change
+        return { adjustedStake: stake, adjustedPayout: grossPayout };
+      } else {
+        // Loss: increase effective stake (loss amount)
+        const adjustedStake = Math.min(Math.floor(stake * crownMult), user.wallet!.balance);
+        return { adjustedStake, adjustedPayout: 0 };
+      }
+    }
 
     const deck = createDeck();
     const playerHand: Card[] = [deck.pop()!, deck.pop()!];
@@ -211,8 +236,12 @@ export async function handleBlackjack(message: Message, args: string[]) {
 
     if (gameOver) {
         try {
-            const actualPayout = await placeBetWithTransaction(user.discordId, user.wallet!.id, "blackjack", currentBet, "blackjack", payout > currentBet, payout, message.guildId!);
+            const { adjustedStake: cs1, adjustedPayout: cp1 } = applyCrown(currentBet, payout);
+            if (cp1 === 0 && currentBet > 300_000) await recordPotentialSoulLedgerLoss(user.discordId, cs1);
+            const actualPayout = await placeBetWithTransaction(user.discordId, user.wallet!.id, "blackjack", cs1, "blackjack", cp1 > cs1, cp1, message.guildId!);
             payout = actualPayout;
+            await releaseActiveGameLock("blackjack", user.discordId);
+            await setCasinoCooldown("blackjack", user.discordId, message.guildId!);
             await updateQuestProgress(user.discordId, "GAMBLE").catch(console.error);
             if (payout > currentBet) await updateQuestProgress(user.discordId, "WIN_BLACKJACK").catch(console.error);
         } catch (e) {
@@ -286,12 +315,16 @@ export async function handleBlackjack(message: Message, args: string[]) {
 
             let actualPayout;
             try {
-                actualPayout = await placeBetWithTransaction(user.discordId, user.wallet!.id, "blackjack", currentBet, "blackjack", payout > currentBet, payout, message.guildId!);
+                const { adjustedStake: cs2, adjustedPayout: cp2 } = applyCrown(currentBet, payout);
+                if (cp2 === 0 && currentBet > 300_000) await recordPotentialSoulLedgerLoss(user.discordId, cs2);
+                actualPayout = await placeBetWithTransaction(user.discordId, user.wallet!.id, "blackjack", cs2, "blackjack", cp2 > cs2, cp2, message.guildId!);
             } catch (e) {
                 await msg.edit({ content: `Transaction failed: ${(e as Error).message}`, embeds: [], components: [] });
                 return;
             }
             payout = actualPayout;
+            await releaseActiveGameLock("blackjack", user.discordId);
+            await setCasinoCooldown("blackjack", user.discordId, message.guildId!);
             await updateQuestProgress(user.discordId, "GAMBLE").catch(console.error);
             if (payout > currentBet) await updateQuestProgress(user.discordId, "WIN_BLACKJACK").catch(console.error);
 
@@ -318,12 +351,16 @@ export async function handleBlackjack(message: Message, args: string[]) {
 
             let actualPayout;
             try {
-                actualPayout = await placeBetWithTransaction(user.discordId, user.wallet!.id, "blackjack", currentBet, "blackjack", payout > currentBet, payout, message.guildId!);
+                const { adjustedStake: cs3, adjustedPayout: cp3 } = applyCrown(currentBet, payout);
+                if (cp3 === 0 && currentBet > 300_000) await recordPotentialSoulLedgerLoss(user.discordId, cs3);
+                actualPayout = await placeBetWithTransaction(user.discordId, user.wallet!.id, "blackjack", cs3, "blackjack", cp3 > cs3, cp3, message.guildId!);
             } catch (e) {
                 await msg.edit({ content: `Transaction failed: ${(e as Error).message}`, components: [] });
                 return;
             }
             payout = actualPayout;
+            await releaseActiveGameLock("blackjack", user.discordId);
+            await setCasinoCooldown("blackjack", user.discordId, message.guildId!);
             await updateQuestProgress(user.discordId, "GAMBLE").catch(console.error);
             // No WIN_BLACKJACK update
 

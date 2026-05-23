@@ -5,10 +5,11 @@ import { placeBetWithTransaction } from "../../services/gameService";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { errorEmbed } from "../../utils/embed";
-import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
+import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage } from "../../services/casinoCooldownService";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { updateQuestProgress } from "../../services/questService";
-import { checkLuckyCoin } from "../../services/shopBuffs";
+import { checkLuckyCoin, checkCrownOfGreed, recordPotentialSoulLedgerLoss } from "../../services/shopBuffs";
+// TODO: Luck integration for slots — weighted probability restructuring needed
 
 export const CHERRY = "<:cherri:1446428169786622053>";
 export const BANANA = "<:banano:1446428190837968989>";
@@ -87,18 +88,14 @@ export async function handleSlots(message: Message, args: string[]) {
     return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Slots is **${fmtCurrency(max, emoji)}**.`)] });
   }
 
-  const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
-  const cdSeconds = cooldowns["slots"] || 0;
-  if (cdSeconds > 0) {
-    const key = `game:slots:${message.guildId}:${message.author.id}`;
-    const remaining = checkCooldown(key, cdSeconds);
-    if (remaining > 0) {
-      const expire = getCooldownExpiry(key);
-      const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
-      return message.reply({
-        embeds: [errorEmbed(message.author, "Cooldown Active", `${Mascot.Emotes.Angry} Please wait <t:${ts}:R> before playing Slots again.`)]
-      });
-    }
+  const cd = await checkCasinoCooldown("slots", message.author.id);
+  if (cd.active) {
+    const msg = cd.unavailable
+      ? "Casino cooldown service is temporarily unavailable. Try again soon."
+      : formatCasinoCooldownMessage("slots", cd.availableAtUnix!);
+    const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Cooldown Active", msg)] });
+    setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
+    return;
   }
 
   if (!user.wallet || user.wallet.balance < amount) {
@@ -106,20 +103,39 @@ export async function handleSlots(message: Message, args: string[]) {
   }
 
   const luckyCoinMult = await checkLuckyCoin(message.author.id);
+  const crownMult = await checkCrownOfGreed(message.author.id);
   const result = getSpinResult();
   const [reel1, reel2, reel3] = result.reels;
   const win = result.win;
+
+  // Crown of Greed: adjust net profit on win, increase effective stake on loss
+  const baseGross = win ? Math.floor(amount * result.multiplier * luckyCoinMult) : 0;
+  let adjustedGross: number;
+  let effectiveStake = amount;
+  if (win) {
+    const netProfit = baseGross - amount;
+    adjustedGross = amount + Math.floor(netProfit * crownMult);
+  } else {
+    effectiveStake = Math.min(Math.floor(amount * crownMult), user.wallet.balance);
+    adjustedGross = 0;
+  }
+
+  if (!win && amount > 300_000) {
+    await recordPotentialSoulLedgerLoss(user.discordId, effectiveStake);
+  }
+
   const payout = await placeBetWithTransaction(
     user.discordId,
     user.wallet.id,
     "slots",
-    amount,
+    effectiveStake,
     "spin",
     win,
-    win ? Math.floor(amount * result.multiplier * luckyCoinMult) : 0,
+    adjustedGross,
     message.guildId!
   );
 
+  await setCasinoCooldown("slots", user.discordId, message.guildId!);
   await updateQuestProgress(user.discordId, "GAMBLE").catch(console.error);
   if (win) await updateQuestProgress(user.discordId, "WIN_SLOTS").catch(console.error);
 

@@ -2,7 +2,7 @@ import { Message } from "discord.js";
 import { GRINDING_COMMANDS } from "../../utils/economyConfig";
 import { checkCooldown, formatDiscordRelativeTime, setCooldown } from "../../services/cooldownService";
 import { addBalance, removeBalance } from "../../services/walletService";
-import { checkLuckyCoin } from "../../services/shopBuffs";
+import { applyLuckToChance, checkCrownOfGreed, checkDevilContract, recordPotentialSoulLedgerLoss } from "../../services/shopBuffs";
 import { addCrimeHeat, getHeatLevel } from "../../services/taxService";
 import { TAX_CONFIG } from "../../utils/economyConfig";
 import { errorEmbed, successEmbed } from "../../utils/embed";
@@ -58,11 +58,14 @@ export async function handleCrime(message: Message) {
         });
     }
 
-    const won = Math.random() < config.winRate;
+    // Luck influences success chance (max ±5%)
+    const crimeChance = await applyLuckToChance(message.author.id, config.winRate, 0.05);
+    const won = Math.random() < crimeChance;
 
     if (won) {
-        const luckyCoinMult = await checkLuckyCoin(message.author.id);
-        const amount = Math.floor(randomInt(config.payoutMin, config.payoutMax) * luckyCoinMult);
+        const crownMult = await checkCrownOfGreed(message.author.id);
+        const devilReduction = await checkDevilContract(message.author.id);
+        const amount = Math.floor(randomInt(config.payoutMin, config.payoutMax) * crownMult * devilReduction);
         const result = await addBalance(message.author.id, message.author.username, amount, "crime_income", { command: "crime" }, true);
         const capNotice = result.capped ? "\n\nYour wallet hit the global safety cap, so part of this payout was withheld." : "";
 
@@ -76,14 +79,19 @@ export async function handleCrime(message: Message) {
         ).addFields({ name: "Global Wallet", value: fmtCurrency(result.newBalance), inline: true });
 
         if (heat >= TAX_CONFIG.raidHeatThreshold * 0.7) {
-            embed.addFields({ name: "🌡️ Heat", value: "Your activity is drawing attention...", inline: true });
+            embed.addFields({ name: "Heat", value: "Your activity is drawing attention...", inline: true });
         }
 
         return message.reply({ embeds: [embed] });
     }
 
-    const fine = randomInt(config.fineMin, config.fineMax);
+    const baseFine = randomInt(config.fineMin, config.fineMax);
+    const crownLoss = await checkCrownOfGreed(message.author.id);
+    const fine = Math.floor(baseFine * crownLoss);
     const result = await removeBalance(message.author.id, fine, "crime_fine", { command: "crime" });
+
+    await recordPotentialSoulLedgerLoss(message.author.id, result.removedAmount);
+
     const baseDescription = result.removedAmount > 0
         ? randomMessage(CRIME_FINE_MESSAGES, result.removedAmount)
         : randomMessage(CRIME_LOSS_MESSAGES);

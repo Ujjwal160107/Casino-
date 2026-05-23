@@ -13,11 +13,11 @@ import { placeBetWithTransaction } from "../../services/gameService";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { errorEmbed } from "../../utils/embed";
-import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
+import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage, acquireActiveGameLock, releaseActiveGameLock } from "../../services/casinoCooldownService";
 import { Mascot } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { updateQuestProgress } from "../../services/questService";
-import { checkLuckyCoin } from "../../services/shopBuffs";
+import { checkLuckyCoin, applyLuckToChance, checkCrownOfGreed, recordPotentialSoulLedgerLoss } from "../../services/shopBuffs";
 
 const COINFLIP_ACCENT = 0xF1C40F;
 
@@ -71,7 +71,7 @@ export async function handleCoinflip(message: Message, args: string[]) {
 
   if (!amountStr) {
     return message.reply({
-      embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}coinflip <amount>\``)],
+      embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}coinflip <amount> [h/t]\`\nExample: \`${config.prefix}coinflip 1000 h\``)],
     });
   }
 
@@ -87,18 +87,14 @@ export async function handleCoinflip(message: Message, args: string[]) {
     return message.reply({ embeds: [errorEmbed(message.author, "Invalid Choice", "Please choose `heads` or `tails`.")] });
   }
 
-  const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
-  const cdSeconds = cooldowns["coinflip"] || 0;
-  if (cdSeconds > 0) {
-    const key = `game:coinflip:${message.guildId}:${message.author.id}`;
-    const remaining = checkCooldown(key, cdSeconds);
-    if (remaining > 0) {
-      const expire = getCooldownExpiry(key);
-      const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
-      return message.reply({
-        embeds: [errorEmbed(message.author, "Cooldown Active", `${Mascot.Emotes.Angry} Please wait <t:${ts}:R> before flipping again.`)]
-      });
-    }
+  const cd = await checkCasinoCooldown("coinflip", message.author.id);
+  if (cd.active) {
+    const msg = cd.unavailable
+      ? "Casino cooldown service is temporarily unavailable. Try again soon."
+      : formatCasinoCooldownMessage("coinflip", cd.availableAtUnix!);
+    const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Cooldown Active", msg)] });
+    setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
+    return;
   }
 
   const { min, max } = getGameBetLimits(config, "coinflip");
@@ -112,22 +108,57 @@ export async function handleCoinflip(message: Message, args: string[]) {
     return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You don't have enough money in your wallet.")] });
   }
 
-  const luckyCoinMult = await checkLuckyCoin(message.author.id);
+  // Active-game lock acquired AFTER all validation — so failed checks never lock the user out
+  const lockAcquired = await acquireActiveGameLock("coinflip", message.author.id);
+  if (!lockAcquired) {
+    const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Game In Progress", "You already have an active Coinflip. Resolve it first.")] });
+    setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
+    return;
+  }
+
+  const luckyWinChance = await applyLuckToChance(message.author.id, 0.5, 0.03);
+  const crownMult = await checkCrownOfGreed(message.author.id);
 
   async function settle(choice: "heads" | "tails") {
-    const result = Math.random() < 0.5 ? "heads" : "tails";
-    const didWin = choice === result;
+    // Lucky Coin consumed here — only if the game actually settles
+    const luckyCoinMult = await checkLuckyCoin(message.author.id);
+
+    // Luck slightly adjusts win probability (max ±3% from 50% base)
+    const didWin = Math.random() < luckyWinChance;
+    // For display: if won, show the choice as result; if lost, show opposite
+    const result: "heads" | "tails" = didWin ? choice : (choice === "heads" ? "tails" : "heads");
+
+    // Apply Crown of Greed: boost net profit on win, increase net loss on loss
+    const baseGrossPayout = didWin ? Math.floor(amount * 2 * luckyCoinMult) : 0;
+    let adjustedPayout: number;
+    let effectiveStake = amount;
+    if (didWin) {
+      const netProfit = baseGrossPayout - amount;
+      adjustedPayout = amount + Math.floor(netProfit * crownMult);
+    } else {
+      // Crown increases the loss but cap to current wallet balance to avoid transaction failure
+      const walletBalance = user.wallet!.balance;
+      effectiveStake = Math.min(Math.floor(amount * crownMult), walletBalance);
+      adjustedPayout = 0;
+    }
+
+    if (!didWin && effectiveStake > 300_000) {
+      await recordPotentialSoulLedgerLoss(user.discordId, effectiveStake);
+    }
+
     const payout = await placeBetWithTransaction(
       user.discordId,
       user.wallet!.id,
       "coinflip",
-      amount,
+      effectiveStake,
       choice,
       didWin,
-      didWin ? Math.floor(amount * 2 * luckyCoinMult) : 0,
+      adjustedPayout,
       message.guildId!
     );
 
+    await releaseActiveGameLock("coinflip", user.discordId);
+    await setCasinoCooldown("coinflip", user.discordId, message.guildId!);
     await updateQuestProgress(user.discordId, "GAMBLE").catch(console.error);
     if (didWin) await updateQuestProgress(user.discordId, "WIN_COINFLIP").catch(console.error);
 
@@ -142,12 +173,12 @@ export async function handleCoinflip(message: Message, args: string[]) {
       }).catch(() => { });
     });
 
-    const finalWalletBalance = user.wallet!.balance - amount + payout;
+    const finalWalletBalance = user.wallet!.balance - effectiveStake + payout;
     const body = [
       `Choice: **${choice.toUpperCase()}**`,
       `Result: **${result.toUpperCase()}**`,
       `Bet: **${fmtCurrency(amount, emoji)}**`,
-      didWin ? `Payout: **${fmtCurrency(payout, emoji)}**` : `Lost: **${fmtCurrency(amount, emoji)}**`,
+      didWin ? `Payout: **${fmtCurrency(payout, emoji)}**` : `Lost: **${fmtCurrency(effectiveStake, emoji)}**`,
       `Wallet: **${fmtCurrency(finalWalletBalance, emoji)}**`
     ].join("\n");
 
@@ -156,17 +187,17 @@ export async function handleCoinflip(message: Message, args: string[]) {
         buildCoinflipContainer(didWin ? "Coinflip Won" : "Coinflip Lost", body, didWin ? 0x2ECC71 : 0xE74C3C),
         buildDisabledChoiceRow(message.author.id, choice)
       ],
-      flags: MessageFlags.IsComponentsV2 as const
     };
   }
 
   if (immediateChoice) {
-    return message.reply(await settle(immediateChoice));
+    const r = await settle(immediateChoice);
+    return message.reply({ ...r, flags: MessageFlags.IsComponentsV2 });
   }
 
   const prompt = buildCoinflipContainer(
     "Coinflip",
-    [`Bet: **${fmtCurrency(amount, emoji)}**`, "Choose heads or tails to flip.", "Only you can use these buttons."].join("\n")
+    [`Bet: **${fmtCurrency(amount, emoji)}**`, "Choose heads or tails to flip.", `Only you can use these buttons. Tip: \`coinflip ${amountStr} h\` or \`t\` to skip this step.`].join("\n")
   );
   const msg = await message.reply({ components: [prompt, buildChoiceRow(message.author.id)], flags: MessageFlags.IsComponentsV2 });
   let settled = false;
@@ -185,11 +216,16 @@ export async function handleCoinflip(message: Message, args: string[]) {
     const choice = i.customId.includes(":heads") ? "heads" : "tails";
     settled = true;
     collector.stop("settled");
-    await i.update(await settle(choice));
+    // Defer immediately to acknowledge within 3s, then do all async work
+    await i.deferUpdate();
+    const result = await settle(choice);
+    await i.editReply(result);
   });
 
   collector.on("end", async (_, reason) => {
     if (reason !== "settled" && !settled) {
+      // Release lock — game abandoned, no cooldown
+      await releaseActiveGameLock("coinflip", user.discordId);
       await msg.edit({
         components: [
           buildCoinflipContainer("Coinflip Expired", "No choice was made, so no wallet changes were made.", 0x95A5A6),

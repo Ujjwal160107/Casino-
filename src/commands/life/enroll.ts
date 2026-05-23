@@ -17,6 +17,7 @@ export async function handleEnroll(message: Message, args: string[]) {
     }
 
     try {
+        await checkAndSeedDegrees(message.guild.id);
         const degrees = await prisma.degree.findMany({ where: { guildId: message.guild.id } });
         const degree = degrees.find(d => d.name.toLowerCase().includes(nameQuery));
 
@@ -41,7 +42,8 @@ export async function handleEnroll(message: Message, args: string[]) {
             .setDescription(`Are you sure you want to enroll in **${degree.name}**?`)
             .addFields(
                 { name: "Tuition Fee", value: fmtCurrency(degree.tuitionPerSem, config.currencyEmoji), inline: true },
-                { name: "Duration", value: `${degree.totalSemesters} Semesters`, inline: true }
+                { name: "Duration", value: `${degree.totalSemesters} Semesters`, inline: true },
+                { name: "XP Required", value: `${degree.xpRequired}`, inline: true }
             )
             .setColor("#F1C40F")
             .setFooter({ text: `${Mascot.Name} • Education` });
@@ -74,7 +76,7 @@ export async function handleEnroll(message: Message, args: string[]) {
     }
 }
 
-import { enroll, takeExam } from "../../services/educationService";
+import { checkAndSeedDegrees, enroll, takeExam } from "../../services/educationService";
 // successEmbed, errorEmbed already imported abov
 
 // ... (handleEnroll stays same)

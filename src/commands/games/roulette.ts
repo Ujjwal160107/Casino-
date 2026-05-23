@@ -15,7 +15,7 @@ import { placeBetWithTransaction } from "../../services/gameService";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { successEmbed, errorEmbed } from "../../utils/embed";
-import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
+import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage } from "../../services/casinoCooldownService";
 import { formatDuration } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import { Mascot } from "../../config/branding";
@@ -121,18 +121,14 @@ export async function handleBet(message: Message, args: string[]) {
       embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Roulette is **${fmtCurrency(max, emoji)}**.`)]
     });
   }
-  const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
-  const cdSeconds = cooldowns["roulette"] || 0;
-  if (cdSeconds > 0) {
-    const key = `game:roulette:${message.guildId}:${message.author.id}`;
-    const remaining = checkCooldown(key, cdSeconds);
-    if (remaining > 0) {
-      const expire = getCooldownExpiry(key);
-      const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
-      return message.reply({
-        embeds: [errorEmbed(message.author, "Cooldown Active", `${Mascot.Emotes.Angry} Please wait <t:${ts}:R> before playing Roulette again.`)]
-      });
-    }
+  const cd = await checkCasinoCooldown("roulette", message.author.id);
+  if (cd.active) {
+    const msg = cd.unavailable
+      ? "Casino cooldown service is temporarily unavailable. Try again soon."
+      : formatCasinoCooldownMessage("roulette", cd.availableAtUnix!);
+    const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Cooldown Active", msg)] });
+    setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
+    return;
   }
   // ... (validations passed) ...
   if (user.wallet!.balance < amount) {
@@ -216,6 +212,7 @@ export async function handleBet(message: Message, args: string[]) {
     didWin ? Math.floor(amount * multiplier * luckyCoinMult) : 0,
     message.guildId!
   );
+  await setCasinoCooldown("roulette", user.discordId, message.guildId!);
   await updateQuestProgress(user.discordId, "GAMBLE").catch(console.error);
   if (didWin) await updateQuestProgress(user.discordId, "WIN_ROULETTE").catch(console.error);
 

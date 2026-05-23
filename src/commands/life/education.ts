@@ -55,29 +55,30 @@ export async function handleEducation(message: Message, args: string[]) {
             const edu = user.currentEducation;
             const deg = edu.degree;
 
-            const progress = Math.min(100, Math.round((edu.currentGpa / 6.0) * 100));
-            const progressBar = "▓".repeat(Math.floor(progress / 10)) + "░".repeat(10 - Math.floor(progress / 10));
+            const xpProgress = Math.min(100, Math.round((edu.educationXp / deg.xpRequired) * 100));
+            const progressBar = "▓".repeat(Math.floor(xpProgress / 10)) + "░".repeat(10 - Math.floor(xpProgress / 10));
 
             const EMOJI_XP = "<:xpfull:1451636569982111765>";
             const EMOJI_XP_EMPTY = "<:xpempty:1451642829427314822>";
-            const filledBars = Math.min(10, Math.floor(edu.currentGpa));
+            const filledBars = Math.min(10, Math.floor((edu.educationXp / deg.xpRequired) * 10));
             const emptyBars = 10 - filledBars;
             const intProgress = `${EMOJI_XP.repeat(filledBars)}${EMOJI_XP_EMPTY.repeat(Math.max(0, emptyBars))}`;
 
             const scholarshipMilestones = [
-                { level: 9, desc: "1.5x Refund" },
-                { level: 10, desc: "2x Refund" },
+                { level: 75, desc: "1.5x Refund" },
+                { level: 100, desc: "2x Refund" },
             ];
 
+            const pct = edu.educationXp / deg.xpRequired;
             const scholarshipGuide = scholarshipMilestones.map((m) => {
                 const isClaimed = edu.scholarshipsClaimed.includes(m.level);
-                const isEligible = edu.currentGpa >= m.level;
+                const isEligible = pct >= m.level / 100;
 
                 let status = `${Mascot.Emotes.Lock} Locked`;
                 if (isClaimed) status = `${Mascot.Emotes.Accept} Claimed`;
                 else if (isEligible) status = `${Mascot.Emotes.MoneyBag} Available`;
 
-                return `${status} **${m.level}.0 Int** (${m.desc})`;
+                return `${status} **${m.level}% XP** (${m.desc})`;
             }).join("\n");
 
             const container = new ContainerBuilder()
@@ -89,7 +90,7 @@ export async function handleEducation(message: Message, args: string[]) {
                             new TextDisplayBuilder().setContent(
                                 `**Degree:** ${deg.name}\n` +
                                 `**Fee Paid:** ${fmtCurrency(deg.tuitionPerSem, config.currencyEmoji)}\n` +
-                                `**Graduation:** ${progressBar} ${progress}%`
+                                `**Graduation:** ${progressBar} ${xpProgress}%`
                             ),
                         )
                         .setThumbnailAccessory((thumbnail) =>
@@ -101,13 +102,13 @@ export async function handleEducation(message: Message, args: string[]) {
                 .addSeparatorComponents(separator())
                 .addTextDisplayComponents(
                     new TextDisplayBuilder().setContent(
-                        `### Intelligence\n${intProgress} **${edu.currentGpa.toFixed(1)} / 10**\nRequired: **6.0**`,
+                        `### Education XP\n${intProgress} **${edu.educationXp} / ${deg.xpRequired}**`,
                     ),
                     new TextDisplayBuilder().setContent(
                         `### Stress\n**${edu.stress}/100**${edu.stress > 70 ? `\n${Mascot.Emotes.Alert} Use \`${prefix}relax\` to recover.` : ""}`,
                     ),
                     new TextDisplayBuilder().setContent(
-                        `### Actions\n\`${prefix}study\` - Gain Intelligence (+0.5)\n\`${prefix}exam\` - Take Final Exam`,
+                        `### Actions\n\`${prefix}study\` - Gain XP (+50 base)\n\`${prefix}exam\` - Take Final Exam`,
                     ),
                     new TextDisplayBuilder().setContent(
                         `### ${Mascot.Emotes.MoneyBag} Scholarship Guide\n${scholarshipGuide}`,
@@ -116,16 +117,15 @@ export async function handleEducation(message: Message, args: string[]) {
 
             const row = new ActionRowBuilder<ButtonBuilder>();
 
-            const milestones = [9, 10];
-            const currentInt = Math.floor(edu.currentGpa);
+            const milestones = [75, 100];
             const claimed = edu.scholarshipsClaimed;
 
             for (const m of milestones) {
-                if (currentInt >= m && !claimed.includes(m)) {
+                if (pct >= m / 100 && !claimed.includes(m)) {
                     row.addComponents(
                         new ButtonBuilder()
                             .setCustomId(`claim_scholarship_${m}`)
-                            .setLabel(`Claim ${m}.0 Int Scholarship`)
+                            .setLabel(`Claim ${m}% XP Scholarship`)
                             .setStyle(ButtonStyle.Success)
                             .setEmoji(Mascot.Emotes.MoneyBag),
                     );
@@ -196,6 +196,7 @@ export async function handleEducation(message: Message, args: string[]) {
                             new TextDisplayBuilder().setContent(
                                 `**Status:** ${statusText}\n` +
                                 `**Degree Fee:** ${fmtCurrency(degree.tuitionPerSem, config.currencyEmoji)}\n` +
+                                `**XP Required:** ${degree.xpRequired}\n` +
                                 `**Reqs:** ${reqText}`,
                             ),
                         )
@@ -306,7 +307,7 @@ export async function handleListDegrees(message: Message) {
     const fields = user.degrees.map((ud) => {
         return {
             name: `${Mascot.Emotes.Graduate} ${ud.degree.name}`,
-            value: `**GPA:** ${ud.finalGpa.toFixed(1)} | **Obtained:** <t:${Math.floor(ud.obtainedAt.getTime() / 1000)}:D>`,
+            value: `**Final Score:** ${ud.finalGpa.toFixed(1)}/10 | **Obtained:** <t:${Math.floor(ud.obtainedAt.getTime() / 1000)}:D>`,
             inline: false,
         };
     });

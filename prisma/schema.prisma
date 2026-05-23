@@ -113,6 +113,18 @@ model WorkLog {
   createdAt DateTime @default(now())
 }
 
+model JobReputation {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String
+  sector    String
+  rep       Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, sector])
+  @@index([userId])
+}
+
 model CreditCard {
   id                    String   @id @default(auto()) @map("_id") @db.ObjectId
   user                  User     @relation(fields: [userId], references: [discordId])
@@ -393,6 +405,9 @@ model Degree {
   // Financial
   tuitionPerSem   Float    @default(1000)
   
+  // XP Progression
+  xpRequired      Int      @default(600) // XP needed to take the final exam
+
   // Perks (Passive)
   intelligenceBoost Int    @default(0) // Permanent stat boost on completion
   incomeMulti     Float    @default(0.1) // Additive multiplier
@@ -420,8 +435,9 @@ model UserEducation {
   
   // Progress
   currentSemester Int      @default(1)
-  currentGpa      Float    @default(3.0) // 0.0 - 4.0 scale
+  currentGpa      Float    @default(3.0) // Legacy cosmetic field
   creditsEarned   Int      @default(0)
+  educationXp     Int      @default(0)  // Primary progression stat
   
   // Sim Stats
   stress          Int      @default(0) // 0-100. High stress = dropout risk.

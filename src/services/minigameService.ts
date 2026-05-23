@@ -66,6 +66,29 @@ export function getWorkGame(): Minigame {
     return generateEmojiMathGame();
 }
 
+/**
+ * Async version that uses the job task pool with anti-repetition.
+ * Falls back to getWorkGame() if no sector-appropriate task can be found.
+ */
+export async function getWorkGameForUser(sector: string, discordId: string): Promise<Minigame> {
+    try {
+        const { getJobTasksForSector } = await import("../data/jobTasks");
+        const { getRecentIds, filterByRecent, recordRecentId } = await import("./jobAntiRepeat");
+
+        const pool = getJobTasksForSector(sector);
+        if (pool.length === 0) return getWorkGame();
+
+        const recent = await getRecentIds(discordId, "task");
+        const available = filterByRecent(pool, recent);
+        const task = available[Math.floor(Math.random() * available.length)];
+
+        await recordRecentId(discordId, "task", task.id);
+        return task;
+    } catch {
+        return getWorkGame();
+    }
+}
+
 export function getStudyGame(): Minigame {
     const rand = Math.random();
     if (rand < 0.20) return generateMathGame();

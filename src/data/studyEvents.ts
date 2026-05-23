@@ -1,0 +1,352 @@
+export interface StudyEvent {
+    id: string;
+    degreeType: string | "all";
+    title: string;
+    description: string;
+    outcome: "success" | "failure" | "random";
+    successChance?: number;
+    xpMod: number;
+    stressMod: number;
+    moneyMod?: number;
+}
+
+export const STUDY_EVENTS: StudyEvent[] = [
+    // ── Guaranteed Success Events ─────────────────────────────────────────────
+    {
+        id: "study_flow_state",
+        degreeType: "all",
+        title: "Flow State",
+        description: "💡 You entered a perfect flow state. Hours flew by like minutes.",
+        outcome: "success",
+        xpMod: 40,
+        stressMod: -10,
+    },
+    {
+        id: "study_group_session",
+        degreeType: "all",
+        title: "Study Group",
+        description: "👥 Your study group pooled notes and explained concepts to each other.",
+        outcome: "success",
+        xpMod: 25,
+        stressMod: -5,
+    },
+    {
+        id: "study_professor_office",
+        degreeType: "all",
+        title: "Office Hours",
+        description: "🎓 The professor held impromptu office hours. You got direct help.",
+        outcome: "success",
+        xpMod: 35,
+        stressMod: -8,
+    },
+    {
+        id: "study_eureka_moment",
+        degreeType: "all",
+        title: "Eureka!",
+        description: "🧠 Everything suddenly clicked. You understand the whole topic now.",
+        outcome: "success",
+        xpMod: 50,
+        stressMod: -5,
+    },
+    {
+        id: "study_free_textbook",
+        degreeType: "all",
+        title: "Free Textbook",
+        description: "📖 Someone left a perfect study guide in the library. Finders keepers.",
+        outcome: "success",
+        xpMod: 30,
+        stressMod: 0,
+    },
+
+    // ── Guaranteed Failure Events ─────────────────────────────────────────────
+    {
+        id: "study_laptop_crash",
+        degreeType: "all",
+        title: "Laptop Crashed",
+        description: "💻 Your laptop crashed and corrupted your notes file. Hours wasted.",
+        outcome: "failure",
+        xpMod: -60,
+        stressMod: 20,
+    },
+    {
+        id: "study_fire_alarm",
+        degreeType: "all",
+        title: "Fire Alarm",
+        description: "🚨 The fire alarm went off mid-session. Everyone evacuated for an hour.",
+        outcome: "failure",
+        xpMod: -30,
+        stressMod: 15,
+    },
+    {
+        id: "study_wrong_chapter",
+        degreeType: "all",
+        title: "Wrong Chapter",
+        description: "📚 You studied the wrong chapter for two hours straight.",
+        outcome: "failure",
+        xpMod: -40,
+        stressMod: 20,
+    },
+    {
+        id: "study_food_poisoning",
+        degreeType: "all",
+        title: "Food Poisoning",
+        description: "🤢 The cafeteria food hit you hard. You spent the night sick instead of studying.",
+        outcome: "failure",
+        xpMod: -50,
+        stressMod: 25,
+    },
+    {
+        id: "study_stolen_bag",
+        degreeType: "all",
+        title: "Bag Stolen",
+        description: "🎒 Someone stole your bag from the library with all your notes inside.",
+        outcome: "failure",
+        xpMod: -70,
+        stressMod: 30,
+    },
+
+    // ── Random (Probability) Events ───────────────────────────────────────────
+    {
+        id: "study_pop_quiz",
+        degreeType: "all",
+        title: "Pop Quiz",
+        description: "📝 The professor gave a surprise pop quiz worth bonus credit.",
+        outcome: "random",
+        successChance: 55,
+        xpMod: 45,
+        stressMod: 10,
+    },
+    {
+        id: "study_group_project",
+        degreeType: "all",
+        title: "Group Project Crisis",
+        description: "👥 Your group partner dropped out. You have to carry the whole project.",
+        outcome: "random",
+        successChance: 50,
+        xpMod: 60,
+        stressMod: 25,
+    },
+    {
+        id: "study_research_paper",
+        degreeType: "all",
+        title: "Research Paper",
+        description: "📄 Your professor wants a 5-page paper by tomorrow. Time to grind.",
+        outcome: "random",
+        successChance: 60,
+        xpMod: 40,
+        stressMod: 15,
+    },
+    {
+        id: "study_lab_experiment",
+        degreeType: "all",
+        title: "Lab Experiment",
+        description: "🧪 Your lab experiment went sideways. Can you salvage the results?",
+        outcome: "random",
+        successChance: 45,
+        xpMod: 55,
+        stressMod: 15,
+    },
+    {
+        id: "study_debate_challenge",
+        degreeType: "all",
+        title: "Debate Challenge",
+        description: "🗣️ A classmate challenged you to a debate on the topic. The professor is watching.",
+        outcome: "random",
+        successChance: 50,
+        xpMod: 50,
+        stressMod: 10,
+    },
+
+    // ── Degree-Specific Events ────────────────────────────────────────────────
+
+    // Tech / CS
+    {
+        id: "study_code_compiles",
+        degreeType: "BACHELORS",
+        title: "Code Compiles First Try",
+        description: "💻 Your assignment compiled and passed all tests on the first try. Miracle.",
+        outcome: "success",
+        xpMod: 45,
+        stressMod: -15,
+    },
+    {
+        id: "study_hackathon",
+        degreeType: "BACHELORS",
+        title: "Hackathon Win",
+        description: "🏆 You entered the campus hackathon and your team placed!",
+        outcome: "random",
+        successChance: 40,
+        xpMod: 80,
+        stressMod: 20,
+    },
+    {
+        id: "study_segfault",
+        degreeType: "BACHELORS",
+        title: "Segmentation Fault",
+        description: "💥 Segfault. No stack trace. The assignment is due in 2 hours.",
+        outcome: "failure",
+        xpMod: -35,
+        stressMod: 25,
+    },
+
+    // Law
+    {
+        id: "study_moot_court",
+        degreeType: "LLB",
+        title: "Moot Court Victory",
+        description: "⚖️ You won your moot court round with a brilliant closing argument.",
+        outcome: "success",
+        xpMod: 50,
+        stressMod: -5,
+    },
+    {
+        id: "study_case_brief",
+        degreeType: "LLB",
+        title: "Case Brief Disaster",
+        description: "⚖️ You cited a case that was overturned. The professor made an example of you.",
+        outcome: "failure",
+        xpMod: -40,
+        stressMod: 20,
+    },
+    {
+        id: "study_law_review",
+        degreeType: "LLB",
+        title: "Law Review Submission",
+        description: "📜 Your article was selected for the law review. Extra credit potential.",
+        outcome: "random",
+        successChance: 55,
+        xpMod: 60,
+        stressMod: 10,
+    },
+
+    // Medical
+    {
+        id: "study_anatomy_lab",
+        degreeType: "MBBS",
+        title: "Anatomy Lab Ace",
+        description: "🫀 You nailed the anatomy practical. Professor was impressed.",
+        outcome: "success",
+        xpMod: 45,
+        stressMod: -10,
+    },
+    {
+        id: "study_patient_sim",
+        degreeType: "MBBS",
+        title: "Patient Simulation",
+        description: "🏥 The simulated patient threw a curveball diagnosis. Can you figure it out?",
+        outcome: "random",
+        successChance: 45,
+        xpMod: 65,
+        stressMod: 15,
+    },
+    {
+        id: "study_clinical_mistake",
+        degreeType: "MBBS",
+        title: "Clinical Error",
+        description: "💊 You made a dosage calculation error in the practice exam.",
+        outcome: "failure",
+        xpMod: -45,
+        stressMod: 20,
+    },
+
+    // PhD / Post-grad
+    {
+        id: "study_thesis_breakthrough",
+        degreeType: "PHD",
+        title: "Thesis Breakthrough",
+        description: "🔬 Your experiment produced unexpected results — publishable ones.",
+        outcome: "success",
+        xpMod: 70,
+        stressMod: -15,
+    },
+    {
+        id: "study_peer_review",
+        degreeType: "PHD",
+        title: "Harsh Peer Review",
+        description: "📑 Reviewer 2 tore your paper apart. \"Fundamentally flawed methodology.\"",
+        outcome: "failure",
+        xpMod: -55,
+        stressMod: 25,
+    },
+    {
+        id: "study_conference_invite",
+        degreeType: "PHD",
+        title: "Conference Presentation",
+        description: "🎤 You were invited to present at a major conference. High stakes.",
+        outcome: "random",
+        successChance: 50,
+        xpMod: 80,
+        stressMod: 20,
+    },
+
+    // LLM (Masters of Law)
+    {
+        id: "study_internship_offer",
+        degreeType: "LLM",
+        title: "Firm Internship Offer",
+        description: "💼 A top law firm offered you a summer internship based on your paper.",
+        outcome: "success",
+        xpMod: 55,
+        stressMod: -10,
+        moneyMod: 50000,
+    },
+    {
+        id: "study_jurisdiction_error",
+        degreeType: "LLM",
+        title: "Jurisdiction Mix-Up",
+        description: "⚖️ You applied the wrong jurisdiction's precedent in your analysis.",
+        outcome: "failure",
+        xpMod: -40,
+        stressMod: 15,
+    },
+
+    // Trade
+    {
+        id: "study_apprentice_praise",
+        degreeType: "TRADE",
+        title: "Master's Praise",
+        description: "🔧 Your master praised your work in front of the whole workshop.",
+        outcome: "success",
+        xpMod: 35,
+        stressMod: -10,
+    },
+    {
+        id: "study_tool_break",
+        degreeType: "TRADE",
+        title: "Tool Malfunction",
+        description: "🔧 Your main tool broke during practice. You have to redo everything.",
+        outcome: "failure",
+        xpMod: -30,
+        stressMod: 15,
+    },
+
+    // High School
+    {
+        id: "study_tutor_help",
+        degreeType: "HS",
+        title: "Tutor Session",
+        description: "👨‍🏫 The school tutor spent extra time explaining the material to you.",
+        outcome: "success",
+        xpMod: 25,
+        stressMod: -5,
+    },
+    {
+        id: "study_bully_distraction",
+        degreeType: "HS",
+        title: "Classroom Disruption",
+        description: "😤 The class troublemaker kept disrupting everyone. Nobody learned anything.",
+        outcome: "failure",
+        xpMod: -20,
+        stressMod: 10,
+    },
+    {
+        id: "study_extra_credit",
+        degreeType: "HS",
+        title: "Extra Credit Assignment",
+        description: "📝 The teacher offered extra credit for anyone who solves the bonus problem.",
+        outcome: "random",
+        successChance: 65,
+        xpMod: 30,
+        stressMod: 5,
+    },
+];

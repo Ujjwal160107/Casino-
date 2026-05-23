@@ -19,6 +19,7 @@ import { initEmojiRegistry, listEmojiKeys } from "./utils/emojiRegistry";
 import { handleBankInteraction } from "./handlers/bankInteractionHandler";
 import { handleMarketInteraction } from "./handlers/marketInteractionHandler";
 import { handleInventoryInteraction } from "./handlers/inventoryInteractionHandler";
+import { handleShopBuyInteraction, handleShopUseInteraction } from "./commands/economy/shop";
 import { guildCreateListener } from "./listeners/guildCreateListener";
 import { Mascot } from "./config/branding";
 import {
@@ -156,6 +157,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
     if (id.startsWith("hunt_") || id.startsWith("zoo_")) {
       const { handleHuntInteraction } = require("./handlers/huntInteractionHandler");
       return await handleHuntInteraction(interaction);
+    }
+
+    if (id.startsWith("shop_buy:") && interaction.isButton()) {
+      return await handleShopBuyInteraction(interaction as import("discord.js").ButtonInteraction);
+    }
+
+    if (id.startsWith("shop_use:") && interaction.isButton()) {
+      return await handleShopUseInteraction(interaction as import("discord.js").ButtonInteraction);
     }
 
     if (id === "global_economy_form_filled") {

@@ -22,7 +22,7 @@ import prisma from "../../utils/prisma";
 import { errorEmbed } from "../../utils/embed";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { generateVsImage, generateWinnerImage } from "../../utils/imageUtils";
-import { checkCooldown, getCooldownExpiry, setCooldown } from "../../utils/cooldown";
+import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage, acquireActiveGameLock, releaseActiveGameLock } from "../../services/casinoCooldownService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { calculateTotalStats, calculateCombatScore, getWinChance, getGameBetLimits } from "../../utils/gameUtils";
 import { GameConfig } from "../../config/gameConfig";
@@ -149,17 +149,14 @@ export async function handleCockFight(message: Message, args: string[]) {
     }
 
     // Cooldown Check for Challenger
-    const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
-    const cdSeconds = cooldowns["cockfight"] || 0;
-    if (cdSeconds > 0) {
-        const key = `game:cockfight:${message.guild.id}:${message.author.id}`;
-        const expiry = getCooldownExpiry(key);
-        if (expiry && expiry > Date.now()) {
-            const ts = Math.floor(expiry / 1000);
-            return message.reply({
-                embeds: [errorEmbed(message.author, "Cooldown Active", `<:cooldown:1454025354631970826> You are on cooldown. Wait <t:${ts}:R>.`)]
-            });
-        }
+    const challengerCd = await checkCasinoCooldown("cockfight", message.author.id);
+    if (challengerCd.active) {
+        const msg = challengerCd.unavailable
+            ? "Casino cooldown service is temporarily unavailable. Try again soon."
+            : formatCasinoCooldownMessage("cockfight", challengerCd.availableAtUnix!);
+        const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Cooldown Active", msg)] });
+        setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
+        return;
     }
 
     const shopItem = await prisma.shopItem.findFirst({
@@ -226,6 +223,14 @@ export async function handleCockFight(message: Message, args: string[]) {
         return message.reply({ embeds: [errorEmbed(message.author, "Opponent Funds", `${targetName} needs **${fmtCurrency(betAmount, config.currencyEmoji)}** in their wallet to accept.`)] });
     }
 
+    // Active-game lock acquired AFTER all validation — so failed checks never lock the user out
+    const challengerLockAcquired = await acquireActiveGameLock("cockfight", message.author.id);
+    if (!challengerLockAcquired) {
+        const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Game In Progress", "You already have an active Cockfight challenge. Wait for it to resolve.")] });
+        setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
+        return;
+    }
+
     const fightId = `${message.id}:${message.author.id}:${targetUser.id}`;
     const challengeContainer = buildContainer(
         `${EMOJI_CHICKEN} Cockfight Challenge`,
@@ -256,6 +261,7 @@ export async function handleCockFight(message: Message, args: string[]) {
 
         const action = i.customId.split(":").pop();
         if (action === "deny") {
+            await releaseActiveGameLock("cockfight", message.author.id);
             await i.update({
                 components: [buildContainer("Cockfight Cancelled", `${targetName} denied the challenge.`, 0xE74C3C), buildAcceptRow(fightId, true)],
                 flags: COCKFIGHT_FLAGS
@@ -268,17 +274,20 @@ export async function handleCockFight(message: Message, args: string[]) {
             if (gameStarted) return;
 
             // Cooldown Check for Acceptor
-            const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
-            const cdSeconds = cooldowns["cockfight"] || 0;
-            if (cdSeconds > 0) {
-                const key = `game:cockfight:${message.guild!.id}:${targetUser.id}`;
+            const acceptorCd = await checkCasinoCooldown("cockfight", targetUser.id);
+            if (acceptorCd.active) {
+                const msg = acceptorCd.unavailable
+                    ? "Casino cooldown service is temporarily unavailable. Try again soon."
+                    : formatCasinoCooldownMessage("cockfight", acceptorCd.availableAtUnix!);
+                await i.reply({ content: msg, ephemeral: true });
+                return;
+            }
 
-                const existingExpiry = getCooldownExpiry(key);
-                if (existingExpiry && existingExpiry > Date.now()) {
-                    const ts = Math.floor(existingExpiry / 1000);
-                    await i.reply({ content: `<:cooldown:1454025354631970826> You are on cooldown! Wait <t:${ts}:R>.`, ephemeral: true });
-                    return;
-                }
+            // Active-game lock for acceptor
+            const acceptorLockAcquired = await acquireActiveGameLock("cockfight", targetUser.id);
+            if (!acceptorLockAcquired) {
+                await i.reply({ content: "You already have an active Cockfight. Finish it first.", ephemeral: true });
+                return;
             }
 
             gameStarted = true;
@@ -312,6 +321,8 @@ export async function handleCockFight(message: Message, args: string[]) {
 
     collector.on("end", (collected: any, reason: string) => {
         if (reason === "time") {
+            // Release challenger lock — acceptor never accepted, so no acceptor lock to release
+            releaseActiveGameLock("cockfight", message.author.id).catch(() => {});
             reply.edit({
                 components: [buildContainer("Cockfight Expired", "The challenge expired with no wallet changes.", 0x95A5A6), buildAcceptRow(fightId, true)]
             }).catch(() => { });
@@ -887,13 +898,11 @@ async function runCockFight(
             }).catch(() => { });
         });
 
-        // Set Cooldowns for NEXT fight
-        const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
-        const cdSeconds = cooldowns["cockfight"] || 0;
-        if (cdSeconds > 0) {
-            setCooldown(`game:cockfight:${guildId}:${p1.user.id}`, cdSeconds);
-            setCooldown(`game:cockfight:${guildId}:${p2.user.id}`, cdSeconds);
-        }
+        // Release active locks and set cooldowns for both players
+        await releaseActiveGameLock("cockfight", p1.user.id);
+        await releaseActiveGameLock("cockfight", p2.user.id);
+        await setCasinoCooldown("cockfight", p1.user.id, guildId);
+        await setCasinoCooldown("cockfight", p2.user.id, guildId);
 
         await gameMsg.edit({ components: [resultContainer], files: [winnerImage], flags: COCKFIGHT_FLAGS });
     });

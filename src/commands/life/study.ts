@@ -6,8 +6,9 @@ import { Mascot, getEmoteUrl } from "../../config/branding";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency } from "../../utils/format";
 
-import prisma from "../../utils/prisma"; // Added prisma import
+import prisma from "../../utils/prisma";
 import { getStudyGame } from "../../services/minigameService";
+import { redisService } from "../../services/redisService";
 
 export async function handleStudy(message: Message) {
     if (!message.guild) return;
@@ -44,6 +45,26 @@ export async function handleStudy(message: Message) {
         if (angryUrl) embed.setThumbnail(angryUrl);
         return message.reply({ embeds: [embed] });
     }
+
+    // Fetch active Uni Store buffs
+    const userId = message.author.id;
+    const [studyLaptop, textbookBundle, labKit, calcPro, focusNotes, tutorPass] = await Promise.all([
+      redisService.get<{ sessionsLeft: number; xpMult: number }>(`study_laptop:${userId}`),
+      redisService.get<{ sessionsLeft: number; xpMult: number }>(`textbook_bundle:${userId}`),
+      redisService.get<{ sessionsLeft: number; failReduction: number; xpMult: number }>(`lab_kit:${userId}`),
+      redisService.get<{ sessionsLeft: number; failRescue: number; xpMult: number }>(`calculator_pro:${userId}`),
+      redisService.get<{ active: boolean; bonusXp: number }>(`focus_notes:${userId}`),
+      redisService.get<{ active: boolean; xpMult: number; failReduction: number }>(`tutor_pass:${userId}`),
+    ]);
+
+    let xpMultiplier = 1.0;
+    let failReduction = 0;
+    if (studyLaptop) xpMultiplier *= studyLaptop.xpMult;
+    if (textbookBundle) xpMultiplier *= textbookBundle.xpMult;
+    if (labKit) { xpMultiplier *= labKit.xpMult; failReduction += labKit.failReduction; }
+    if (calcPro) { xpMultiplier *= calcPro.xpMult; failReduction += calcPro.failRescue; }
+    if (tutorPass) { xpMultiplier *= tutorPass.xpMult; failReduction += tutorPass.failReduction; }
+    xpMultiplier = Math.min(xpMultiplier, 2.0);
 
     // 2. Pick Game
     const game = getStudyGame();
@@ -137,34 +158,74 @@ export async function handleStudy(message: Message) {
     // Disable buttons on game message
     if (reply) await reply.edit({ components: [] }).catch(() => { });
 
+    // Fail rescue: if user failed but has active buffs with failReduction, attempt rescue
+    let rescued = false;
+    if (!isWin && failReduction > 0 && Math.random() < failReduction) {
+        isWin = true;
+        rescued = true;
+    }
+
     // Result Handling
     if (!isWin) {
+        if (tutorPass) await redisService.del(`tutor_pass:${userId}`);
+
         const failEmbed = new EmbedBuilder()
             .setTitle("📖 Study Session Failed")
             .setDescription(`${Mascot.Emotes.Confused} You failed the test!\n\n**Correct Answer:** ${game.answer}`)
-            .setColor("#E74C3C"); // Red
+            .setColor("#E74C3C");
 
-        // NEW: Reply to USER MESSAGE with result
         await message.reply({ embeds: [failEmbed] });
         return;
     }
 
     // Success - Execute Study
     try {
-        const bonus = 0.5;
-        const res = await study(message.author.id, message.guild!.id, bonus);
+        const focusNotesBonus = focusNotes?.bonusXp ?? 0;
+        const bonusXp = Math.floor(50 * (xpMultiplier - 1)) + focusNotesBonus;
+        const res = await study(message.author.id, message.guild!.id, bonusXp);
+
+        // Apply focus_notes bonus XP
+        let focusBonus = "";
+        if (focusNotes) {
+            focusBonus = `\n📝 **Focus Notes:** +${focusNotes.bonusXp} bonus XP applied!`;
+            await redisService.del(`focus_notes:${userId}`);
+        }
+
+        // Decrement session-based buffs (only after successful study)
+        const decrementBuff = async (key: string, data: { sessionsLeft: number; [k: string]: any } | null) => {
+            if (!data) return;
+            const current = await redisService.get<typeof data>(key);
+            if (!current) return;
+            const remaining = current.sessionsLeft - 1;
+            if (remaining <= 0) { await redisService.del(key); return; }
+            const ttl = await redisService.getInstance().ttl(key);
+            if (ttl > 0) await redisService.set(key, { ...current, sessionsLeft: remaining }, ttl);
+        };
+
+        await Promise.all([
+            decrementBuff(`study_laptop:${userId}`, studyLaptop),
+            decrementBuff(`textbook_bundle:${userId}`, textbookBundle),
+            decrementBuff(`lab_kit:${userId}`, labKit),
+            decrementBuff(`calculator_pro:${userId}`, calcPro),
+        ]);
+        if (tutorPass) await redisService.del(`tutor_pass:${userId}`);
+
+        // Build result message
+        let footerText = bonusXp > 0 ? `Perfect! +${bonusXp} Bonus XP!` : "Perfect study session!";
+        if (xpMultiplier > 1.0) footerText += ` (${xpMultiplier.toFixed(2)}x buff)`;
+        if (rescued) footerText = bonusXp > 0 ? `Rescued by buff! +${bonusXp} Bonus XP!` : "Rescued by buff!";
 
         const resultEmbed = new EmbedBuilder()
             .setTitle("📚 Study Successful!")
-            .setDescription(res.msg)
+            .setDescription(res.msg + focusBonus + (rescued ? "\n✨ **Your study items rescued the attempt!**" : ""))
             .setColor(res.newStress > 80 ? "#E74C3C" : "#2ECC71")
-            .setFooter({ text: "Perfect! +0.5 Bonus Int!" });
+            .setFooter({ text: footerText });
 
         const comps: any[] = [];
         if (res.scholarship) {
             resultEmbed.addFields({
                 name: "🎉 Scholarship Unlocked!",
-                value: `You reached GPA **${res.scholarship.milestone}.0**!\nReward: **${fmtCurrency(res.scholarship.amount, config?.currencyEmoji || "$")}**`
+                value: `You reached **${res.scholarship.milestone}%** XP!\nReward: **${fmtCurrency(res.scholarship.amount, config?.currencyEmoji || "$")}**`
             });
             const claimRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
                 new ButtonBuilder()
@@ -179,7 +240,6 @@ export async function handleStudy(message: Message) {
         const thumb = getEmoteUrl(Mascot.Emotes.Teacher);
         if (thumb) resultEmbed.setThumbnail(thumb);
 
-        // NEW: Reply to USER MESSAGE with result
         await message.reply({ embeds: [resultEmbed], components: comps });
 
     } catch (err: any) {

@@ -10,7 +10,10 @@ import {
     SeparatorSpacingSize,
     TextDisplayBuilder
 } from "discord.js";
-import { JOBS, getJob, getJobPaySync } from "../../services/jobService";
+import { getJob, getJobPaySync, getRequiredGearKey, getPromotionProgress } from "../../services/jobService";
+import { getSectorReputation } from "../../services/jobReputationService";
+import { JOB_SHOP_CATALOG } from "../../utils/shopCatalog";
+import { seedJobShop } from "../../services/shopService";
 import { Mascot } from "../../config/branding";
 import prisma from "../../utils/prisma";
 import { fmtCurrency } from "../../utils/format";
@@ -24,6 +27,16 @@ function hexColorToNumber(color: unknown, fallback = 0x9B59B6) {
         if (!Number.isNaN(parsed)) return parsed;
     }
     return fallback;
+}
+
+function capitalize(s: string) {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function getStressColor(stress: number) {
+    if (stress < 30) return "<:n_check:1451281806279311435>";
+    if (stress < 70) return "<:alert_sign:1451625691664875610>";
+    return "<:rip:1451287136132403303>";
 }
 
 export async function handleWork(message: Message) {
@@ -43,42 +56,85 @@ export async function handleWork(message: Message) {
                 new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.JobWorking} Employment Status`),
                 new TextDisplayBuilder().setContent(`**Position:** Unemployed\nUse \`${config?.prefix || "!"}jobs\` to browse available careers and apply.`)
             );
-
         return message.reply({ components: [container], flags: MessageFlags.IsComponentsV2 });
     }
 
-    // 2. Employed View
     const job = getJob(user.jobId);
     if (!job) {
-        // Fallback if job ID invalid
         return message.reply("Error: Your job ID is invalid. Please contact admin.");
     }
 
-    const nextLevelJob = JOBS.find(j => j.reqJobId === job.id);
-    let promoText = "You are at the top of the ladder!";
-    let progress = 100;
+    // Promotion progress (XP-based, correct)
+    const promo = await getPromotionProgress(
+        { jobId: user.jobId, jobXp: user.jobXp, shiftsWorked: user.shiftsWorked },
+        message.guildId!
+    );
 
-    // Simple promo logic for display (Real logic in work result later)
-    if (nextLevelJob) {
-        let shiftsReq = 20; // Default requirement
-        if (config && config.jobShiftReqs) {
-            const reqs = config.jobShiftReqs as Record<string, number>;
-            if (reqs[nextLevelJob.id]) {
-                shiftsReq = reqs[nextLevelJob.id];
+    // Reputation for this sector
+    const repData = await getSectorReputation(user.discordId, job.sector);
+    const repLine = `\n**Reputation:** ${repData.rep} — ${repData.tier.name}` +
+      (repData.nextTier ? ` (${repData.repToNext} to ${repData.nextTier.name})` : " — Max Tier");
+
+    // Gear status check
+    let gearStatusLine = "";
+    const gearKey = getRequiredGearKey(job.sector);
+    if (gearKey && message.guildId) {
+        await seedJobShop(message.guildId);
+        const gearCatalogItem = JOB_SHOP_CATALOG.find(i => i.key === gearKey);
+        if (gearCatalogItem) {
+            const gearInDb = await prisma.shopItem.findFirst({
+                where: { guildId: message.guildId, name: { equals: gearCatalogItem.name, mode: "insensitive" } }
+            });
+            const invRow = gearInDb
+                ? await prisma.inventory.findUnique({
+                    where: { userId_shopItemId: { userId: user.discordId, shopItemId: gearInDb.id } }
+                })
+                : null;
+            if (!invRow || invRow.amount < 1) {
+                gearStatusLine = `\n**Gear:** ${gearCatalogItem.name} — Missing — buy from \`!shop job\``;
+            } else {
+                const durability = (invRow.meta as any)?.durability ?? 100;
+                if (durability <= 0) {
+                    gearStatusLine = `\n**Gear:** ${gearCatalogItem.name} — Broken (0/100) — use Repair Coupon`;
+                } else {
+                    gearStatusLine = `\n**Gear:** ${gearCatalogItem.name} — Ready (${durability}/100)`;
+                }
             }
         }
-
-        progress = Math.min((user.shiftsWorked / shiftsReq) * 100, 100);
-        promoText = `Next Promotion: **${nextLevelJob.title}**\nProgress: ${makeProgressBar(progress)} (${user.shiftsWorked}/${shiftsReq} shifts)`;
     }
 
+    // Career progress section
+    let careerProgressContent: string;
+    if (promo.eligible && promo.nextJob) {
+        careerProgressContent =
+            `### ${Mascot.Emotes.JobPromotion} PROMOTION READY\n` +
+            `**${promo.nextJob.title}** is waiting for you.\n` +
+            `Click **Promote** to advance your career now.`;
+    } else if (promo.nextJob) {
+        const xpPct = Math.min(100, Math.floor(((promo.nextJob.reqXp ?? 0) - promo.missingXp) / Math.max(1, promo.nextJob.reqXp ?? 1) * 100));
+        const filled = Math.round(xpPct / 10);
+        const bar = "`[" + "█".repeat(filled) + "░".repeat(10 - filled) + "]`";
+        careerProgressContent =
+            `### Career Progress\n` +
+            `Next: **${promo.nextJob.title}**\n` +
+            `${bar} ${xpPct}%\n` +
+            promo.progressText;
+    } else {
+        careerProgressContent = `### Career Progress\n${promo.progressText}`;
+    }
+
+    const accentColor = promo.eligible ? 0xF1C40F : hexColorToNumber(Mascot.Colors.Base);
+
     const container = new ContainerBuilder()
-        .setAccentColor(hexColorToNumber(Mascot.Colors.Base))
+        .setAccentColor(accentColor)
         .addSectionComponents(
             new SectionBuilder()
                 .addTextDisplayComponents(
                     new TextDisplayBuilder().setContent(`## ${job.emoji} ${job.title}`),
-        new TextDisplayBuilder().setContent(`**Sector:** ${capitalize(job.sector)}\n**Level:** ${job.level}\n**Pay:** ${fmtCurrency(getJobPaySync(job), config?.currencyEmoji)}/shift`)
+                    new TextDisplayBuilder().setContent(
+                        `**Sector:** ${capitalize(job.sector)} | **Level:** ${job.level}\n` +
+                        `**Pay:** ${fmtCurrency(getJobPaySync(job), config?.currencyEmoji)}/shift`
+                    )
                 )
                 .setThumbnailAccessory((thumbnail) =>
                     thumbnail
@@ -90,33 +146,31 @@ export async function handleWork(message: Message) {
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
                 `### Shift Status\n` +
-                `**Shifts Worked:** ${user.shiftsWorked}\n` +
-                `**XP:** ${user.jobXp}\n` +
-                `**Stress:** ${getStressColor(user.jobStress ?? 0)} ${user.jobStress ?? 0}/100`
+                `**XP:** ${user.jobXp}  |  **Shifts:** ${user.shiftsWorked}  |  **Streak:** ${user.jobStreak ?? 0}\n` +
+                `**Stress:** ${getStressColor(user.jobStress ?? 0)} ${user.jobStress ?? 0}/100` +
+                gearStatusLine +
+                repLine
             ),
-            new TextDisplayBuilder().setContent(`### Career Progress\n${promoText}`)
+            new TextDisplayBuilder().setContent(careerProgressContent)
         );
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    const buttons: ButtonBuilder[] = [
         new ButtonBuilder().setCustomId("work_shift").setLabel("Start Shift").setStyle(ButtonStyle.Success).setEmoji(Mascot.Emotes.JobWorking),
+    ];
+    if (promo.eligible && promo.nextJob) {
+        buttons.push(
+            new ButtonBuilder()
+                .setCustomId(`work_promote_${promo.nextJob.id}`)
+                .setLabel(`Promote → ${promo.nextJob.title}`)
+                .setStyle(ButtonStyle.Primary)
+                .setEmoji(Mascot.Emotes.JobPromotion)
+        );
+    }
+    buttons.push(
         new ButtonBuilder().setCustomId("work_resign").setLabel("Resign").setStyle(ButtonStyle.Danger)
     );
 
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(buttons);
+
     message.reply({ components: [container, row], flags: MessageFlags.IsComponentsV2 });
-}
-
-function makeProgressBar(pct: number) {
-    const total = 10;
-    const fill = Math.round((pct / 100) * total);
-    return "`[" + "█".repeat(fill) + "░".repeat(total - fill) + "]`";
-}
-
-function capitalize(s: string) {
-    return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function getStressColor(stress: number) {
-    if (stress < 30) return "<:n_check:1451281806279311435>"; // Low
-    if (stress < 70) return "<:alert_sign:1451625691664875610>"; // Medium
-    return "<:rip:1451287136132403303>"; // High
 }

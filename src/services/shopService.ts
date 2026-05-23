@@ -4,9 +4,10 @@ import { applyItemEffects, ItemEffect, ItemEffectResult } from "./effectService"
 import { logToChannel } from "../utils/discordLogger";
 import { Colors } from "discord.js";
 import { Mascot } from "../config/branding";
-import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG } from "../utils/shopCatalog";
+import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG, JOB_SHOP_CATALOG, UNI_SHOP_CATALOG } from "../utils/shopCatalog";
 import { RIFLE_PRIORITY } from "../utils/animalCatalog";
 import { redisService } from "./redisService";
+import { isTester } from "../utils/developerAccess";
 
 export async function resetShop(guildId: string, category: string = "GENERAL") {
   return prisma.shopItem.deleteMany({
@@ -110,7 +111,7 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       include: { wallet: true, bank: true }
     });
 
-    if (!user || !user.wallet || user.wallet.balance < item.price) {
+    if (!user || !user.wallet || (user.wallet.balance < item.price && !isTester(userId))) {
       throw new Error(`You need ${item.price.toLocaleString("en-US")} coins to buy this.`);
     }
 
@@ -405,6 +406,42 @@ export async function seedGeneralShop(guildId: string) {
   });
 }
 
+const seededJobGuilds = new Set<string>();
+
+export async function seedJobShop(guildId: string) {
+  if (seededJobGuilds.has(guildId)) return;
+
+  const existing = await prisma.shopItem.findMany({
+    where: { guildId, category: "JOB" },
+    select: { name: true },
+  });
+  const existingNames = new Set(existing.map(e => e.name.toLowerCase()));
+
+  const toCreate = JOB_SHOP_CATALOG.filter(
+    item => !existingNames.has(item.name.toLowerCase())
+  );
+
+  if (toCreate.length > 0) {
+    await prisma.shopItem.createMany({
+      data: toCreate.map(item => ({
+        guildId,
+        name: item.name,
+        price: item.price,
+        description: item.description,
+        stock: -1,
+        itemType: item.itemType,
+        effects: item.effects as any,
+        consumable: item.consumable,
+        usable: item.usable,
+        category: item.category,
+      })),
+    });
+  }
+
+  // Mark seeded only after DB write succeeds
+  seededJobGuilds.add(guildId);
+}
+
 const seededHuntGuilds = new Set<string>();
 
 export async function seedHuntShop(guildId: string) {
@@ -437,4 +474,39 @@ export async function seedHuntShop(guildId: string) {
       category: item.category,
     })),
   });
+}
+
+const seededUniGuilds = new Set<string>();
+
+export async function seedUniShop(guildId: string) {
+  if (seededUniGuilds.has(guildId)) return;
+
+  const existing = await prisma.shopItem.findMany({
+    where: { guildId, category: "UNI" },
+    select: { name: true },
+  });
+  const existingNames = new Set(existing.map(e => e.name.toLowerCase()));
+
+  const toCreate = UNI_SHOP_CATALOG.filter(
+    item => !existingNames.has(item.name.toLowerCase())
+  );
+
+  if (toCreate.length > 0) {
+    await prisma.shopItem.createMany({
+      data: toCreate.map(item => ({
+        guildId,
+        name: item.name,
+        price: item.price,
+        description: item.description,
+        stock: -1,
+        itemType: item.itemType,
+        effects: item.effects as any,
+        consumable: item.consumable,
+        usable: item.usable,
+        category: item.category,
+      })),
+    });
+  }
+
+  seededUniGuilds.add(guildId);
 }

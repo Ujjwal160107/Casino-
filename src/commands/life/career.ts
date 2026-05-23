@@ -12,6 +12,7 @@ import { Mascot } from "../../config/branding";
 import { fmtCurrency } from "../../utils/format";
 import { getGuildConfig } from "../../services/guildConfigService";
 import { getJob } from "../../services/jobService";
+import { getAllSectorReputation } from "../../services/jobReputationService";
 
 export async function handleCareer(message: Message) {
     if (!message.guild) return;
@@ -57,6 +58,11 @@ export async function handleCareer(message: Message) {
         }
     }
 
+    const allRep = await getAllSectorReputation(user.discordId);
+    const repLines = allRep.length > 0
+        ? allRep.map(r => `**${r.sector.charAt(0).toUpperCase() + r.sector.slice(1)}:** ${r.rep} rep — ${r.tier.name}`).join("\n")
+        : "No reputation earned yet. Work shifts to build it.";
+
     const container = new ContainerBuilder()
         .setAccentColor(ratingColor)
         .addSectionComponents(
@@ -89,6 +95,10 @@ export async function handleCareer(message: Message) {
                 `**Total:** ${fmtCurrency(totalEarned, config.currencyEmoji)}\n` +
                 `**Avg/Shift:** ${totalShifts > 0 ? fmtCurrency(Math.floor(totalEarned / totalShifts), config.currencyEmoji) : "0"}`
             )
+        )
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`### Sector Reputation\n${repLines}`)
         );
 
     return message.reply({ components: [container], flags: MessageFlags.IsComponentsV2 });
