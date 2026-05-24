@@ -7,7 +7,8 @@ import {
 import prisma from "../../utils/prisma";
 import { useItem } from "../../services/shopService";
 import { handleSpecialItemUse } from "../../services/shopItemEffects";
-import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG, JOB_SHOP_CATALOG, UNI_SHOP_CATALOG } from "../../utils/shopCatalog";
+import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG, JOB_SHOP_CATALOG, UNI_SHOP_CATALOG, COCK_SHOP_CATALOG } from "../../utils/shopCatalog";
+import { seedCockShop } from "../../services/shopService";
 
 const USE_ACCENT_COLOR = 0x3498DB;
 
@@ -33,9 +34,15 @@ function parseTargetAndItemName(args: string[]): { itemName: string; targetId: s
   return { itemName: args.join(" "), targetId: null };
 }
 
+const FEED_SHORTHANDS: Record<string, string> = {
+  basic: "Basic Feed",
+  protein: "Protein Feed",
+  champion: "Champion Feed",
+};
+
 function findCatalogKeyByName(name: string): string | null {
   const normalized = name.trim().toLowerCase();
-  const all = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG];
+  const all = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG];
   return all.find(i => i.name.toLowerCase() === normalized)?.key ?? null;
 }
 
@@ -60,7 +67,47 @@ async function consumeInventoryItem(discordId: string, itemName: string): Promis
 export async function handleUse(message: Message, args: string[]) {
   if (!message.guild || !message.member) return;
 
-  const { itemName, targetId } = parseTargetAndItemName(args);
+  // --- Feed shorthand + amount parsing ---
+  // "!use basic 5", "!use basic feed 5", "!use protein", "!use champion feed"
+  let feedAmount = 1;
+  let resolvedArgs = [...args];
+
+  if (args.length > 0) {
+    const firstWord = args[0]?.toLowerCase();
+    if (FEED_SHORTHANDS[firstWord]) {
+      const fullName = FEED_SHORTHANDS[firstWord];
+      // Check if last arg is a number (amount)
+      const lastArg = args[args.length - 1];
+      const parsed = parseInt(lastArg, 10);
+      if (!isNaN(parsed) && parsed > 0 && args.length > 1) {
+        feedAmount = parsed;
+        // Remove the amount from args, replace with full name
+        resolvedArgs = fullName.split(" ");
+      } else if (args[1]?.toLowerCase() === "feed") {
+        // "basic feed 5" or "basic feed"
+        const amountArg = args[2];
+        if (amountArg && !isNaN(parseInt(amountArg, 10))) {
+          feedAmount = parseInt(amountArg, 10);
+        }
+        resolvedArgs = fullName.split(" ");
+      } else {
+        resolvedArgs = fullName.split(" ");
+      }
+    } else {
+      // Check for trailing number on non-shorthand feed items: "!use basic feed 5"
+      const lastArg = args[args.length - 1];
+      const parsed = parseInt(lastArg, 10);
+      if (!isNaN(parsed) && parsed > 0 && args.length > 1) {
+        const nameWithoutAmount = args.slice(0, -1).join(" ").toLowerCase();
+        if (Object.values(FEED_SHORTHANDS).some(n => n.toLowerCase() === nameWithoutAmount)) {
+          feedAmount = parsed;
+          resolvedArgs = args.slice(0, -1);
+        }
+      }
+    }
+  }
+
+  const { itemName, targetId } = parseTargetAndItemName(resolvedArgs);
 
   if (!itemName) {
     return message.reply({
@@ -134,6 +181,45 @@ export async function handleUse(message: Message, args: string[]) {
     }
 
     try {
+      // Seed cock shop for cock items
+      const cockItem = COCK_SHOP_CATALOG.find(i => i.key === catalogKey);
+      if (cockItem) await seedCockShop(message.guildId!);
+
+      // For feed items with amount > 1, loop through feed actions
+      const isFeed = ["basic_feed", "protein_feed", "champion_feed"].includes(catalogKey);
+      if (isFeed && feedAmount > 1) {
+        if (entry.amount < feedAmount) {
+          return message.reply({
+            components: [v2Container("Error", `You only have **${entry.amount}x ${entry.shopItem.name}** but tried to use ${feedAmount}.`, 0xE74C3C)],
+            flags: MessageFlags.IsComponentsV2,
+          });
+        }
+
+        let totalConsumed = 0;
+        let lastResult: any = null;
+        for (let i = 0; i < feedAmount; i++) {
+          const result = await handleSpecialItemUse(catalogKey, message.author.id, message.guildId!, message.member, undefined);
+          if (!result || !result.success) { lastResult = result; break; }
+          lastResult = result;
+          totalConsumed++;
+        }
+
+        if (totalConsumed > 0) {
+          if (entry.amount <= totalConsumed) {
+            await prisma.inventory.delete({ where: { id: entry.id } });
+          } else {
+            await prisma.inventory.update({ where: { id: entry.id }, data: { amount: { decrement: totalConsumed } } });
+          }
+        }
+
+        const color = totalConsumed > 0 ? 0x2ECC71 : 0xE74C3C;
+        const msg = lastResult?.message || "No feeds processed.";
+        return message.reply({
+          components: [v2Container(entry.shopItem.name, msg, color)],
+          flags: MessageFlags.IsComponentsV2,
+        });
+      }
+
       // Run the special handler BEFORE consuming
       const specialResult = await handleSpecialItemUse(
         catalogKey,

@@ -26,7 +26,7 @@ import { managePropertyHandler } from "./commands/admin/adminProperty";
 import { handleProfile } from "./commands/economy/profile";
 import { handleLeaderboard } from "./commands/economy/leaderboard";
 import { execute as handleBank } from "./commands/economy/bank";
-import { execute as handleMarket } from "./commands/economy/market";
+import { handleMarket } from "./commands/economy/market";
 import { handleDaily } from "./commands/economy/daily";
 import { handleWeekly } from "./commands/economy/weekly";
 import { handleMonthly } from "./commands/economy/monthly";
@@ -351,6 +351,9 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "buy":
       return handleShop(message, ["buy", ...args]);
     case "inventory":
+    case "inv":
+    case "bag":
+    case "items":
       return handleInventory(message, args);
     case "profile":
       return handleProfile(message, args);
@@ -475,8 +478,8 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "cockstore":
     case "cock-store":
     case "cs": {
-      const { handleCockStore } = require("./commands/shop/cockStore");
-      return handleCockStore(message, args);
+      const { handleShop } = require("./commands/economy/shop");
+      return handleShop(message, ["cock"]);
     }
     case "degrees":
     case "mydegrees":

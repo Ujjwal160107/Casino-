@@ -29,6 +29,8 @@ import { GameConfig } from "../../config/gameConfig";
 import { Mascot } from "../../config/branding";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { creditGamePayout, debitGameBet } from "../../services/gameService";
+import { seedCockShop } from "../../services/shopService";
+import { questBus } from "../../services/questEvents";
 
 
 const EMOJI_CHICKEN = GameConfig.Emojis.Chicken;
@@ -114,6 +116,7 @@ function buildSideBetRow(fightId: string, p1Name: string, p2Name: string, disabl
 export async function handleCockFight(message: Message, args: string[]) {
     if (!message.guild || !message.member) return;
     const config = await getGuildConfig(message.guild.id);
+    await seedCockShop(message.guild.id);
 
     const targetUser = message.mentions.users.first();
     // Allow finding any argument that looks like a number/amount (including 10k, 1e5)
@@ -186,6 +189,9 @@ export async function handleCockFight(message: Message, args: string[]) {
     }
 
     const challengerMeta = (invChallenger.meta as any) || {};
+    if (challengerMeta.critical) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Critical", `Your chicken is in **critical condition**! Use \`${config.prefix}use phoenix serum\` to save it.`)] });
+    }
     if (challengerMeta.training) {
         const endTime = Math.floor(challengerMeta.training.endTime / 1000);
         return message.reply({
@@ -193,7 +199,7 @@ export async function handleCockFight(message: Message, args: string[]) {
         });
     }
     if (challengerMeta.injured) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Injured", `Your chicken is injured! Heal it via \`${config.prefix}chicken\`.`)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Injured", `Your chicken is injured! Heal it via \`${config.prefix}chicken\` or \`${config.prefix}use feather bandage\`.`)] });
     }
 
     const invTarget = await prisma.inventory.findUnique({
@@ -205,6 +211,9 @@ export async function handleCockFight(message: Message, args: string[]) {
     }
 
     const targetMeta = (invTarget.meta as any) || {};
+    if (targetMeta.critical) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Critical", `**${targetName}**'s chicken is in critical condition!`)] });
+    }
     if (targetMeta.training) {
         const endTime = Math.floor(targetMeta.training.endTime / 1000);
         return message.reply({
@@ -236,11 +245,16 @@ export async function handleCockFight(message: Message, args: string[]) {
         `${EMOJI_CHICKEN} Cockfight Challenge`,
         [
             `${message.author} challenged ${targetUser} to a **Cockfight**.`,
-            `Challenger: **${challengerName}**`,
-            `Opponent: **${targetName}**`,
+            ``,
+            `**${challengerName}**'s Chicken:`,
+            formatChickenStats(challengerMeta, challengerMeta.level || 0),
+            ``,
+            `**${targetName}**'s Chicken:`,
+            formatChickenStats(targetMeta, targetMeta.level || 0),
+            ``,
             `Bet: **${fmtCurrency(betAmount, config.currencyEmoji)}**`,
-            "Requirement: the losing chicken can be injured or lost by the existing fight rules.",
-            "The opponent must accept within 30 seconds."
+            `⚠️ Loser's chicken will be injured (2h) with equipment broken. Small permadeath chance.`,
+            `The opponent must accept within 30 seconds.`
         ].join("\n")
     );
 
@@ -344,6 +358,18 @@ const FIGHT_MOVES = [
     "{attacker} unleashes a flurry of pecks!",
 ];
 
+const SPUR_MOVES = [
+    "{attacker}'s **Iron Spurs** slash deep into {defender}!",
+    "{attacker} strikes with razor-sharp spurs!",
+    "The glint of iron spurs flashes as {attacker} lunges!",
+];
+
+const VEST_BLOCKS = [
+    "{defender}'s **Guard Vest** absorbs the blow!",
+    "The reinforced vest deflects {attacker}'s strike!",
+    "{defender} barely feels it through their armored vest!",
+];
+
 const CRITICAL_MOVES = [
     "CRITICAL HIT! {attacker} tears a hole in the fabric of space-time!",
     "BOOM! {attacker} lands a devastating spur strike!",
@@ -355,6 +381,31 @@ const MISS_MOVES = [
     "{defender} dodges the attack effortlessly!",
     "{attacker} trips over their own feet!",
 ];
+
+function getEquipList(meta: any): string[] {
+    const list: string[] = [];
+    if (meta.equipment) {
+        Object.values(meta.equipment).forEach((e: any) => list.push(e.name));
+    } else if (meta.equippedItemName) {
+        list.push(meta.equippedItemName);
+    }
+    return list;
+}
+
+function hasEquipment(meta: any, name: string): boolean {
+    if (!meta.equipment) return false;
+    return Object.values(meta.equipment).some((e: any) => e.name?.toLowerCase() === name.toLowerCase());
+}
+
+function formatChickenStats(meta: any, level: number): string {
+    const equips = getEquipList(meta);
+    const equipStr = equips.length > 0 ? equips.join(", ") : "None";
+    return [
+        `Lv.**${level}** | W:**${meta.wins || 0}** | Trait: **${meta.trait || "?"}**`,
+        `STR:**${meta.strength || 0}** AGI:**${meta.agility || 0}** DEF:**${meta.defense || 0}**`,
+        `Gear: ${equipStr}`,
+    ].join("\n");
+}
 
 async function runCockFight(
     originalMsg: Message,
@@ -589,19 +640,6 @@ async function runCockFight(
         const p2Meta = (p2Inv?.meta as any) || {};
         const p2Level = p2Meta.level || 0;
 
-        // Helper to get equipment list
-        const getEquipList = (meta: any) => {
-            const list: string[] = [];
-            if (meta.equipment) {
-                // New Format
-                Object.values(meta.equipment).forEach((e: any) => list.push(e.name));
-            } else if (meta.equippedItemName) {
-                // Legacy Format
-                list.push(meta.equippedItemName);
-            }
-            return list;
-        };
-
         const p1Equips = getEquipList(p1Meta);
         const p2Equips = getEquipList(p2Meta);
 
@@ -653,18 +691,28 @@ async function runCockFight(
             const attacker = isP1Attacking ? p1.displayName : p2.displayName;
             const defender = isP1Attacking ? p2.displayName : p1.displayName;
 
-            // Stats for flavor text logic
+            const attMeta = isP1Attacking ? p1Meta : p2Meta;
+            const defMeta = isP1Attacking ? p2Meta : p1Meta;
             const attStats = isP1Attacking ? p1Stats : p2Stats;
             const defStats = isP1Attacking ? p2Stats : p1Stats;
 
-            const defenderDodgeChance = defStats.agi * 0.02; // 2% per agility
+            const defenderDodgeChance = defStats.agi * 0.02;
+            const attackerHasSpurs = hasEquipment(attMeta, "Iron Spurs");
+            const defenderHasVest = hasEquipment(defMeta, "Guard Vest");
 
             let moveText = "";
             const moveRoll = Math.random();
-            // Miss chance = base 10% + dodge chance
-            if (moveRoll < (0.10 + defenderDodgeChance)) moveText = MISS_MOVES[Math.floor(Math.random() * MISS_MOVES.length)];
-            else if (moveRoll > 0.85) moveText = CRITICAL_MOVES[Math.floor(Math.random() * CRITICAL_MOVES.length)];
-            else moveText = FIGHT_MOVES[Math.floor(Math.random() * FIGHT_MOVES.length)];
+            if (moveRoll < (0.10 + defenderDodgeChance)) {
+                moveText = MISS_MOVES[Math.floor(Math.random() * MISS_MOVES.length)];
+            } else if (defenderHasVest && Math.random() < 0.20) {
+                moveText = VEST_BLOCKS[Math.floor(Math.random() * VEST_BLOCKS.length)];
+            } else if (attackerHasSpurs && Math.random() < 0.30) {
+                moveText = SPUR_MOVES[Math.floor(Math.random() * SPUR_MOVES.length)];
+            } else if (moveRoll > 0.85) {
+                moveText = CRITICAL_MOVES[Math.floor(Math.random() * CRITICAL_MOVES.length)];
+            } else {
+                moveText = FIGHT_MOVES[Math.floor(Math.random() * FIGHT_MOVES.length)];
+            }
 
             moveText = moveText.replace(/{attacker}/g, `**${attacker}**`).replace(/{defender}/g, `**${defender}**`);
             logText += `**Round ${i}:** ${moveText}\n`;
@@ -779,25 +827,28 @@ async function runCockFight(
         }));
 
         const lId = loser.discordId;
-        // DEATH MECHANIC UPDATE:
-        // 5% Chance of Permadeath. 95% Chance of Injury.
-        // Equipment is broken (Cleared) on Injury.
-
         const loserLevel = winnerIsP1 ? p2Level : p1Level;
         const levelDiff = Math.max(0, winnerLevel - loserLevel);
+        const winnerStats = winnerIsP1 ? p1Stats : p2Stats;
+        const loserStats = winnerIsP1 ? p2Stats : p1Stats;
+        const winnerTotalStats = winnerStats.str + winnerStats.agi + winnerStats.def;
+        const loserTotalStats = loserStats.str + loserStats.agi + loserStats.def;
 
-        let deathChance = 0.05; // Base 5%
-        if (levelDiff > 0) {
-            deathChance += (levelDiff * 0.02); // +2% per level difference
-        }
-        deathChance = Math.min(deathChance, 0.50); // Cap at 50%
-
+        // Death roll: 5% base + 2% per level diff, cap 50%
+        let deathChance = 0.05 + (levelDiff * 0.02);
+        deathChance = Math.min(deathChance, 0.50);
         const isDeadRoll = Math.random() < deathChance;
+
+        // Extreme damage: enemy stats >= 3x loser stats
+        const extremeDamage = winnerTotalStats >= loserTotalStats * 3 && winnerTotalStats > 0;
+
+        // Critical state triggers on death roll OR extreme damage
+        const isCritical = isDeadRoll || extremeDamage;
+
         let survivedByEffect = false;
         let usedDeathSave = false;
 
-        if (isDeadRoll) {
-            // Check for Death Save
+        if (isCritical) {
             const activeDeathSave = await prisma.activeEffect.findFirst({
                 where: {
                     userId: lId,
@@ -816,43 +867,86 @@ async function runCockFight(
             }
         }
 
-        const actuallyDead = isDeadRoll && !survivedByEffect;
+        // Calculate injury recovery time: base 2h + (enemyLevel * 20min) + (enemyTotalStats * 5min), cap 12h
+        const recoveryMs = Math.min(
+            12 * 60 * 60 * 1000,
+            (2 * 60 * 60 * 1000) + (winnerLevel * 20 * 60 * 1000) + (winnerTotalStats * 5 * 60 * 1000)
+        );
+        const recoveryHours = recoveryMs / (60 * 60 * 1000);
 
-        if (!actuallyDead) {
-            // INJURED STATE (95% or Saved by Effect)
-            const loserMeta = winnerIsP1 ? p2Meta : p1Meta;
-            const newLoserMeta = JSON.parse(JSON.stringify(loserMeta));
+        let equipmentSaved = false;
+        if (isCritical && !survivedByEffect) {
+            // CRITICAL STATE: 24h window, only Phoenix Serum can save
+            const loserMetaCopy = JSON.parse(JSON.stringify(winnerIsP1 ? p2Meta : p1Meta));
 
-            // Break Item (Clear Equipment)
-            delete newLoserMeta.equippedItem;
-            delete newLoserMeta.equippedItemName;
-            delete newLoserMeta.equipment; // Clear new format too
+            // Break equipment
+            delete loserMetaCopy.equippedItem;
+            delete loserMetaCopy.equippedItemName;
+            delete loserMetaCopy.equipment;
 
-            // Apply Injury (2 Hours)
-            newLoserMeta.injured = {
-                endTime: Date.now() + (2 * 60 * 60 * 1000)
+            // Set critical state with 24h deadline
+            loserMetaCopy.critical = {
+                endTime: Date.now() + (24 * 60 * 60 * 1000),
+                reason: isDeadRoll ? "death_roll" : "extreme_damage",
             };
+            delete loserMetaCopy.injured;
 
             payoutOps.push(prisma.inventory.update({
                 where: { userId_shopItemId: { userId: lId, shopItemId: chickenItemId } },
-                data: { meta: newLoserMeta }
+                data: { meta: loserMetaCopy }
             }));
         } else {
-            // PERMADEATH (5%)
-            payoutOps.push(prisma.inventory.delete({
-                where: { userId_shopItemId: { userId: lId, shopItemId: chickenItemId } }
+            // Normal injury (or saved from critical by Death Save effect)
+            const loserMetaCopy = JSON.parse(JSON.stringify(winnerIsP1 ? p2Meta : p1Meta));
+
+            const loserHasVest = hasEquipment(loserMetaCopy, "Guard Vest");
+            equipmentSaved = loserHasVest && Math.random() < 0.50;
+
+            if (!equipmentSaved) {
+                delete loserMetaCopy.equippedItem;
+                delete loserMetaCopy.equippedItemName;
+                delete loserMetaCopy.equipment;
+            }
+
+            loserMetaCopy.injured = {
+                endTime: Date.now() + recoveryMs,
+                recoveryHours: Math.round(recoveryHours * 10) / 10,
+            };
+            delete loserMetaCopy.critical;
+
+            payoutOps.push(prisma.inventory.update({
+                where: { userId_shopItemId: { userId: lId, shopItemId: chickenItemId } },
+                data: { meta: loserMetaCopy }
             }));
         }
 
         await prisma.$transaction(payoutOps);
 
+        // Coin heal cost scales: 50k per 2h of recovery
+        const coinHealCost = Math.floor(50_000 * (recoveryHours / 2));
+
         let deathMessage = "";
-        if (actuallyDead) {
-            deathMessage = `${EMOJI_RIP} **CRITICAL FAILURE!** ${loser.displayName}'s chicken has died (Permadeath).`;
+        if (isCritical && !survivedByEffect) {
+            deathMessage = [
+                `${EMOJI_RIP} **CRITICAL CONDITION!** ${loser.displayName}'s chicken is dying!`,
+                `⏰ You have **24 hours** to save it with \`${config.prefix}use phoenix serum\``,
+                `💀 If the timer expires, your chicken is **permanently lost**.`,
+                `💥 Equipment destroyed.`,
+            ].join("\n");
         } else if (usedDeathSave) {
-            deathMessage = `🛡️ **SAVED!** ${loser.displayName}'s chicken was saved from death by a **Death Save** effect!\n<:clinic:1453972244610154507> It is now injured for 2 hours (Equipment Broken).`;
+            deathMessage = [
+                `🛡️ **SAVED!** ${loser.displayName}'s chicken was saved from critical by a **Death Save** effect!`,
+                `<:clinic:1453972244610154507> Injured for **${recoveryHours.toFixed(1)}h**. Coin heal: **${fmtCurrency(coinHealCost, config.currencyEmoji)}**`,
+                `-# Or use \`${config.prefix}use feather bandage\` for instant heal`,
+            ].join("\n");
         } else {
-            deathMessage = `<:clinic:1453972244610154507> **INJURED!** ${loser.displayName}'s chicken survives but is hospitalized for 2 hours.\n<:alert_sign:1451625691664875610> **Equipment Broken!**`;
+            const vestNote = equipmentSaved
+                ? "\n🛡️ **Guard Vest protected equipment!**"
+                : "\n💥 Equipment broken!";
+            deathMessage = [
+                `<:clinic:1453972244610154507> **INJURED!** ${loser.displayName}'s chicken is hospitalized for **${recoveryHours.toFixed(1)}h**.${vestNote}`,
+                `-# Coin heal: **${fmtCurrency(coinHealCost, config.currencyEmoji)}** | \`${config.prefix}use feather bandage\` | \`${config.prefix}use phoenix serum\``,
+            ].join("\n");
         }
 
         const EMOJI_XP = "<:xpfull:1451636569982111765>";
@@ -892,11 +986,16 @@ async function runCockFight(
                 guild: originalMsg.guild!,
                 type: "ECONOMY",
                 title: "Cockfight Result",
-                description: `**Winner:** ${winner.displayName}\n**Loser:** ${loser.displayName}\n**Pot:** ${fmtCurrency(pot, config.currencyEmoji)}\n**Outcome:** ${actuallyDead ? "DEATH" : "INJURY"}\n**Winner Level:** ${newLevel}`,
+                description: `**Winner:** ${winner.displayName}\n**Loser:** ${loser.displayName}\n**Pot:** ${fmtCurrency(pot, config.currencyEmoji)}\n**Outcome:** ${(isCritical && !survivedByEffect) ? "CRITICAL" : "INJURY"}\n**Winner Level:** ${newLevel}`,
                 color: logColor,
                 thumbnail: winner.user.displayAvatarURL()
             }).catch(() => { });
         });
+
+        // Quest progress
+        questBus.emit("cockfight:participate", { discordId: p1.discordId });
+        questBus.emit("cockfight:participate", { discordId: p2.discordId });
+        questBus.emit("cockfight:win", { discordId: winner.discordId });
 
         // Release active locks and set cooldowns for both players
         await releaseActiveGameLock("cockfight", p1.user.id);

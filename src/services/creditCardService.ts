@@ -138,6 +138,13 @@ export async function upgradeCard(discordId: string) {
       if (card.status === "LOCKED") throw new Error("Locked cards cannot be upgraded.");
       if (card.status === "CLOSED") throw new Error("Closed cards cannot be upgraded.");
 
+      if (card.currentBalance > 0) {
+        const utilization = card.currentBalance / card.creditLimit;
+        if (utilization > 0.5) {
+          throw new Error(`Pay down your balance to below 50% utilization before upgrading. Current: ${Math.round(utilization * 100)}%`);
+        }
+      }
+
       const { tier } = await getEligibleTierForUser(trx, discordId);
       const current = getCardTierConfig(card.tier);
       if (tier.creditLimit <= current.creditLimit) {
@@ -159,12 +166,19 @@ export async function applyForCardTier(discordId: string, requestedTierName: str
       if (existing?.status === "DELINQUENT") throw new Error("Delinquent cards cannot be upgraded.");
       if (existing?.status === "LOCKED") throw new Error("Locked cards cannot be changed.");
 
+      if (existing && existing.currentBalance > 0) {
+        const utilization = existing.currentBalance / existing.creditLimit;
+        if (utilization > 0.5) {
+          throw new Error(`Pay down your balance to below 50% utilization before changing tiers. Current: ${Math.round(utilization * 100)}%`);
+        }
+      }
+
       const requestedTier = getCardTierConfig(requestedTierName);
       const { user, careerTier } = await getEligibleTierForUser(trx, discordId);
       const canUseTier = user.creditScore >= requestedTier.reqScore && careerTier >= requestedTier.reqCareerTier;
       if (!canUseTier) throw new Error(`You do not meet the requirements for ${requestedTier.tier}.`);
 
-      if (existing && ["ACTIVE", "DELINQUENT", "LOCKED"].includes(existing.status)) {
+      if (existing && ["ACTIVE"].includes(existing.status)) {
         const currentTier = getCardTierConfig(existing.tier);
         if (requestedTier.tier === currentTier.tier) throw new Error("You already own this card.");
         if (requestedTier.creditLimit <= currentTier.creditLimit) {
@@ -205,7 +219,7 @@ export async function closeCard(discordId: string) {
 export async function payCard(discordId: string, amount: number) {
   const paymentAmount = requireIntAmount(amount);
 
-  return runWithRetry(async (tx: PrismaClient) => {
+  const result = await runWithRetry(async (tx: PrismaClient) => {
     return tx.$transaction(async (trx) => {
       const [card, wallet] = await Promise.all([
         trx.creditCard.findUnique({ where: { userId: discordId } }),
@@ -259,6 +273,11 @@ export async function payCard(discordId: string, amount: number) {
       return { card: updatedCard, paid: appliedAmount, statementPaid };
     });
   });
+
+  const { questBus } = require("./questEvents");
+  questBus.emit("card:payment", { discordId });
+
+  return result;
 }
 
 export async function withdrawFromCard(discordId: string, amount: number) {
@@ -344,8 +363,52 @@ export async function chargeCardPurchaseTx(trx: any, discordId: string, amount: 
   return { card: updatedCard, amount: purchaseAmount };
 }
 
-export function isCardPurchaseBlocked(kind: string) {
-  return ["black_market", "p2p_trade", "currency_bundle", "liquid_asset", "casino", "resellable_profit"].includes(kind);
+export async function rehabilitateCard(discordId: string) {
+  return runWithRetry(async (tx: PrismaClient) => {
+    return tx.$transaction(async (trx) => {
+      const card = await trx.creditCard.findUnique({ where: { userId: discordId } });
+      if (!card) throw new Error("You do not have a card.");
+      if (card.status !== "LOCKED") throw new Error("Your card is not locked. Only locked cards can be rehabilitated.");
+      if (card.currentBalance > 0) throw new Error(`Pay off your full balance (**${card.currentBalance.toLocaleString()}** remaining) to unlock your card.`);
+
+      return trx.creditCard.update({
+        where: { id: card.id },
+        data: { status: "ACTIVE", missStreak: 0 }
+      });
+    });
+  });
+}
+
+export async function applyGarnishment(discordId: string, incomeAmount: number): Promise<{ garnished: number; netIncome: number }> {
+  const card = await prisma.creditCard.findUnique({ where: { userId: discordId } });
+  if (!card || !["DELINQUENT", "LOCKED"].includes(card.status) || card.currentBalance <= 0) {
+    return { garnished: 0, netIncome: incomeAmount };
+  }
+
+  const GARNISH_RATE = 0.25;
+  const garnishAmount = Math.min(
+    Math.floor(incomeAmount * GARNISH_RATE),
+    card.currentBalance
+  );
+
+  if (garnishAmount <= 0) return { garnished: 0, netIncome: incomeAmount };
+
+  await prisma.creditCard.update({
+    where: { id: card.id },
+    data: { currentBalance: { decrement: garnishAmount } }
+  });
+
+  await prisma.cardTransaction.create({
+    data: {
+      cardId: card.id,
+      type: "GARNISHMENT",
+      amount: garnishAmount,
+      cycleKey: card.currentCycleKey,
+      meta: { source: "income_garnishment", originalIncome: incomeAmount }
+    }
+  });
+
+  return { garnished: garnishAmount, netIncome: incomeAmount - garnishAmount };
 }
 
 export async function generateWeeklyStatements(now = new Date()) {
@@ -368,7 +431,7 @@ async function generateStatementForCard(cardId: string, now: Date) {
   return runWithRetry(async (tx: PrismaClient) => {
     return tx.$transaction(async (trx) => {
       const card = await trx.creditCard.findUnique({ where: { id: cardId } });
-      if (!card || !["ACTIVE", "DELINQUENT"].includes(card.status)) return false;
+      if (!card || card.status === "LOCKED" || card.status === "CLOSED") return false;
 
       const cycleKey = getCycleKey(now);
       const existing = await trx.cardStatement.findUnique({
@@ -479,7 +542,7 @@ async function settleStatement(statementId: string) {
       } else {
         missStreak += 1;
         scoreDelta = missStreak > 1 ? CARD_SCORE_RULES.repeatMiss : CARD_SCORE_RULES.missPayment;
-        cardStatus = "DELINQUENT";
+        cardStatus = missStreak >= 3 ? "LOCKED" : "DELINQUENT";
         const unpaid = Math.max(0, statement.statementBalance - statement.amountPaid);
         interestCharged = Math.floor(unpaid * (tier.weeklyInterestPct / 100));
       }
@@ -494,7 +557,11 @@ async function settleStatement(statementId: string) {
         }
       });
 
-      const balanceIncrement = interestCharged + lateFeeCharged;
+      const maxBalance = Math.floor(statement.card.creditLimit * 1.5);
+      const headroom = Math.max(0, maxBalance - statement.card.currentBalance);
+      const rawIncrement = interestCharged + lateFeeCharged;
+      const balanceIncrement = Math.min(rawIncrement, headroom);
+
       await trx.creditCard.update({
         where: { id: statement.card.id },
         data: {

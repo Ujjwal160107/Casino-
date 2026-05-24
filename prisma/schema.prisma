@@ -100,6 +100,10 @@ model User {
   // Hunt / Zoo System
   lastZooClaim    DateTime?
   caughtAnimals   CaughtAnimal[]
+
+  // Quest System
+  questStreak       Int       @default(0)
+  lastQuestComplete DateTime?
 }
 
 model WorkLog {
@@ -354,19 +358,17 @@ model MarketListing {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   seller      User     @relation(fields: [sellerId], references: [discordId])
   sellerId    String
-  
-  // Snapshotted item details (in case ShopItem changes or deleted)
-  // But ideally we link to ShopItem to show image/details dynamically.
-  // Converting inventory item to listing.
+
   shopItem    ShopItem? @relation(fields: [shopItemId], references: [id])
   shopItemId  String?   @db.ObjectId
 
   property    Property? @relation(fields: [propertyId], references: [id])
   propertyId  String?   @db.ObjectId
-  
+
   amount      Int
-  totalPrice  Float    // Price for the whole batch
-  
+  totalPrice  Int
+  expiresAt   DateTime
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -582,16 +584,15 @@ model DailyQuest {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
   user          User     @relation(fields: [userId], references: [discordId])
   userId        String
-
-  dayKey        String   // Format: "YYYY-MM-DD"
-
-  // Storing tasks as JSON to allow flexibility in task types
-  // e.g. [{ type: "WORK", target: 3, progress: 1, completed: false, description: "Work 3 times" }]
+  dayKey        String
   tasks         Json
-
-  completed     Boolean  @default(false) // All tasks completed
+  completed     Boolean  @default(false)
   rewardClaimed Boolean  @default(false)
-
+  totalReward   Int      @default(0)
+  streakBonus   Int      @default(0)
+  rerollsUsed   Int      @default(0)
+  assignedAt    DateTime @default(now())
+  expiresAt     DateTime
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

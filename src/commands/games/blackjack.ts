@@ -9,9 +9,8 @@ import { formatDuration } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
-import { updateQuestProgress } from "../../services/questService";
-import { checkLuckyCoin, checkCrownOfGreed, recordPotentialSoulLedgerLoss } from "../../services/shopBuffs";
-// TODO: Luck integration for Blackjack — card logic is deterministic, not probability-based
+import { questBus } from "../../services/questEvents";
+import { checkLuckyCoin, checkCrownOfGreed, recordPotentialSoulLedgerLoss, getCurrentLuck } from "../../services/shopBuffs";
 
 export type Card = { suit: string; rank: string; value: number };
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
@@ -107,6 +106,24 @@ export function calculateScore(hand: Card[]): number {
     return score;
 }
 
+function drawDealerCardWithLuck(deck: Card[], dealerScore: number, luck: number): Card {
+    if (dealerScore >= 12 && dealerScore <= 16) {
+        const luckDelta = (luck - 50) / 100;
+        const impactChance = Math.abs(luckDelta) * 0.08;
+
+        if (Math.random() < impactChance) {
+            if (luckDelta > 0) {
+                const bustIdx = deck.findIndex(c => c.value + dealerScore > 21);
+                if (bustIdx !== -1) return deck.splice(bustIdx, 1)[0];
+            } else {
+                const safeIdx = deck.findIndex(c => c.value + dealerScore <= 21);
+                if (safeIdx !== -1) return deck.splice(safeIdx, 1)[0];
+            }
+        }
+    }
+    return deck.pop()!;
+}
+
 export function formatHand(hand: Card[], hideFirst = false): string {
     if (hideFirst) {
         return `**??**   ${hand.slice(1).map(c => getCardEmoji(c)).join("  ")}`;
@@ -165,6 +182,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
     const luckyCoinMultiplier = await checkLuckyCoin(message.author.id);
     const hasLuckyCoin = luckyCoinMultiplier > 1;
     const crownMult = await checkCrownOfGreed(message.author.id);
+    const luck = await getCurrentLuck(message.author.id);
 
     // Applies Crown of Greed to gross payout: boosts profit on win, increases stake on loss
     function applyCrown(stake: number, grossPayout: number): { adjustedStake: number; adjustedPayout: number } {
@@ -242,8 +260,8 @@ export async function handleBlackjack(message: Message, args: string[]) {
             payout = actualPayout;
             await releaseActiveGameLock("blackjack", user.discordId);
             await setCasinoCooldown("blackjack", user.discordId, message.guildId!);
-            await updateQuestProgress(user.discordId, "GAMBLE").catch(console.error);
-            if (payout > currentBet) await updateQuestProgress(user.discordId, "WIN_BLACKJACK").catch(console.error);
+            questBus.emit("casino:play", { discordId: user.discordId, bet: amount });
+            if (payout > currentBet) questBus.emit("casino:win", { discordId: user.discordId, game: "blackjack" });
         } catch (e) {
             return message.reply({ content: "Transaction failed." });
         }
@@ -293,7 +311,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
         } else {
             if (playerScore <= 21) {
                 while (dealerScore < 17) {
-                    dealerHand.push(deck.pop()!);
+                    dealerHand.push(drawDealerCardWithLuck(deck, dealerScore, luck));
                     dealerScore = calculateScore(dealerHand);
                 }
                 if (dealerScore > 21) {
@@ -325,8 +343,8 @@ export async function handleBlackjack(message: Message, args: string[]) {
             payout = actualPayout;
             await releaseActiveGameLock("blackjack", user.discordId);
             await setCasinoCooldown("blackjack", user.discordId, message.guildId!);
-            await updateQuestProgress(user.discordId, "GAMBLE").catch(console.error);
-            if (payout > currentBet) await updateQuestProgress(user.discordId, "WIN_BLACKJACK").catch(console.error);
+            questBus.emit("casino:play", { discordId: user.discordId, bet: amount });
+            if (payout > currentBet) questBus.emit("casino:win", { discordId: user.discordId, game: "blackjack" });
 
             import("../../utils/discordLogger").then(({ logToChannel }) => {
                 logToChannel(message.client, {
@@ -361,7 +379,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
             payout = actualPayout;
             await releaseActiveGameLock("blackjack", user.discordId);
             await setCasinoCooldown("blackjack", user.discordId, message.guildId!);
-            await updateQuestProgress(user.discordId, "GAMBLE").catch(console.error);
+            questBus.emit("casino:play", { discordId: user.discordId, bet: amount });
             // No WIN_BLACKJACK update
 
             await msg.edit({ embeds: [getEmbed(true)], components: [] });

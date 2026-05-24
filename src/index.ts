@@ -19,7 +19,7 @@ import { initEmojiRegistry, listEmojiKeys } from "./utils/emojiRegistry";
 import { handleBankInteraction } from "./handlers/bankInteractionHandler";
 import { handleMarketInteraction } from "./handlers/marketInteractionHandler";
 import { handleInventoryInteraction } from "./handlers/inventoryInteractionHandler";
-import { handleShopBuyInteraction, handleShopUseInteraction } from "./commands/economy/shop";
+import { handleShopBuyInteraction, handleShopUseInteraction, handleShopBuyCardInteraction, handleShopBuyCardConfirmInteraction } from "./commands/economy/shop";
 import { guildCreateListener } from "./listeners/guildCreateListener";
 import { Mascot } from "./config/branding";
 import {
@@ -77,6 +77,9 @@ client.once("ready", async () => {
   await initEmojiRegistry(client);
   console.log("Emoji registry keys:", listEmojiKeys().slice(0, 200));
 
+  const { initQuestListeners } = require("./services/questService");
+  initQuestListeners();
+
   guildCreateListener(client);
   initScheduler(client);
 
@@ -119,6 +122,32 @@ client.on("interactionCreate", async (interaction: Interaction) => {
       return await handleBankInteraction(interaction);
     }
 
+    if (id.startsWith("bm_buy_confirm:") && interaction.isButton()) {
+      const parts = id.split(":");
+      const listingId = parts[1];
+      const ownerId = parts[2];
+      if (interaction.user.id !== ownerId) {
+        await interaction.reply({ content: "Not yours.", ephemeral: true });
+        return;
+      }
+      try {
+        const { buyListing } = require("./services/marketService");
+        await interaction.deferUpdate();
+        const result = await buyListing(ownerId, listingId);
+        await interaction.editReply({
+          content: `✅ Bought **${result.itemName}** (x${result.amount}) for **${result.fees.buyerTotal.toLocaleString()}**!`,
+          components: [],
+        });
+      } catch (err: any) {
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply({ content: `❌ ${err.message}`, components: [] });
+        } else {
+          await interaction.reply({ content: `❌ ${err.message}`, ephemeral: true });
+        }
+      }
+      return;
+    }
+
     if (id.startsWith("market_") || id.startsWith("sell_") || id.startsWith("buy_property_") || id.startsWith("property_page_") || id === "cancel_property_buy") {
       return await handleMarketInteraction(interaction);
     }
@@ -157,6 +186,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
     if (id.startsWith("hunt_") || id.startsWith("zoo_")) {
       const { handleHuntInteraction } = require("./handlers/huntInteractionHandler");
       return await handleHuntInteraction(interaction);
+    }
+
+    if (id.startsWith("shop_buy_card_confirm:") && interaction.isButton()) {
+      return await handleShopBuyCardConfirmInteraction(interaction as import("discord.js").ButtonInteraction);
+    }
+
+    if (id.startsWith("shop_buy_card:") && interaction.isButton()) {
+      return await handleShopBuyCardInteraction(interaction as import("discord.js").ButtonInteraction);
     }
 
     if (id.startsWith("shop_buy:") && interaction.isButton()) {

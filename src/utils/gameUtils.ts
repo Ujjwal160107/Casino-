@@ -33,9 +33,18 @@ export function getEquipmentSlot(itemName: string): EquipmentSlot | null {
     return null;
 }
 
+const NAMED_EQUIPMENT_BONUSES: Record<string, StatBonus> = {
+    "iron spurs": { str: 3, agi: 0, def: 0 },
+    "guard vest": { str: 0, agi: 0, def: 4 },
+};
+
 export function getEquipmentBonuses(itemName: string | undefined): StatBonus {
     if (!itemName) return { str: 0, agi: 0, def: 0 };
     const name = itemName.toLowerCase();
+
+    const named = NAMED_EQUIPMENT_BONUSES[name];
+    if (named) return { ...named };
+
     const bonus = { str: 0, agi: 0, def: 0 };
 
     // --- Material Bonuses ---

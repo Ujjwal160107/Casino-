@@ -20,7 +20,7 @@ import { formatDuration } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import { Mascot } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
-import { updateQuestProgress } from "../../services/questService";
+import { questBus } from "../../services/questEvents";
 import { checkLuckyCoin } from "../../services/shopBuffs";
 
 export async function handleRouletteMenu(message: Message) {
@@ -213,8 +213,8 @@ export async function handleBet(message: Message, args: string[]) {
     message.guildId!
   );
   await setCasinoCooldown("roulette", user.discordId, message.guildId!);
-  await updateQuestProgress(user.discordId, "GAMBLE").catch(console.error);
-  if (didWin) await updateQuestProgress(user.discordId, "WIN_ROULETTE").catch(console.error);
+  questBus.emit("casino:play", { discordId: user.discordId, bet: amount });
+  if (didWin) questBus.emit("casino:win", { discordId: user.discordId, game: "roulette" });
 
   // Cleanup spinning message
   await spinMsg.delete().catch(() => { });

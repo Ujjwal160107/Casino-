@@ -110,6 +110,22 @@ export async function handleSpecialItemUse(
       return handleTutorPass(discordId);
     case "scholarship_letter":
       return handleScholarshipLetter(discordId);
+    // Cock Store items
+    case "basic_feed":
+    case "protein_feed":
+    case "champion_feed":
+      return handleCockFeed(itemKey, discordId, guildId);
+    case "agility_vitamins":
+      return handleAgilityVitamins(discordId, guildId);
+    case "feather_bandage":
+      return handleFeatherBandage(discordId, guildId);
+    case "training_whistle":
+      return handleTrainingWhistle(discordId, guildId);
+    case "phoenix_serum":
+      return handlePhoenixSerum(discordId, guildId);
+    case "iron_spurs":
+    case "guard_vest":
+      return handleCockEquip(itemKey, discordId, guildId);
     default:
       return null;
   }
@@ -865,4 +881,191 @@ async function handleScholarshipLetter(discordId: string): Promise<ShopItemUseRe
 
   await redisService.set(cdKey, { used: true }, 3600);
   return { success: true, message: resultMsg };
+}
+
+// ---------------------------------------------------------------------------
+// Cock Store Handlers
+// ---------------------------------------------------------------------------
+
+async function getChickenMeta(discordId: string, guildId: string) {
+  const chickenItem = await prisma.shopItem.findFirst({
+    where: { name: { equals: "Chicken", mode: "insensitive" }, guildId },
+  });
+  if (!chickenItem) return { chickenInv: null, meta: {} as any };
+
+  const chickenInv = await prisma.inventory.findUnique({
+    where: { userId_shopItemId: { userId: discordId, shopItemId: chickenItem.id } },
+  });
+  if (!chickenInv) return { chickenInv: null, meta: {} as any };
+
+  const meta = (chickenInv.meta as any) || {};
+  return { chickenInv, meta };
+}
+
+const FEED_XP: Record<string, number> = {
+  basic_feed: 10,
+  protein_feed: 35,
+  champion_feed: 120,
+};
+
+async function handleCockFeed(
+  itemKey: string,
+  discordId: string,
+  guildId: string,
+): Promise<ShopItemUseResult> {
+  const { chickenInv, meta } = await getChickenMeta(discordId, guildId);
+  if (!chickenInv) return { success: false, shouldConsume: false, message: "You don't own a chicken!" };
+
+  const feedKey = `cock_feed_count:${discordId}`;
+  const todayFeeds = (await redisService.get<number>(feedKey)) ?? 0;
+  const DAILY_CAP = 5;
+
+  if (todayFeeds >= DAILY_CAP) {
+    return { success: false, shouldConsume: false, message: `You've used all **${DAILY_CAP}** feed slots today! Resets daily.` };
+  }
+
+  const xpPerFeed = FEED_XP[itemKey] ?? 10;
+  const xpGain = xpPerFeed;
+
+  let level = meta.level || 0;
+  let xp = (meta.xp || 0) + xpGain;
+  let levelsGained = 0;
+
+  while (xp >= (level + 1) * 100) {
+    xp -= (level + 1) * 100;
+    level++;
+    levelsGained++;
+  }
+
+  await prisma.inventory.update({
+    where: { id: chickenInv.id },
+    data: { meta: { ...meta, level, xp } },
+  });
+
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  const secondsUntilMidnight = Math.floor((midnight.getTime() - now.getTime()) / 1000);
+  await redisService.set(feedKey, todayFeeds + 1, secondsUntilMidnight);
+
+  const { questBus } = require("./questEvents");
+  questBus.emit("cockfight:feed", { discordId });
+
+  let msg = `Fed your chicken! **+${xpGain} XP**`;
+  if (levelsGained > 0) msg += `\n🎉 **Level Up!** Now Level ${level}! (+${levelsGained})`;
+  msg += `\n📊 ${xp}/${(level + 1) * 100} XP | Feeds remaining: **${DAILY_CAP - (todayFeeds + 1)}**/${DAILY_CAP}`;
+
+  return { success: true, message: msg };
+}
+
+async function handleAgilityVitamins(discordId: string, guildId: string): Promise<ShopItemUseResult> {
+  const { chickenInv, meta } = await getChickenMeta(discordId, guildId);
+  if (!chickenInv) return { success: false, shouldConsume: false, message: "You don't own a chicken!" };
+
+  const stats = ["strength", "agility", "defense"] as const;
+  const allMaxed = stats.every(s => (meta[s] || 0) >= 10);
+  if (allMaxed) {
+    return { success: false, shouldConsume: false, message: "Your chicken's stats are all maxed at **10**!" };
+  }
+
+  const available = stats.filter(s => (meta[s] || 0) < 10);
+  const stat = available[Math.floor(Math.random() * available.length)];
+  const current = meta[stat] || 0;
+  meta[stat] = current + 1;
+
+  await prisma.inventory.update({ where: { id: chickenInv.id }, data: { meta } });
+
+  return { success: true, message: `${Mascot.Emotes.Accept} Your chicken's **${stat.toUpperCase()}** increased! ${current} → **${current + 1}** / 10` };
+}
+
+async function handleFeatherBandage(discordId: string, guildId: string): Promise<ShopItemUseResult> {
+  const { chickenInv, meta } = await getChickenMeta(discordId, guildId);
+  if (!chickenInv) return { success: false, shouldConsume: false, message: "You don't own a chicken!" };
+  if (meta.critical) return { success: false, shouldConsume: false, message: "Your chicken is in **critical condition**! Only a **Phoenix Serum** can save it." };
+  if (!meta.injured) return { success: false, shouldConsume: false, message: "Your chicken isn't injured!" };
+
+  delete meta.injured;
+  await prisma.inventory.update({ where: { id: chickenInv.id }, data: { meta } });
+
+  return { success: true, message: `${Mascot.Emotes.Accept} Injuries healed! Your chicken is ready to fight.` };
+}
+
+async function handleTrainingWhistle(discordId: string, guildId: string): Promise<ShopItemUseResult> {
+  const { chickenInv, meta } = await getChickenMeta(discordId, guildId);
+  if (!chickenInv) return { success: false, shouldConsume: false, message: "You don't own a chicken!" };
+  if (!meta.training) return { success: false, shouldConsume: false, message: "Your chicken isn't training!" };
+
+  const stat = meta.training.stat;
+  meta[stat] = (meta[stat] || 0) + 1;
+  delete meta.training;
+  await prisma.inventory.update({ where: { id: chickenInv.id }, data: { meta } });
+
+  return { success: true, message: `${Mascot.Emotes.Accept} Training complete! **${stat.toUpperCase()}** +1 (now ${meta[stat]}).` };
+}
+
+async function handlePhoenixSerum(discordId: string, guildId: string): Promise<ShopItemUseResult> {
+  const cdKey = `phoenix_serum_cd:${discordId}`;
+  const onCooldown = await redisService.get<{ until: number }>(cdKey);
+  if (onCooldown) {
+    const expiresAt = Math.floor(onCooldown.until / 1000);
+    return { success: false, shouldConsume: false, message: `Phoenix Serum on cooldown! Available <t:${expiresAt}:R>.` };
+  }
+
+  const { chickenInv, meta } = await getChickenMeta(discordId, guildId);
+  if (!chickenInv) return { success: false, shouldConsume: false, message: "You don't own a chicken!" };
+  if (!meta.injured && !meta.training && !meta.critical) {
+    return { success: false, shouldConsume: false, message: "Your chicken doesn't need recovery right now!" };
+  }
+
+  const effects: string[] = [];
+
+  if (meta.critical) {
+    delete meta.critical;
+    effects.push("**SAVED FROM DEATH!** Critical condition cleared");
+  }
+  if (meta.injured) { delete meta.injured; effects.push("Injury healed"); }
+  if (meta.training) {
+    const stat = meta.training.stat;
+    meta[stat] = (meta[stat] || 0) + 1;
+    delete meta.training;
+    effects.push(`Training completed (${stat.toUpperCase()} +1)`);
+  }
+
+  await prisma.inventory.update({ where: { id: chickenInv.id }, data: { meta } });
+
+  const until = Date.now() + 86_400_000;
+  await redisService.set(cdKey, { until }, 86400);
+
+  return { success: true, message: `**Phoenix Serum activated!**\n${effects.map(e => `✅ ${e}`).join("\n")}` };
+}
+
+async function handleCockEquip(itemKey: string, discordId: string, guildId: string): Promise<ShopItemUseResult> {
+  const { chickenInv, meta } = await getChickenMeta(discordId, guildId);
+  if (!chickenInv) return { success: false, shouldConsume: false, message: "You don't own a chicken!" };
+
+  const EQUIP_MAP: Record<string, { slot: string; name: string }> = {
+    iron_spurs: { slot: "weapon", name: "Iron Spurs" },
+    guard_vest: { slot: "armor", name: "Guard Vest" },
+  };
+  const equipInfo = EQUIP_MAP[itemKey];
+  if (!equipInfo) return { success: false, shouldConsume: false, message: "Item not equippable." };
+
+  const shopItem = await prisma.shopItem.findFirst({
+    where: { guildId, name: { equals: equipInfo.name, mode: "insensitive" } },
+  });
+
+  if (!meta.equipment) meta.equipment = {};
+  const oldItem = meta.equipment[equipInfo.slot]?.name ?? "None";
+  meta.equipment[equipInfo.slot] = { id: shopItem?.id ?? itemKey, name: equipInfo.name };
+
+  if (meta.equippedItem) delete meta.equippedItem;
+  if (meta.equippedItemName) delete meta.equippedItemName;
+
+  await prisma.inventory.update({ where: { id: chickenInv.id }, data: { meta } });
+
+  return {
+    success: true,
+    shouldConsume: false,
+    message: `${Mascot.Emotes.Accept} **${equipInfo.name}** equipped to **${equipInfo.slot}** slot!\nReplaced: ${oldItem}`,
+  };
 }

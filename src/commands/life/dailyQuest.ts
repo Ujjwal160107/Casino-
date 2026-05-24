@@ -1,112 +1,176 @@
-import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, AttachmentBuilder } from "discord.js";
-import path from "path";
-import { getGuildConfig } from "../../services/guildConfigService";
-import { getDailyQuest, claimQuestReward, QUEST_REWARD } from "../../services/questService";
-import { ensureUserAndWallet } from "../../services/walletService";
-import { fmtCurrency } from "../../utils/format";
-import { successEmbed, errorEmbed } from "../../utils/embed";
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  ContainerBuilder,
+  Message,
+  MessageFlags,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+} from "discord.js";
 import { Mascot } from "../../config/branding";
+import {
+  getOrCreateDailyQuest,
+  claimQuestReward,
+  rerollQuest,
+  getStreakBonus,
+  QuestTask,
+} from "../../services/questService";
+
+const QUEST_ACCENT = 0x9B59B6;
+const E = Mascot.Emotes;
+
+const DIFFICULTY_EMOJI: Record<string, string> = {
+  EASY: E.Accept,
+  MEDIUM: E.Alert,
+  HARD: E.Decline,
+};
+
+const DIFFICULTY_LABEL: Record<string, string> = {
+  EASY: "Easy",
+  MEDIUM: "Medium",
+  HARD: "Hard",
+};
+
+function fmt(n: number) {
+  return n.toLocaleString("en-US");
+}
+
+function progressBar(progress: number, target: number): string {
+  const pct = Math.min(1, progress / target);
+  const filled = Math.round(pct * 10);
+  const empty = 10 - filled;
+  return `${E.XpFull.repeat(filled)}${E.XpEmpty.repeat(empty)}`;
+}
 
 export async function handleDailyQuest(message: Message, args: string[]) {
-    if (!message.guild) return;
+  const discordId = message.author.id;
+  const quest = await getOrCreateDailyQuest(discordId);
+  const tasks = quest.tasks as unknown as QuestTask[];
+  const prisma = (await import("../../utils/prisma")).default;
+  const user = await prisma.user.findUnique({ where: { discordId } });
+  const streak = user?.questStreak ?? 0;
+  const bonusPct = getStreakBonus(streak);
 
-    // Ensure config is loaded
-    const config = await getGuildConfig(message.guild.id);
+  const expiresUnix = Math.floor(quest.expiresAt.getTime() / 1000);
+  const totalAvailable = tasks.reduce((s, t) => s + t.reward, 0);
+  const completedCount = tasks.filter(t => t.completed).length;
+  const allDone = completedCount === tasks.length;
+  const rerolls = (quest as any).rerollsUsed ?? 0;
+  const freeRerollAvailable = rerolls === 0;
 
-    // Resolve user to get internal ObjectId
-    const authorDiscordId = message.author.id;
-    const user = await ensureUserAndWallet(authorDiscordId, message.guild.id, message.author.tag);
-    const userId = user.id; // This is the ObjectId
+  const container = new ContainerBuilder()
+    .setAccentColor(QUEST_ACCENT)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`## ${E.Scroll} Daily Quests`),
+      new TextDisplayBuilder().setContent(
+        `${E.Sparks} **Streak:** ${streak} day${streak !== 1 ? "s" : ""}${bonusPct > 0 ? ` (+${Math.round(bonusPct * 100)}% bonus)` : ""}\n` +
+        `${E.Cooldown} Expires <t:${expiresUnix}:R>\n` +
+        `-# ${completedCount}/${tasks.length} completed | ${E.Currency} ${fmt(totalAvailable)} available${bonusPct > 0 ? ` + ${Math.round(bonusPct * 100)}% streak` : ""}`,
+      ),
+    )
+    .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
 
-    // Get or generate quest
-    const quest = await getDailyQuest(userId, message.guild.id);
-    const tasks = quest.tasks as any[];
+  for (let i = 0; i < tasks.length; i++) {
+    const task = tasks[i];
+    const dEmoji = DIFFICULTY_EMOJI[task.difficulty] ?? E.Alert;
+    const dLabel = DIFFICULTY_LABEL[task.difficulty] ?? "?";
+    const status = task.completed ? E.Accept : E.Lock;
+    const bar = progressBar(task.progress, task.target);
 
-    const imagePath = path.join(__dirname, "../../assets/daily_quest.jpg");
-    const attachment = new AttachmentBuilder(imagePath, { name: 'daily_quest.jpg' });
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `${status} ${dEmoji} **${dLabel}** — ${task.description}\n` +
+        `${bar} ${task.progress}/${task.target} | ${E.Currency} ${fmt(task.reward)}`,
+      ),
+    );
+    container.addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small));
+  }
 
-    // Build Embed
-    const embed = new EmbedBuilder()
-        .setTitle(`📜 Daily Quests`)
-        .setDescription(`Complete 5 daily missions to earn a **Massive Reward**!`)
-        .setColor(quest.completed ? 0x00FF00 : 0xFFAA00);
+  const buttons: ButtonBuilder[] = [];
 
-    // Dynamic Image Positioning
-    if (quest.completed) {
-        embed.setImage("attachment://daily_quest.jpg");
-    } else {
-        embed.setThumbnail("attachment://daily_quest.jpg");
+  if (allDone && !quest.rewardClaimed) {
+    buttons.push(
+      new ButtonBuilder()
+        .setCustomId(`quest_claim:${discordId}`)
+        .setLabel(`Claim ${fmt(totalAvailable + Math.floor(totalAvailable * bonusPct))}`)
+        .setStyle(ButtonStyle.Success),
+    );
+  }
+
+  if (!allDone && rerolls < 3) {
+    buttons.push(
+      new ButtonBuilder()
+        .setCustomId(`quest_reroll:${discordId}`)
+        .setLabel(freeRerollAvailable ? "Reroll (Free)" : "Reroll (50k)")
+        .setStyle(ButtonStyle.Secondary),
+    );
+  }
+
+  if (quest.rewardClaimed) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`\n${E.Accept} **Reward claimed!** Next quest <t:${expiresUnix}:R>.`),
+    );
+  }
+
+  const components: any[] = [container];
+  if (buttons.length > 0) {
+    components.push(new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons));
+  }
+
+  const reply = await message.reply({ components, flags: MessageFlags.IsComponentsV2 });
+
+  if (buttons.length === 0) return;
+
+  const collector = reply.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: 60_000,
+    filter: (i) => i.user.id === discordId,
+  });
+
+  collector.on("collect", async (i) => {
+    if (i.customId === `quest_claim:${discordId}`) {
+      try {
+        const result = await claimQuestReward(discordId);
+        const msg = [
+          `${E.Accept} **Reward Claimed!**`,
+          `${E.Currency} **+${fmt(result.totalReward)}** coins`,
+          result.streakBonus > 0 ? `${E.Sparks} Streak bonus: +${fmt(result.streakBonus)} (${Math.round(getStreakBonus(result.newStreak) * 100)}%)` : "",
+          `${E.MedalGold} Streak: **${result.newStreak}** days`,
+        ].filter(Boolean).join("\n");
+
+        const claimContainer = new ContainerBuilder()
+          .setAccentColor(0x2ECC71)
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`## ${E.Scroll} Quest Complete`),
+            new TextDisplayBuilder().setContent(msg),
+          );
+
+        await i.update({ components: [claimContainer], flags: MessageFlags.IsComponentsV2 });
+      } catch (err) {
+        await i.reply({ content: (err as Error).message, ephemeral: true });
+      }
+      collector.stop();
     }
 
-    let progressText = "";
-    tasks.forEach((task, index) => {
-        const status = task.completed ? Mascot.Emotes.Tick : "⬜";
-        const progressPercent = Math.min(100, Math.round((task.progress / task.target) * 100));
-        // Simple progress bar
-        const barLength = 10;
-        const filled = Math.round((progressPercent / 100) * barLength);
-        const bar = "█".repeat(filled) + "░".repeat(barLength - filled);
+    if (i.customId === `quest_reroll:${discordId}`) {
+      const incomplete = tasks.findIndex(t => !t.completed);
+      if (incomplete === -1) {
+        await i.reply({ content: "All quests are complete!", ephemeral: true });
+        return;
+      }
 
-        progressText += `**${index + 1}. ${task.description}**\n${status} \`${bar}\` ${task.progress}/${task.target}\n\n`;
-    });
-
-    embed.addFields({ name: "Your Missions", value: progressText });
-
-    if (quest.rewardClaimed) {
-        embed.setFooter({ text: "You have already claimed today's reward! Come back tomorrow." });
-        return message.reply({ embeds: [embed], files: [attachment] });
-    }
-
-    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-
-    if (quest.completed && !quest.rewardClaimed) {
-        embed.addFields({
-            name: "🎉 All Quests Completed!",
-            value: `Claim your reward:\n${Mascot.Emotes.MoneyBag || "💰"} **${fmtCurrency(QUEST_REWARD.money, config.currencyEmoji)}**`
+      try {
+        const newTask = await rerollQuest(discordId, incomplete);
+        await i.reply({
+          content: `${E.Refresh} Rerolled quest #${incomplete + 1} → **${newTask.description}** (${newTask.target}x, ${DIFFICULTY_LABEL[newTask.difficulty]})`,
+          ephemeral: true,
         });
-
-        const claimRow = new ActionRowBuilder<ButtonBuilder>()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId("claim_daily_quest")
-                    .setLabel("Claim Reward")
-                    .setStyle(ButtonStyle.Success)
-                    .setEmoji(Mascot.Emotes.Lootbox?.match(/:(\d+)>/)?.[1] || "🎁")
-            );
-        rows.push(claimRow);
-    } else {
-        embed.setFooter({ text: "Complete all missions to unlock the reward." });
+      } catch (err) {
+        await i.reply({ content: (err as Error).message, ephemeral: true });
+      }
     }
-
-    const reply = await message.reply({ embeds: [embed], components: rows, files: [attachment] });
-
-    if (quest.completed && !quest.rewardClaimed) {
-        const collector = reply.createMessageComponentCollector({
-            componentType: ComponentType.Button,
-            time: 60000
-        });
-
-        collector.on("collect", async (i) => {
-            if (i.user.id !== authorDiscordId) {
-                await i.reply({ content: "This is not your quest log!", ephemeral: true });
-                return;
-            }
-
-            if (i.customId === "claim_daily_quest") {
-                const result = await claimQuestReward(userId);
-                if (result.success) {
-                    const successEmbedObj = successEmbed(message.author, "Reward Claimed!", `You received **${fmtCurrency(result.reward!.money, config.currencyEmoji)}**!`);
-                    successEmbedObj.setImage("attachment://daily_quest.jpg");
-
-                    await i.update({
-                        embeds: [successEmbedObj],
-                        components: [],
-                        files: [attachment]
-                    });
-                } else {
-                    await i.reply({ content: result.message, ephemeral: true });
-                }
-            }
-        });
-    }
+  });
 }

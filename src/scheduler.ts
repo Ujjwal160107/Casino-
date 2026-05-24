@@ -55,6 +55,17 @@ export function initScheduler(client: Client) {
     }
   });
 
+  // Expire old market listings every 6 hours
+  cron.schedule("0 */6 * * *", async () => {
+    try {
+      const { expireOldListings } = require("./services/marketService");
+      const expired = await expireOldListings();
+      if (expired > 0) console.log(`Expired ${expired} market listing(s). Items returned to sellers.`);
+    } catch (err) {
+      console.error("Market listing expiry failed:", err);
+    }
+  });
+
   console.log("Banking scheduler initialized.");
 }
 

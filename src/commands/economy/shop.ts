@@ -19,7 +19,7 @@ import {
 } from "discord.js";
 import fs from "fs";
 import path from "path";
-import { buyItem, getUserInventory, seedGeneralShop, seedHuntShop, seedJobShop, seedUniShop } from "../../services/shopService";
+import { buyItem, getUserInventory, seedGeneralShop, seedHuntShop, seedJobShop, seedUniShop, seedCockShop } from "../../services/shopService";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { fmtCurrency } from "../../utils/format";
 import { logToChannel } from "../../utils/discordLogger";
@@ -29,6 +29,7 @@ import {
   HUNT_SHOP_CATALOG,
   JOB_SHOP_CATALOG,
   UNI_SHOP_CATALOG,
+  COCK_SHOP_CATALOG,
   SHOP_CATEGORIES,
   ShopCategory,
   ShopCatalogItem,
@@ -92,7 +93,12 @@ const US_PAGE_ITEMS: string[] = [
   "scholarship_letter",
 ];
 
-// Cock Store: 1 image page
+// Cock Store: 9 items on 1 image page
+const CS_ITEMS: string[] = [
+  "basic_feed", "protein_feed", "agility_vitamins",
+  "feather_bandage", "training_whistle", "iron_spurs",
+  "guard_vest", "champion_feed", "phoenix_serum",
+];
 
 // General Store: 9 items per image page, 2 pages total
 const GS_TOTAL_PAGES = 2;
@@ -167,6 +173,7 @@ function getCatalogForCategory(category: ShopCategory): ShopCatalogItem[] {
     case "HUNT":    return HUNT_SHOP_CATALOG;
     case "JOB":     return JOB_SHOP_CATALOG;
     case "UNI":     return UNI_SHOP_CATALOG;
+    case "COCK":    return COCK_SHOP_CATALOG;
     default:        return [];
   }
 }
@@ -543,10 +550,29 @@ function buildCockStoreMessage(ownerId: string, disabled = false) {
       ),
     );
 
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    [1, 2, 3, 4, 5].map(i =>
+      new ButtonBuilder()
+        .setCustomId(`shop_info_slot:COCK:1:${i}:${ownerId}`)
+        .setLabel(`${i}`)
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disabled),
+    ),
+  );
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    [6, 7, 8, 9].map(i =>
+      new ButtonBuilder()
+        .setCustomId(`shop_info_slot:COCK:1:${i}:${ownerId}`)
+        .setLabel(`${i}`)
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disabled),
+    ),
+  );
+
   const dropdown = buildCategoryDropdown("COCK", ownerId, disabled);
 
   return {
-    components: [container, dropdown],
+    components: [container, row1, row2, dropdown],
     files,
     flags: MessageFlags.IsComponentsV2,
   } as any;
@@ -614,6 +640,16 @@ const ITEM_ASSET_MAP: Record<string, string> = {
   hunters_compass:      "hunter's compass.png",
   sniper_rifle:         "sniper rifle.png",
   legendary_rifle:      "legendary rifle.png",
+  // Cock Store
+  basic_feed:           "basic feed.png",
+  protein_feed:         "protein feed.png",
+  agility_vitamins:     "agility vitamins.png",
+  feather_bandage:      "feather bandage.png",
+  training_whistle:     "training whistle.png",
+  iron_spurs:           "iron spurs.png",
+  guard_vest:           "gaurd vest.png",
+  champion_feed:        "champion feed.png",
+  phoenix_serum:        "pheonix serum.png",
 };
 
 // Ephemeral info card for one item slot, with thumbnail if asset exists
@@ -679,6 +715,15 @@ function buildItemInfoCard(item: ShopCatalogItem, ownerId: string) {
   if (currencyEmoji) buyBtn.setEmoji(currencyEmoji);
 
   const buyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(buyBtn);
+
+  if (!item.creditBlocked) {
+    const buyCardBtn = new ButtonBuilder()
+      .setCustomId(`shop_buy_card:${item.key}:${ownerId}`)
+      .setLabel("Buy (Credit)")
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji("💳");
+    buyRow.addComponents(buyCardBtn);
+  }
 
   const files: AttachmentBuilder[] = [];
   if (hasAsset && assetPath && safeName) {
@@ -860,8 +905,9 @@ async function executeBuy(
   catalogItem: ShopCatalogItem,
   client: import("discord.js").Client,
   guild: import("discord.js").Guild,
+  paymentSource: "wallet" | "card" = "wallet",
 ): Promise<{ components: any[]; files: AttachmentBuilder[]; flags: number }> {
-  const { item, results } = await buyItem(guildId, userId, catalogItem.name, member);
+  const { item, results, cardInfo } = await buyItem(guildId, userId, catalogItem.name, member, false, paymentSource) as any;
 
   if (item.roleId) {
     const role = guild.roles.cache.get(item.roleId);
@@ -884,7 +930,7 @@ async function executeBuy(
   const hasAsset = assetPath !== null && fs.existsSync(assetPath);
   const safeName = assetFile ? assetFile.replace(/\s+/g, "_") : null;
 
-  const effectLines = results?.length ? results.map(r => r.message).join("\n") : null;
+  const effectLines = results?.length ? results.map((r: any) => r.message).join("\n") : null;
   const usageHint = catalogItem.usable
     ? `-# To use: \`use ${catalogItem.name.toLowerCase()}\``
     : catalogItem.itemType === "EQUIPMENT"
@@ -939,6 +985,17 @@ async function executeBuy(
     new TextDisplayBuilder().setContent(usageHint),
   );
 
+  if (paymentSource === "card" && cardInfo) {
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
+    );
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `💳 **Charged to Credit Card**\nBalance: **${formatAmount(cardInfo.currentBalance)}** / ${formatAmount(cardInfo.creditLimit)} limit\nWeekly spend: **${formatAmount(cardInfo.spentThisCycle)}** / ${formatAmount(cardInfo.weeklySpendCap)} cap`,
+      ),
+    );
+  }
+
   const files: AttachmentBuilder[] = [];
   if (hasAsset && assetPath && safeName) {
     files.push(new AttachmentBuilder(assetPath, { name: safeName }));
@@ -970,15 +1027,37 @@ export async function handleShop(message: Message, args: string[]) {
     await seedGeneralShop(message.guildId!);
     const sub = args[0]?.toLowerCase();
 
-    // ---- !shop buy <name> ----
+    // ---- !shop buy [card] <name> ----
     if (sub === "buy") {
-      const itemName = args.slice(1).join(" ");
+      let paymentSource: "wallet" | "card" = "wallet";
+      let itemName: string;
+
+      if (args[1]?.toLowerCase() === "card") {
+        paymentSource = "card";
+        itemName = args.slice(2).join(" ");
+      } else {
+        itemName = args.slice(1).join(" ");
+      }
+
       if (!itemName) {
         return message.reply({
-          components: [v2Container("Shop Purchase", "Usage: `shop buy <item name>`")],
+          components: [v2Container("Shop Purchase", "Usage: `shop buy <item name>` or `shop buy card <item name>`")],
           flags: MessageFlags.IsComponentsV2,
         });
       }
+
+      // Check credit-blocked items for card purchases
+      if (paymentSource === "card") {
+        const allCatalogs = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG];
+        const catalogEntry = allCatalogs.find(c => c.name.toLowerCase() === itemName.trim().toLowerCase());
+        if (catalogEntry?.creditBlocked) {
+          return message.reply({
+            components: [v2Container("Credit Blocked", `**${catalogEntry.name}** cannot be purchased with a credit card.`, 0xE74C3C)],
+            flags: MessageFlags.IsComponentsV2,
+          });
+        }
+      }
+
       try {
         // Seed the correct store before buying so the item exists in the DB
         const normalizedName = itemName.trim().toLowerCase();
@@ -988,10 +1067,12 @@ export async function handleShop(message: Message, args: string[]) {
           await seedJobShop(message.guildId!);
         } else if (UNI_SHOP_CATALOG.some(i => i.name.toLowerCase() === normalizedName)) {
           await seedUniShop(message.guildId!);
+        } else if (COCK_SHOP_CATALOG.some(i => i.name.toLowerCase() === normalizedName)) {
+          await seedCockShop(message.guildId!);
         }
         await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
         if (!message.member) return;
-        const { item, results } = await buyItem(message.guildId!, message.author.id, itemName, message.member);
+        const { item, results, cardInfo } = await buyItem(message.guildId!, message.author.id, itemName, message.member, false, paymentSource) as any;
         if (item.roleId && message.guild) {
           const role = message.guild.roles.cache.get(item.roleId);
           if (role) try { await message.member?.roles.add(role); } catch { }
@@ -1000,11 +1081,15 @@ export async function handleShop(message: Message, args: string[]) {
           guild: message.guild!,
           type: "MARKET",
           title: "Shop Purchase",
-          description: `**User:** ${message.author.tag}\n**Item:** ${item.name}\n**Price:** ${fmtCurrency(item.price)}`,
+          description: `**User:** ${message.author.tag}\n**Item:** ${item.name}\n**Price:** ${fmtCurrency(item.price)}\n**Payment:** ${paymentSource === "card" ? "Credit Card" : "Wallet"}`,
           color: 0x00FF00,
         });
+        let confirmMsg = `You bought **${item.name}** for **${fmtCurrency(item.price)}**!`;
+        if (paymentSource === "card" && cardInfo) {
+          confirmMsg += `\n\n💳 **Charged to Credit Card**\nBalance: **${formatAmount(cardInfo.currentBalance)}** / ${formatAmount(cardInfo.creditLimit)} limit\nWeekly: **${formatAmount(cardInfo.spentThisCycle)}** / ${formatAmount(cardInfo.weeklySpendCap)} cap`;
+        }
         await message.reply({
-          components: [v2Container("Purchase Successful", `You bought **${item.name}** for **${fmtCurrency(item.price)}**!`, 0x2ECC71)],
+          components: [v2Container("Purchase Successful", confirmMsg, 0x2ECC71)],
           flags: MessageFlags.IsComponentsV2,
         });
         await sendEffectMessages(message, results);
@@ -1052,6 +1137,7 @@ export async function handleShop(message: Message, args: string[]) {
       currentCategory = "UNI";
       currentItems = getCatalogForCategory(currentCategory);
     } else if (sub === "cock") {
+      await seedCockShop(message.guildId!);
       currentCategory = "COCK";
       currentItems = getCatalogForCategory(currentCategory);
     }
@@ -1091,6 +1177,7 @@ export async function handleShop(message: Message, args: string[]) {
         if (newCategory === "HUNT") await seedHuntShop(interaction.guildId!);
         if (newCategory === "JOB") await seedJobShop(interaction.guildId!);
         if (newCategory === "UNI") await seedUniShop(interaction.guildId!);
+        if (newCategory === "COCK") await seedCockShop(interaction.guildId!);
         currentCategory = newCategory;
         currentItems = getCatalogForCategory(currentCategory);
         currentPage = 1;
@@ -1227,6 +1314,24 @@ export async function handleShop(message: Message, args: string[]) {
         return;
       }
 
+      // ── Cock Store numbered info slot: shop_info_slot:COCK:1:<slot>:<owner> ─
+      if (customId.startsWith("shop_info_slot:COCK:") && customId.endsWith(`:${ownerId}`)) {
+        if (!isOwner) {
+          await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
+          return;
+        }
+        const parts = customId.split(":");
+        const slot = parseInt(parts[3], 10);
+        if (isNaN(slot) || slot < 1 || slot > CS_ITEMS.length) return;
+
+        const itemKey = CS_ITEMS[slot - 1];
+        const catalogItem = COCK_SHOP_CATALOG.find(i => i.key === itemKey);
+        if (!catalogItem) return;
+
+        await interaction.reply(buildItemInfoCard(catalogItem, ownerId));
+        return;
+      }
+
       // ── Buy button: shop_buy:<key>:<owner> ───────────────────────────────
       // Can appear on ephemeral info cards — any user who opened their own shop
       if (customId.startsWith("shop_buy:") && customId.endsWith(`:${ownerId}`)) {
@@ -1239,6 +1344,7 @@ export async function handleShop(message: Message, args: string[]) {
           ?? HUNT_SHOP_CATALOG.find(i => i.key === itemKey)
           ?? JOB_SHOP_CATALOG.find(i => i.key === itemKey)
           ?? UNI_SHOP_CATALOG.find(i => i.key === itemKey)
+          ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey)
           ?? currentItems.find(i => i.key === itemKey);
 
         if (!catalogItem) {
@@ -1278,6 +1384,82 @@ export async function handleShop(message: Message, args: string[]) {
         }
         return;
       }
+
+      // ── Credit card buy: shop_buy_card:<key>:<owner> — show confirmation ─
+      if (customId.startsWith("shop_buy_card:") && customId.endsWith(`:${ownerId}`)) {
+        if (!isOwner) {
+          await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
+          return;
+        }
+        const itemKey = customId.split(":")[1];
+        const catalogItem = GENERAL_SHOP_CATALOG.find(i => i.key === itemKey)
+          ?? HUNT_SHOP_CATALOG.find(i => i.key === itemKey)
+          ?? JOB_SHOP_CATALOG.find(i => i.key === itemKey)
+          ?? UNI_SHOP_CATALOG.find(i => i.key === itemKey)
+          ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey);
+        if (!catalogItem) return;
+
+        const confirmContainer = v2Container(
+          "💳 Confirm Credit Purchase",
+          `Charge **${formatAmount(catalogItem.price)}** to your credit card for **${catalogItem.name}**?\n\nThis will be added to your card balance and accrue interest if unpaid.`,
+          0x3498DB,
+        );
+        const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`shop_buy_card_confirm:${itemKey}:${ownerId}`)
+            .setLabel("Confirm Purchase")
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji("💳"),
+          new ButtonBuilder()
+            .setCustomId(`shop_buy_card_cancel:${ownerId}`)
+            .setLabel("Cancel")
+            .setStyle(ButtonStyle.Secondary),
+        );
+
+        await interaction.reply({
+          components: [confirmContainer, confirmRow],
+          flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
+      // ── Credit card confirm: shop_buy_card_confirm:<key>:<owner> ─
+      if (customId.startsWith("shop_buy_card_confirm:") && customId.endsWith(`:${ownerId}`)) {
+        if (!isOwner) return;
+        const itemKey = customId.split(":")[1];
+        const catalogItem = GENERAL_SHOP_CATALOG.find(i => i.key === itemKey)
+          ?? HUNT_SHOP_CATALOG.find(i => i.key === itemKey)
+          ?? JOB_SHOP_CATALOG.find(i => i.key === itemKey)
+          ?? UNI_SHOP_CATALOG.find(i => i.key === itemKey)
+          ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey);
+        if (!catalogItem) return;
+
+        try {
+          await interaction.deferUpdate();
+          await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
+          const payload = await executeBuy(
+            interaction.user.id,
+            interaction.guildId!,
+            interaction.user.tag,
+            interaction.member as GuildMember,
+            catalogItem,
+            interaction.client,
+            interaction.guild!,
+            "card",
+          );
+          await interaction.editReply(payload);
+        } catch (err) {
+          const errContainer = v2Container("Credit Purchase Failed", (err as Error).message.slice(0, 1800), 0xE74C3C);
+          await interaction.editReply({ components: [errContainer], flags: MessageFlags.IsComponentsV2 });
+        }
+        return;
+      }
+
+      // ── Credit card cancel ─
+      if (customId.startsWith("shop_buy_card_cancel:")) {
+        await interaction.update({ components: [v2Container("Cancelled", "Credit purchase cancelled.", 0x95A5A6)], flags: MessageFlags.IsComponentsV2 });
+        return;
+      }
     });
 
   } catch (err) {
@@ -1311,7 +1493,8 @@ export async function handleShopBuyInteraction(interaction: import("discord.js")
   const catalogItem = GENERAL_SHOP_CATALOG.find(i => i.key === itemKey)
     ?? HUNT_SHOP_CATALOG.find(i => i.key === itemKey)
     ?? JOB_SHOP_CATALOG.find(i => i.key === itemKey)
-    ?? UNI_SHOP_CATALOG.find(i => i.key === itemKey);
+    ?? UNI_SHOP_CATALOG.find(i => i.key === itemKey)
+    ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey);
 
   if (!catalogItem) {
     await interaction.reply({
@@ -1323,6 +1506,7 @@ export async function handleShopBuyInteraction(interaction: import("discord.js")
 
   try {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    if (catalogItem.category === "COCK") await seedCockShop(interaction.guildId!);
     await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
     const payload = await executeBuy(
       interaction.user.id,
@@ -1336,6 +1520,106 @@ export async function handleShopBuyInteraction(interaction: import("discord.js")
     await interaction.editReply(payload);
   } catch (err) {
     const errContainer = v2Container("Purchase Failed", (err as Error).message.slice(0, 1800), 0xE74C3C);
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ components: [errContainer], flags: MessageFlags.IsComponentsV2 });
+    } else {
+      await interaction.reply({ components: [errContainer], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Global shop_buy_card handler — shows confirmation before credit purchase
+// ---------------------------------------------------------------------------
+
+export async function handleShopBuyCardInteraction(interaction: import("discord.js").ButtonInteraction): Promise<void> {
+  const customId = interaction.customId;
+  const parts = customId.split(":");
+  const itemKey = parts[1];
+  const ownerId = parts[2];
+
+  if (interaction.user.id !== ownerId) {
+    await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  const catalogItem = GENERAL_SHOP_CATALOG.find(i => i.key === itemKey)
+    ?? HUNT_SHOP_CATALOG.find(i => i.key === itemKey)
+    ?? JOB_SHOP_CATALOG.find(i => i.key === itemKey)
+    ?? UNI_SHOP_CATALOG.find(i => i.key === itemKey)
+    ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey);
+
+  if (!catalogItem) {
+    await interaction.reply({ components: [v2Container("Error", "Item not found.", 0xE74C3C)], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+    return;
+  }
+
+  const confirmContainer = v2Container(
+    "💳 Confirm Credit Purchase",
+    `Charge **${formatAmount(catalogItem.price)}** to your credit card for **${catalogItem.name}**?\n\nThis will be added to your card balance and accrue interest if unpaid.`,
+    0x3498DB,
+  );
+  const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`shop_buy_card_confirm:${itemKey}:${ownerId}`)
+      .setLabel("Confirm Purchase")
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji("💳"),
+    new ButtonBuilder()
+      .setCustomId(`shop_buy_card_cancel:${ownerId}`)
+      .setLabel("Cancel")
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  await interaction.reply({
+    components: [confirmContainer, confirmRow],
+    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Global shop_buy_card_confirm handler — executes credit card purchase
+// ---------------------------------------------------------------------------
+
+export async function handleShopBuyCardConfirmInteraction(interaction: import("discord.js").ButtonInteraction): Promise<void> {
+  const customId = interaction.customId;
+  const parts = customId.split(":");
+  const itemKey = parts[1];
+  const ownerId = parts[2];
+
+  if (interaction.user.id !== ownerId) {
+    await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  const catalogItem = GENERAL_SHOP_CATALOG.find(i => i.key === itemKey)
+    ?? HUNT_SHOP_CATALOG.find(i => i.key === itemKey)
+    ?? JOB_SHOP_CATALOG.find(i => i.key === itemKey)
+    ?? UNI_SHOP_CATALOG.find(i => i.key === itemKey)
+    ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey);
+
+  if (!catalogItem) {
+    await interaction.reply({ components: [v2Container("Error", "Item not found.", 0xE74C3C)], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+    return;
+  }
+
+  try {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    if (catalogItem.category === "COCK") await seedCockShop(interaction.guildId!);
+    await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
+    const payload = await executeBuy(
+      interaction.user.id,
+      interaction.guildId!,
+      interaction.user.tag,
+      interaction.member as GuildMember,
+      catalogItem,
+      interaction.client,
+      interaction.guild!,
+      "card",
+    );
+    await interaction.editReply(payload);
+  } catch (err) {
+    const errContainer = v2Container("Credit Purchase Failed", (err as Error).message.slice(0, 1800), 0xE74C3C);
     if (interaction.deferred || interaction.replied) {
       await interaction.editReply({ components: [errContainer], flags: MessageFlags.IsComponentsV2 });
     } else {
@@ -1360,7 +1644,7 @@ export async function handleShopUseInteraction(interaction: import("discord.js")
     return;
   }
 
-  const allCatalogs = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG];
+  const allCatalogs = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG];
   const catalogItem = allCatalogs.find(i => i.key === itemKey);
 
   if (!catalogItem || !catalogItem.usable) {

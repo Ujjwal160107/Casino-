@@ -1,5 +1,6 @@
 import prisma from "../utils/prisma";
 import { MAX_SAFE_BALANCE, STARTING_WALLET_BALANCE } from "../utils/economyConfig";
+import { questBus } from "./questEvents";
 
 export async function ensureUserAndWallet(discordId: string, _guildId: string, username: string) {
   let user = await prisma.user.findUnique({
@@ -105,7 +106,7 @@ export async function transferMoney(fromDiscordId: string, toDiscordId: string, 
 export async function addBalance(discordId: string, username: string, amount: number, type = "income", meta: any = {}, earned = true) {
   if (amount <= 0) throw new Error("Amount must be positive.");
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     let user = await tx.user.findUnique({
       where: { discordId },
       include: { wallet: true }
@@ -160,6 +161,28 @@ export async function addBalance(discordId: string, username: string, amount: nu
       capped
     };
   });
+
+  // Garnishment: deduct 25% of earned income toward delinquent/locked card debt
+  if (earned && result.appliedAmount > 0) {
+    try {
+      const { applyGarnishment } = await import("./creditCardService");
+      const { garnished } = await applyGarnishment(discordId, result.appliedAmount);
+      if (garnished > 0) {
+        await prisma.wallet.update({
+          where: { id: result.walletId },
+          data: { balance: { decrement: garnished } }
+        });
+        result.newBalance -= garnished;
+        (result as any).garnished = garnished;
+      }
+    } catch { /* Card service unavailable — skip garnishment */ }
+  }
+
+  if (earned && result.appliedAmount > 0) {
+    questBus.emit("economy:earn", { discordId, amount: result.appliedAmount });
+  }
+
+  return result;
 }
 
 export async function removeBalance(discordId: string, amount: number, type = "remove", meta: any = {}) {

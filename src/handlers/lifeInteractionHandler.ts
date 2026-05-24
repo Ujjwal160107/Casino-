@@ -5,7 +5,7 @@ import { fmtCurrency, formatDuration } from "../utils/format";
 import { Mascot, getEmoteUrl } from "../config/branding";
 import prisma from "../utils/prisma";
 import { logToChannel } from "../utils/discordLogger";
-import { updateQuestProgress } from "../services/questService";
+import { questBus } from "../services/questEvents";
 import { applyRelaxOption, getRelaxSnapshot } from "../services/relaxService";
 import { buildRelaxDashboard } from "../commands/life/relax";
 import { checkCounterfeitKit, checkCrownOfGreed, checkDevilContract } from "../services/shopBuffs";
@@ -1153,7 +1153,7 @@ async function handleButton(interaction: ButtonInteraction) {
             });
 
             // Update Quest Progress
-            await updateQuestProgress(userData.discordId, "WORK").catch(console.error);
+            questBus.emit("work:complete", { discordId: userData.discordId });
 
             if (userMessage) {
                 await (userMessage as Message).reply({ embeds: [winEmbed], components: rows });

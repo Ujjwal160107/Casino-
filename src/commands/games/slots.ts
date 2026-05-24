@@ -7,9 +7,8 @@ import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { errorEmbed } from "../../utils/embed";
 import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage } from "../../services/casinoCooldownService";
 import { getGameBetLimits } from "../../utils/gameUtils";
-import { updateQuestProgress } from "../../services/questService";
-import { checkLuckyCoin, checkCrownOfGreed, recordPotentialSoulLedgerLoss } from "../../services/shopBuffs";
-// TODO: Luck integration for slots — weighted probability restructuring needed
+import { questBus } from "../../services/questEvents";
+import { checkLuckyCoin, checkCrownOfGreed, recordPotentialSoulLedgerLoss, getCurrentLuck } from "../../services/shopBuffs";
 
 export const CHERRY = "<:cherri:1446428169786622053>";
 export const BANANA = "<:banano:1446428190837968989>";
@@ -39,12 +38,18 @@ function buildSlotsContainer(title: string, body: string, accent: number) {
 }
 
 export function getSpinResult(): { reels: string[], win: boolean, multiplier: number, payout: number } {
-  const roll = Math.random();
-  let cumulative = 0;
+  return getSpinResultWithLuck(50);
+}
 
+export function getSpinResultWithLuck(luck: number): { reels: string[], win: boolean, multiplier: number, payout: number } {
+  const roll = Math.random();
+  const bias = ((luck - 50) / 100) * 0.05;
+  const adjustedRoll = Math.max(0, Math.min(1, roll - bias));
+
+  let cumulative = 0;
   for (const tier of SLOTS_PAYOUT_TABLE) {
     cumulative += tier.chance;
-    if (roll < cumulative) {
+    if (adjustedRoll < cumulative) {
       const symbol = tier.symbols[Math.floor(Math.random() * tier.symbols.length)];
       return {
         reels: [symbol, symbol, symbol],
@@ -104,7 +109,8 @@ export async function handleSlots(message: Message, args: string[]) {
 
   const luckyCoinMult = await checkLuckyCoin(message.author.id);
   const crownMult = await checkCrownOfGreed(message.author.id);
-  const result = getSpinResult();
+  const luck = await getCurrentLuck(message.author.id);
+  const result = getSpinResultWithLuck(luck);
   const [reel1, reel2, reel3] = result.reels;
   const win = result.win;
 
@@ -136,8 +142,8 @@ export async function handleSlots(message: Message, args: string[]) {
   );
 
   await setCasinoCooldown("slots", user.discordId, message.guildId!);
-  await updateQuestProgress(user.discordId, "GAMBLE").catch(console.error);
-  if (win) await updateQuestProgress(user.discordId, "WIN_SLOTS").catch(console.error);
+  questBus.emit("casino:play", { discordId: user.discordId, bet: amount });
+  if (win) questBus.emit("casino:win", { discordId: user.discordId, game: "slots" });
 
   await import("../../utils/discordLogger").then(({ logToChannel }) => {
     logToChannel(message.client, {

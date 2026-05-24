@@ -378,28 +378,59 @@ async function handleView(message: Message, args: string[]) {
         }
         // --- END TRAINING CHECK ---
 
+        // --- CRITICAL STATE CHECK (24h death window) ---
+        if (meta.critical) {
+            const now = Date.now();
+            if (now >= meta.critical.endTime) {
+                // Timer expired → permadeath
+                await prisma.inventory.delete({ where: { id: inventoryItem.id } });
+                const embed = new EmbedBuilder()
+                    .setColor("#000000")
+                    .setTitle("💀 Your Chicken Has Died")
+                    .setDescription("The critical window expired. Your chicken could not be saved.\n\nRest in peace. You can buy a new chicken from the Cock Store.");
+                return message.reply({ embeds: [embed] });
+            }
+
+            const endTimeUnix = Math.floor(meta.critical.endTime / 1000);
+            const embed = new EmbedBuilder()
+                .setColor("#8B0000")
+                .setTitle("💀 CRITICAL CONDITION")
+                .setDescription(
+                    `Your chicken is **dying** and will be lost permanently if not saved!\n\n` +
+                    `⏰ **Death in:** <t:${endTimeUnix}:R>\n\n` +
+                    `**Only a Phoenix Serum can save it.**\n` +
+                    `\`${config.prefix}use phoenix serum\`\n\n` +
+                    `-# No coin heal available. No other items work. Act fast.`
+                );
+            return message.reply({ embeds: [embed] });
+        }
+
         // --- INJURY CHECK ---
         const activeInjury = meta.injured;
         if (activeInjury) {
             const now = Date.now();
             if (now >= activeInjury.endTime) {
-                // Auto-healed
                 delete meta.injured;
                 await prisma.inventory.update({ where: { id: inventoryItem.id }, data: { meta } });
-                // Fallthrough to normal view
             } else {
-                // Still Injured
                 const endTimeUnix = Math.floor(activeInjury.endTime / 1000);
-                const healCost = (config as any).chickenHealCost ?? 500;
+                const recoveryHours = activeInjury.recoveryHours ?? 2;
+                const healCost = Math.floor(50_000 * (recoveryHours / 2));
 
                 const embed = new EmbedBuilder()
                     .setColor("#E74C3C")
                     .setTitle("<:clinic:1453972244610154507> Veterinary Clinic")
-                    .setDescription(`Your chicken is **Injured** and cannot fight or train.\n\n<a:bandaid:1453972442300154018> Recovers <t:${endTimeUnix}:R>`)
-                    .addFields({ name: "Instant Heal", value: `Pay **${healCost}** coins to heal instantly.` });
+                    .setDescription(
+                        `Your chicken is **Injured** and cannot fight or train.\n\n` +
+                        `<a:bandaid:1453972442300154018> Recovers <t:${endTimeUnix}:R> (${recoveryHours.toFixed(1)}h total)`
+                    )
+                    .addFields(
+                        { name: "💰 Coin Heal", value: `Pay **${healCost.toLocaleString()}** coins to heal instantly.`, inline: true },
+                        { name: "🏪 Cock Store", value: `\`${config.prefix}use feather bandage\` — Instant heal\n\`${config.prefix}use phoenix serum\` — Full recovery`, inline: false },
+                    );
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                    new ButtonBuilder().setCustomId("chicken_heal").setLabel(`Heal (${healCost})`).setStyle(ButtonStyle.Success).setEmoji("<:medicine:1453973645675200727>")
+                    new ButtonBuilder().setCustomId("chicken_heal").setLabel(`Heal (${healCost.toLocaleString()})`).setStyle(ButtonStyle.Success).setEmoji("<:medicine:1453973645675200727>")
                 );
 
                 const reply = await message.reply({ embeds: [embed], components: [row] });
@@ -420,7 +451,6 @@ async function handleView(message: Message, args: string[]) {
                                     data: { balance: { decrement: healCost } }
                                 });
 
-                                // Fetch latest to ensure still injured
                                 const freshInv = await tx.inventory.findUnique({ where: { id: inventoryItem.id } });
                                 const freshMeta = (freshInv?.meta as any) || {};
                                 delete freshMeta.injured;
@@ -433,7 +463,7 @@ async function handleView(message: Message, args: string[]) {
 
                             await i.update({ content: `${Mascot.Emotes.Accept} Your chicken has been healed!`, embeds: [], components: [] });
                         } catch (e) {
-                            await i.reply({ content: `Heal failed. You might lack funds (${healCost}) or an error occurred.`, ephemeral: true });
+                            await i.reply({ content: `Heal failed. You might lack funds (${healCost.toLocaleString()}) or an error occurred.`, ephemeral: true });
                         }
                     }
                 });
@@ -577,12 +607,15 @@ async function handleTrain(message: Message, args: string[]) {
 
     const meta = (inv.meta as any) || {};
 
-    // Check if already training or injured
+    // Check if already training, injured, or critical
+    if (meta.critical) {
+        return message.reply(`Your chicken is in **critical condition**! Use \`${config.prefix}use phoenix serum\` to save it.`);
+    }
     if (meta.training) {
         return message.reply(`Your chicken is already training! Check \`${config.prefix}chicken\`.`);
     }
     if (meta.injured) {
-        return message.reply(`Your chicken is injured! Visit the \`${config.prefix}chicken\` dashboard to heal.`);
+        return message.reply(`Your chicken is injured! Use \`${config.prefix}use feather bandage\` or coin-heal via \`${config.prefix}chicken\`.`);
     }
 
     const level = meta.level || 0;
@@ -653,6 +686,9 @@ async function handleTrain(message: Message, args: string[]) {
                         data: { meta: newMeta }
                     });
                 });
+
+                const { questBus } = require("../../services/questEvents");
+                questBus.emit("cockfight:train", { discordId: user.id });
 
                 const endTimeUnix = Math.floor((Date.now() + durationMs) / 1000);
 

@@ -184,6 +184,9 @@ export async function handleStudy(message: Message) {
         const bonusXp = Math.floor(50 * (xpMultiplier - 1)) + focusNotesBonus;
         const res = await study(message.author.id, message.guild!.id, bonusXp);
 
+        const { questBus } = await import("../../services/questEvents");
+        questBus.emit("education:study", { discordId: message.author.id });
+
         // Apply focus_notes bonus XP
         let focusBonus = "";
         if (focusNotes) {

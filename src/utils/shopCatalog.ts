@@ -15,6 +15,7 @@ export interface ShopCatalogItem {
   itemType: "CONSUMABLE" | "EQUIPMENT" | "COLLECTIBLE";
   effects: ItemEffect[];
   maxStack?: number;
+  creditBlocked?: boolean;
 }
 
 export const SHOP_CATEGORIES: { key: ShopCategory; label: string; emoji: string; emojiKey?: string }[] = [
@@ -148,6 +149,7 @@ export const GENERAL_SHOP_CATALOG: ShopCatalogItem[] = [
     consumable: true,
     usable: true,
     itemType: "CONSUMABLE",
+    creditBlocked: true,
     effects: [
       { type: "CUSTOM_MESSAGE", message: "Opening Mystery Box...", trigger: "USE" },
     ],
@@ -163,6 +165,7 @@ export const GENERAL_SHOP_CATALOG: ShopCatalogItem[] = [
     consumable: true,
     usable: true,
     itemType: "CONSUMABLE",
+    creditBlocked: true,
     effects: [
       { type: "CUSTOM_MESSAGE", message: "Following the Treasure Map...", trigger: "USE" },
     ],
@@ -221,6 +224,7 @@ export const GENERAL_SHOP_CATALOG: ShopCatalogItem[] = [
     consumable: true,
     usable: true,
     itemType: "CONSUMABLE",
+    creditBlocked: true,
     maxStack: 1,
     effects: [{ type: "CUSTOM_MESSAGE", message: "Pandora Box opened!", trigger: "USE" }],
   },
@@ -792,11 +796,149 @@ export const UNI_SHOP_CATALOG: ShopCatalogItem[] = [
   },
 ];
 
+export const COCK_SHOP_CATALOG: ShopCatalogItem[] = [
+  {
+    key: "basic_feed",
+    name: "Basic Feed",
+    price: 10_000,
+    description: "Simple grain mix for your chicken. A daily staple that provides steady XP growth. +10 XP per use.",
+    shortDescription: "+10 XP per feed.",
+    category: "COCK",
+    asset: "basic_feed",
+    consumable: true,
+    usable: true,
+    itemType: "CONSUMABLE",
+    effects: [{ type: "CUSTOM_MESSAGE", message: "Use with `!use basic feed [amount]`", trigger: "BUY" }],
+  },
+  {
+    key: "protein_feed",
+    name: "Protein Feed",
+    price: 45_000,
+    description: "High-protein formula for accelerated growth. +35 XP per use.",
+    shortDescription: "+35 XP per feed.",
+    category: "COCK",
+    asset: "protein_feed",
+    consumable: true,
+    usable: true,
+    itemType: "CONSUMABLE",
+    effects: [{ type: "CUSTOM_MESSAGE", message: "Use with `!use protein feed [amount]`", trigger: "BUY" }],
+  },
+  {
+    key: "agility_vitamins",
+    name: "Agility Vitamins",
+    price: 60_000,
+    description: "Performance-enhancing vitamins. Grants +1 to a random stat (Strength, Agility, or Defense). Each stat caps at 10.",
+    shortDescription: "+1 random stat (cap 10).",
+    category: "COCK",
+    asset: "agility_vitamins",
+    consumable: true,
+    usable: true,
+    itemType: "CONSUMABLE",
+    effects: [{ type: "CUSTOM_MESSAGE", message: "+1 random stat to your chicken.", trigger: "USE" }],
+  },
+  {
+    key: "feather_bandage",
+    name: "Feather Bandage",
+    price: 75_000,
+    description: "Specially designed bandage for cockfighting injuries. Instantly clears your chicken's injury timer.",
+    shortDescription: "Heal injured chicken instantly.",
+    category: "COCK",
+    asset: "feather_bandage",
+    consumable: true,
+    usable: true,
+    itemType: "CONSUMABLE",
+    effects: [{ type: "CUSTOM_MESSAGE", message: "Clears chicken injury.", trigger: "USE" }],
+  },
+  {
+    key: "training_whistle",
+    name: "Training Whistle",
+    price: 120_000,
+    description: "A sharp whistle that instantly completes your chicken's current training session, granting the stat immediately.",
+    shortDescription: "Complete training instantly.",
+    category: "COCK",
+    asset: "training_whistle",
+    consumable: true,
+    usable: true,
+    itemType: "CONSUMABLE",
+    effects: [{ type: "CUSTOM_MESSAGE", message: "Completes active training.", trigger: "USE" }],
+  },
+  {
+    key: "iron_spurs",
+    name: "Iron Spurs",
+    price: 300_000,
+    description: "Razor-sharp iron spurs that attach to your chicken's talons. Equips to the weapon slot. +3 Strength.",
+    shortDescription: "Weapon: +3 Strength.",
+    category: "COCK",
+    asset: "iron_spurs",
+    consumable: false,
+    usable: true,
+    itemType: "EQUIPMENT",
+    effects: [{ type: "CUSTOM_MESSAGE", message: "Equips to weapon slot.", trigger: "USE" }],
+  },
+  {
+    key: "guard_vest",
+    name: "Guard Vest",
+    price: 350_000,
+    description: "Reinforced protective vest for your chicken. Equips to the armor slot. +4 Defense.",
+    shortDescription: "Armor: +4 Defense.",
+    category: "COCK",
+    asset: "guard_vest",
+    consumable: false,
+    usable: true,
+    itemType: "EQUIPMENT",
+    effects: [{ type: "CUSTOM_MESSAGE", message: "Equips to armor slot.", trigger: "USE" }],
+  },
+  {
+    key: "champion_feed",
+    name: "Champion Feed",
+    price: 500_000,
+    description: "Premium championship-grade nutrition. +120 XP per use. Best value when daily feed slots are limited.",
+    shortDescription: "+120 XP per feed (premium).",
+    category: "COCK",
+    asset: "champion_feed",
+    consumable: true,
+    usable: true,
+    itemType: "CONSUMABLE",
+    effects: [{ type: "CUSTOM_MESSAGE", message: "Use with `!use champion feed [amount]`", trigger: "BUY" }],
+  },
+  {
+    key: "phoenix_serum",
+    name: "Phoenix Serum",
+    price: 900_000,
+    description: "Emergency recovery serum. Instantly clears injury AND completes active training. 24-hour cooldown between uses.",
+    shortDescription: "Full recovery (heal + finish training). 24h CD.",
+    category: "COCK",
+    asset: "phoenix_serum",
+    consumable: true,
+    usable: true,
+    itemType: "CONSUMABLE",
+    effects: [{ type: "CUSTOM_MESSAGE", message: "Full chicken recovery. 24h cooldown.", trigger: "USE" }],
+  },
+];
+
+export const COCK_SYSTEM_ITEMS: ShopCatalogItem[] = [
+  {
+    key: "chicken",
+    name: "Chicken",
+    price: 25_000,
+    description: "Your fighting companion. Each chicken has a unique trait.",
+    shortDescription: "A cockfighting chicken.",
+    category: "COCK",
+    asset: "cockstore_mascot",
+    consumable: false,
+    usable: false,
+    itemType: "COLLECTIBLE",
+    effects: [],
+    maxStack: 1,
+  },
+];
+
 export const SHOP_CATALOG: ShopCatalogItem[] = [
   ...GENERAL_SHOP_CATALOG,
   ...HUNT_SHOP_CATALOG,
   ...JOB_SHOP_CATALOG,
   ...UNI_SHOP_CATALOG,
+  ...COCK_SHOP_CATALOG,
 ];
 
 export function getCatalogByCategory(category: ShopCategory): ShopCatalogItem[] {

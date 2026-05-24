@@ -20,7 +20,7 @@ export async function handleEquip(message: Message, args: string[]) {
 
     // 1. Get User
     const userData = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: user.id, guildId } }
+        where: { discordId: user.id }
     });
     if (!userData) return message.reply("User not found.");
 
@@ -32,7 +32,7 @@ export async function handleEquip(message: Message, args: string[]) {
     if (!shopItem) return message.reply({ embeds: [errorEmbed(user, "Item Not Found", "That item does not exist via shop.")] });
 
     const invItem = await prisma.inventory.findUnique({
-        where: { userId_shopItemId: { userId: userData.id, shopItemId: shopItem.id } }
+        where: { userId_shopItemId: { userId: userData.discordId, shopItemId: shopItem.id } }
     });
 
     if (!invItem || invItem.amount < 1) {
@@ -52,7 +52,7 @@ export async function handleEquip(message: Message, args: string[]) {
     if (!chickenItem) return message.reply("Chicken not configured.");
 
     const chickenInv = await prisma.inventory.findUnique({
-        where: { userId_shopItemId: { userId: userData.id, shopItemId: chickenItem.id } }
+        where: { userId_shopItemId: { userId: userData.discordId, shopItemId: chickenItem.id } }
     });
 
     if (!chickenInv || chickenInv.amount < 1) {

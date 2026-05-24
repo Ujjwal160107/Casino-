@@ -16,7 +16,7 @@ import { errorEmbed } from "../../utils/embed";
 import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage, acquireActiveGameLock, releaseActiveGameLock } from "../../services/casinoCooldownService";
 import { Mascot } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
-import { updateQuestProgress } from "../../services/questService";
+import { questBus } from "../../services/questEvents";
 import { checkLuckyCoin, applyLuckToChance, checkCrownOfGreed, recordPotentialSoulLedgerLoss } from "../../services/shopBuffs";
 
 const COINFLIP_ACCENT = 0xF1C40F;
@@ -159,8 +159,8 @@ export async function handleCoinflip(message: Message, args: string[]) {
 
     await releaseActiveGameLock("coinflip", user.discordId);
     await setCasinoCooldown("coinflip", user.discordId, message.guildId!);
-    await updateQuestProgress(user.discordId, "GAMBLE").catch(console.error);
-    if (didWin) await updateQuestProgress(user.discordId, "WIN_COINFLIP").catch(console.error);
+    questBus.emit("casino:play", { discordId: user.discordId, bet: amount });
+    if (didWin) questBus.emit("casino:win", { discordId: user.discordId, game: "coinflip" });
 
     await import("../../utils/discordLogger").then(({ logToChannel }) => {
       logToChannel(message.client, {

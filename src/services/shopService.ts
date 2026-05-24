@@ -4,7 +4,7 @@ import { applyItemEffects, ItemEffect, ItemEffectResult } from "./effectService"
 import { logToChannel } from "../utils/discordLogger";
 import { Colors } from "discord.js";
 import { Mascot } from "../config/branding";
-import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG, JOB_SHOP_CATALOG, UNI_SHOP_CATALOG } from "../utils/shopCatalog";
+import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG, JOB_SHOP_CATALOG, UNI_SHOP_CATALOG, COCK_SHOP_CATALOG, COCK_SYSTEM_ITEMS } from "../utils/shopCatalog";
 import { RIFLE_PRIORITY } from "../utils/animalCatalog";
 import { redisService } from "./redisService";
 import { isTester } from "../utils/developerAccess";
@@ -86,7 +86,7 @@ export async function deleteShopItem(itemId: string) {
   return prisma.shopItem.delete({ where: { id: itemId } });
 }
 
-export async function buyItem(guildId: string, userId: string, identifier: string, member?: GuildMember, byId: boolean = false) {
+export async function buyItem(guildId: string, userId: string, identifier: string, member?: GuildMember, byId: boolean = false, paymentSource: "wallet" | "card" = "wallet") {
   let item;
 
   if (byId) {
@@ -111,7 +111,17 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       include: { wallet: true, bank: true }
     });
 
-    if (!user || !user.wallet || (user.wallet.balance < item.price && !isTester(userId))) {
+    if (!user || !user.wallet) {
+      throw new Error("User or wallet not found.");
+    }
+
+    if (paymentSource === "card") {
+      const allCatalogs = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG];
+      const catalogEntry = allCatalogs.find(c => c.name.toLowerCase() === item.name.toLowerCase());
+      if (catalogEntry?.creditBlocked) {
+        throw new Error(`**${item.name}** cannot be purchased with a credit card.`);
+      }
+    } else if (user.wallet.balance < item.price && !isTester(userId)) {
       throw new Error(`You need ${item.price.toLocaleString("en-US")} coins to buy this.`);
     }
 
@@ -184,10 +194,31 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       };
     }
 
-    await tx.wallet.update({
-      where: { id: user.wallet.id },
-      data: { balance: { decrement: item.price } }
-    });
+    let cardInfo: any = null;
+
+    if (paymentSource === "card") {
+      const { chargeCardPurchaseTx } = await import("./creditCardService");
+      const result = await chargeCardPurchaseTx(tx, userId, item.price, {
+        type: "shop_purchase",
+        itemName: item.name,
+        guildId,
+      });
+      cardInfo = result.card;
+    } else {
+      await tx.wallet.update({
+        where: { id: user.wallet.id },
+        data: { balance: { decrement: item.price } }
+      });
+      await tx.transaction.create({
+        data: {
+          walletId: user.wallet.id,
+          amount: -item.price,
+          type: "shop_buy",
+          meta: { itemName: item.name },
+          isEarned: false
+        }
+      });
+    }
 
     if (item.stock !== -1) {
       await tx.shopItem.update({
@@ -207,20 +238,14 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       update: { amount: { increment: 1 } }
     });
 
-    await tx.transaction.create({
-      data: {
-        walletId: user.wallet.id,
-        amount: -item.price,
-        type: "shop_buy",
-        meta: { itemName: item.name },
-        isEarned: false
-      }
-    });
-
     const buyEffects = ((item.effects as any) || []).filter((e: any) => e.trigger === "BUY");
 
-    return { item, buyEffects };
+    return { item, buyEffects, paymentSource, cardInfo };
   });
+
+  // Quest progress
+  const { questBus } = require("./questEvents");
+  questBus.emit("economy:shop_buy", { discordId: userId, paymentSource: res.paymentSource });
 
   // If user just bought a rifle upgrade, clear the hunt cooldown so the new tier takes effect immediately
   const purchasedRifleName = res.item.name.toLowerCase();
@@ -509,4 +534,64 @@ export async function seedUniShop(guildId: string) {
   }
 
   seededUniGuilds.add(guildId);
+}
+
+const seededCockGuilds = new Set<string>();
+
+export async function seedCockShop(guildId: string) {
+  if (seededCockGuilds.has(guildId)) return;
+
+  const existing = await prisma.shopItem.findMany({
+    where: { guildId, category: "COCK" },
+    select: { name: true },
+  });
+  const existingNames = new Set(existing.map(e => e.name.toLowerCase()));
+
+  const toCreate = COCK_SHOP_CATALOG.filter(
+    item => !existingNames.has(item.name.toLowerCase())
+  );
+
+  const systemToCreate = COCK_SYSTEM_ITEMS.filter(
+    item => !existingNames.has(item.name.toLowerCase())
+  );
+
+  const allToCreate = [...toCreate, ...systemToCreate];
+  if (allToCreate.length > 0) {
+    await prisma.shopItem.createMany({
+      data: allToCreate.map(item => ({
+        guildId,
+        name: item.name,
+        price: item.price,
+        description: item.description,
+        stock: -1,
+        itemType: item.itemType,
+        effects: item.effects as any,
+        consumable: item.consumable,
+        usable: item.usable,
+        category: "COCK",
+      })),
+    });
+  }
+
+  // Migrate: remove old V1 cock equipment from inventories
+  const validNames = ["Chicken", ...COCK_SHOP_CATALOG.map(i => i.name)];
+  const oldV1Items = await prisma.shopItem.findMany({
+    where: {
+      guildId,
+      category: "COCK",
+      name: { notIn: validNames },
+    },
+  });
+
+  if (oldV1Items.length > 0) {
+    const oldItemIds = oldV1Items.map(i => i.id);
+    await prisma.inventory.deleteMany({
+      where: { shopItemId: { in: oldItemIds } },
+    });
+    await prisma.shopItem.deleteMany({
+      where: { id: { in: oldItemIds } },
+    });
+  }
+
+  seededCockGuilds.add(guildId);
 }
