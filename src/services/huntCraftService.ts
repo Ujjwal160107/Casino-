@@ -315,11 +315,11 @@ async function grantCraftedInventoryItem(userId: string, guildId: string, recipe
 async function upsertActiveEffect(userId: string, effectType: string, value: number, durationMs: number) {
   const expiresAt = new Date(Date.now() + durationMs);
   const existing = await prisma.activeEffect.findFirst({ where: { userId, effectType } });
-  await prisma.activeEffect.upsert({
-    where: { id: existing?.id ?? "new" },
-    create: { userId, effectType, value, expiresAt },
-    update: { value, expiresAt },
-  });
+  if (existing) {
+    await prisma.activeEffect.update({ where: { id: existing.id }, data: { value, expiresAt } });
+  } else {
+    await prisma.activeEffect.create({ data: { userId, effectType, value, expiresAt } });
+  }
   const ttlSeconds = Math.floor(durationMs / 1000);
   await redisService.set(`craft_effect:${userId}:${effectType}`, { value, expiresAt: expiresAt.toISOString() }, ttlSeconds);
 }
@@ -366,7 +366,7 @@ async function applyCraftEffect(userId: string, guildId: string, recipe: HuntCra
       return `${recipe.name} prepared: next successful rob gets +10% loot.`;
     case "hunt_rare_boost":
       await upsertActiveEffect(userId, "hunt_rare_boost", effect.rareBonus, 3 * 24 * 3600 * 1000);
-      await redisService.set(`crafted_hunt_boost:${userId}`, { rareBonus: effect.rareBonus }, 3 * 24 * 3600);
+      await redisService.set(`crafted_hunt_rare_boost:${userId}`, { rareBonus: effect.rareBonus }, 3 * 24 * 3600);
       return `${recipe.name} prepared: next hunt has better Rare odds.`;
     case "cock_defense":
       await upsertActiveEffect(userId, "cock_defense", effect.reduction, 3 * 24 * 3600 * 1000);
@@ -388,7 +388,7 @@ async function applyCraftEffect(userId: string, guildId: string, recipe: HuntCra
       return `${recipe.name} added to inventory. Use it on a target later.`;
     case "hunt_legendary_boost":
       await upsertActiveEffect(userId, "hunt_legendary_boost", effect.legendaryBonus, 3 * 24 * 3600 * 1000);
-      await redisService.set(`crafted_hunt_boost:${userId}`, { legendaryBonus: effect.legendaryBonus }, 3 * 24 * 3600);
+      await redisService.set(`crafted_hunt_legendary_boost:${userId}`, { legendaryBonus: effect.legendaryBonus }, 3 * 24 * 3600);
       return `${recipe.name} prepared: next hunt has better Legendary odds.`;
     case "zoo_boost":
       await upsertActiveEffect(userId, "zoo_boost", effect.multiplier, effect.durationMs);

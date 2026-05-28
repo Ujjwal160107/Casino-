@@ -87,9 +87,8 @@ export async function hunt(
   }
 
   const weights = { ...tier.weights };
-  const rareBoostRow = await getCraftEffect(discordId, `crafted_hunt_boost:${discordId}`, "hunt_rare_boost", (v) => ({ rareBonus: v }));
-  const legendaryBoostRow = await getCraftEffect(discordId, `crafted_hunt_boost:${discordId}`, "hunt_legendary_boost", (v) => ({ legendaryBonus: v }));
-  const craftedBoost = rareBoostRow ?? legendaryBoostRow ?? null;
+  const rareBoostRow = await getCraftEffect(discordId, `crafted_hunt_rare_boost:${discordId}`, "hunt_rare_boost", (v) => ({ rareBonus: v }));
+  const legendaryBoostRow = await getCraftEffect(discordId, `crafted_hunt_legendary_boost:${discordId}`, "hunt_legendary_boost", (v) => ({ legendaryBonus: v }));
   if (rareBoostRow?.rareBonus) {
     weights.Rare = Math.min(0.40, weights.Rare + rareBoostRow.rareBonus);
     weights.Common = Math.max(0, weights.Common - rareBoostRow.rareBonus);
@@ -145,8 +144,11 @@ export async function hunt(
   if (!isTester(discordId)) {
     await redis.set(huntKey, "1", "EX", tier.cooldownSeconds);
   }
-  if (craftedBoost) {
-    await redisService.del(`crafted_hunt_boost:${discordId}`);
+  if (rareBoostRow) {
+    await redisService.del(`crafted_hunt_rare_boost:${discordId}`);
+  }
+  if (legendaryBoostRow) {
+    await redisService.del(`crafted_hunt_legendary_boost:${discordId}`);
   }
 
   const groups: HuntGroup[] = Array.from(grouped.values()).map((e) => ({
