@@ -58,6 +58,10 @@ function buildGlobalRow(ownerId: string): ActionRowBuilder<ButtonBuilder> {
       .setCustomId(`hunt_sell_all:${ownerId}`)
       .setLabel("Sell All")
       .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`inv2_hunt_craft:${ownerId}`)
+      .setLabel("Craft")
+      .setStyle(ButtonStyle.Secondary),
   );
 }
 
