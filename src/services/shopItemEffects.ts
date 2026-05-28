@@ -13,6 +13,8 @@ import {
   applyLossModifiers,
   checkCrownOfGreed,
 } from "./shopBuffs";
+import { isTester } from "../utils/developerAccess";
+import { HUNT_CRAFT_RECIPES, getUnlockedRecipeKeys } from "./huntCraftService";
 
 export interface ShopItemUseResult {
   success: boolean;
@@ -126,6 +128,12 @@ export async function handleSpecialItemUse(
     case "iron_spurs":
     case "guard_vest":
       return handleCockEquip(itemKey, discordId, guildId);
+    case "komodo_venom_flask":
+      return handleKomodoVenomFlask(discordId, targetId, member);
+    case "rare_blueprint":
+      return handleRareBlueprint(discordId);
+    case "legendary_blueprint":
+      return handleLegendaryBlueprint(discordId);
     default:
       return null;
   }
@@ -156,6 +164,26 @@ async function handleThiefGloves(discordId: string, guildId: string): Promise<Sh
   return {
     success: true,
     message: `**Thieves Gloves equipped!** Your robbery earnings are boosted by **25%** for the next 6 attempts (6hr max).`,
+  };
+}
+
+async function handleKomodoVenomFlask(discordId: string, targetId?: string, member?: GuildMember): Promise<ShopItemUseResult> {
+  if (!targetId) {
+    return { success: false, shouldConsume: false, message: "Mention a target: `use Komodo Venom Flask @user`." };
+  }
+  if (targetId === discordId) {
+    return { success: false, shouldConsume: false, message: "You cannot use Komodo Venom Flask on yourself." };
+  }
+
+  const targetMember = member?.guild ? await member.guild.members.fetch(targetId).catch(() => null) : null;
+  if (targetMember?.user.bot) {
+    return { success: false, shouldConsume: false, message: "You cannot use Komodo Venom Flask on bots." };
+  }
+
+  await upsertLuckModifier(targetId, -20, "komodo_venom_flask", 2 * 3600 * 1000);
+  return {
+    success: true,
+    message: `Komodo Venom Flask used. <@${targetId}> loses **20 Luck** for **2 hours**.`,
   };
 }
 
@@ -847,7 +875,7 @@ async function handleTutorPass(discordId: string): Promise<ShopItemUseResult> {
 async function handleScholarshipLetter(discordId: string): Promise<ShopItemUseResult> {
   const cdKey = `scholarship_letter_cd:${discordId}`;
   const cd = await redisService.get<{ used: boolean }>(cdKey);
-  if (cd) {
+  if (cd && !isTester(discordId)) {
     return { success: false, shouldConsume: false, message: `You must wait before submitting another scholarship application.` };
   }
 
@@ -879,7 +907,9 @@ async function handleScholarshipLetter(discordId: string): Promise<ShopItemUseRe
     resultMsg = `**Scholarship Rejected.**\n\nYour application was not accepted this time. Better luck next time.`;
   }
 
-  await redisService.set(cdKey, { used: true }, 3600);
+  if (!isTester(discordId)) {
+    await redisService.set(cdKey, { used: true }, 3600);
+  }
   return { success: true, message: resultMsg };
 }
 
@@ -1006,7 +1036,7 @@ async function handleTrainingWhistle(discordId: string, guildId: string): Promis
 async function handlePhoenixSerum(discordId: string, guildId: string): Promise<ShopItemUseResult> {
   const cdKey = `phoenix_serum_cd:${discordId}`;
   const onCooldown = await redisService.get<{ until: number }>(cdKey);
-  if (onCooldown) {
+  if (onCooldown && !isTester(discordId)) {
     const expiresAt = Math.floor(onCooldown.until / 1000);
     return { success: false, shouldConsume: false, message: `Phoenix Serum on cooldown! Available <t:${expiresAt}:R>.` };
   }
@@ -1034,7 +1064,9 @@ async function handlePhoenixSerum(discordId: string, guildId: string): Promise<S
   await prisma.inventory.update({ where: { id: chickenInv.id }, data: { meta } });
 
   const until = Date.now() + 86_400_000;
-  await redisService.set(cdKey, { until }, 86400);
+  if (!isTester(discordId)) {
+    await redisService.set(cdKey, { until }, 86400);
+  }
 
   return { success: true, message: `**Phoenix Serum activated!**\n${effects.map(e => `✅ ${e}`).join("\n")}` };
 }
@@ -1067,5 +1099,48 @@ async function handleCockEquip(itemKey: string, discordId: string, guildId: stri
     success: true,
     shouldConsume: false,
     message: `${Mascot.Emotes.Accept} **${equipInfo.name}** equipped to **${equipInfo.slot}** slot!\nReplaced: ${oldItem}`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Blueprint Handlers
+// ---------------------------------------------------------------------------
+
+async function handleRareBlueprint(discordId: string): Promise<ShopItemUseResult> {
+  return handleBlueprintUnlock(discordId, "Rare");
+}
+
+async function handleLegendaryBlueprint(discordId: string): Promise<ShopItemUseResult> {
+  return handleBlueprintUnlock(discordId, "Legendary");
+}
+
+async function handleBlueprintUnlock(
+  discordId: string,
+  tier: "Rare" | "Legendary",
+): Promise<ShopItemUseResult> {
+  const unlocked = await getUnlockedRecipeKeys(discordId);
+  const available = HUNT_CRAFT_RECIPES.filter(
+    (r) => r.tier === tier && !unlocked.has(r.key),
+  );
+
+  if (available.length === 0) {
+    return {
+      success: false,
+      message: `You've already unlocked all ${tier} recipes! The blueprint has been refunded.`,
+      shouldConsume: false,
+    };
+  }
+
+  const recipe = available[Math.floor(Math.random() * available.length)];
+  await prisma.userCraftUnlock.upsert({
+    where: { userId_recipeKey: { userId: discordId, recipeKey: recipe.key } },
+    create: { userId: discordId, recipeKey: recipe.key },
+    update: {},
+  });
+
+  return {
+    success: true,
+    message: `${Mascot.Emotes.Accept} Unlocked: **${recipe.name}** — view it with \`!hunt craft\``,
+    shouldConsume: true,
   };
 }
