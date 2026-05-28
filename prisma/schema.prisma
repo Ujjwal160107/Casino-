@@ -89,6 +89,8 @@ model User {
   lastDivorcedAt DateTime?
   marriagesAsSpouse1 Marriage[] @relation("Spouse1")
   marriagesAsSpouse2 Marriage[] @relation("Spouse2")
+  marriageVaultRequestsMade MarriageVaultRequest[] @relation("MarriageVaultRequester")
+  marriageVaultRequestsReceived MarriageVaultRequest[] @relation("MarriageVaultSpouse")
   
   dailyQuests DailyQuest[]
 
@@ -574,10 +576,44 @@ model Marriage {
   
   affection Int      @default(0)
   jointBalance Float @default(0)
+
+  lastAffectionActionAt DateTime?
+  lastHugAt             DateTime?
+  lastKissAt            DateTime?
+  lastMakeLoveAt        DateTime?
+  lastDateAt            DateTime?
+  lastChaosAt           DateTime?
+  decayWarnings         Int       @default(0)
+  lastDecayAt           DateTime?
+  lastDrama             String?
+
+  vaultRequests MarriageVaultRequest[]
   
   @@unique([spouse1Id]) // User can only be spouse1 once
   @@unique([spouse2Id]) // User can only be spouse2 once
   // Application logic must enforce that a user is not BOTH spouse1 and spouse2 in different records
+}
+
+model MarriageVaultRequest {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  marriage   Marriage @relation(fields: [marriageId], references: [id], onDelete: Cascade)
+  marriageId String   @db.ObjectId
+
+  requester   User   @relation("MarriageVaultRequester", fields: [requesterId], references: [discordId])
+  requesterId String
+
+  spouse   User   @relation("MarriageVaultSpouse", fields: [spouseId], references: [discordId])
+  spouseId String
+
+  amount     Float
+  status     String   @default("PENDING")
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  resolvedAt DateTime?
+
+  @@index([marriageId, status])
+  @@index([requesterId])
+  @@index([spouseId])
 }
 
 model DailyQuest {
@@ -611,5 +647,41 @@ model CaughtAnimal {
   user           User     @relation(fields: [discordId], references: [discordId])
 
   @@index([discordId])
+}
+
+model HuntPartInventory {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String
+  partKey   String
+  amount    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, partKey])
+  @@index([userId])
+}
+
+model HuntPartListing {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  sellerId   String
+  partKey    String
+  amount     Int
+  totalPrice Float
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([sellerId])
+  @@index([partKey])
+  @@index([expiresAt])
+}
+
+model UserCraftUnlock {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String
+  recipeKey   String
+  unlockedAt  DateTime @default(now())
+
+  @@unique([userId, recipeKey])
+  @@index([userId])
 }
 
