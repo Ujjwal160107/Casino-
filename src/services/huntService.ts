@@ -146,9 +146,11 @@ export async function hunt(
   }
   if (rareBoostRow) {
     await redisService.del(`crafted_hunt_rare_boost:${discordId}`);
+    await prisma.activeEffect.deleteMany({ where: { userId: discordId, effectType: "hunt_rare_boost" } });
   }
   if (legendaryBoostRow) {
     await redisService.del(`crafted_hunt_legendary_boost:${discordId}`);
+    await prisma.activeEffect.deleteMany({ where: { userId: discordId, effectType: "hunt_legendary_boost" } });
   }
 
   const groups: HuntGroup[] = Array.from(grouped.values()).map((e) => ({
