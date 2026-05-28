@@ -18,6 +18,7 @@ import { fmtCurrency } from "../../utils/format";
 import { errorEmbed } from "../../utils/embed";
 import { AnimalEmojis } from "../../config/branding";
 import prisma from "../../utils/prisma";
+import { buildHuntCraftPayload } from "../../services/huntCraftService";
 
 function buildGroupRow(
   group: HuntGroup,
@@ -33,6 +34,10 @@ function buildGroupRow(
       .setCustomId(`hunt_market:${group.animalKey}:${ownerId}`)
       .setLabel("Black Market")
       .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`hunt_store_parts:${group.animalKey}:${ownerId}`)
+      .setLabel("Store Parts")
+      .setStyle(ButtonStyle.Secondary),
   );
 
   if (hasZoo) {
@@ -47,11 +52,24 @@ function buildGroupRow(
   return row;
 }
 
-export async function handleHunt(message: Message, _args: string[]) {
+function buildGlobalRow(ownerId: string): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`hunt_sell_all:${ownerId}`)
+      .setLabel("Sell All")
+      .setStyle(ButtonStyle.Danger),
+  );
+}
+
+export async function handleHunt(message: Message, args: string[]) {
   const guildId = message.guildId!;
   const ownerId = message.author.id;
 
   await seedHuntShop(guildId);
+
+  if ((args[0] ?? "").toLowerCase() === "craft") {
+    return message.reply(await buildHuntCraftPayload(ownerId, ownerId, 1));
+  }
 
   let result: Awaited<ReturnType<typeof hunt>>;
   try {
@@ -72,7 +90,7 @@ export async function handleHunt(message: Message, _args: string[]) {
     return message.reply({ embeds: [errorEmbed(message.author, "Error", "Something went wrong while hunting.")] });
   }
 
-  const { groups, rifleName } = result;
+  const { groups, rifleName, newlyUnlockedRecipes } = result;
   const totalCaught = groups.reduce((sum, g) => sum + g.count, 0);
 
   const hasZoo = !!(await prisma.ownedProperty.findFirst({
@@ -122,6 +140,17 @@ export async function handleHunt(message: Message, _args: string[]) {
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(`-# Next hunt <t:${readyAt}:R>`)
   );
+  if (newlyUnlockedRecipes.length > 0) {
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false)
+    );
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        newlyUnlockedRecipes.map((name) => `-# New recipe discovered: **${name}**!`).join("\n")
+      )
+    );
+  }
+  container.addActionRowComponents(buildGlobalRow(ownerId));
 
   return message.reply({
     components: [container],

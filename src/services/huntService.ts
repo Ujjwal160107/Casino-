@@ -16,6 +16,8 @@ import {
   rollRarity,
   getAnimalsByRarity,
 } from "../utils/animalCatalog";
+import { isTester } from "../utils/developerAccess";
+import { unlockCommonRecipesForAnimal } from "./huntCraftService";
 
 export interface CaughtAnimalWithDef {
   id: string;
@@ -50,7 +52,7 @@ export async function hunt(
   discordId: string,
   username: string,
   guildId: string
-): Promise<{ groups: HuntGroup[]; rifleName: string }> {
+): Promise<{ groups: HuntGroup[]; rifleName: string; newlyUnlockedRecipes: string[] }> {
   await ensureUserAndWallet(discordId, guildId, username);
 
   const inventory = await prisma.inventory.findMany({
@@ -78,13 +80,22 @@ export async function hunt(
   const redis = redisService.getInstance();
   const ttl = await redis.ttl(huntKey);
 
-  if (ttl > 0) {
+  if (ttl > 0 && !isTester(discordId)) {
     const err = new Error("COOLDOWN");
     (err as any).ttl = ttl;
     throw err;
   }
 
-  const { weights } = tier;
+  const weights = { ...tier.weights };
+  const craftedBoost = await redisService.get<{ rareBonus?: number; legendaryBonus?: number }>(`crafted_hunt_boost:${discordId}`);
+  if (craftedBoost?.rareBonus) {
+    weights.Rare = Math.min(0.40, weights.Rare + craftedBoost.rareBonus);
+    weights.Common = Math.max(0, weights.Common - craftedBoost.rareBonus);
+  }
+  if (craftedBoost?.legendaryBonus) {
+    weights.Legendary = Math.min(0.20, weights.Legendary + craftedBoost.legendaryBonus);
+    weights.Common = Math.max(0, weights.Common - craftedBoost.legendaryBonus);
+  }
 
   // Roll a number of distinct rarity outcomes based on rifle tier
   // Each rarity outcome produces a random species + OWO-style quantity
@@ -122,7 +133,19 @@ export async function hunt(
     entry.ids = created.map((c) => c.id);
   }
 
-  await redis.set(huntKey, "1", "EX", tier.cooldownSeconds);
+  // Unlock Common/Uncommon recipes for each species caught
+  const allNewlyUnlocked: string[] = [];
+  for (const [animalKey] of grouped) {
+    const names = await unlockCommonRecipesForAnimal(discordId, animalKey);
+    allNewlyUnlocked.push(...names);
+  }
+
+  if (!isTester(discordId)) {
+    await redis.set(huntKey, "1", "EX", tier.cooldownSeconds);
+  }
+  if (craftedBoost) {
+    await redisService.del(`crafted_hunt_boost:${discordId}`);
+  }
 
   const groups: HuntGroup[] = Array.from(grouped.values()).map((e) => ({
     animalKey: e.def.key,
@@ -131,7 +154,7 @@ export async function hunt(
     ids: e.ids,
   }));
 
-  return { groups, rifleName };
+  return { groups, rifleName, newlyUnlockedRecipes: allNewlyUnlocked };
 }
 
 // Sell ALL units of a species from non-zoo inventory
@@ -152,6 +175,30 @@ export async function sellAnimalsByKey(
   await addBalance(discordId, username, earned, "animal_sell", { animalKey, count: animals.length });
   await prisma.caughtAnimal.deleteMany({ where: { discordId, animalKey, inZoo: false } });
   return { earned, count: animals.length };
+}
+
+export async function sellAllInventoryAnimals(
+  discordId: string,
+  username: string
+): Promise<{ earned: number; count: number; summary: Record<string, number> }> {
+  const animals = await prisma.caughtAnimal.findMany({
+    where: { discordId, inZoo: false },
+  });
+  if (animals.length === 0) throw new Error("No hunted animals in your inventory.");
+
+  let earned = 0;
+  const summary: Record<string, number> = {};
+  for (const animal of animals) {
+    const def = getAnimal(animal.animalKey);
+    if (!def) continue;
+    earned += def.sellValue;
+    summary[def.name] = (summary[def.name] ?? 0) + 1;
+  }
+
+  if (earned <= 0) throw new Error("No sellable hunted animals found.");
+  await addBalance(discordId, username, earned, "animal_sell_all", { count: animals.length, summary });
+  await prisma.caughtAnimal.deleteMany({ where: { discordId, inZoo: false } });
+  return { earned, count: animals.length, summary };
 }
 
 // Keep backward-compat single-id sell (used by legacy paths)
@@ -374,9 +421,9 @@ export async function claimZooIncome(
       .then((a) => a?.caughtAt ?? new Date()));
 
   const hoursSinceLastClaim = Math.floor((Date.now() - resolvedClaim.getTime()) / 3_600_000);
-  const cappedHours = Math.min(hoursSinceLastClaim, 24);
+  const cappedHours = isTester(discordId) ? 24 : Math.min(hoursSinceLastClaim, 24);
 
-  if (cappedHours < 1) {
+  if (cappedHours < 1 && !isTester(discordId)) {
     const nextMs = resolvedClaim.getTime() + 3_600_000;
     const minutesLeft = Math.ceil((nextMs - Date.now()) / 60_000);
     const err = new Error(`Come back in **${minutesLeft} minute${minutesLeft !== 1 ? "s" : ""}** to collect income.`);
@@ -384,7 +431,8 @@ export async function claimZooIncome(
     throw err;
   }
 
-  const totalIncome = Math.floor(ratePerHour * cappedHours);
+  const zooBoost = await redisService.get<{ multiplier: number }>(`crafted_zoo_boost:${discordId}`);
+  const totalIncome = Math.floor(ratePerHour * cappedHours * (zooBoost?.multiplier ?? 1));
   await addBalance(discordId, username, totalIncome, "zoo_income", {
     hours: cappedHours,
     slotCount: slots.length,
@@ -413,7 +461,8 @@ export async function getZooStatus(
   const zooProps = ownedZoos.filter((op) => Object.keys(ZOO_CAPACITY).includes(op.property.key));
   const maxSlots = zooProps.reduce((sum, op) => sum + (ZOO_CAPACITY[op.property.key] ?? 0), 0);
 
-  const ratePerHour = slots.reduce((sum, s) => sum + s.incomePerHour, 0);
+  const zooBoost = await redisService.get<{ multiplier: number }>(`crafted_zoo_boost:${discordId}`);
+  const ratePerHour = Math.floor(slots.reduce((sum, s) => sum + s.incomePerHour, 0) * (zooBoost?.multiplier ?? 1));
 
   const user = await prisma.user.findUnique({ where: { discordId } });
   const lastClaim = user?.lastZooClaim ?? null;
