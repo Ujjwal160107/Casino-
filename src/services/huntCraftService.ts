@@ -258,7 +258,14 @@ function getRecipeScore(recipe: HuntCraftRecipe, parts: Map<string, number>, coi
   };
 }
 
-export async function getSortedCraftRecipes(userId: string) {
+function getAnimalHintForRecipe(recipe: HuntCraftRecipe): string {
+  const firstPartKey = Object.keys(recipe.parts)[0];
+  if (!firstPartKey) return "Hunt animals";
+  const animal = ANIMAL_CATALOG.find((a) => firstPartKey.startsWith(`${a.key}_`));
+  return animal ? `Catch a ${animal.name}` : "Hunt animals";
+}
+
+export async function getSortedCraftRecipes(userId: string, unlockedKeys: Set<string>) {
   const [parts, wallet] = await Promise.all([
     getHuntPartMap(userId),
     prisma.wallet.findUnique({ where: { userId } }),
@@ -268,6 +275,9 @@ export async function getSortedCraftRecipes(userId: string) {
   return HUNT_CRAFT_RECIPES
     .map((recipe) => ({ recipe, score: getRecipeScore(recipe, parts, coins), parts, coins }))
     .sort((a, b) => {
+      const aUnlocked = unlockedKeys.has(a.recipe.key);
+      const bUnlocked = unlockedKeys.has(b.recipe.key);
+      if (aUnlocked !== bUnlocked) return aUnlocked ? -1 : 1;
       if (a.score.craftable !== b.score.craftable) return a.score.craftable ? -1 : 1;
       if (a.score.missingKinds !== b.score.missingKinds) return a.score.missingKinds - b.score.missingKinds;
       if (a.score.missingTotal !== b.score.missingTotal) return a.score.missingTotal - b.score.missingTotal;
@@ -473,7 +483,8 @@ function recipeRequirementLines(recipe: HuntCraftRecipe, parts: Map<string, numb
 }
 
 export async function buildHuntCraftPayload(userId: string, ownerId: string, page = 1, disabled = false) {
-  const rows = await getSortedCraftRecipes(userId);
+  const unlockedKeys = await getUnlockedRecipeKeys(userId);
+  const rows = await getSortedCraftRecipes(userId, unlockedKeys);
   const totalPages = Math.max(1, Math.ceil(rows.length / CRAFTS_PER_PAGE));
   const safePage = Math.min(Math.max(page, 1), totalPages);
   const pageRows = rows.slice((safePage - 1) * CRAFTS_PER_PAGE, safePage * CRAFTS_PER_PAGE);
@@ -481,31 +492,77 @@ export async function buildHuntCraftPayload(userId: string, ownerId: string, pag
   const container = new ContainerBuilder()
     .setAccentColor(CRAFT_ACCENT)
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Gun ?? ""} Hunt Crafting\n-# Recipes are sorted by what you can craft right now. Page ${safePage}/${totalPages}`),
+      new TextDisplayBuilder().setContent(`## Hunt Crafting\n-# Recipes sorted by availability. Page ${safePage}/${totalPages}`),
     )
     .addSeparatorComponents(separator(true));
 
+  // Tutorial: show if user has zero unlocked recipes and hasn't seen it
+  const tutorialKey = `craft_tutorial_seen:${userId}`;
+  const tutorialSeen = await redisService.get<boolean>(tutorialKey);
+  if (!tutorialSeen && unlockedKeys.size === 0) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        "-# Hunt animals to discover Common and Uncommon recipes on first catch.\n" +
+        "-# Buy Rare and Legendary Blueprints from the hunt shop to unlock higher-tier recipes.\n" +
+        "-# Each recipe shows the parts and amounts needed — store parts with `Store Parts` during a hunt.",
+      ),
+    );
+    container.addSeparatorComponents(separator(true));
+    await redisService.set(tutorialKey, true, 365 * 24 * 3600); // 1 year TTL
+  }
+
   for (const row of pageRows) {
     const { recipe, score, parts, coins } = row;
+    const isUnlocked = unlockedKeys.has(recipe.key);
     const coinOk = coins >= recipe.coinCost;
-    container.addSectionComponents(
-      new SectionBuilder()
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(`### ${recipe.name}\n-# ${recipe.tier} recipe | ${fmtCurrency(recipe.coinCost)}`),
-          new TextDisplayBuilder().setContent(
-            `${recipe.description}\n` +
-            `${coinOk ? Mascot.Emotes.Accept : Mascot.Emotes.Decline} Coins ${fmtCurrency(Math.min(coins, recipe.coinCost))}/${fmtCurrency(recipe.coinCost)}\n` +
-            recipeRequirementLines(recipe, parts),
+
+    if (!isUnlocked) {
+      const isCommonOrUncommon = recipe.tier === "Common" || recipe.tier === "Uncommon";
+      const hint = isCommonOrUncommon
+        ? getAnimalHintForRecipe(recipe)
+        : recipe.tier === "Rare"
+        ? "Buy a Rare Blueprint"
+        : "Buy a Legendary Blueprint";
+
+      const displayName = isCommonOrUncommon ? "???" : recipe.name;
+      const lockLine = isCommonOrUncommon
+        ? `-# ${hint} to discover this recipe`
+        : `-# ${hint} to unlock this recipe`;
+
+      container.addSectionComponents(
+        new SectionBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`### ${displayName}\n-# ${recipe.tier} recipe`),
+            new TextDisplayBuilder().setContent(lockLine),
+          )
+          .setButtonAccessory(
+            new ButtonBuilder()
+              .setCustomId(`hunt_craft_make:${recipe.key}:${ownerId}`)
+              .setLabel("Locked")
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(true),
           ),
-        )
-        .setButtonAccessory(
-          new ButtonBuilder()
-            .setCustomId(`hunt_craft_make:${recipe.key}:${ownerId}`)
-            .setLabel(score.craftable ? "Craft" : "Missing")
-            .setStyle(score.craftable ? ButtonStyle.Success : ButtonStyle.Secondary)
-            .setDisabled(disabled || !score.craftable),
-        ),
-    );
+      );
+    } else {
+      container.addSectionComponents(
+        new SectionBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`### ${recipe.name}\n-# ${recipe.tier} recipe | ${fmtCurrency(recipe.coinCost)}`),
+            new TextDisplayBuilder().setContent(
+              `${recipe.description}\n` +
+              `${coinOk ? Mascot.Emotes.Accept : Mascot.Emotes.Decline} Coins ${fmtCurrency(Math.min(coins, recipe.coinCost))}/${fmtCurrency(recipe.coinCost)}\n` +
+              recipeRequirementLines(recipe, parts),
+            ),
+          )
+          .setButtonAccessory(
+            new ButtonBuilder()
+              .setCustomId(`hunt_craft_make:${recipe.key}:${ownerId}`)
+              .setLabel(score.craftable ? "Craft" : "Missing")
+              .setStyle(score.craftable ? ButtonStyle.Success : ButtonStyle.Secondary)
+              .setDisabled(disabled || !score.craftable),
+          ),
+      );
+    }
     container.addSeparatorComponents(separator(false));
   }
 
