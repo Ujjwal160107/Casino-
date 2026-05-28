@@ -17,7 +17,7 @@ import {
   getAnimalsByRarity,
 } from "../utils/animalCatalog";
 import { isTester } from "../utils/developerAccess";
-import { unlockCommonRecipesForAnimal } from "./huntCraftService";
+import { getCraftEffect, unlockCommonRecipesForAnimal } from "./huntCraftService";
 
 export interface CaughtAnimalWithDef {
   id: string;
@@ -87,14 +87,16 @@ export async function hunt(
   }
 
   const weights = { ...tier.weights };
-  const craftedBoost = await redisService.get<{ rareBonus?: number; legendaryBonus?: number }>(`crafted_hunt_boost:${discordId}`);
-  if (craftedBoost?.rareBonus) {
-    weights.Rare = Math.min(0.40, weights.Rare + craftedBoost.rareBonus);
-    weights.Common = Math.max(0, weights.Common - craftedBoost.rareBonus);
+  const rareBoostRow = await getCraftEffect(discordId, `crafted_hunt_boost:${discordId}`, "hunt_rare_boost", (v) => ({ rareBonus: v }));
+  const legendaryBoostRow = await getCraftEffect(discordId, `crafted_hunt_boost:${discordId}`, "hunt_legendary_boost", (v) => ({ legendaryBonus: v }));
+  const craftedBoost = rareBoostRow ?? legendaryBoostRow ?? null;
+  if (rareBoostRow?.rareBonus) {
+    weights.Rare = Math.min(0.40, weights.Rare + rareBoostRow.rareBonus);
+    weights.Common = Math.max(0, weights.Common - rareBoostRow.rareBonus);
   }
-  if (craftedBoost?.legendaryBonus) {
-    weights.Legendary = Math.min(0.20, weights.Legendary + craftedBoost.legendaryBonus);
-    weights.Common = Math.max(0, weights.Common - craftedBoost.legendaryBonus);
+  if (legendaryBoostRow?.legendaryBonus) {
+    weights.Legendary = Math.min(0.20, weights.Legendary + legendaryBoostRow.legendaryBonus);
+    weights.Common = Math.max(0, weights.Common - legendaryBoostRow.legendaryBonus);
   }
 
   // Roll a number of distinct rarity outcomes based on rifle tier
@@ -431,7 +433,7 @@ export async function claimZooIncome(
     throw err;
   }
 
-  const zooBoost = await redisService.get<{ multiplier: number }>(`crafted_zoo_boost:${discordId}`);
+  const zooBoost = await getCraftEffect(discordId, `crafted_zoo_boost:${discordId}`, "zoo_boost", (v) => ({ multiplier: v }));
   const totalIncome = Math.floor(ratePerHour * cappedHours * (zooBoost?.multiplier ?? 1));
   await addBalance(discordId, username, totalIncome, "zoo_income", {
     hours: cappedHours,
@@ -461,7 +463,7 @@ export async function getZooStatus(
   const zooProps = ownedZoos.filter((op) => Object.keys(ZOO_CAPACITY).includes(op.property.key));
   const maxSlots = zooProps.reduce((sum, op) => sum + (ZOO_CAPACITY[op.property.key] ?? 0), 0);
 
-  const zooBoost = await redisService.get<{ multiplier: number }>(`crafted_zoo_boost:${discordId}`);
+  const zooBoost = await getCraftEffect(discordId, `crafted_zoo_boost:${discordId}`, "zoo_boost", (v) => ({ multiplier: v }));
   const ratePerHour = Math.floor(slots.reduce((sum, s) => sum + s.incomePerHour, 0) * (zooBoost?.multiplier ?? 1));
 
   const user = await prisma.user.findUnique({ where: { discordId } });

@@ -312,33 +312,72 @@ async function grantCraftedInventoryItem(userId: string, guildId: string, recipe
   });
 }
 
+async function upsertActiveEffect(userId: string, effectType: string, value: number, durationMs: number) {
+  const expiresAt = new Date(Date.now() + durationMs);
+  const existing = await prisma.activeEffect.findFirst({ where: { userId, effectType } });
+  await prisma.activeEffect.upsert({
+    where: { id: existing?.id ?? "new" },
+    create: { userId, effectType, value, expiresAt },
+    update: { value, expiresAt },
+  });
+  const ttlSeconds = Math.floor(durationMs / 1000);
+  await redisService.set(`craft_effect:${userId}:${effectType}`, { value, expiresAt: expiresAt.toISOString() }, ttlSeconds);
+}
+
+export async function getCraftEffect<T extends object>(
+  userId: string,
+  redisKey: string,
+  effectType: string,
+  builder: (value: number) => T,
+): Promise<T | null> {
+  const cached = await redisService.get<T>(redisKey);
+  if (cached) return cached;
+
+  const row = await prisma.activeEffect.findFirst({
+    where: { userId, effectType, expiresAt: { gt: new Date() } },
+  });
+  if (!row) return null;
+
+  const result = builder(row.value);
+  const ttlMs = row.expiresAt ? row.expiresAt.getTime() - Date.now() : 0;
+  if (ttlMs > 0) await redisService.set(redisKey, result, Math.floor(ttlMs / 1000));
+  return result;
+}
+
 async function applyCraftEffect(userId: string, guildId: string, recipe: HuntCraftRecipe) {
-  const ttlSeconds = (ms: number) => Math.floor(ms / 1000);
   const effect = recipe.effect;
 
   switch (effect.type) {
     case "luck":
       await upsertLuckModifier(userId, effect.value, effect.source, effect.durationMs);
+      await upsertActiveEffect(userId, "luck", effect.value, effect.durationMs);
       return `${recipe.name} activated: Luck +${effect.value}.`;
     case "study_xp":
+      await upsertActiveEffect(userId, "study_xp", effect.bonusXp, 2 * 24 * 3600 * 1000);
       await redisService.set(`crafted_study_xp:${userId}`, { bonusXp: effect.bonusXp }, 2 * 24 * 3600);
       return `${recipe.name} prepared: next successful study gets +${effect.bonusXp} XP.`;
     case "crime_fine_guard":
+      await upsertActiveEffect(userId, "crime_fine_guard", effect.chance, 3 * 24 * 3600 * 1000);
       await redisService.set(`crafted_crime_fine_guard:${userId}`, { chance: effect.chance }, 3 * 24 * 3600);
       return `${recipe.name} prepared: next crime failure may soften the fine.`;
     case "rob_boost":
+      await upsertActiveEffect(userId, "rob_boost", effect.multiplier, 3 * 24 * 3600 * 1000);
       await redisService.set(`crafted_rob_boost:${userId}`, { multiplier: effect.multiplier }, 3 * 24 * 3600);
       return `${recipe.name} prepared: next successful rob gets +10% loot.`;
     case "hunt_rare_boost":
+      await upsertActiveEffect(userId, "hunt_rare_boost", effect.rareBonus, 3 * 24 * 3600 * 1000);
       await redisService.set(`crafted_hunt_boost:${userId}`, { rareBonus: effect.rareBonus }, 3 * 24 * 3600);
       return `${recipe.name} prepared: next hunt has better Rare odds.`;
     case "cock_defense":
+      await upsertActiveEffect(userId, "cock_defense", effect.reduction, 3 * 24 * 3600 * 1000);
       await redisService.set(`crafted_cock_defense:${userId}`, { reduction: effect.reduction }, 3 * 24 * 3600);
       return `${recipe.name} prepared: next cockfight has reduced incoming damage.`;
     case "rob_defense":
-      await redisService.set(`crafted_rob_defense:${userId}`, { active: true }, ttlSeconds(effect.durationMs));
+      await upsertActiveEffect(userId, "rob_defense", 1, effect.durationMs);
+      await redisService.set(`crafted_rob_defense:${userId}`, { active: true }, Math.floor(effect.durationMs / 1000));
       return `${recipe.name} active: blocks one robbery attempt for 24 hours.`;
     case "crime_boost":
+      await upsertActiveEffect(userId, "crime_boost", effect.successBonus, 3 * 24 * 3600 * 1000);
       await redisService.set(`crafted_crime_boost:${userId}`, { successBonus: effect.successBonus }, 3 * 24 * 3600);
       return `${recipe.name} prepared: next crime attempt gets +7% success.`;
     case "cosmetic":
@@ -348,10 +387,12 @@ async function applyCraftEffect(userId: string, guildId: string, recipe: HuntCra
       await grantCraftedInventoryItem(userId, guildId, recipe, true);
       return `${recipe.name} added to inventory. Use it on a target later.`;
     case "hunt_legendary_boost":
+      await upsertActiveEffect(userId, "hunt_legendary_boost", effect.legendaryBonus, 3 * 24 * 3600 * 1000);
       await redisService.set(`crafted_hunt_boost:${userId}`, { legendaryBonus: effect.legendaryBonus }, 3 * 24 * 3600);
       return `${recipe.name} prepared: next hunt has better Legendary odds.`;
     case "zoo_boost":
-      await redisService.set(`crafted_zoo_boost:${userId}`, { multiplier: effect.multiplier }, ttlSeconds(effect.durationMs));
+      await upsertActiveEffect(userId, "zoo_boost", effect.multiplier, effect.durationMs);
+      await redisService.set(`crafted_zoo_boost:${userId}`, { multiplier: effect.multiplier }, Math.floor(effect.durationMs / 1000));
       return `${recipe.name} active: zoo income +10% for 7 days.`;
     default:
       return `${recipe.name} crafted.`;
