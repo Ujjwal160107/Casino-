@@ -84,13 +84,18 @@ export async function buyStock(discordId: string, symbol: string, quantity: numb
 
   const user = await prisma.user.findUnique({ where: { discordId }, include: { wallet: true } });
   if (!user) throw new Error("User not found. Try chatting first to register.");
+  // Fast-fail pre-check; the atomic conditional update inside runWithRetry is the authoritative guard.
   if (!user.wallet || user.wallet.balance < fill.total) throw new Error(`Insufficient funds. Cost (incl. slippage): ${fill.total}`);
 
   return runWithRetry(async () => {
     let portfolio = await prisma.portfolio.findUnique({ where: { userId: user.discordId } });
     if (!portfolio) portfolio = await prisma.portfolio.create({ data: { userId: user.discordId } });
 
-    await prisma.wallet.update({ where: { id: user.wallet!.id }, data: { balance: { decrement: fill.total } } });
+    const res = await prisma.wallet.updateMany({
+      where: { id: user.wallet!.id, balance: { gte: fill.total } },
+      data: { balance: { decrement: fill.total } },
+    });
+    if (res.count === 0) throw new Error(`Insufficient funds. Cost (incl. slippage): ${fill.total}`);
 
     const holding = await prisma.stockHolding.findUnique({
       where: { portfolioId_stockId: { portfolioId: portfolio.id, stockId: stock.id } },
@@ -118,6 +123,7 @@ export async function sellStock(discordId: string, symbol: string, quantity: num
 
   const stock = await getStock(symbol);
   if (!stock) throw new Error(`Stock **${symbol.toUpperCase()}** not found.`);
+  if (stock.status === "DELISTED") throw new Error(`**${stock.symbol}** has been delisted — it can no longer be traded.`);
 
   const user = await prisma.user.findUnique({ where: { discordId }, include: { wallet: true } });
   if (!user || !user.wallet) throw new Error("User not found.");
@@ -125,14 +131,14 @@ export async function sellStock(discordId: string, symbol: string, quantity: num
   const portfolio = await prisma.portfolio.findUnique({ where: { userId: user.discordId } });
   if (!portfolio) throw new Error("You don't own any stocks.");
 
-  const holding = await prisma.stockHolding.findUnique({
-    where: { portfolioId_stockId: { portfolioId: portfolio.id, stockId: stock.id } },
-  });
-  if (!holding || holding.quantity < quantity) throw new Error(`You don't have enough shares (${holding?.quantity || 0}).`);
-
   const fill = computeFill(stock.currentPrice, quantity, stock.liquidity, "SELL");
 
   return runWithRetry(async () => {
+    const holding = await prisma.stockHolding.findUnique({
+      where: { portfolioId_stockId: { portfolioId: portfolio.id, stockId: stock.id } },
+    });
+    if (!holding || holding.quantity < quantity) throw new Error(`You don't have enough shares (${holding?.quantity || 0}).`);
+
     await prisma.wallet.update({ where: { id: user.wallet!.id }, data: { balance: { increment: fill.total } } });
 
     if (holding.quantity === quantity) {
@@ -190,9 +196,13 @@ async function processStockTick(stock: NonNullable<StockRow>, tick: number): Pro
     busy = true;
     if (ev.durationTicks > 1) {
       // Multi-tick trend (SLUMP): magnitudePct is per-tick. Apply first tick now.
-      trendPerTick = ev.magnitudePct;
-      trendTicksLeft = ev.durationTicks - 1;
-      pendingPct += ev.magnitudePct;
+      if (trendTicksLeft === 0) {
+        trendPerTick = ev.magnitudePct;
+        trendTicksLeft = ev.durationTicks - 1;
+        pendingPct += ev.magnitudePct;
+      } else {
+        pendingPct += ev.magnitudePct; // already trending: apply one-off, don't overwrite
+      }
     } else {
       pendingPct += ev.magnitudePct;
     }
@@ -259,14 +269,17 @@ async function liquidateAndRelist(stock: NonNullable<StockRow>): Promise<void> {
   const holdings = await prisma.stockHolding.findMany({ where: { stockId: stock.id } });
   for (const h of holdings) {
     const pf = await prisma.portfolio.findUnique({ where: { id: h.portfolioId } });
-    if (pf) {
-      const wallet = await prisma.wallet.findUnique({ where: { userId: pf.userId } });
-      if (wallet) {
-        const payout = Math.max(1, Math.round(stock.currentPrice)) * h.quantity;
-        await runWithRetry(() => prisma.wallet.update({ where: { id: wallet.id }, data: { balance: { increment: payout } } }));
-      }
+    const wallet = pf ? await prisma.wallet.findUnique({ where: { userId: pf.userId } }) : null;
+    if (wallet) {
+      const payout = Math.max(1, Math.round(stock.currentPrice)) * h.quantity;
+      // Atomic: pay out the holder and remove the holding together so a crash can't do one without the other.
+      await runWithRetry(() => prisma.$transaction([
+        prisma.wallet.update({ where: { id: wallet.id }, data: { balance: { increment: payout } } }),
+        prisma.stockHolding.delete({ where: { id: h.id } }),
+      ]));
+    } else {
+      await prisma.stockHolding.delete({ where: { id: h.id } });
     }
-    await prisma.stockHolding.delete({ where: { id: h.id } });
   }
   await prisma.stockEvent.deleteMany({ where: { stockId: stock.id } });
   await prisma.stock.delete({ where: { id: stock.id } });
