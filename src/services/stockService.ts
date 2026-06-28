@@ -87,17 +87,17 @@ export async function buyStock(discordId: string, symbol: string, quantity: numb
   // Fast-fail pre-check; the atomic conditional update inside runWithRetry is the authoritative guard.
   if (!user.wallet || user.wallet.balance < fill.total) throw new Error(`Insufficient funds. Cost (incl. slippage): ${fill.total}`);
 
-  return runWithRetry(async () => {
-    let portfolio = await prisma.portfolio.findUnique({ where: { userId: user.discordId } });
-    if (!portfolio) portfolio = await prisma.portfolio.create({ data: { userId: user.discordId } });
+  return runWithRetry(() => prisma.$transaction(async (tx) => {
+    let portfolio = await tx.portfolio.findUnique({ where: { userId: user.discordId } });
+    if (!portfolio) portfolio = await tx.portfolio.create({ data: { userId: user.discordId } });
 
-    const res = await prisma.wallet.updateMany({
+    const res = await tx.wallet.updateMany({
       where: { id: user.wallet!.id, balance: { gte: fill.total } },
       data: { balance: { decrement: fill.total } },
     });
     if (res.count === 0) throw new Error(`Insufficient funds. Cost (incl. slippage): ${fill.total}`);
 
-    const holding = await prisma.stockHolding.findUnique({
+    const holding = await tx.stockHolding.findUnique({
       where: { portfolioId_stockId: { portfolioId: portfolio.id, stockId: stock.id } },
     });
 
@@ -106,16 +106,16 @@ export async function buyStock(discordId: string, symbol: string, quantity: numb
       const totalCost = holding.avgBuyPrice * holding.quantity + fill.total;
       newQty = holding.quantity + quantity;
       const newAvg = Math.round(totalCost / newQty);
-      await prisma.stockHolding.update({ where: { id: holding.id }, data: { quantity: newQty, avgBuyPrice: newAvg } });
+      await tx.stockHolding.update({ where: { id: holding.id }, data: { quantity: newQty, avgBuyPrice: newAvg } });
     } else {
       newQty = quantity;
-      await prisma.stockHolding.create({
+      await tx.stockHolding.create({
         data: { portfolioId: portfolio.id, stockId: stock.id, quantity, avgBuyPrice: fill.avgPrice },
       });
     }
 
     return { stock, avgPrice: fill.avgPrice, cost: fill.total, impactPct: fill.impactPct, newQty };
-  });
+  }));
 }
 
 export async function sellStock(discordId: string, symbol: string, quantity: number) {
@@ -133,23 +133,23 @@ export async function sellStock(discordId: string, symbol: string, quantity: num
 
   const fill = computeFill(stock.currentPrice, quantity, stock.liquidity, "SELL");
 
-  return runWithRetry(async () => {
-    const holding = await prisma.stockHolding.findUnique({
+  return runWithRetry(() => prisma.$transaction(async (tx) => {
+    const holding = await tx.stockHolding.findUnique({
       where: { portfolioId_stockId: { portfolioId: portfolio.id, stockId: stock.id } },
     });
     if (!holding || holding.quantity < quantity) throw new Error(`You don't have enough shares (${holding?.quantity || 0}).`);
 
-    await prisma.wallet.update({ where: { id: user.wallet!.id }, data: { balance: { increment: fill.total } } });
+    await tx.wallet.update({ where: { id: user.wallet!.id }, data: { balance: { increment: fill.total } } });
 
     if (holding.quantity === quantity) {
-      await prisma.stockHolding.delete({ where: { id: holding.id } });
+      await tx.stockHolding.delete({ where: { id: holding.id } });
     } else {
-      await prisma.stockHolding.update({ where: { id: holding.id }, data: { quantity: { decrement: quantity } } });
+      await tx.stockHolding.update({ where: { id: holding.id }, data: { quantity: { decrement: quantity } } });
     }
 
     const profit = fill.total - holding.avgBuyPrice * quantity;
     return { stock, avgPrice: fill.avgPrice, value: fill.total, impactPct: fill.impactPct, profit, remaining: holding.quantity - quantity };
-  });
+  }));
 }
 
 // --- MARKET TICK ENGINE ---
