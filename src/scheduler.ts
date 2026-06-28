@@ -3,20 +3,22 @@ import { Client } from "discord.js";
 import { processAllInvestments } from "./services/bankingService";
 import { processWeeklyCardSettlement } from "./services/creditCardService";
 import { removeTemporaryRoles } from "./services/effectService";
-import { updateMarket } from "./services/stockService";
+import { marketTick, initGlobalMarket } from "./services/stockService";
 import { decayAllHeat, runRaidScan } from "./services/taxService";
 import prisma from "./utils/prisma";
 
 export function initScheduler(client: Client) {
   setInterval(async () => {
     try {
-      await updateMarket();
+      await marketTick();
     } catch (err) {
       console.error("Failed to update stock market:", err);
     }
   }, 60 * 1000);
 
-  updateMarket().catch((err) => console.error("Initial market update failed:", err));
+  initGlobalMarket()
+    .then(() => marketTick())
+    .catch((err) => console.error("Initial market seed/tick failed:", err));
 
   cron.schedule("* * * * *", async () => {
     console.log("Running banking jobs...");
