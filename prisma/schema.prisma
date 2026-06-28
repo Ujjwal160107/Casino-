@@ -508,20 +508,48 @@ model OwnedProperty {
 }
 
 model Stock {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  guildId      String
-  symbol       String
-  name         String
-  currentPrice Float
-  volatility   Int      @default(5) // Max percentage change per update
-  basePrice    Float    @default(100) // Reference for resets/crashes
-  lastUpdate   DateTime @default(now())
-  
-  updatedAt    DateTime @updatedAt
-  
-  holdings     StockHolding[]
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  symbol        String   @unique
+  name          String
+  currentPrice  Float
+  previousPrice Float    @default(0)
+  basePrice     Float    @default(100)
+  volatility    Int      @default(5)
+  liquidity     Float    @default(1000)
 
-  @@unique([guildId, symbol])
+  status        String   @default("ACTIVE") // ACTIVE | DELISTING | DELISTED
+  delistWatch   Int      @default(0)
+
+  trendTicksLeft Int     @default(0)
+  trendPerTick   Float   @default(0)
+
+  lastUpdate    DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  holdings      StockHolding[]
+  events        StockEvent[]
+}
+
+model StockEvent {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  stock        Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  stockId      String   @db.ObjectId
+  symbol       String
+
+  type          String   // MINOR_DIP | MINOR_GAIN | SLUMP | RALLY | CRASH | BOOM
+  direction     String   // UP | DOWN
+  magnitudePct  Float    // total move; for SLUMP this is the per-tick move
+  durationTicks Int      @default(1) // >1 only for multi-tick events (SLUMP)
+  telegraphed   Boolean  @default(false)
+
+  status        String   // FORECAST | RESOLVED | FAKEOUT
+  forecastTick  Int
+  resolveTick   Int
+
+  createdAt    DateTime @default(now())
+
+  @@index([symbol, status])
+  @@index([resolveTick])
 }
 
 model Portfolio {
