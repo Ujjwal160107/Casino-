@@ -1,9 +1,10 @@
 import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { checkJailStatus, payBail } from "../../services/jailService";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { fmtCurrency, formatDuration } from "../../utils/format";
 import { errorEmbed, successEmbed, infoEmbed } from "../../utils/embed";
+import { getGuildPrefix } from "../../utils/guildContext";
+import { DEFAULT_JAIL_FINE } from "../../utils/economyConfig";
 
 const POLICE_EMOTE = "<:fortuna_police:1457053051582939237>";
 
@@ -19,24 +20,24 @@ export async function handleJail(message: Message) {
     }
 
     const timeLeft = status.releaseTime ? Math.max(0, status.releaseTime.getTime() - Date.now()) : 0;
-    const config = await getGuildConfig(message.guildId!);
+    const prefix = await getGuildPrefix(message.guildId!);
 
     const embed = new EmbedBuilder()
         .setTitle(`${POLICE_EMOTE} JAIL STATUS`)
         .setDescription(`You are currently incarcerated.`)
         .addFields(
             { name: "Release In", value: status.releaseTime ? `<t:${Math.floor(status.releaseTime.getTime() / 1000)}:R>` : "N/A", inline: true },
-            { name: "Bail Cost", value: fmtCurrency(config.jailFine, config.currencyEmoji), inline: true }
+            { name: "Bail Cost", value: fmtCurrency(DEFAULT_JAIL_FINE), inline: true }
         )
         .setColor(0xFF0000)
         .setThumbnail("https://cdn.discordapp.com/emojis/1457053051582939237.png")
-        .setFooter({ text: `Type ${config.prefix}bail to pay the fine and leave.` });
+        .setFooter({ text: `Type ${prefix}bail to pay the fine and leave.` });
 
     const row = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(
             new ButtonBuilder()
                 .setCustomId("pay_bail")
-                .setLabel(`Pay Bail (${fmtCurrency(config.jailFine, "")})`)
+                .setLabel(`Pay Bail (${fmtCurrency(DEFAULT_JAIL_FINE, "")})`)
                 .setStyle(ButtonStyle.Danger)
         );
 

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { X, Home, Book, Terminal, FileText, Shield, Users, LifeBuoy, LayoutDashboard, LogOut } from "lucide-react";
+import { X, Home, Book, Terminal, FileText, Shield, Users, LifeBuoy, LogOut } from "lucide-react";
 import { signIn, signOut } from "next-auth/react";
 
 interface MobileSidebarProps {
@@ -24,7 +24,6 @@ const NAV_ITEMS = [
     { label: "Privacy Policy", href: "/policy", icon: Shield },
     { label: "Team", href: "/team", icon: Users },
     { label: "Changelog", href: "/changelog", icon: LifeBuoy },
-    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
 ];
 
 export function MobileSidebar({ isOpen, onClose, user }: MobileSidebarProps) {
@@ -115,7 +114,7 @@ export function MobileSidebar({ isOpen, onClose, user }: MobileSidebarProps) {
                                 </div>
                             ) : (
                                 <button
-                                    onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
+                                    onClick={() => signIn("discord", { callbackUrl: "/" })}
                                     className="w-full py-3.5 rounded-xl bg-white text-black font-bold hover:bg-zinc-200 transition-colors"
                                 >
                                     Login with Discord

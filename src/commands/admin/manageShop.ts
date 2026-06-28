@@ -17,20 +17,20 @@ import {
   CacheType
 } from "discord.js";
 import { getShopItems, getShopItemByName, updateShopItem, deleteShopItem } from "../../services/shopService";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency } from "../../utils/format";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
 import { ItemEffect, EffectType } from "../../services/effectService";
 import { parseDuration } from "../../utils/duration";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleManageShop(message: Message, args: string[]) {
   if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
     return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "Admins or Bot Commanders only.")] });
   }
 
-  const config = await getGuildConfig(message.guildId!);
-  const emoji = config.currencyEmoji;
+  const prefix = await getGuildPrefix(message.guildId!);
+  
   const searchName = args.join(" ");
   let targetItem: any;
 
@@ -101,7 +101,7 @@ export async function handleManageShop(message: Message, args: string[]) {
       .setColor(Colors.Orange)
       .addFields(
         { name: "<:pencill:1449707576475521102> Name", value: item.name, inline: true },
-        { name: "<:pricee:1449707707442528387> Price", value: fmtCurrency(item.price, emoji), inline: true },
+        { name: "<:pricee:1449707707442528387> Price", value: fmtCurrency(item.price), inline: true },
         { name: "<a:BoxBox:1449707866079494154> Stock", value: item.stock === -1 ? "Infinite" : String(item.stock), inline: true },
         { name: "<:scrolll:1446218234171887760> Description", value: item.description || "None", inline: false },
         { name: "Role ID (Legacy)", value: item.roleId || "None", inline: false },

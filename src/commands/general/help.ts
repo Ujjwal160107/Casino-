@@ -40,13 +40,16 @@ export async function handleHelp(message: Message) {
       commands: [
         { name: "balance", aliases: ["bal"], description: "Check your wallet, bank, and net worth." },
         { name: "bank", aliases: [], description: "Open the bank dashboard and cards flow." },
+        { name: "mycards", aliases: ["my-cards", "mycard"], description: "View your Fortuna Card balance, due date, and pay dashboard." },
+        { name: "card", aliases: [], description: "Manage your card: issue, pay, withdraw, upgrade." },
         { name: "deposit", aliases: ["dep"], description: "Move wallet money into the bank." },
         { name: "withdraw", aliases: ["with"], description: "Move bank money into your wallet." },
         { name: "transfer", aliases: ["give"], description: "Send money to another player." },
         { name: "daily", aliases: [], description: "Claim your daily reward." },
         { name: "weekly", aliases: [], description: "Claim your weekly reward." },
         { name: "monthly", aliases: [], description: "Claim your monthly reward." },
-        { name: "credit", aliases: ["score"], description: "Check your credit score." }
+        { name: "credit", aliases: ["score"], description: "Credit score summary and My Cards dashboard." },
+        { name: "ask", aliases: ["ask-money"], description: "Ask another user for money (accept / decline / block)." }
       ]
     },
     {
@@ -89,7 +92,6 @@ export async function handleHelp(message: Message) {
       commands: [
         { name: "help", aliases: [], description: "Open this help menu." },
         { name: "guide", aliases: ["tutorial"], description: "Read the quick-start guide." },
-        { name: "dashboard", aliases: [], description: "Open the main player dashboard." },
         { name: "start", aliases: [], description: "Create your profile if you have not started yet." },
         { name: "set-prefix", aliases: ["setprefix"], description: "Change this server's command prefix." }
       ]
@@ -170,7 +172,7 @@ export async function handleHelp(message: Message) {
     .setColor(0x9b59b6)
     .addFields({
       name: "Quick Links",
-      value: `[Dashboard](${Mascot.Links.Dashboard}) • [Commands](${Mascot.Links.CommandList}) • [Guide](${Mascot.Links.Docs}) • [Support](${Mascot.Links.Support})`
+      value: `[Commands](${Mascot.Links.CommandList}) • [Guide](${Mascot.Links.Docs}) • [Support](${Mascot.Links.Support})`
     });
 
   if (thumbnail) {

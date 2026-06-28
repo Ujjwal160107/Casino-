@@ -1,16 +1,11 @@
-
 import { Message, EmbedBuilder } from "discord.js";
 import { getPortfolio } from "../../services/stockService";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency } from "../../utils/format";
 import { Mascot } from "../../config/branding";
 import { errorEmbed } from "../../utils/embed";
 
 export async function handleMyStocks(message: Message) {
     if (!message.guildId) return;
-
-    const config = await getGuildConfig(message.guildId);
-    const emoji = config.currencyEmoji;
 
     const pf = await getPortfolio(message.guildId, message.author.id);
     if (!pf || pf.holdings.length === 0) {
@@ -28,17 +23,17 @@ export async function handleMyStocks(message: Message) {
 
         const pnl = val - cost;
         const pnlIcon = pnl >= 0 ? Mascot.Emotes.Graph : Mascot.Emotes.GraphDown;
-        const pnlStr = pnl >= 0 ? `+${fmtCurrency(pnl, emoji)}` : `-${fmtCurrency(Math.abs(pnl), emoji)}`;
+        const pnlStr = pnl >= 0 ? `+${fmtCurrency(pnl)}` : `-${fmtCurrency(Math.abs(pnl))}`;
 
-        return `**${h.stock.symbol}**: ${h.quantity} shares @ ${fmtCurrency(h.stock.currentPrice, emoji)} (Avg: ${h.avgBuyPrice})\nValue: **${fmtCurrency(val, emoji)}** (${pnlIcon} ${pnlStr})`;
+        return `**${h.stock.symbol}**: ${h.quantity} shares @ ${fmtCurrency(h.stock.currentPrice)} (Avg: ${h.avgBuyPrice})\nValue: **${fmtCurrency(val)}** (${pnlIcon} ${pnlStr})`;
     });
 
     const totalPnl = totalValue - totalCost;
-    const totalPnlStr = totalPnl >= 0 ? `+${fmtCurrency(totalPnl, emoji)}` : `-${fmtCurrency(Math.abs(totalPnl), emoji)}`;
+    const totalPnlStr = totalPnl >= 0 ? `+${fmtCurrency(totalPnl)}` : `-${fmtCurrency(Math.abs(totalPnl))}`;
 
     const embed = new EmbedBuilder()
         .setTitle(`📊 Stock Portfolio: ${message.author.username}`)
-        .setDescription(`**Total Value:** ${fmtCurrency(totalValue, emoji)}\n**Total Profit:** ${totalPnlStr}\n\n${lines.join("\n\n")}`)
+        .setDescription(`**Total Value:** ${fmtCurrency(totalValue)}\n**Total Profit:** ${totalPnlStr}\n\n${lines.join("\n\n")}`)
         .setColor(Mascot.Colors.Base as any);
 
     return message.reply({ embeds: [embed] });

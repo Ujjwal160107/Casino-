@@ -1,5 +1,4 @@
 import { Client, EmbedBuilder, TextChannel, Colors, Guild } from "discord.js";
-import { getGuildConfig } from "../services/guildConfigService";
 
 interface LogOptions {
     guild: Guild;
@@ -13,10 +12,10 @@ interface LogOptions {
 
 export async function logToChannel(client: Client, options: LogOptions) {
     try {
-        const config = await getGuildConfig(options.guild.id);
-        if (!config.logChannelId) return;
+        const logChannelId = process.env.LOG_CHANNEL_ID;
+        if (!logChannelId) return;
 
-        const channel = await client.channels.fetch(config.logChannelId);
+        const channel = await client.channels.fetch(logChannelId);
         if (!channel || !channel.isTextBased()) return;
 
         const embed = new EmbedBuilder()

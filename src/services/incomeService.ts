@@ -67,7 +67,7 @@ export async function runIncomeCommand({
   walletId: string;
 }) {
   const cfg = await getIncomeConfigOrDefault(guildId, commandKey);
-  const cooldownKey = `income:${guildId}:${discordId}:${commandKey}`;
+  const cooldownKey = `income:${discordId}:${commandKey}`;
   const cd = checkDynamicCooldown(cooldownKey, cfg.cooldown);
 
   if (cd > 0) {

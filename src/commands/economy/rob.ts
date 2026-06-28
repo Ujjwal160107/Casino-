@@ -14,6 +14,7 @@ import {
 } from "../../services/shopBuffs";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { fmtCurrency } from "../../utils/format";
+import { redisService } from "../../services/redisService";
 
 function randomInt(min: number, max: number) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -53,6 +54,14 @@ export async function handleRob(message: Message, args: string[]) {
         });
     }
 
+    const craftedDefense = await redisService.get<{ active: boolean }>(`crafted_rob_defense:${targetUser.id}`);
+    if (craftedDefense?.active) {
+        await redisService.del(`crafted_rob_defense:${targetUser.id}`);
+        return message.reply({
+            embeds: [errorEmbed(message.author, "Robbery Blocked!", `**${targetUser.displayName}** had Crocodile Hide Armor active. It blocked your robbery attempt.`)]
+        });
+    }
+
     // Pre-fetch all item states before success roll
     const [eclipseActive, demonicVuln] = await Promise.all([
         checkEclipseMask(message.author.id),       // consumed here regardless of outcome
@@ -74,7 +83,10 @@ export async function handleRob(message: Message, args: string[]) {
         const eclipseLootMult = eclipseActive ? 1.15 : 1;
         // Demonic vulnerability optional loot boost (up to +10%)
         const demonicLootMult = demonicVuln ? 1.05 : 1;
-        const robMult = thiefMult * eclipseLootMult * demonicLootMult;
+        const craftedRobBoost = await redisService.get<{ multiplier: number }>(`crafted_rob_boost:${message.author.id}`);
+        const craftedRobMult = craftedRobBoost?.multiplier ?? 1;
+        const robMult = thiefMult * eclipseLootMult * demonicLootMult * craftedRobMult;
+        if (craftedRobBoost) await redisService.del(`crafted_rob_boost:${message.author.id}`);
         // NOTE: Crown of Greed does NOT apply to rob proceeds (PvP transfer)
 
         const result = await prisma.$transaction(async (tx) => {
@@ -91,7 +103,7 @@ export async function handleRob(message: Message, args: string[]) {
             const capSteal = Math.min(requestedSteal, ROB_CONFIG.stealCap);
             const availableSpace = Math.max(0, MAX_SAFE_BALANCE - robber.wallet.balance);
             const robAmount = Math.min(capSteal, availableSpace);
-            if (robAmount <= 0) throw new Error("Your wallet is at the global safety cap.");
+            if (robAmount <= 0) throw new Error("Your wallet is at the maximum balance limit.");
 
             await tx.wallet.update({ where: { id: victim.wallet.id }, data: { balance: { decrement: robAmount } } });
             await tx.transaction.create({ data: { walletId: victim.wallet.id, amount: -robAmount, type: "robbed_by", meta: { robber: robber.discordId, percent } } });
@@ -102,7 +114,7 @@ export async function handleRob(message: Message, args: string[]) {
         });
 
         return message.reply({
-            embeds: [successEmbed(message.author, "Robbery Successful!", `Stole **${fmtCurrency(result.robAmount)}** from **${targetUser.displayName}**!\nGlobal Wallet: **${fmtCurrency(result.updatedWallet.balance)}**`)]
+            embeds: [successEmbed(message.author, "Robbery Successful!", `Stole **${fmtCurrency(result.robAmount)}** from **${targetUser.displayName}**!\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**${craftedRobBoost ? "\n\nWolf Fang Dagger boosted the loot." : ""}`)]
         });
     }
 
@@ -136,6 +148,6 @@ export async function handleRob(message: Message, args: string[]) {
 
     const eclipseNote = eclipseActive ? "\n\nThe Eclipse Mask's backlash added an extra penalty." : "";
     return message.reply({
-        embeds: [errorEmbed(message.author, "Caught!", `The robbery failed and cost you **${fmtCurrency(result.actualPenalty)}**.${eclipseNote}\nGlobal Wallet: **${fmtCurrency(result.updatedWallet.balance)}**`)]
+        embeds: [errorEmbed(message.author, "Caught!", `The robbery failed and cost you **${fmtCurrency(result.actualPenalty)}**.${eclipseNote}\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**`)]
     });
 }

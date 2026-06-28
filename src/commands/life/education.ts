@@ -14,10 +14,10 @@ import {
 } from "discord.js";
 import { getDegrees } from "../../services/educationService";
 import { fmtCurrency } from "../../utils/format";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { errorEmbed } from "../../utils/embed";
 import { Mascot } from "../../config/branding";
 import { getUser } from "../../services/userService";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 const EDUCATION_ACCENT_COLOR = 0xF1C40F;
 const ITEMS_PER_PAGE = 5;
@@ -42,8 +42,8 @@ export async function handleEducation(message: Message, args: string[]) {
         if (!message.guild) return;
         const guildId = message.guild.id;
         const userId = message.author.id;
-        const config = await getGuildConfig(guildId);
-        const prefix = config?.prefix || "!";
+        const prefix = await getGuildPrefix(guildId);
+        
 
         const user = await getUser(userId, guildId);
 
@@ -89,7 +89,7 @@ export async function handleEducation(message: Message, args: string[]) {
                             new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Graduate} Student Dashboard`),
                             new TextDisplayBuilder().setContent(
                                 `**Degree:** ${deg.name}\n` +
-                                `**Fee Paid:** ${fmtCurrency(deg.tuitionPerSem, config.currencyEmoji)}\n` +
+                                `**Fee Paid:** ${fmtCurrency(deg.tuitionPerSem)}\n` +
                                 `**Graduation:** ${progressBar} ${xpProgress}%`
                             ),
                         )
@@ -195,7 +195,7 @@ export async function handleEducation(message: Message, args: string[]) {
                             new TextDisplayBuilder().setContent(`### ${statusIcon} ${displayName}`),
                             new TextDisplayBuilder().setContent(
                                 `**Status:** ${statusText}\n` +
-                                `**Degree Fee:** ${fmtCurrency(degree.tuitionPerSem, config.currencyEmoji)}\n` +
+                                `**Degree Fee:** ${fmtCurrency(degree.tuitionPerSem)}\n` +
                                 `**XP Required:** ${degree.xpRequired}\n` +
                                 `**Reqs:** ${reqText}`,
                             ),
@@ -290,8 +290,8 @@ export async function handleListDegrees(message: Message) {
     const userId = message.author.id;
     const guildId = message.guild.id;
 
-    const config = await getGuildConfig(guildId);
-    const prefix = config?.prefix || "!";
+    const prefix = await getGuildPrefix(guildId);
+    
 
     const user = await getUser(userId, guildId);
 
@@ -299,21 +299,13 @@ export async function handleListDegrees(message: Message) {
         return message.reply({ embeds: [errorEmbed(message.author, "No Degrees", `You haven't earned any degrees yet. Use \`${prefix}education\` to find a program!`)] });
     }
 
-    const embed = new EmbedBuilder()
-        .setDescription(`# ${Mascot.Emotes.Graduate} ${message.author.username}'s Earned Degrees`)
-        .setColor("#F1C40F")
-        .setThumbnail(message.author.displayAvatarURL());
-
-    const fields = user.degrees.map((ud) => {
-        return {
-            name: `${Mascot.Emotes.Graduate} ${ud.degree.name}`,
-            value: `**Final Score:** ${ud.finalGpa.toFixed(1)}/10 | **Obtained:** <t:${Math.floor(ud.obtainedAt.getTime() / 1000)}:D>`,
-            inline: false,
-        };
+    const lines = user.degrees.map((ud) => {
+        const finalXp = ud.finalXp ?? (ud.finalGpa > 0 ? Math.round((ud.finalGpa / 10) * ud.degree.xpRequired) : 0);
+        return `${Mascot.Emotes.Graduate} **${ud.degree.name}** — Final XP **${finalXp}/${ud.degree.xpRequired}** · <t:${Math.floor(ud.obtainedAt.getTime() / 1000)}:D>`;
     });
 
-    embed.addFields(fields);
-    embed.setFooter({ text: `Total Degrees: ${user.degrees.length}` });
-
-    message.reply({ embeds: [embed] });
+    return message.reply({
+        components: [buildTextOnlyContainer("Earned Degrees", lines.join("\n"), 0xF1C40F)],
+        flags: MessageFlags.IsComponentsV2,
+    });
 }

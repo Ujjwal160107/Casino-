@@ -3,18 +3,18 @@ import { ensureUserAndWallet, removeMoneyFromWallet } from "../../services/walle
 import { removeMoneyFromBank } from "../../services/bankService";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { fmtCurrency, parseSmartAmount } from "../../utils/format";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { logToChannel } from "../../utils/discordLogger";
 import prisma from "../../utils/prisma";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleRemoveMoney(message: Message, args: string[]) {
   if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
     return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "You need Administrator or Bot Commander permissions.")] });
   }
 
-  const config = await getGuildConfig(message.guildId!);
-  const emoji = config.currencyEmoji;
+  const prefix = await getGuildPrefix(message.guildId!);
+  
 
   const targetUser = message.mentions.users.first();
   const amountArg = args[1];
@@ -23,7 +23,7 @@ export async function handleRemoveMoney(message: Message, args: string[]) {
 
   if (!targetUser) {
     return message.reply({
-      embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}removemoney @user <amount|all|%> [wallet/bank]\``)]
+      embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}removemoney @user <amount|all|%> [wallet/bank]\``)]
     });
   }
   if (!amountArg) {
@@ -72,11 +72,11 @@ export async function handleRemoveMoney(message: Message, args: string[]) {
         guild: message.guild!,
         type: "ADMIN",
         title: "Money Removed (Bank)",
-        description: `**Admin:** ${message.author.tag}\n**Target:** ${targetUser.tag}\n**Amount:** -${fmtCurrency(removeAmount, emoji)} (${amountArg})\n**New Balance:** ${fmtCurrency(newBal, emoji)}`,
+        description: `**Admin:** ${message.author.tag}\n**Target:** ${targetUser.tag}\n**Amount:** -${fmtCurrency(removeAmount)} (${amountArg})\n**New Balance:** ${fmtCurrency(newBal)}`,
         color: 0xFF0000
       });
       return message.reply({
-        embeds: [successEmbed(message.author, "Money Removed", `Removed **${fmtCurrency(removeAmount, emoji)}** from ${targetUser.username}'s **Bank**.\nNew Balance: **${fmtCurrency(newBal, emoji)}**`)]
+        embeds: [successEmbed(message.author, "Money Removed", `Removed **${fmtCurrency(removeAmount)}** from ${targetUser.username}'s **Bank**.\nNew Balance: **${fmtCurrency(newBal)}**`)]
       });
     } else {
       const currentBal = user.wallet?.balance || 0;
@@ -97,11 +97,11 @@ export async function handleRemoveMoney(message: Message, args: string[]) {
         guild: message.guild!,
         type: "ADMIN",
         title: "Money Removed (Wallet)",
-        description: `**Admin:** ${message.author.tag}\n**Target:** ${targetUser.tag}\n**Amount:** -${fmtCurrency(removeAmount, emoji)} (${amountArg})\n**New Balance:** ${fmtCurrency(newBal, emoji)}`,
+        description: `**Admin:** ${message.author.tag}\n**Target:** ${targetUser.tag}\n**Amount:** -${fmtCurrency(removeAmount)} (${amountArg})\n**New Balance:** ${fmtCurrency(newBal)}`,
         color: 0xFF0000
       });
       return message.reply({
-        embeds: [successEmbed(message.author, "Money Removed", `Removed **${fmtCurrency(removeAmount, emoji)}** from ${targetUser.username}'s **Wallet**.\nNew Balance: **${fmtCurrency(newBal, emoji)}**`)]
+        embeds: [successEmbed(message.author, "Money Removed", `Removed **${fmtCurrency(removeAmount)}** from ${targetUser.username}'s **Wallet**.\nNew Balance: **${fmtCurrency(newBal)}**`)]
       });
     }
   } catch (err) {

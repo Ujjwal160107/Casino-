@@ -10,7 +10,10 @@ import {
   SeparatorBuilder,
   SeparatorSpacingSize,
   TextDisplayBuilder,
+  ThumbnailBuilder,
 } from "discord.js";
+import fs from "fs";
+import path from "path";
 import { hunt, HuntGroup } from "../../services/huntService";
 import { seedHuntShop } from "../../services/shopService";
 import { ZOO_CAPACITY, RIFLE_TIERS, RARITY_INCOME } from "../../utils/animalCatalog";
@@ -19,6 +22,23 @@ import { errorEmbed } from "../../utils/embed";
 import { AnimalEmojis } from "../../config/branding";
 import prisma from "../../utils/prisma";
 import { buildHuntCraftPayload } from "../../services/huntCraftService";
+
+function resolveAnimalAsset(assetName: string, prefix = ""): { filePath: string; attachmentName: string } | null {
+  const assetDirs = [
+    path.resolve(process.cwd(), "src", "assets"),
+    path.resolve(process.cwd(), "assets"),
+  ];
+  for (const dir of assetDirs) {
+    const filePath = [".png", ".jpg", ".jpeg", ".webp"]
+      .map((ext) => path.join(dir, `${assetName}${ext}`))
+      .find((f) => fs.existsSync(f));
+    if (filePath) {
+      const safeName = (prefix + assetName).replace(/\s+/g, "_");
+      return { filePath, attachmentName: `${safeName}${path.extname(filePath)}` };
+    }
+  }
+  return null;
+}
 
 function buildGroupRow(
   group: HuntGroup,
@@ -109,6 +129,7 @@ export async function handleHunt(message: Message, args: string[]) {
   const rifleDisplay = rifleName.split(" ").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 
   const container = new ContainerBuilder();
+  const files: AttachmentBuilder[] = [];
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
@@ -124,17 +145,30 @@ export async function handleHunt(message: Message, args: string[]) {
 
     if (i > 0) {
       container.addSeparatorComponents(
-        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true),
       );
     }
 
-    container.addTextDisplayComponents(
+    const section = new SectionBuilder().addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `${emojiDisplay} **${group.count}×** **${group.def.name}** — ${group.def.rarity}\n` +
-        `Sell: **${fmtCurrency(totalSell)}** | Zoo: **+${fmtCurrency(zooPerDay)}/day**`
+        `Sell: **${fmtCurrency(totalSell)}** | Zoo: **+${fmtCurrency(zooPerDay)}/day**`,
       ),
     );
 
+    if (group.def.asset) {
+      const asset = resolveAnimalAsset(group.def.asset, `hunt_${group.def.key}_`);
+      if (asset && !files.some((f) => f.name === asset.attachmentName)) {
+        section.setThumbnailAccessory(
+          new ThumbnailBuilder()
+            .setURL(`attachment://${asset.attachmentName}`)
+            .setDescription(group.def.name),
+        );
+        files.push(new AttachmentBuilder(asset.filePath, { name: asset.attachmentName }));
+      }
+    }
+
+    container.addSectionComponents(section);
     container.addActionRowComponents(buildGroupRow(group, ownerId, hasZoo));
   }
 
@@ -158,6 +192,7 @@ export async function handleHunt(message: Message, args: string[]) {
 
   return message.reply({
     components: [container],
+    files,
     flags: MessageFlags.IsComponentsV2,
   });
 }

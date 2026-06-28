@@ -2,16 +2,23 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ButtonInteraction,
   ContainerBuilder,
+  GuildMember,
   Message,
   MessageFlags,
+  ModalBuilder,
+  ModalSubmitInteraction,
   SectionBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
   StringSelectMenuBuilder,
   TextDisplayBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } from "discord.js";
 import prisma from "../../utils/prisma";
+import { refreshMessageComponent, ensureDeferredEphemeralReply, ensureDeferredUpdate, safeEditReply, safeFollowUp, safeReply } from "../../utils/interactionHelpers";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { fmtCurrency } from "../../utils/format";
 import { Mascot } from "../../config/branding";
@@ -25,10 +32,29 @@ import {
   UNI_SHOP_CATALOG,
 } from "../../utils/shopCatalog";
 import { useItem } from "../../services/shopService";
+import { buildHuntCraftPayload } from "../../services/huntCraftService";
+import { getHuntParts, listPartFromInventory } from "../../services/huntPartService";
+import { getInventoryAnimals } from "../../services/huntService";
+import { listItem } from "../../services/marketService";
 
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 4;
 const INV_ACCENT_COLOR = 0x9B59B6;
 const COLLECTOR_TIMEOUT = 120_000;
+
+type InventorySession = {
+  guildId: string;
+  targetUserId: string;
+  canAct: boolean;
+  member: GuildMember;
+  refreshDashboard: () => Promise<void>;
+};
+
+const inventorySessions = new Map<string, InventorySession>();
+
+function registerInventorySession(ownerId: string, session: InventorySession) {
+  inventorySessions.set(ownerId, session);
+  setTimeout(() => inventorySessions.delete(ownerId), COLLECTOR_TIMEOUT + 5_000);
+}
 
 type InventorySlot = Awaited<ReturnType<typeof getInventory>>[number];
 type InventoryCategory = "ALL" | "GENERAL" | "HUNT" | "JOB" | "UNI" | "COCK" | "OTHER";
@@ -59,6 +85,14 @@ function normalize(value: string) {
 
 function findCatalogByName(name: string) {
   const norm = normalize(name);
+  if (norm === "komodo venom flask") {
+    return {
+      key: "komodo_venom_flask",
+      name: "Komodo Venom Flask",
+      category: "HUNT",
+      shortDescription: "Target loses 20 Luck for 2 hours. Use with `use Komodo Venom Flask @user`.",
+    } as any;
+  }
   return CATALOGS.find((item) => normalize(item.name) === norm) ?? SHOP_CATALOG.find((item) => normalize(item.name) === norm);
 }
 
@@ -123,19 +157,54 @@ function inventoryValue(items: InventorySlot[]) {
   return items.reduce((sum, slot) => sum + Number(slot.shopItem.price || 0) * slot.amount, 0);
 }
 
-function buildCategoryCounts(items: InventorySlot[]) {
+function getQuickSellValue(price: number) {
+  const basePrice = Math.max(0, Math.floor(price));
+  if (basePrice <= 0) return { value: 0, rate: 0.5 };
+
+  // Fortuna's pawn counter usually pays half, but occasionally lowballs harder.
+  const rate = Math.random() < 0.8
+    ? 0.5
+    : (30 + Math.floor(Math.random() * 16)) / 100;
+
+  return { value: Math.max(1, Math.floor(basePrice * rate)), rate };
+}
+
+function buildHuntAnimalCounts(huntAnimals: Awaited<ReturnType<typeof getInventoryAnimals>>) {
+  const animalCounts = new Map<string, { name: string; count: number; rarity: string }>();
+  for (const animal of huntAnimals) {
+    const current = animalCounts.get(animal.animalKey);
+    if (current) current.count++;
+    else animalCounts.set(animal.animalKey, { name: animal.def.name, count: 1, rarity: animal.def.rarity });
+  }
+  return animalCounts;
+}
+
+function buildCategoryCounts(
+  items: InventorySlot[],
+  huntParts: Awaited<ReturnType<typeof getHuntParts>>,
+  huntAnimals: Awaited<ReturnType<typeof getInventoryAnimals>>,
+) {
   const counts = new Map<InventoryCategory, number>();
   for (const category of CATEGORY_ORDER) counts.set(category, 0);
-  counts.set("ALL", items.length);
   for (const slot of items) {
     const cat = categoryOf(slot);
     counts.set(cat, (counts.get(cat) ?? 0) + 1);
   }
+  const huntVirtualCount = buildHuntAnimalCounts(huntAnimals).size + huntParts.length;
+  counts.set("HUNT", (counts.get("HUNT") ?? 0) + huntVirtualCount);
+  counts.set("ALL", items.length + huntVirtualCount);
   return counts;
 }
 
-function buildCategorySelect(category: InventoryCategory, items: InventorySlot[], ownerId: string, disabled = false) {
-  const counts = buildCategoryCounts(items);
+function buildCategorySelect(
+  category: InventoryCategory,
+  items: InventorySlot[],
+  huntParts: Awaited<ReturnType<typeof getHuntParts>>,
+  huntAnimals: Awaited<ReturnType<typeof getInventoryAnimals>>,
+  ownerId: string,
+  disabled = false,
+) {
+  const counts = buildCategoryCounts(items, huntParts, huntAnimals);
 
   return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
@@ -175,6 +244,8 @@ function buildNav(page: number, totalPages: number, ownerId: string, disabled = 
 
 function buildInventoryPayload(
   items: InventorySlot[],
+  huntParts: Awaited<ReturnType<typeof getHuntParts>>,
+  huntAnimals: Awaited<ReturnType<typeof getInventoryAnimals>>,
   page: number,
   category: InventoryCategory,
   username: string,
@@ -186,7 +257,8 @@ function buildInventoryPayload(
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const safePage = Math.min(Math.max(page, 1), totalPages);
   const currentItems = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
-  const totalAmount = items.reduce((sum, slot) => sum + slot.amount, 0);
+  const huntAnimalCounts = buildHuntAnimalCounts(huntAnimals);
+  const totalAmount = items.reduce((sum, slot) => sum + slot.amount, 0) + huntParts.reduce((sum, part) => sum + part.amount, 0) + huntAnimals.length;
 
   const container = new ContainerBuilder()
     .setAccentColor(INV_ACCENT_COLOR)
@@ -234,28 +306,58 @@ function buildInventoryPayload(
             .setDisabled(disabled),
         );
 
-      container
-        .addSectionComponents(section)
-        .addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small));
+      container.addSectionComponents(section);
+      container.addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small));
     });
   }
 
-  if (!canAct) {
+  if (category === "HUNT" || category === "ALL") {
+    const animalPreview = huntAnimalCounts.size > 0
+      ? Array.from(huntAnimalCounts.values()).slice(0, 8).map((animal) => `**${animal.name}:** ${animal.count}`).join(" | ")
+      : "No hunted animals stored. Go hunting to fill this up.";
+    const partPreview = huntParts.length > 0
+      ? huntParts.slice(0, 8).map((part) => `**${part.name}:** ${part.amount}`).join(" | ")
+      : "No animal parts owned yet. Use the Hunt Black Market or buy parts from players.";
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `### Hunted Animals\n${animalPreview}${huntAnimalCounts.size > 8 ? ` | +${huntAnimalCounts.size - 8} more` : ""}\n\n` +
+        `### Hunt Materials\n${partPreview}${huntParts.length > 8 ? ` | +${huntParts.length - 8} more` : ""}`,
+      ),
+    );
+    if (!canAct && category === "HUNT") {
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent("-# Viewing another user's hunt inventory. Actions are disabled."));
+    }
+  } else if (!canAct) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent("-# Viewing another user's inventory. Actions are disabled."));
   } else {
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent("-# Open Details to use, sell, or inspect an item."));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent("-# Use **Details** to use, quick sell, or list on the Black Market."));
   }
 
-  const components: any[] = [container, buildCategorySelect(category, items, ownerId, disabled)];
+  const components: any[] = [container, buildCategorySelect(category, items, huntParts, huntAnimals, ownerId, disabled)];
+  if (category === "HUNT" && canAct) {
+    components.push(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`inv2_hunt_craft:${ownerId}`)
+          .setLabel("Craft")
+          .setStyle(ButtonStyle.Success)
+          .setDisabled(disabled),
+        new ButtonBuilder()
+          .setCustomId(`inv2_hunt_market:${ownerId}`)
+          .setLabel("List Parts")
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(disabled || huntParts.length === 0),
+      ),
+    );
+  }
   if (totalPages > 1) components.push(buildNav(safePage, totalPages, ownerId, disabled));
 
   return { components, flags: MessageFlags.IsComponentsV2 } as any;
 }
 
-function buildItemDetailPayload(slot: InventorySlot, ownerId: string, canAct: boolean) {
+function buildItemDetailPayload(slot: InventorySlot, ownerId: string, canAct: boolean, ephemeral = false) {
   const item = slot.shopItem;
   const cat = categoryOf(slot);
-  const sellValue = Math.floor(Number(item.price || 0) * 0.5);
   const catalog = findCatalogByName(item.name);
 
   const container = new ContainerBuilder()
@@ -268,7 +370,7 @@ function buildItemDetailPayload(slot: InventorySlot, ownerId: string, canAct: bo
         `**Category:** ${CATEGORY_LABELS[cat]}\n` +
         `**Type:** ${item.itemType}\n` +
         `**Usable:** ${item.usable ? "Yes" : "No"}\n` +
-        `**Sell value:** ${fmtCurrency(sellValue)} each${metaSummary(slot.meta)}`,
+        `**Quick sell:** up to ${fmtCurrency(Math.floor(Number(item.price || 0) * 0.5))} each${metaSummary(slot.meta)}`,
       ),
     );
 
@@ -277,12 +379,23 @@ function buildItemDetailPayload(slot: InventorySlot, ownerId: string, canAct: bo
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${catalog.shortDescription}`));
   }
 
-  const buttons: ButtonBuilder[] = [
-    new ButtonBuilder()
-      .setCustomId(`inv2_back:${ownerId}`)
-      .setLabel("Back")
-      .setStyle(ButtonStyle.Secondary),
-  ];
+  const buttons: ButtonBuilder[] = [];
+
+  if (ephemeral) {
+    buttons.push(
+      new ButtonBuilder()
+        .setCustomId(`inv2_detail_close:${ownerId}`)
+        .setLabel("Close")
+        .setStyle(ButtonStyle.Secondary),
+    );
+  } else {
+    buttons.push(
+      new ButtonBuilder()
+        .setCustomId(`inv2_back:${ownerId}`)
+        .setLabel("Back")
+        .setStyle(ButtonStyle.Secondary),
+    );
+  }
 
   if (canAct) {
     buttons.push(
@@ -293,15 +406,67 @@ function buildItemDetailPayload(slot: InventorySlot, ownerId: string, canAct: bo
         .setDisabled(!item.usable),
       new ButtonBuilder()
         .setCustomId(`inv2_sell:${slot.id}:${ownerId}`)
-        .setLabel(`Sell ${fmtCurrency(sellValue)}`)
+        .setLabel("Quick Sell")
         .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId(`inv2_market:${slot.id}:${ownerId}`)
+        .setLabel("Black Market")
+        .setStyle(ButtonStyle.Secondary),
     );
   }
 
   return {
     components: [container, new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons)],
-    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+    flags: MessageFlags.IsComponentsV2,
   } as any;
+}
+
+function buildHuntPartMarketPayload(
+  huntParts: Awaited<ReturnType<typeof getHuntParts>>,
+  ownerId: string,
+  disabled = false,
+) {
+  const container = new ContainerBuilder()
+    .setAccentColor(INV_ACCENT_COLOR)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Gun || ""} List Hunt Materials`),
+      new TextDisplayBuilder().setContent(
+        huntParts.length > 0
+          ? "Choose a stored animal part, then set the quantity and listing price. Buyers pay your price plus 5%; you receive the listed price minus 10%."
+          : "You don't have any stored hunt materials to list yet.",
+      ),
+    );
+
+  const components: any[] = [container];
+  if (huntParts.length > 0) {
+    components.push(
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`inv2_part_select:${ownerId}`)
+          .setPlaceholder("Choose a stored part to list")
+          .setDisabled(disabled)
+          .addOptions(
+            huntParts.slice(0, 25).map((part) => ({
+              label: `${part.name} x${part.amount}`,
+              value: part.partKey,
+              description: "List this material on the Black Market",
+            })),
+          ),
+      ),
+    );
+  }
+
+  components.push(
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`inv2_back:${ownerId}`)
+        .setLabel("Back")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disabled),
+    ),
+  );
+
+  return { components, flags: MessageFlags.IsComponentsV2 } as any;
 }
 
 async function consumeSlot(slotId: string) {
@@ -319,7 +484,7 @@ async function sellOne(slotId: string, discordId: string) {
   const slot = await prisma.inventory.findUnique({ where: { id: slotId }, include: { shopItem: true } });
   if (!slot || slot.userId !== discordId || slot.amount <= 0) throw new Error("Item not found in your inventory.");
 
-  const sellValue = Math.floor(Number(slot.shopItem.price || 0) * 0.5);
+  const { value: sellValue, rate } = getQuickSellValue(Number(slot.shopItem.price || 0));
   await prisma.$transaction([
     slot.amount <= 1
       ? prisma.inventory.delete({ where: { id: slot.id } })
@@ -327,7 +492,7 @@ async function sellOne(slotId: string, discordId: string) {
     prisma.wallet.update({ where: { userId: discordId }, data: { balance: { increment: sellValue } } }),
   ]);
 
-  return { itemName: slot.shopItem.name, sellValue };
+  return { itemName: slot.shopItem.name, sellValue, rate };
 }
 
 async function useInventorySlot(slotId: string, discordId: string, guildId: string, member: any) {
@@ -351,6 +516,149 @@ async function useInventorySlot(slotId: string, discordId: string, guildId: stri
   return messages.join("\n") || `${slot.shopItem.name} used.`;
 }
 
+function buildMarketModal(customId: string, title: string, maxAmount: number) {
+  return new ModalBuilder()
+    .setCustomId(customId)
+    .setTitle(title)
+    .addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("quantity")
+          .setLabel(`Quantity (max ${maxAmount})`)
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder("1")
+          .setRequired(true),
+      ),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("price")
+          .setLabel("Total listing price")
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder("100000")
+          .setRequired(true),
+      ),
+    );
+}
+
+async function handleInv2UseAction(interaction: ButtonInteraction, slotId: string, session: InventorySession) {
+  if (!session.canAct) {
+    await safeReply(interaction, { content: "You can only use items from your own inventory.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (!await ensureDeferredEphemeralReply(interaction, MessageFlags.Ephemeral)) return;
+  try {
+    const messageText = await useInventorySlot(slotId, session.member.id, session.guildId, session.member);
+    await safeEditReply(interaction, { content: messageText });
+    await session.refreshDashboard();
+  } catch (err: any) {
+    await safeEditReply(interaction, { content: err.message || "Failed to use item." });
+  }
+}
+
+async function handleInv2SellAction(interaction: ButtonInteraction, slotId: string, session: InventorySession) {
+  if (!session.canAct) {
+    await safeReply(interaction, { content: "You can only sell items from your own inventory.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (!await ensureDeferredEphemeralReply(interaction, MessageFlags.Ephemeral)) return;
+  try {
+    const result = await sellOne(slotId, session.member.id);
+    await safeEditReply(interaction, {
+      content: `${Mascot.Emotes.Currency} Quick sold **${result.itemName}** for **${result.sellValue.toLocaleString("en-US")}** (${Math.round(result.rate * 100)}% resale).`,
+    });
+    await session.refreshDashboard();
+  } catch (err: any) {
+    await safeEditReply(interaction, { content: err.message || "Failed to sell item." });
+  }
+}
+
+async function handleInv2MarketAction(interaction: ButtonInteraction, slotId: string, session: InventorySession) {
+  if (!session.canAct) {
+    await safeReply(interaction, { content: "You can only list items from your own inventory.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const slot = await prisma.inventory.findUnique({ where: { id: slotId }, include: { shopItem: true } });
+  if (!slot || slot.userId !== session.member.id || slot.amount <= 0) {
+    await safeReply(interaction, { content: "Item is no longer in your inventory.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const modalId = `inv2_market_modal:${slot.id}:${session.member.id}`;
+  await interaction.showModal(buildMarketModal(modalId, `List ${slot.shopItem.name}`, slot.amount));
+}
+
+/** Routes detail-panel buttons on ephemeral follow-ups (outside the dashboard collector). */
+export async function handleInv2EphemeralInteraction(interaction: ButtonInteraction): Promise<boolean> {
+  const customId = interaction.customId;
+  const isDetailAction =
+    customId.startsWith("inv2_use:") ||
+    customId.startsWith("inv2_sell:") ||
+    customId.startsWith("inv2_market:") ||
+    customId.startsWith("inv2_detail_close:");
+  if (!isDetailAction) return false;
+
+  const ownerId = interaction.user.id;
+  const session = inventorySessions.get(ownerId);
+  if (!session) {
+    await safeReply(interaction, { content: "Open `!inventory` again to manage items.", flags: MessageFlags.Ephemeral });
+    return true;
+  }
+
+  if (customId === `inv2_detail_close:${ownerId}`) {
+    if (!await ensureDeferredUpdate(interaction)) return true;
+    await interaction.deleteReply().catch(async () => {
+      await safeEditReply(interaction, { content: "Closed.", components: [] });
+    });
+    return true;
+  }
+
+  const slotId = customId.split(":")[1];
+  if (customId.startsWith("inv2_use:") && customId.endsWith(`:${ownerId}`)) {
+    await handleInv2UseAction(interaction, slotId, session);
+    return true;
+  }
+  if (customId.startsWith("inv2_sell:") && customId.endsWith(`:${ownerId}`)) {
+    await handleInv2SellAction(interaction, slotId, session);
+    return true;
+  }
+  if (customId.startsWith("inv2_market:") && customId.endsWith(`:${ownerId}`)) {
+    await handleInv2MarketAction(interaction, slotId, session);
+    return true;
+  }
+
+  return false;
+}
+
+export async function handleInv2ModalSubmit(interaction: ModalSubmitInteraction): Promise<boolean> {
+  if (!interaction.customId.startsWith("inv2_market_modal:")) return false;
+
+  const [, slotId, ownerId] = interaction.customId.split(":");
+  if (interaction.user.id !== ownerId) return true;
+
+  const session = inventorySessions.get(ownerId);
+  if (!session) {
+    await safeReply(interaction, { content: "Open `!inventory` again to list items.", flags: MessageFlags.Ephemeral });
+    return true;
+  }
+
+  if (!await ensureDeferredEphemeralReply(interaction, MessageFlags.Ephemeral)) return true;
+  try {
+    const quantity = parseInt(interaction.fields.getTextInputValue("quantity"), 10);
+    const price = parseInt(interaction.fields.getTextInputValue("price"), 10);
+    const slot = await prisma.inventory.findUnique({ where: { id: slotId }, include: { shopItem: true } });
+    if (!slot || slot.userId !== ownerId) throw new Error("Item is no longer in your inventory.");
+    const result = await listItem(ownerId, slot.shopItemId, quantity, price);
+    await safeEditReply(interaction, {
+      content:
+        `${Mascot.Emotes.Accept} Listed **${result.itemName} x${result.amount}** for **${fmtCurrency(result.totalPrice)}**.\n` +
+        `Seller payout after fee: **${fmtCurrency(result.fees.sellerPayout)}**.`,
+    });
+    await session.refreshDashboard();
+  } catch (err: any) {
+    await safeEditReply(interaction, { content: err.message || "Failed to list item." });
+  }
+  return true;
+}
+
 export async function handleInventory(message: Message, args: string[]) {
   try {
     if (!message.guild || !message.member) return;
@@ -371,11 +679,25 @@ export async function handleInventory(message: Message, args: string[]) {
     const canAct = targetUser.id === ownerId;
 
     const loadPayload = async (disabled = false) => {
-      const inventory = await getInventory(targetUser.id);
-      return buildInventoryPayload(inventory, page, category, targetUser.username, ownerId, canAct, disabled);
+      const [inventory, huntParts, huntAnimals] = await Promise.all([
+        getInventory(targetUser.id),
+        getHuntParts(targetUser.id),
+        getInventoryAnimals(targetUser.id),
+      ]);
+      return buildInventoryPayload(inventory, huntParts, huntAnimals, page, category, targetUser.username, ownerId, canAct, disabled);
     };
 
     const reply = await message.reply(await loadPayload());
+
+    registerInventorySession(ownerId, {
+      guildId: message.guild.id,
+      targetUserId: targetUser.id,
+      canAct,
+      member: message.member,
+      refreshDashboard: async () => {
+        await reply.edit(await loadPayload()).catch(() => {});
+      },
+    });
 
     const collector = reply.createMessageComponentCollector({
       time: COLLECTOR_TIMEOUT,
@@ -387,76 +709,108 @@ export async function handleInventory(message: Message, args: string[]) {
 
       if (customId === `inv2_prev:${ownerId}`) {
         page = Math.max(1, page - 1);
-        await interaction.update(await loadPayload());
+        await refreshMessageComponent(interaction, () => loadPayload());
         return;
       }
 
       if (customId === `inv2_next:${ownerId}`) {
         page += 1;
-        await interaction.update(await loadPayload());
+        await refreshMessageComponent(interaction, () => loadPayload());
         return;
       }
 
       if (customId === `inv2_back:${ownerId}`) {
-        await interaction.update(await loadPayload());
+        await refreshMessageComponent(interaction, () => loadPayload());
         return;
       }
 
       if (customId === `inv2_cat:${ownerId}` && interaction.isStringSelectMenu()) {
         category = interaction.values[0] as InventoryCategory;
         page = 1;
-        await interaction.update(await loadPayload());
+        await refreshMessageComponent(interaction, () => loadPayload());
+        return;
+      }
+
+      if (customId === `inv2_hunt_craft:${ownerId}`) {
+        if (!canAct) {
+          await safeReply(interaction, { content: "You can only craft from your own inventory.", flags: MessageFlags.Ephemeral });
+          return;
+        }
+        await ensureDeferredEphemeralReply(interaction, MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral);
+        const payload = await buildHuntCraftPayload(ownerId, ownerId, 1);
+        await safeEditReply(interaction, { ...payload, flags: MessageFlags.IsComponentsV2 });
+        return;
+      }
+
+      if (customId === `inv2_hunt_market:${ownerId}`) {
+        if (!canAct) {
+          await safeReply(interaction, { content: "You can only list parts from your own inventory.", flags: MessageFlags.Ephemeral });
+          return;
+        }
+        await refreshMessageComponent(interaction, async () => {
+          const huntParts = await getHuntParts(ownerId);
+          return buildHuntPartMarketPayload(huntParts, ownerId);
+        });
         return;
       }
 
       if (customId.startsWith("inv2_info:") && customId.endsWith(`:${ownerId}`)) {
         const slotId = customId.split(":")[1];
+        if (!await ensureDeferredUpdate(interaction)) return;
         const slot = await prisma.inventory.findUnique({ where: { id: slotId }, include: { shopItem: true } });
         if (!slot || slot.userId !== targetUser.id) {
-          await interaction.reply({ content: "Item is no longer in this inventory.", flags: MessageFlags.Ephemeral });
+          await safeFollowUp(interaction, { content: "Item is no longer in this inventory.", flags: MessageFlags.Ephemeral });
           return;
         }
-        await interaction.reply(buildItemDetailPayload(slot, ownerId, canAct));
+        const detail = buildItemDetailPayload(slot, ownerId, canAct, true);
+        await safeFollowUp(interaction, {
+          ...detail,
+          flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+        });
         return;
       }
 
-      if (customId.startsWith("inv2_use:") && customId.endsWith(`:${ownerId}`)) {
+      if (customId.startsWith("inv2_part_select:") && customId.endsWith(`:${ownerId}`) && interaction.isStringSelectMenu()) {
         if (!canAct) {
-          await interaction.reply({ content: "You can only use items from your own inventory.", flags: MessageFlags.Ephemeral });
+          await interaction.reply({ content: "You can only list parts from your own inventory.", flags: MessageFlags.Ephemeral });
           return;
         }
 
-        const slotId = customId.split(":")[1];
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        const partKey = interaction.values[0];
+        const part = (await getHuntParts(ownerId)).find((row) => row.partKey === partKey);
+        if (!part) {
+          await interaction.reply({ content: "That part is no longer in your inventory.", flags: MessageFlags.Ephemeral });
+          return;
+        }
+
+        const modalId = `inv2_part_modal:${partKey}:${ownerId}`;
+        await interaction.showModal(buildMarketModal(modalId, `List ${part.name}`, part.amount));
+        const modal = await interaction.awaitModalSubmit({
+          time: 60_000,
+          filter: (submit) => submit.customId === modalId && submit.user.id === ownerId,
+        }).catch(() => null);
+        if (!modal) return;
+
+        await modal.deferReply({ flags: MessageFlags.Ephemeral });
         try {
-          const messageText = await useInventorySlot(slotId, ownerId, message.guildId!, message.member);
-          await interaction.editReply({ content: messageText });
+          const quantity = parseInt(modal.fields.getTextInputValue("quantity"), 10);
+          const price = parseInt(modal.fields.getTextInputValue("price"), 10);
+          const result = await listPartFromInventory(ownerId, partKey, quantity, price);
+          await modal.editReply({
+            content:
+              `${Mascot.Emotes.Accept} Listed **${result.partName} x${result.amount}** for **${fmtCurrency(result.totalPrice)}**.\n` +
+              `Seller payout after fee: **${fmtCurrency(result.fees.sellerPayout)}**.`,
+          });
           await reply.edit(await loadPayload()).catch(() => {});
         } catch (err: any) {
-          await interaction.editReply({ content: err.message || "Failed to use item." });
+          await modal.editReply({ content: err.message || "Failed to list this part." });
         }
         return;
-      }
-
-      if (customId.startsWith("inv2_sell:") && customId.endsWith(`:${ownerId}`)) {
-        if (!canAct) {
-          await interaction.reply({ content: "You can only sell items from your own inventory.", flags: MessageFlags.Ephemeral });
-          return;
-        }
-
-        const slotId = customId.split(":")[1];
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        try {
-          const result = await sellOne(slotId, ownerId);
-          await interaction.editReply({ content: `${Mascot.Emotes.Currency} Sold **${result.itemName}** for **${result.sellValue.toLocaleString("en-US")}**.` });
-          await reply.edit(await loadPayload()).catch(() => {});
-        } catch (err: any) {
-          await interaction.editReply({ content: err.message || "Failed to sell item." });
-        }
       }
     });
 
     collector.on("end", async () => {
+      inventorySessions.delete(ownerId);
       await reply.edit(await loadPayload(true)).catch(() => {});
     });
   } catch (err) {

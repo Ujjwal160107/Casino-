@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getTopGGReviews } from "@/actions/public-actions";
+import { getTopGGReviews } from "@/lib/topgg-reviews";
 
 interface Review {
     id: string;

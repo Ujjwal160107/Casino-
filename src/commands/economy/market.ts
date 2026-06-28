@@ -17,6 +17,14 @@ import {
 } from "discord.js";
 import { Mascot } from "../../config/branding";
 import {
+  ensureDeferredEphemeralReply,
+  ensureDeferredUpdate,
+  replyEphemeralAfterWork,
+  safeEditReply,
+  safeReply,
+  safeUpdate,
+} from "../../utils/interactionHelpers";
+import {
   getListings,
   getUserListings,
   getUserInventoryForSale,
@@ -25,6 +33,13 @@ import {
   cancelListing,
   calculateFees,
 } from "../../services/marketService";
+import {
+  buyHuntPartListing,
+  cancelHuntPartListing,
+  formatPartName,
+  getHuntPartListings,
+  getUserHuntPartListings,
+} from "../../services/huntPartService";
 
 const BM_ACCENT = 0x2C2F33;
 const BM_SUCCESS = 0x2ECC71;
@@ -66,7 +81,7 @@ export async function handleMarket(message: Message, args: string[]) {
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${E.Market} Black Market`),
       new TextDisplayBuilder().setContent(
-        `The global underground marketplace.\n` +
+        `The underground marketplace.\n` +
         `Trade items with players across all servers.`,
       ),
     )
@@ -85,6 +100,10 @@ export async function handleMarket(message: Message, args: string[]) {
     new ButtonBuilder()
       .setCustomId(`bm_browse:1:${ownerId}`)
       .setLabel("Browse")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`bm_parts:1:${ownerId}`)
+      .setLabel("Animal Parts")
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(`bm_sell:${ownerId}`)
@@ -109,69 +128,197 @@ export async function handleMarket(message: Message, args: string[]) {
 
     // --- BROWSE ---
     if (customId.startsWith("bm_browse:") && customId.endsWith(`:${ownerId}`)) {
-      if (!isOwner) { await interaction.reply({ content: "Not yours.", ephemeral: true }); return; }
+      if (!isOwner) { await safeReply(interaction, { content: "Not yours.", flags: MessageFlags.Ephemeral }); return; }
       const page = parseInt(customId.split(":")[1], 10) || 1;
-      const { listings, total, totalPages } = await getListings(page, 5);
+      await replyEphemeralAfterWork(interaction, BM_FLAGS | MessageFlags.Ephemeral, async () => {
+        const { listings, total, totalPages } = await getListings(page, 5);
 
-      if (listings.length === 0) {
+        if (listings.length === 0) {
+          return {
+            components: [bmContainer(`${E.Market} Black Market`, `${E.Confused} No active listings. Be the first to sell!`)],
+          };
+        }
+
+        const container = new ContainerBuilder()
+          .setAccentColor(BM_ACCENT)
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`## ${E.Market} Black Market`),
+            new TextDisplayBuilder().setContent(`-# Page ${page}/${totalPages} ${E.Scroll} ${total} listings`),
+          )
+          .addSeparatorComponents(separator());
+
+        for (const listing of listings) {
+          const itemName = (listing.shopItem as any)?.name ?? "Unknown";
+          const sellerName = (listing.seller as any)?.username ?? "Unknown";
+          const fees = calculateFees(listing.totalPrice);
+          const expiresUnix = Math.floor(listing.expiresAt.getTime() / 1000);
+
+          container.addSectionComponents(
+            new SectionBuilder()
+              .addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(`**${itemName}** x${listing.amount}`),
+                new TextDisplayBuilder().setContent(
+                  `${E.Price} **${fmt(fees.buyerTotal)}** ${E.Currency}\n` +
+                  `-# Listed: ${fmt(listing.totalPrice)} + ${fmt(fees.buyerFee)} fee\n` +
+                  `-# Seller: ${sellerName} ${E.Cooldown} <t:${expiresUnix}:R>`,
+                ),
+              )
+              .setButtonAccessory(
+                new ButtonBuilder()
+                  .setCustomId(`bm_buy:${listing.id}:${ownerId}`)
+                  .setLabel(`${fmt(fees.buyerTotal)}`)
+                  .setStyle(ButtonStyle.Success),
+              ),
+          );
+          container.addSeparatorComponents(softSeparator());
+        }
+
+        const navRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`bm_browse:${page - 1}:${ownerId}`)
+            .setLabel("Previous")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page <= 1),
+          new ButtonBuilder()
+            .setCustomId(`bm_browse:${page + 1}:${ownerId}`)
+            .setLabel("Next")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page >= totalPages),
+        );
+
+        return { components: [container, navRow] };
+      });
+      return;
+    }
+
+    // --- ANIMAL PARTS BROWSE ---
+    if (customId.startsWith("bm_parts:") && customId.endsWith(`:${ownerId}`)) {
+      if (!isOwner) { await safeReply(interaction, { content: "Not yours.", flags: MessageFlags.Ephemeral }); return; }
+      const page = parseInt(customId.split(":")[1], 10) || 1;
+      await replyEphemeralAfterWork(interaction, BM_FLAGS | MessageFlags.Ephemeral, async () => {
+        const { listings, total, totalPages } = await getHuntPartListings(page, 5);
+
+        if (listings.length === 0) {
+          return {
+            components: [bmContainer(`${E.Market} Animal Parts`, `${E.Confused} No animal parts are listed right now.`)],
+          };
+        }
+
+        const container = new ContainerBuilder()
+          .setAccentColor(BM_ACCENT)
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`## ${E.Market} Animal Parts`),
+            new TextDisplayBuilder().setContent(`-# Page ${page}/${totalPages} ${E.Scroll} ${total} part listings`),
+          )
+          .addSeparatorComponents(separator());
+
+        for (const listing of listings) {
+          const fees = calculateFees(listing.totalPrice);
+          const expiresUnix = Math.floor(listing.expiresAt.getTime() / 1000);
+          container.addSectionComponents(
+            new SectionBuilder()
+              .addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(`**${listing.partName}** x${listing.amount}`),
+                new TextDisplayBuilder().setContent(
+                  `${E.Price} **${fmt(fees.buyerTotal)}** ${E.Currency}\n` +
+                  `-# Listed: ${fmt(listing.totalPrice)} + ${fmt(fees.buyerFee)} fee\n` +
+                  `-# Seller: <@${listing.sellerId}> ${E.Cooldown} <t:${expiresUnix}:R>`,
+                ),
+              )
+              .setButtonAccessory(
+                new ButtonBuilder()
+                  .setCustomId(`bm_part_buy:${listing.id}:${ownerId}`)
+                  .setLabel(`${fmt(fees.buyerTotal)}`)
+                  .setStyle(ButtonStyle.Success),
+              ),
+          );
+          container.addSeparatorComponents(softSeparator());
+        }
+
+        const navRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`bm_parts:${page - 1}:${ownerId}`)
+            .setLabel("Previous")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page <= 1),
+          new ButtonBuilder()
+            .setCustomId(`bm_parts:${page + 1}:${ownerId}`)
+            .setLabel("Next")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page >= totalPages),
+        );
+
+        return { components: [container, navRow] };
+      });
+      return;
+    }
+
+    if (customId.startsWith("bm_part_buy:") && customId.endsWith(`:${ownerId}`)) {
+      if (!isOwner) return;
+      const listingId = customId.split(":")[1];
+
+      try {
+        const prisma = (await import("../../utils/prisma")).default;
+        const listing = await prisma.huntPartListing.findUnique({ where: { id: listingId } });
+        if (!listing) {
+          await interaction.reply({ components: [bmContainer(`${E.Alert} Unavailable`, "This part listing is no longer available.", BM_ERROR)], flags: BM_FLAGS | MessageFlags.Ephemeral });
+          return;
+        }
+
+        const fees = calculateFees(listing.totalPrice);
+        const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`bm_part_buy_confirm:${listingId}:${ownerId}`)
+            .setLabel("Confirm Purchase")
+            .setStyle(ButtonStyle.Danger),
+          new ButtonBuilder()
+            .setCustomId(`bm_buy_cancel:${ownerId}`)
+            .setLabel("Cancel")
+            .setStyle(ButtonStyle.Secondary),
+        );
+
         await interaction.reply({
-          components: [bmContainer(`${E.Market} Black Market`, `${E.Confused} No active listings. Be the first to sell!`)],
+          components: [
+            bmContainer(
+              `${E.Alert} Confirm Part Purchase`,
+              `**${formatPartName(listing.partKey)}** (x${listing.amount})\n\n` +
+              `${E.Price} Listed Price: **${fmt(listing.totalPrice)}** ${E.Currency}\n` +
+              `${E.Alert} Buyer Fee (5%): +**${fmt(fees.buyerFee)}**\n` +
+              `${E.MoneyBag} **Total: ${fmt(fees.buyerTotal)}** ${E.Currency}`,
+              BM_WARN,
+            ),
+            confirmRow,
+          ],
           flags: BM_FLAGS | MessageFlags.Ephemeral,
         });
-        return;
+      } catch (err) {
+        await interaction.reply({ components: [bmContainer(`${E.Decline} Error`, (err as Error).message, BM_ERROR)], flags: BM_FLAGS | MessageFlags.Ephemeral });
       }
+      return;
+    }
 
-      const container = new ContainerBuilder()
-        .setAccentColor(BM_ACCENT)
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(`## ${E.Market} Black Market`),
-          new TextDisplayBuilder().setContent(`-# Page ${page}/${totalPages} ${E.Scroll} ${total} listings`),
-        )
-        .addSeparatorComponents(separator());
+    if (customId.startsWith("bm_part_buy_confirm:") && customId.endsWith(`:${ownerId}`)) {
+      if (!isOwner) return;
+      const listingId = customId.split(":")[1];
 
-      for (const listing of listings) {
-        const itemName = (listing.shopItem as any)?.name ?? "Unknown";
-        const sellerName = (listing.seller as any)?.username ?? "Unknown";
-        const fees = calculateFees(listing.totalPrice);
-        const expiresUnix = Math.floor(listing.expiresAt.getTime() / 1000);
-
-        container.addSectionComponents(
-          new SectionBuilder()
-            .addTextDisplayComponents(
-              new TextDisplayBuilder().setContent(`**${itemName}** x${listing.amount}`),
-              new TextDisplayBuilder().setContent(
-                `${E.Price} **${fmt(fees.buyerTotal)}** ${E.Currency}\n` +
-                `-# Listed: ${fmt(listing.totalPrice)} + ${fmt(fees.buyerFee)} fee\n` +
-                `-# Seller: ${sellerName} ${E.Cooldown} <t:${expiresUnix}:R>`,
-              ),
-            )
-            .setButtonAccessory(
-              new ButtonBuilder()
-                .setCustomId(`bm_buy:${listing.id}:${ownerId}`)
-                .setLabel(`${fmt(fees.buyerTotal)}`)
-                .setStyle(ButtonStyle.Success),
-            ),
-        );
-        container.addSeparatorComponents(softSeparator());
+      try {
+        await interaction.deferUpdate();
+        const result = await buyHuntPartListing(ownerId, listingId);
+        await interaction.editReply({
+          components: [bmContainer(
+            `${E.Accept} Part Purchase Complete`,
+            `${E.Inventory} **${result.partName}** (x${result.amount}) added to Hunt Materials.\n\n` +
+            `${E.Currency} Paid: **${fmt(result.fees.buyerTotal)}**`,
+            BM_SUCCESS,
+          )],
+          flags: BM_FLAGS,
+        });
+      } catch (err) {
+        await interaction.editReply({
+          components: [bmContainer(`${E.Decline} Purchase Failed`, (err as Error).message, BM_ERROR)],
+          flags: BM_FLAGS,
+        });
       }
-
-      const navRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`bm_browse:${page - 1}:${ownerId}`)
-          .setLabel("Previous")
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(page <= 1),
-        new ButtonBuilder()
-          .setCustomId(`bm_browse:${page + 1}:${ownerId}`)
-          .setLabel("Next")
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(page >= totalPages),
-      );
-
-      await interaction.reply({
-        components: [container, navRow],
-        flags: BM_FLAGS | MessageFlags.Ephemeral,
-      });
       return;
     }
 
@@ -368,9 +515,12 @@ export async function handleMarket(message: Message, args: string[]) {
     // --- MY LISTINGS ---
     if (customId === `bm_my:${ownerId}`) {
       if (!isOwner) return;
-      const listings = await getUserListings(ownerId);
+      const [listings, partListings] = await Promise.all([
+        getUserListings(ownerId),
+        getUserHuntPartListings(ownerId),
+      ]);
 
-      if (listings.length === 0) {
+      if (listings.length === 0 && partListings.length === 0) {
         await interaction.reply({
           components: [bmContainer(`${E.Inventory} My Listings`, `${E.Confused} You have no active listings.`)],
           flags: BM_FLAGS | MessageFlags.Ephemeral,
@@ -381,7 +531,7 @@ export async function handleMarket(message: Message, args: string[]) {
       const container = new ContainerBuilder()
         .setAccentColor(BM_ACCENT)
         .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(`## ${E.Inventory} My Listings (${listings.length}/5)`),
+          new TextDisplayBuilder().setContent(`## ${E.Inventory} My Listings (${listings.length + partListings.length}/5)`),
         )
         .addSeparatorComponents(separator());
 
@@ -409,7 +559,49 @@ export async function handleMarket(message: Message, args: string[]) {
         container.addSeparatorComponents(softSeparator());
       }
 
+      for (const listing of partListings) {
+        const expiresUnix = Math.floor(listing.expiresAt.getTime() / 1000);
+        const fees = calculateFees(listing.totalPrice);
+
+        container.addSectionComponents(
+          new SectionBuilder()
+            .addTextDisplayComponents(
+              new TextDisplayBuilder().setContent(`**${listing.partName}** (x${listing.amount})`),
+              new TextDisplayBuilder().setContent(
+                `${E.Price} ${fmt(listing.totalPrice)} ${E.Currency} ${E.MoneyBag} You get: ${fmt(fees.sellerPayout)}\n` +
+                `-# Animal Part ${E.Cooldown} <t:${expiresUnix}:R>`,
+              ),
+            )
+            .setButtonAccessory(
+              new ButtonBuilder()
+                .setCustomId(`bm_part_cancel:${listing.id}:${ownerId}`)
+                .setLabel("Cancel")
+                .setStyle(ButtonStyle.Danger),
+            ),
+        );
+        container.addSeparatorComponents(softSeparator());
+      }
+
       await interaction.reply({ components: [container], flags: BM_FLAGS | MessageFlags.Ephemeral });
+      return;
+    }
+
+    if (customId.startsWith("bm_part_cancel:") && customId.endsWith(`:${ownerId}`)) {
+      if (!isOwner) return;
+      const listingId = customId.split(":")[1];
+
+      try {
+        const result = await cancelHuntPartListing(ownerId, listingId);
+        await interaction.reply({
+          components: [bmContainer(`${E.Accept} Cancelled`, `${E.Inventory} ${result.partName} x${result.amount} returned to Hunt Materials.`, BM_SUCCESS)],
+          flags: BM_FLAGS | MessageFlags.Ephemeral,
+        });
+      } catch (err) {
+        await interaction.reply({
+          components: [bmContainer(`${E.Decline} Error`, (err as Error).message, BM_ERROR)],
+          flags: BM_FLAGS | MessageFlags.Ephemeral,
+        });
+      }
       return;
     }
 

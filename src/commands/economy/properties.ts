@@ -23,9 +23,9 @@ import {
 } from "../../services/propertyService";
 import { ZOO_CAPACITY } from "../../utils/animalCatalog";
 import { fmtCurrency, fmtAmount } from "../../utils/format";
-import { Mascot } from "../../config/branding";
-import { getGuildConfig } from "../../services/guildConfigService";
+import { GLOBAL_CURRENCY_EMOJI, Mascot } from "../../config/branding";
 import { Property } from "@prisma/client";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 const PROPERTY_ACCENT_COLOR = 0x9B59B6;
 const PROPERTIES_PER_PAGE = 3;
@@ -431,9 +431,10 @@ function buildCollectReceiptContainer(
 export const propertiesHandler = async (message: Message, args: string[]) => {
     const subCommand = args[0]?.toLowerCase();
     const guildId = message.guildId!;
-    const guildConfig = await getGuildConfig(guildId);
-    const prefix = guildConfig.prefix || "!";
-    const currencyEmoji = guildConfig.currencyEmoji || Mascot.Emotes.Blackcoin;
+    const prefix = await getGuildPrefix(guildId);
+    const currencyEmoji = GLOBAL_CURRENCY_EMOJI;
+    
+    
 
     // ---- !properties collect ----
     if (subCommand === "collect") {
@@ -503,8 +504,8 @@ export const propertiesHandler = async (message: Message, args: string[]) => {
 // ---------------------------------------------------------------------------
 
 export const buyPropertyHandler = async (message: Message, args: string[]) => {
-    const guildConfig = await getGuildConfig(message.guildId!);
-    const prefix = guildConfig.prefix || "!";
+    const prefix = await getGuildPrefix(message.guildId!);
+    
     const key = args[0]?.toLowerCase();
 
     if (!key) {
@@ -541,8 +542,8 @@ export const buyPropertyHandler = async (message: Message, args: string[]) => {
 // ---------------------------------------------------------------------------
 
 export const sellPropertyHandler = async (message: Message, args: string[]) => {
-    const guildConfig = await getGuildConfig(message.guildId!);
-    const prefix = guildConfig.prefix || "!";
+    const prefix = await getGuildPrefix(message.guildId!);
+    
     const key = args[0]?.toLowerCase();
 
     if (!key) {
@@ -576,9 +577,10 @@ export const sellPropertyHandler = async (message: Message, args: string[]) => {
 // ---------------------------------------------------------------------------
 
 export const myPropertiesHandler = async (message: Message) => {
-    const guildConfig = await getGuildConfig(message.guildId!);
-    const prefix = guildConfig.prefix || "!";
-    const currencyEmoji = guildConfig.currencyEmoji || Mascot.Emotes.Blackcoin;
+    const prefix = await getGuildPrefix(message.guildId!);
+    const currencyEmoji = GLOBAL_CURRENCY_EMOJI;
+    
+    
     const owned = await PropertyService.getOwnedProperties(message.author.id, message.guildId!);
 
     if (owned.length === 0) {

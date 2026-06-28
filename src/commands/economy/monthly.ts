@@ -29,7 +29,7 @@ export async function handleMonthly(message: Message) {
     const devilReduction = await checkDevilContract(message.author.id);
     const amount = Math.floor(reward.amount * counterfeitMult * crownMult * devilReduction);
     const result = await addBalance(message.author.id, message.author.username, amount, "monthly_reward", { command: reward.commandName }, true);
-    const capNotice = result.capped ? "\n\nYour wallet is at the global safety cap, so only part of the reward could be added." : "";
+    const capNotice = result.capped ? "\n\nYour wallet is at the maximum balance limit, so only part of the reward could be added." : "";
 
     const tax = await applyIncomeTax(message.author.id, result.appliedAmount);
     const taxField = tax.shielded

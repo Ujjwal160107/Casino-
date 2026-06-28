@@ -14,8 +14,8 @@ import {
 } from "discord.js";
 import { getAllStocks, getPortfolio, buyStock, sellStock, initStocks } from "../../services/stockService";
 import { fmtCurrency } from "../../utils/format";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { Mascot } from "../../config/branding";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 const STOCK_ACCENT_COLOR = 0x9B59B6;
 const STOCK_BANNER_NAME = "stock_market.jpg";
@@ -43,12 +43,12 @@ function riskLabel(volatility: number) {
     return `${Mascot.Emotes.Accept} Stable`;
 }
 
-function buildMarketContainer(stocks: Awaited<ReturnType<typeof getAllStocks>>, emoji: string, prefix: string) {
+function buildMarketContainer(stocks: Awaited<ReturnType<typeof getAllStocks>>, prefix: string) {
     const container = new ContainerBuilder()
         .setAccentColor(STOCK_ACCENT_COLOR)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
-                `## ${Mascot.Emotes.GraphUp} Global Stock Market\n` +
+                `## ${Mascot.Emotes.GraphUp} Stock Market\n` +
                 `> Market prices refresh on this server's stock timer.\n` +
                 `> Buy low, sell high, and keep an eye on volatility.`,
             ),
@@ -59,15 +59,15 @@ function buildMarketContainer(stocks: Awaited<ReturnType<typeof getAllStocks>>, 
         const trend = stock.currentPrice >= stock.basePrice ? Mascot.Emotes.GraphUp : Mascot.Emotes.GraphDown;
         const change = stock.currentPrice - stock.basePrice;
         const changeText = change >= 0
-            ? `+${fmtCurrency(change, emoji)} vs base`
-            : `-${fmtCurrency(Math.abs(change), emoji)} vs base`;
+            ? `+${fmtCurrency(change)} vs base`
+            : `-${fmtCurrency(Math.abs(change))} vs base`;
 
         container.addSectionComponents(
             new SectionBuilder()
                 .addTextDisplayComponents(
                     new TextDisplayBuilder().setContent(`### ${trend} ${stock.symbol} - ${stock.name}`),
                     new TextDisplayBuilder().setContent(
-                        `**Price:** ${fmtCurrency(stock.currentPrice, emoji)}\n` +
+                        `**Price:** ${fmtCurrency(stock.currentPrice)}\n` +
                         `**Risk:** ${riskLabel(stock.volatility)} (${stock.volatility}% volatility)\n` +
                         `**Movement:** ${changeText}`,
                     ),
@@ -103,7 +103,7 @@ function buildMarketContainer(stocks: Awaited<ReturnType<typeof getAllStocks>>, 
         );
 }
 
-async function buildPortfolioContainer(guildId: string, discordId: string, username: string, emoji: string) {
+async function buildPortfolioContainer(guildId: string, discordId: string, username: string) {
     const pf = await getPortfolio(guildId, discordId);
     if (!pf || pf.holdings.length === 0) {
         return textContainer("Portfolio Empty", "You don't own any stocks.", 0xE74C3C);
@@ -127,7 +127,7 @@ async function buildPortfolioContainer(guildId: string, discordId: string, usern
 
         const pnl = value - cost;
         const pnlIcon = pnl >= 0 ? Mascot.Emotes.GraphUp : Mascot.Emotes.GraphDown;
-        const pnlText = pnl >= 0 ? `+${fmtCurrency(pnl, emoji)}` : `-${fmtCurrency(Math.abs(pnl), emoji)}`;
+        const pnlText = pnl >= 0 ? `+${fmtCurrency(pnl)}` : `-${fmtCurrency(Math.abs(pnl))}`;
 
         container.addSectionComponents(
             new SectionBuilder()
@@ -135,8 +135,8 @@ async function buildPortfolioContainer(guildId: string, discordId: string, usern
                     new TextDisplayBuilder().setContent(`### ${pnlIcon} ${holding.stock.symbol} - ${holding.stock.name}`),
                     new TextDisplayBuilder().setContent(
                         `**Shares:** ${holding.quantity}\n` +
-                        `**Current:** ${fmtCurrency(holding.stock.currentPrice, emoji)} | **Avg:** ${fmtCurrency(holding.avgBuyPrice, emoji)}\n` +
-                        `**Value:** ${fmtCurrency(value, emoji)} (${pnlText})`,
+                        `**Current:** ${fmtCurrency(holding.stock.currentPrice)} | **Avg:** ${fmtCurrency(holding.avgBuyPrice)}\n` +
+                        `**Value:** ${fmtCurrency(value)} (${pnlText})`,
                     ),
                 )
                 .setButtonAccessory(
@@ -155,13 +155,13 @@ async function buildPortfolioContainer(guildId: string, discordId: string, usern
     });
 
     const totalPnl = totalValue - totalCost;
-    const totalPnlText = totalPnl >= 0 ? `+${fmtCurrency(totalPnl, emoji)}` : `-${fmtCurrency(Math.abs(totalPnl), emoji)}`;
+    const totalPnlText = totalPnl >= 0 ? `+${fmtCurrency(totalPnl)}` : `-${fmtCurrency(Math.abs(totalPnl))}`;
 
     return container
         .addSeparatorComponents(separator())
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
-                `**Total Value:** ${fmtCurrency(totalValue, emoji)}\n` +
+                `**Total Value:** ${fmtCurrency(totalValue)}\n` +
                 `**Total Profit/Loss:** ${totalPnlText}`,
             ),
         );
@@ -172,9 +172,9 @@ export async function handleStock(message: Message, args: string[]) {
     await initStocks(message.guildId);
 
     const sub = args[0]?.toLowerCase();
-    const config = await getGuildConfig(message.guildId);
-    const emoji = config.currencyEmoji || Mascot.Emotes.Blackcoin;
-    const prefix = config.prefix || "!";
+    const prefix = await getGuildPrefix(message.guildId);
+    
+    
 
     if (sub === "buy") {
         const symbol = args[1];
@@ -192,7 +192,7 @@ export async function handleStock(message: Message, args: string[]) {
                 components: [
                     textContainer(
                         "Stock Purchased",
-                        `Bought **${qty}x ${res.stock.symbol}** for **${fmtCurrency(res.cost, emoji)}**.\nYou now own **${res.newQty}** shares.`,
+                        `Bought **${qty}x ${res.stock.symbol}** for **${fmtCurrency(res.cost)}**.\nYou now own **${res.newQty}** shares.`,
                         0x2ECC71,
                     ),
                 ],
@@ -218,12 +218,12 @@ export async function handleStock(message: Message, args: string[]) {
 
         try {
             const res = await sellStock(message.guildId, message.author.id, symbol, qty);
-            const profitText = res.profit >= 0 ? `+${fmtCurrency(res.profit, emoji)}` : `-${fmtCurrency(Math.abs(res.profit), emoji)}`;
+            const profitText = res.profit >= 0 ? `+${fmtCurrency(res.profit)}` : `-${fmtCurrency(Math.abs(res.profit))}`;
             return message.reply({
                 components: [
                     textContainer(
                         "Stock Sold",
-                        `Sold **${qty}x ${res.stock.symbol}** for **${fmtCurrency(res.value, emoji)}**.\nProfit/Loss: **${profitText}**.`,
+                        `Sold **${qty}x ${res.stock.symbol}** for **${fmtCurrency(res.value)}**.\nProfit/Loss: **${profitText}**.`,
                         0x2ECC71,
                     ),
                 ],
@@ -239,7 +239,7 @@ export async function handleStock(message: Message, args: string[]) {
 
     if (sub === "portfolio" || sub === "port") {
         return message.reply({
-            components: [await buildPortfolioContainer(message.guildId, message.author.id, message.author.username, emoji)],
+            components: [await buildPortfolioContainer(message.guildId, message.author.id, message.author.username)],
             flags: MessageFlags.IsComponentsV2,
         });
     }
@@ -248,7 +248,7 @@ export async function handleStock(message: Message, args: string[]) {
     const file = new AttachmentBuilder("./src/assets/stock_market.jpg", { name: STOCK_BANNER_NAME });
 
     return message.reply({
-        components: [buildMarketContainer(stocks, emoji, prefix)],
+        components: [buildMarketContainer(stocks, prefix)],
         files: [file],
         flags: MessageFlags.IsComponentsV2,
     });

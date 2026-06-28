@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Book, FileText, Globe, LifeBuoy, Shield, Users, Terminal, LayoutDashboard, Home } from "lucide-react";
+import { Book, FileText, LifeBuoy, Shield, Users, Terminal, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -13,7 +13,6 @@ const NAV_ITEMS = [
     { label: "Privacy Policy", href: "/policy", icon: Shield },
     { label: "Team", href: "/team", icon: Users },
     { label: "Changelog", href: "/changelog", icon: LifeBuoy },
-    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
 ];
 
 export function GeneralSidebar() {

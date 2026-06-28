@@ -1,12 +1,13 @@
 
 import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ButtonInteraction } from "discord.js";
 import prisma from "../../utils/prisma";
+import { globalCatalogGuildFilter } from "../../utils/globalCatalog";
 import { errorEmbed } from "../../utils/embed";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { calculateTotalStats, calculateCombatScore, getWinChance } from "../../utils/gameUtils";
 import { GameConfig } from "../../config/gameConfig";
 import { Mascot } from "../../config/branding";
 import { ensureUserAndWallet } from "../../services/walletService";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 const EMOJI_CHICKEN = GameConfig.Emojis.Chicken;
 const EMOJI_XP = GameConfig.Emojis.XpFull;
@@ -46,10 +47,12 @@ export async function handleChicken(message: Message, args: string[]) {
 
 async function handleTop(message: Message) {
     const guildId = message.guildId!;
-    const config = await getGuildConfig(guildId);
+    const prefix = await getGuildPrefix(guildId);
 
     const shopItem = await prisma.shopItem.findFirst({
-        where: { name: { equals: "Chicken", mode: "insensitive" }, guildId }
+        where: globalCatalogGuildFilter({
+            name: { equals: "Chicken", mode: "insensitive" },
+        })
     });
 
     if (!shopItem) return message.reply("Chicken item not configured in shop.");
@@ -101,15 +104,15 @@ async function handleTop(message: Message) {
         .setColor("#FFD700")
         .setTitle(`${EMOJI_TROPHY} Chicken Leaderboard`)
         .setDescription(description || "No active chickens.")
-        .setFooter({ text: `Use ${config.prefix}chicken top to see this list.` });
+        .setFooter({ text: `Use ${prefix}chicken top to see this list.` });
 
     return message.reply({ embeds: [embed] });
 }
 
 async function handleName(message: Message, args: string[]) {
-    const config = await getGuildConfig(message.guildId!);
+    const prefix = await getGuildPrefix(message.guildId!);
     if (args.length < 1) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}chicken name <New Name>\``)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}chicken name <New Name>\``)] });
     }
 
     const newName = args.join(" ");
@@ -121,7 +124,9 @@ async function handleName(message: Message, args: string[]) {
     const user = message.author;
 
     const shopItem = await prisma.shopItem.findFirst({
-        where: { name: { equals: "Chicken", mode: "insensitive" }, guildId }
+        where: globalCatalogGuildFilter({
+            name: { equals: "Chicken", mode: "insensitive" },
+        })
     });
 
     if (!shopItem) return message.reply("Chicken item not configured in shop.");
@@ -157,7 +162,7 @@ async function handleName(message: Message, args: string[]) {
 }
 
 async function handleTraitsInfo(message: Message) {
-    const config = await getGuildConfig(message.guildId!);
+    const prefix = await getGuildPrefix(message.guildId!);
 
     // Trait Definitions
     const traits = [
@@ -174,7 +179,7 @@ async function handleTraitsInfo(message: Message) {
         .setColor("#3498db")
         .setTitle("🧬 Chicken Traits")
         .setDescription(`Chickens are born with a random trait that affects their combat stats.\n\n${description}`)
-        .setFooter({ text: `Traits are permanent and assigned at birth. Use ${config.prefix}chicken traits` });
+        .setFooter({ text: `Traits are permanent and assigned at birth. Use ${prefix}chicken traits` });
 
     return message.reply({ embeds: [embed] });
 }
@@ -186,7 +191,7 @@ async function handleView(message: Message, args: string[]) {
     if (!guildId) return;
 
     try {
-        const config = await getGuildConfig(guildId);
+        const prefix = await getGuildPrefix(guildId);
         const userData = await prisma.user.findUnique({ where: { discordId: user.id } });
 
         if (!userData) {
@@ -194,7 +199,9 @@ async function handleView(message: Message, args: string[]) {
         }
 
         const shopItem = await prisma.shopItem.findFirst({
-            where: { name: { equals: "Chicken", mode: "insensitive" }, guildId }
+            where: globalCatalogGuildFilter({
+            name: { equals: "Chicken", mode: "insensitive" },
+        })
         });
 
         if (!shopItem) {
@@ -399,7 +406,7 @@ async function handleView(message: Message, args: string[]) {
                     `Your chicken is **dying** and will be lost permanently if not saved!\n\n` +
                     `⏰ **Death in:** <t:${endTimeUnix}:R>\n\n` +
                     `**Only a Phoenix Serum can save it.**\n` +
-                    `\`${config.prefix}use phoenix serum\`\n\n` +
+                    `\`${prefix}use phoenix serum\`\n\n` +
                     `-# No coin heal available. No other items work. Act fast.`
                 );
             return message.reply({ embeds: [embed] });
@@ -426,7 +433,7 @@ async function handleView(message: Message, args: string[]) {
                     )
                     .addFields(
                         { name: "💰 Coin Heal", value: `Pay **${healCost.toLocaleString()}** coins to heal instantly.`, inline: true },
-                        { name: "🏪 Cock Store", value: `\`${config.prefix}use feather bandage\` — Instant heal\n\`${config.prefix}use phoenix serum\` — Full recovery`, inline: false },
+                        { name: "🏪 Cock Store", value: `\`${prefix}use feather bandage\` — Instant heal\n\`${prefix}use phoenix serum\` — Full recovery`, inline: false },
                     );
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -541,7 +548,7 @@ Vs Lvl 10: **${getProb(10)}%**
 `, inline: false
                 }
             )
-            .setFooter({ text: `Use ${config.prefix}chicken name <name> to rename!` });
+            .setFooter({ text: `Use ${prefix}chicken name <name> to rename!` });
 
         return message.reply({ embeds: [embed] });
 
@@ -586,12 +593,12 @@ function drawStatBar(baseValue: number, traitBonus: number) {
 
 async function handleTrain(message: Message, args: string[]) {
     const stat = args[0]?.toLowerCase();
-    const config = await getGuildConfig(message.guildId!);
+    const prefix = await getGuildPrefix(message.guildId!);
     const validStats = ["strength", "agility", "defense"];
 
     if (!validStats.includes(stat)) {
         return message.reply({
-            embeds: [errorEmbed(message.author, "Invalid Stat", `Usage: \`${config.prefix}chicken train <strength|agility|defense>\`\nValid stats: Strength, Agility, Defense.`)]
+            embeds: [errorEmbed(message.author, "Invalid Stat", `Usage: \`${prefix}chicken train <strength|agility|defense>\`\nValid stats: Strength, Agility, Defense.`)]
         });
     }
 
@@ -599,7 +606,11 @@ async function handleTrain(message: Message, args: string[]) {
     const user = message.author;
 
     // 2. Get Chicken to Check Level
-    const shopItem = await prisma.shopItem.findFirst({ where: { name: { equals: "Chicken", mode: "insensitive" }, guildId } });
+    const shopItem = await prisma.shopItem.findFirst({
+        where: globalCatalogGuildFilter({
+            name: { equals: "Chicken", mode: "insensitive" },
+        }),
+    });
     if (!shopItem) return message.reply("Chicken item missing.");
 
     const inv = await prisma.inventory.findUnique({ where: { userId_shopItemId: { userId: await getUserId(user.id, guildId), shopItemId: shopItem.id } } });
@@ -609,19 +620,19 @@ async function handleTrain(message: Message, args: string[]) {
 
     // Check if already training, injured, or critical
     if (meta.critical) {
-        return message.reply(`Your chicken is in **critical condition**! Use \`${config.prefix}use phoenix serum\` to save it.`);
+        return message.reply(`Your chicken is in **critical condition**! Use \`${prefix}use phoenix serum\` to save it.`);
     }
     if (meta.training) {
-        return message.reply(`Your chicken is already training! Check \`${config.prefix}chicken\`.`);
+        return message.reply(`Your chicken is already training! Check \`${prefix}chicken\`.`);
     }
     if (meta.injured) {
-        return message.reply(`Your chicken is injured! Use \`${config.prefix}use feather bandage\` or coin-heal via \`${config.prefix}chicken\`.`);
+        return message.reply(`Your chicken is injured! Use \`${prefix}use feather bandage\` or coin-heal via \`${prefix}chicken\`.`);
     }
 
     const level = meta.level || 0;
 
-    const baseCost = (config as any).chickenTrainBaseCost || 500;
-    const trainMult = (config as any).chickenTrainMultiplier || 0.5;
+    const baseCost = 500;
+    const trainMult = 0.5;
 
     // Dynamic Cost & Time
     const cost = Math.floor(baseCost * (1 + level * trainMult));

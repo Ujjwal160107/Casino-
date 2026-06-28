@@ -1,5 +1,4 @@
 import prisma from "../utils/prisma";
-import { getGuildConfig } from "./guildConfigService";
 
 export const STARTING_STOCKS = [
     { symbol: "CRSH", name: "CasinoCoin", price: 50, volatility: 15 }, // High risk
@@ -46,8 +45,7 @@ export async function updateMarket() {
 
     for (const g of guildsWithStocks) {
         const guildId = g.guildId;
-        const config = await getGuildConfig(guildId);
-        const refreshRateMs = (config.stockRefreshRate || 600) * 1000;
+        const refreshRateMs = 3600 * 1000;
 
         // Find stocks for this guild that need updating
         // We can't do complex date math in "where" easily for "lastUpdate + refreshRate < now" without raw query
@@ -108,16 +106,16 @@ export async function getAllStocks(guildId: string) {
     });
 }
 
-// Helper to resolve User ObjectID from Discord ID
-async function getUserObjectId(guildId: string, discordId: string) {
+// Helper to resolve user discordId
+async function getUserDiscordId(discordId: string) {
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId, guildId } }
+        where: { discordId }
     });
-    return user ? user.id : null;
+    return user ? user.discordId : null;
 }
 
 export async function getPortfolio(guildId: string, discordId: string) {
-    const userId = await getUserObjectId(guildId, discordId);
+    const userId = await getUserDiscordId(discordId);
     if (!userId) return null;
 
     return prisma.portfolio.findUnique({
@@ -136,7 +134,7 @@ export async function buyStock(guildId: string, discordId: string, symbol: strin
 
     // Resolve User
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId, guildId } },
+        where: { discordId },
         include: { wallet: true }
     });
 
@@ -145,7 +143,7 @@ export async function buyStock(guildId: string, discordId: string, symbol: strin
         throw new Error(`Insufficient funds. Cost: ${cost}`);
     }
 
-    const userId = user.id; // User's ObjectID
+    const userId = user.discordId; // User's ObjectID
 
     // Ensure Portfolio
     let portfolio = await prisma.portfolio.findUnique({ where: { userId } });
@@ -193,7 +191,7 @@ export async function sellStock(guildId: string, discordId: string, symbol: stri
     const stock = await getStock(guildId, symbol);
     if (!stock) throw new Error(`Stock **${symbol}** not found in this market.`);
 
-    const userId = await getUserObjectId(guildId, discordId);
+    const userId = await getUserDiscordId(discordId);
     if (!userId) throw new Error("User not found.");
 
     const portfolio = await prisma.portfolio.findUnique({
@@ -215,7 +213,7 @@ export async function sellStock(guildId: string, discordId: string, symbol: stri
     const value = stock.currentPrice * quantity;
 
     // Update Wallet
-    const user = await prisma.user.findUnique({ where: { id: userId }, include: { wallet: true } });
+    const user = await prisma.user.findUnique({ where: { discordId: userId }, include: { wallet: true } });
     await prisma.wallet.update({
         where: { id: user!.wallet!.id },
         data: { balance: { increment: value } }

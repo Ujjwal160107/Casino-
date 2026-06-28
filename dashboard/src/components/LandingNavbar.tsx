@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { signIn, signOut } from "next-auth/react";
-import { LayoutDashboard, Menu, X, LogOut, User } from "lucide-react";
+import { Menu, X, LogOut } from "lucide-react";
 import { useState, useEffect } from "react";
 import { GlassCard } from "./ui/GlassCard";
 import Image from "next/image";
@@ -101,13 +101,6 @@ export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
                                                     <p className="text-xs text-zinc-400">Logged in via Discord</p>
                                                 </div>
                                                 <div className="p-2 space-y-1">
-                                                    <Link
-                                                        href="/dashboard"
-                                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 hover:text-white rounded-lg transition-colors"
-                                                    >
-                                                        <LayoutDashboard size={16} />
-                                                        Dashboard
-                                                    </Link>
                                                     <button
                                                         onClick={() => signOut({ callbackUrl: "/" })}
                                                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-colors text-left"
@@ -128,7 +121,7 @@ export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
                             ) : (
                                 !hideLogin && (
                                     <button
-                                        onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
+                                        onClick={() => signIn("discord", { callbackUrl: "/" })}
                                         className="px-6 py-2 rounded-full border border-white/10 text-zinc-300 font-medium text-sm hover:bg-white/5 hover:text-white hover:border-white/20 transition-all cursor-pointer"
                                     >
                                         Login

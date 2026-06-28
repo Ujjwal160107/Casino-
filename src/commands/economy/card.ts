@@ -9,7 +9,7 @@ import {
   withdrawFromCard
 } from "../../services/creditCardService";
 import { fmtCurrency, parseSmartAmount } from "../../utils/format";
-import { buildBankCardsPayload } from "./bank";
+import { buildBankCardsPayload, buildMyCardsPayload } from "./bank";
 
 const CARD_ACCENT_COLOR = 0x5865F2;
 
@@ -82,7 +82,9 @@ export async function handleCard(message: Message, args: string[]) {
 
     const member = message.member;
     const displayName = member?.displayName || message.author.globalName || message.author.username;
-    const payload = await buildBankCardsPayload(message.author.id, displayName);
+    const summary = await getCardSummary(message.author.id);
+    const view = summary.card ? "mine" as const : "catalog" as const;
+    const payload = await buildBankCardsPayload(message.author.id, displayName, view, message.guild!.id);
     return message.reply({
       ...payload,
       flags: MessageFlags.IsComponentsV2
@@ -91,6 +93,23 @@ export async function handleCard(message: Message, args: string[]) {
     return message.reply({
       components: [container("Card Error", (error as Error).message, 0xE74C3C)],
       flags: MessageFlags.IsComponentsV2
+    });
+  }
+}
+
+export async function handleMyCards(message: Message) {
+  await ensureBankingUser(message.author.id, message.author.username);
+  const displayName = message.member?.displayName || message.author.globalName || message.author.username;
+  try {
+    const payload = await buildMyCardsPayload(message.author.id, displayName, message.guild!.id);
+    return message.reply({
+      ...payload,
+      flags: MessageFlags.IsComponentsV2,
+    });
+  } catch (error) {
+    return message.reply({
+      components: [container("My Cards", (error as Error).message, 0xE74C3C)],
+      flags: MessageFlags.IsComponentsV2,
     });
   }
 }

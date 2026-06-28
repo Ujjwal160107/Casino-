@@ -10,12 +10,14 @@ import {
   TextDisplayBuilder,
 } from "discord.js";
 import prisma from "../utils/prisma";
+import { GLOBAL_CATALOG_GUILD_ID } from "../utils/globalCatalog";
 import { Mascot } from "../config/branding";
 import { fmtCurrency } from "../utils/format";
 import { redisService } from "./redisService";
 import { upsertLuckModifier } from "./shopBuffs";
 import { ANIMAL_CATALOG } from "../utils/animalCatalog";
 import { formatPartName, getHuntPartMap } from "./huntPartService";
+import { CRIME_PREP_CRAFT_KEYS } from "../data/crimePrepWhitelist";
 
 const CRAFTS_PER_PAGE = 4;
 const CRAFT_ACCENT = 0x8E44AD;
@@ -285,24 +287,12 @@ export async function getSortedCraftRecipes(userId: string, unlockedKeys: Set<st
     });
 }
 
-async function grantCraftedInventoryItem(userId: string, guildId: string, recipe: HuntCraftRecipe, consumable = false, client: typeof prisma | any = prisma) {
-  const existing = await client.shopItem.findFirst({ where: { guildId, name: recipe.name } });
-  const item = existing
-    ? await client.shopItem.update({
-      where: { id: existing.id },
-      data: {
-        description: recipe.description,
-        price: recipe.coinCost,
-        category: consumable ? "HUNT" : "COSMETICS",
-        itemType: consumable ? "CONSUMABLE" : "COLLECTIBLE",
-        consumable,
-        usable: consumable,
-        showInInventory: true,
-      },
-    })
-    : await client.shopItem.create({
-      data: {
-      guildId,
+async function grantCraftedInventoryItem(userId: string, _guildId: string, recipe: HuntCraftRecipe, consumable = false, client: typeof prisma | any = prisma) {
+  const item = await client.shopItem.upsert({
+    where: { catalogKey: recipe.key },
+    create: {
+      catalogKey: recipe.key,
+      guildId: GLOBAL_CATALOG_GUILD_ID,
       name: recipe.name,
       description: recipe.description,
       price: recipe.coinCost,
@@ -312,8 +302,18 @@ async function grantCraftedInventoryItem(userId: string, guildId: string, recipe
       usable: consumable,
       effects: [],
       showInInventory: true,
-      },
-    });
+    },
+    update: {
+      name: recipe.name,
+      description: recipe.description,
+      price: recipe.coinCost,
+      category: consumable ? "HUNT" : "COSMETICS",
+      itemType: consumable ? "CONSUMABLE" : "COLLECTIBLE",
+      consumable,
+      usable: consumable,
+      showInInventory: true,
+    },
+  });
 
   await client.inventory.upsert({
     where: { userId_shopItemId: { userId, shopItemId: item.id } },
@@ -355,6 +355,11 @@ export async function getCraftEffect<T extends object>(
 }
 
 async function applyCraftEffect(userId: string, guildId: string, recipe: HuntCraftRecipe) {
+  if (CRIME_PREP_CRAFT_KEYS.has(recipe.key)) {
+    await grantCraftedInventoryItem(userId, guildId, recipe, true);
+    return `${recipe.name} added to inventory. Required for certain crimes — open your crime board when ready.`;
+  }
+
   const effect = recipe.effect;
 
   switch (effect.type) {

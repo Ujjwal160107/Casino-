@@ -5,8 +5,8 @@ import { ensureBankForUser } from "../../services/bankService";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { fmtCurrency, parseSmartAmount } from "../../utils/format";
 import { logToChannel } from "../../utils/discordLogger";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleSetMoney(message: Message, args: string[]) {
     if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
@@ -27,8 +27,8 @@ export async function handleSetMoney(message: Message, args: string[]) {
         return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please specify a valid positive amount (0 or more).")] });
     }
 
-    const config = await getGuildConfig(message.guildId!);
-    const emoji = config.currencyEmoji;
+    const prefix = await getGuildPrefix(message.guildId!);
+    
 
     const discordId = mention.replace(/[<@!>]/g, "");
     const target = await ensureUserAndWallet(discordId, message.guildId!, "Unknown");
@@ -64,11 +64,11 @@ export async function handleSetMoney(message: Message, args: string[]) {
             guild: message.guild!,
             type: "ADMIN",
             title: "Money Set (Bank)",
-            description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Old Balance:** ${fmtCurrency(oldBalance, emoji)}\n**New Balance:** ${fmtCurrency(updatedBank.balance, emoji)}`,
+            description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Old Balance:** ${fmtCurrency(oldBalance)}\n**New Balance:** ${fmtCurrency(updatedBank.balance)}`,
             color: 0xFFA500
         });
         return message.reply({
-            embeds: [successEmbed(message.author, "Money Set", `Set ${mention}'s **Bank** balance to **${fmtCurrency(updatedBank.balance, emoji)}**.`)]
+            embeds: [successEmbed(message.author, "Money Set", `Set ${mention}'s **Bank** balance to **${fmtCurrency(updatedBank.balance)}**.`)]
         });
 
     } else {
@@ -102,11 +102,11 @@ export async function handleSetMoney(message: Message, args: string[]) {
             guild: message.guild!,
             type: "ADMIN",
             title: "Money Set (Wallet)",
-            description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Old Balance:** ${fmtCurrency(oldBalance, emoji)}\n**New Balance:** ${fmtCurrency(updatedWallet.balance, emoji)}`,
+            description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Old Balance:** ${fmtCurrency(oldBalance)}\n**New Balance:** ${fmtCurrency(updatedWallet.balance)}`,
             color: 0xFFA500
         });
         return message.reply({
-            embeds: [successEmbed(message.author, "Money Set", `Set ${mention}'s **Wallet** balance to **${fmtCurrency(updatedWallet.balance, emoji)}**.`)]
+            embeds: [successEmbed(message.author, "Money Set", `Set ${mention}'s **Wallet** balance to **${fmtCurrency(updatedWallet.balance)}**.`)]
         });
     }
 }

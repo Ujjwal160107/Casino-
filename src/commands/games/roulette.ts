@@ -12,7 +12,6 @@ import {
 import path from "path";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { placeBetWithTransaction } from "../../services/gameService";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage } from "../../services/casinoCooldownService";
@@ -22,9 +21,11 @@ import { Mascot } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { questBus } from "../../services/questEvents";
 import { checkLuckyCoin } from "../../services/shopBuffs";
+import { getGuildPrefix } from "../../utils/guildContext";
+import { GAME_UI_TIMINGS } from "../../utils/economyConfig";
 
 export async function handleRouletteMenu(message: Message) {
-  const config = await getGuildConfig(message.guildId!);
+  const prefix = await getGuildPrefix(message.guildId!);
   const eCasino = "<a:casino:1445732641545654383>";
   const eScroll = "<:scroll:1446218234171887760>";
   const eDicesBtn = "<:dices:1446220119733702767>";
@@ -87,7 +88,7 @@ export async function handleRouletteMenu(message: Message) {
     }
     if (i.customId === "roul_play") {
       await i.reply({
-        content: `To place a bet, type:\n\`${config.prefix}bet <amount> <choice>\`\n\n**Examples:**\n\`${config.prefix}bet 100 red\`\n\`${config.prefix}bet 500 17\`\n\`${config.prefix}bet 1000 odd\``,
+        content: `To place a bet, type:\n\`${prefix}bet <amount> <choice>\`\n\n**Examples:**\n\`${prefix}bet 100 red\`\n\`${prefix}bet 500 17\`\n\`${prefix}bet 1000 odd\``,
         ephemeral: true
       });
     }
@@ -108,17 +109,17 @@ export async function handleBet(message: Message, args: string[]) {
   if (isNaN(amount) || amount <= 0) {
     return message.reply({ embeds: [errorEmbed(message.author, "Invalid Wager", "Please bet a valid positive amount.")] });
   }
-  const config = await getGuildConfig(message.guildId!);
-  const emoji = config.currencyEmoji;
-  const { min, max } = getGameBetLimits(config, "roulette");
+  const prefix = await getGuildPrefix(message.guildId!);
+  
+  const { min, max } = getGameBetLimits("roulette");
   if (amount < min) {
     return message.reply({
-      embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Roulette is **${fmtCurrency(min, emoji)}**.`)]
+      embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Roulette is **${fmtCurrency(min)}**.`)]
     });
   }
   if (amount > max) {
     return message.reply({
-      embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Roulette is **${fmtCurrency(max, emoji)}**.`)]
+      embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Roulette is **${fmtCurrency(max)}**.`)]
     });
   }
   const cd = await checkCasinoCooldown("roulette", message.author.id);
@@ -138,7 +139,7 @@ export async function handleBet(message: Message, args: string[]) {
   const luckyCoinMult = await checkLuckyCoin(message.author.id);
 
   // SPIN ANIMATION
-  const spinTime = config.rouletteSpinTime || 3;
+  const spinTime = GAME_UI_TIMINGS.rouletteSpinSeconds;
   const eCasino = "<a:casino:1445732641545654383>";
   const spinningEmbed = new EmbedBuilder()
     .setTitle(`${eCasino} The wheel is spinning...`)
@@ -226,7 +227,7 @@ export async function handleBet(message: Message, args: string[]) {
       guild: message.guild!,
       type: "ECONOMY",
       title: "Roulette Game",
-      description: `**User:** ${message.author.toString()}\n**Bet on:** ${choiceRaw}\n**Result:** ${isRed ? "RED" : (isBlack ? "BLACK" : "ZERO")} (${spin})\n**Bet:** ${fmtCurrency(amount, emoji)}\n**Payout:** ${fmtCurrency(payout, emoji)}`,
+      description: `**User:** ${message.author.toString()}\n**Bet on:** ${choiceRaw}\n**Result:** ${isRed ? "RED" : (isBlack ? "BLACK" : "ZERO")} (${spin})\n**Bet:** ${fmtCurrency(amount)}\n**Payout:** ${fmtCurrency(payout)}`,
       color: logColor,
       thumbnail: message.author.displayAvatarURL()
     }).catch(() => { });
@@ -241,7 +242,7 @@ export async function handleBet(message: Message, args: string[]) {
     .setDescription(
       `**Result:** ${displayColor} **${spin}**\n` +
       `**Your Bet:** ${choiceRaw}\n` +
-      `**${didWin ? "Won" : "Lost"}:** ${fmtCurrency(didWin ? payout : amount, emoji)}`
+      `**${didWin ? "Won" : "Lost"}:** ${fmtCurrency(didWin ? payout : amount)}`
     )
     .setFooter({ text: `${Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet!.balance - amount + payout).toLocaleString('en-US')}` });
 

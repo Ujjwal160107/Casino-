@@ -10,9 +10,9 @@ import {
 import prisma from "../../utils/prisma";
 import { Mascot } from "../../config/branding";
 import { fmtCurrency } from "../../utils/format";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { getJob } from "../../services/jobService";
 import { getAllSectorReputation } from "../../services/jobReputationService";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleCareer(message: Message) {
     if (!message.guild) return;
@@ -26,7 +26,7 @@ export async function handleCareer(message: Message) {
         return message.reply("You don't have a profile yet.");
     }
 
-    const config = await getGuildConfig(message.guild.id);
+    const prefix = await getGuildPrefix(message.guild.id);
     const totalShifts = user.workLogs.length;
     const successfulShifts = user.workLogs.filter((log) => log.success).length;
     const successRate = totalShifts > 0 ? (successfulShifts / totalShifts) * 100 : 0;
@@ -92,8 +92,8 @@ export async function handleCareer(message: Message) {
             ),
             new TextDisplayBuilder().setContent(
                 `### ${Mascot.Emotes.MoneyBag} Earnings\n` +
-                `**Total:** ${fmtCurrency(totalEarned, config.currencyEmoji)}\n` +
-                `**Avg/Shift:** ${totalShifts > 0 ? fmtCurrency(Math.floor(totalEarned / totalShifts), config.currencyEmoji) : "0"}`
+                `**Total:** ${fmtCurrency(totalEarned)}\n` +
+                `**Avg/Shift:** ${totalShifts > 0 ? fmtCurrency(Math.floor(totalEarned / totalShifts)) : "0"}`
             )
         )
         .addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small))

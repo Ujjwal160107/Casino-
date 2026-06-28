@@ -4,27 +4,30 @@ import { applyItemEffects, ItemEffect, ItemEffectResult } from "./effectService"
 import { logToChannel } from "../utils/discordLogger";
 import { Colors } from "discord.js";
 import { Mascot } from "../config/branding";
-import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG, JOB_SHOP_CATALOG, UNI_SHOP_CATALOG, COCK_SHOP_CATALOG, COCK_SYSTEM_ITEMS } from "../utils/shopCatalog";
+import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG, JOB_SHOP_CATALOG, UNI_SHOP_CATALOG, COCK_SHOP_CATALOG, COCK_SYSTEM_ITEMS, COSMETICS_SHOP_CATALOG } from "../utils/shopCatalog";
 import { RIFLE_PRIORITY } from "../utils/animalCatalog";
 import { redisService } from "./redisService";
 import { isTester } from "../utils/developerAccess";
+import { ensureUserAndWallet } from "./walletService";
+import { GLOBAL_CATALOG_GUILD_ID, globalCatalogGuildFilter } from "../utils/globalCatalog";
+import type { ShopCatalogItem } from "../utils/shopCatalog";
 
-export async function resetShop(guildId: string, category: string = "GENERAL") {
+export async function resetShop(_guildId: string, category: string = "GENERAL") {
   return prisma.shopItem.deleteMany({
-    where: { guildId, category }
+    where: globalCatalogGuildFilter({ category }),
   });
 }
 
-export async function getShopItems(guildId: string, category: string = "GENERAL") {
-  return prisma.shopItem.findMany({ where: { guildId, category } });
+export async function getShopItems(_guildId: string, category: string = "GENERAL") {
+  return prisma.shopItem.findMany({ where: globalCatalogGuildFilter({ category }) });
 }
 
-export async function getShopItemByName(guildId: string, name: string) {
+export async function getShopItemByName(_guildId: string, name: string) {
   return prisma.shopItem.findFirst({
     where: {
-      guildId,
-      name: { equals: name, mode: "insensitive" }
-    }
+      ...globalCatalogGuildFilter(),
+      name: { equals: name, mode: "insensitive" },
+    },
   });
 }
 
@@ -41,7 +44,8 @@ export async function createShopItem(
 ) {
   return prisma.shopItem.create({
     data: {
-      guildId,
+      guildId: GLOBAL_CATALOG_GUILD_ID,
+      catalogKey: name.toLowerCase().replace(/\s+/g, "_"),
       name,
       price,
       description: description || "No description",
@@ -87,6 +91,11 @@ export async function deleteShopItem(itemId: string) {
 }
 
 export async function buyItem(guildId: string, userId: string, identifier: string, member?: GuildMember, byId: boolean = false, paymentSource: "wallet" | "card" = "wallet") {
+  const tester = isTester(userId, member);
+  if (tester) {
+    await ensureUserAndWallet(userId, guildId, member?.user.username ?? "Tester");
+  }
+
   let item;
 
   if (byId) {
@@ -96,14 +105,14 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
   } else {
     item = await prisma.shopItem.findFirst({
       where: {
-        guildId,
-        name: { equals: identifier, mode: "insensitive" }
-      }
+        ...globalCatalogGuildFilter(),
+        name: { equals: identifier, mode: "insensitive" },
+      },
     });
   }
 
   if (!item) throw new Error("Item not found.");
-  if (item.stock !== -1 && item.stock <= 0) throw new Error("Out of stock.");
+  if (item.stock !== -1 && item.stock <= 0 && !tester) throw new Error("Out of stock.");
 
   const res = await prisma.$transaction(async (tx) => {
     const user = await (tx.user.findUnique as any)({
@@ -115,30 +124,30 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       throw new Error("User or wallet not found.");
     }
 
-    if (paymentSource === "card") {
-      const allCatalogs = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG];
+    if (paymentSource === "card" && !tester) {
+      const allCatalogs = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG, ...COSMETICS_SHOP_CATALOG];
       const catalogEntry = allCatalogs.find(c => c.name.toLowerCase() === item.name.toLowerCase());
       if (catalogEntry?.creditBlocked) {
         throw new Error(`**${item.name}** cannot be purchased with a credit card.`);
       }
-    } else if (user.wallet.balance < item.price && !isTester(userId)) {
+    } else if (user.wallet.balance < item.price && !tester) {
       throw new Error(`You need ${item.price.toLocaleString("en-US")} coins to buy this.`);
     }
 
     const reqs = (item.requirements as any) || {};
 
-    if (reqs.balance && user.wallet.balance < reqs.balance) {
+    if (reqs.balance && user.wallet.balance < reqs.balance && !tester) {
       throw new Error(`You need a wallet balance of ${reqs.balance} to buy this.`);
     }
 
-    if (reqs.netWorth) {
+    if (reqs.netWorth && !tester) {
       const netWorth = user.wallet.balance + (user.bank?.balance || 0);
       if (netWorth < reqs.netWorth) {
         throw new Error(`You need a net worth of ${reqs.netWorth} to buy this.`);
       }
     }
 
-    if (reqs.roles && reqs.roles.length > 0) {
+    if (reqs.roles && reqs.roles.length > 0 && !tester) {
       if (!member) throw new Error("Could not verify role requirements.");
       const hasRole = reqs.roles.some((roleId: string) => member.roles.cache.has(roleId));
       if (!hasRole) {
@@ -146,7 +155,7 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       }
     }
 
-    if (reqs.denyRoles && reqs.denyRoles.length > 0) {
+    if (reqs.denyRoles && reqs.denyRoles.length > 0 && !tester) {
       if (member) {
         const hasDenyRole = reqs.denyRoles.some((roleId: string) => member.roles.cache.has(roleId));
         if (hasDenyRole) {
@@ -155,7 +164,7 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       }
     }
 
-    if (reqs.items && reqs.items.length > 0) {
+    if (reqs.items && reqs.items.length > 0 && !tester) {
       const userInv = await tx.inventory.findMany({
         where: { userId: user.discordId },
         include: { shopItem: true }
@@ -196,7 +205,9 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
 
     let cardInfo: any = null;
 
-    if (paymentSource === "card") {
+    if (tester) {
+      cardInfo = null;
+    } else if (paymentSource === "card") {
       const { chargeCardPurchaseTx } = await import("./creditCardService");
       const result = await chargeCardPurchaseTx(tx, userId, item.price, {
         type: "shop_purchase",
@@ -220,7 +231,7 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       });
     }
 
-    if (item.stock !== -1) {
+    if (item.stock !== -1 && !tester) {
       await tx.shopItem.update({
         where: { id: item.id },
         data: { stock: { decrement: 1 } }
@@ -294,7 +305,12 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
     }
   }
 
-  return { item: res.item, results };
+  return {
+    item: res.item,
+    results,
+    cardInfo: res.cardInfo ?? null,
+    paymentSource: res.paymentSource,
+  };
 }
 
 export async function useItem(userId: string, guildId: string, itemName: string, member?: GuildMember) {
@@ -397,59 +413,15 @@ export async function getUserInventory(discordId: string, _guildId?: string) {
   }) as any;
 }
 
-const seededGuilds = new Set<string>();
+const seededCategories = new Set<string>();
 
-export async function seedGeneralShop(guildId: string) {
-  if (seededGuilds.has(guildId)) return;
-  seededGuilds.add(guildId);
-
-  const existing = await prisma.shopItem.findMany({
-    where: { guildId, category: "GENERAL" },
-    select: { name: true },
-  });
-  const existingNames = new Set(existing.map(e => e.name.toLowerCase()));
-
-  const toCreate = GENERAL_SHOP_CATALOG.filter(
-    item => !existingNames.has(item.name.toLowerCase())
-  );
-
-  if (toCreate.length === 0) return;
-
-  await prisma.shopItem.createMany({
-    data: toCreate.map(item => ({
-      guildId,
-      name: item.name,
-      price: item.price,
-      description: item.description,
-      stock: -1,
-      itemType: item.itemType,
-      effects: item.effects as any,
-      consumable: item.consumable,
-      usable: item.usable,
-      category: item.category,
-    })),
-  });
-}
-
-const seededJobGuilds = new Set<string>();
-
-export async function seedJobShop(guildId: string) {
-  if (seededJobGuilds.has(guildId)) return;
-
-  const existing = await prisma.shopItem.findMany({
-    where: { guildId, category: "JOB" },
-    select: { name: true },
-  });
-  const existingNames = new Set(existing.map(e => e.name.toLowerCase()));
-
-  const toCreate = JOB_SHOP_CATALOG.filter(
-    item => !existingNames.has(item.name.toLowerCase())
-  );
-
-  if (toCreate.length > 0) {
-    await prisma.shopItem.createMany({
-      data: toCreate.map(item => ({
-        guildId,
+async function upsertCatalogItems(items: ShopCatalogItem[]) {
+  for (const item of items) {
+    await prisma.shopItem.upsert({
+      where: { catalogKey: item.key },
+      create: {
+        catalogKey: item.key,
+        guildId: GLOBAL_CATALOG_GUILD_ID,
         name: item.name,
         price: item.price,
         description: item.description,
@@ -459,139 +431,53 @@ export async function seedJobShop(guildId: string) {
         consumable: item.consumable,
         usable: item.usable,
         category: item.category,
-      })),
-    });
-  }
-
-  // Mark seeded only after DB write succeeds
-  seededJobGuilds.add(guildId);
-}
-
-const seededHuntGuilds = new Set<string>();
-
-export async function seedHuntShop(guildId: string) {
-  if (seededHuntGuilds.has(guildId)) return;
-  seededHuntGuilds.add(guildId);
-
-  const existing = await prisma.shopItem.findMany({
-    where: { guildId, category: "HUNT" },
-    select: { name: true },
-  });
-  const existingNames = new Set(existing.map(e => e.name.toLowerCase()));
-
-  const toCreate = HUNT_SHOP_CATALOG.filter(
-    item => !existingNames.has(item.name.toLowerCase())
-  );
-
-  if (toCreate.length === 0) return;
-
-  await prisma.shopItem.createMany({
-    data: toCreate.map(item => ({
-      guildId,
-      name: item.name,
-      price: item.price,
-      description: item.description,
-      stock: -1,
-      itemType: item.itemType,
-      effects: item.effects as any,
-      consumable: item.consumable,
-      usable: item.usable,
-      category: item.category,
-    })),
-  });
-}
-
-const seededUniGuilds = new Set<string>();
-
-export async function seedUniShop(guildId: string) {
-  if (seededUniGuilds.has(guildId)) return;
-
-  const existing = await prisma.shopItem.findMany({
-    where: { guildId, category: "UNI" },
-    select: { name: true },
-  });
-  const existingNames = new Set(existing.map(e => e.name.toLowerCase()));
-
-  const toCreate = UNI_SHOP_CATALOG.filter(
-    item => !existingNames.has(item.name.toLowerCase())
-  );
-
-  if (toCreate.length > 0) {
-    await prisma.shopItem.createMany({
-      data: toCreate.map(item => ({
-        guildId,
+      },
+      update: {
         name: item.name,
         price: item.price,
         description: item.description,
-        stock: -1,
         itemType: item.itemType,
         effects: item.effects as any,
         consumable: item.consumable,
         usable: item.usable,
         category: item.category,
-      })),
+      },
     });
   }
-
-  seededUniGuilds.add(guildId);
 }
 
-const seededCockGuilds = new Set<string>();
+export async function seedGeneralShop(_guildId?: string) {
+  if (seededCategories.has("GENERAL")) return;
+  await upsertCatalogItems(GENERAL_SHOP_CATALOG);
+  seededCategories.add("GENERAL");
+}
 
-export async function seedCockShop(guildId: string) {
-  if (seededCockGuilds.has(guildId)) return;
+export async function seedJobShop(_guildId?: string) {
+  if (seededCategories.has("JOB")) return;
+  await upsertCatalogItems(JOB_SHOP_CATALOG);
+  seededCategories.add("JOB");
+}
 
-  const existing = await prisma.shopItem.findMany({
-    where: { guildId, category: "COCK" },
-    select: { name: true },
-  });
-  const existingNames = new Set(existing.map(e => e.name.toLowerCase()));
+export async function seedHuntShop(_guildId?: string) {
+  if (seededCategories.has("HUNT")) return;
+  await upsertCatalogItems(HUNT_SHOP_CATALOG);
+  seededCategories.add("HUNT");
+}
 
-  const toCreate = COCK_SHOP_CATALOG.filter(
-    item => !existingNames.has(item.name.toLowerCase())
-  );
+export async function seedUniShop(_guildId?: string) {
+  if (seededCategories.has("UNI")) return;
+  await upsertCatalogItems(UNI_SHOP_CATALOG);
+  seededCategories.add("UNI");
+}
 
-  const systemToCreate = COCK_SYSTEM_ITEMS.filter(
-    item => !existingNames.has(item.name.toLowerCase())
-  );
+export async function seedCockShop(_guildId?: string) {
+  if (seededCategories.has("COCK")) return;
+  await upsertCatalogItems([...COCK_SHOP_CATALOG, ...COCK_SYSTEM_ITEMS]);
+  seededCategories.add("COCK");
+}
 
-  const allToCreate = [...toCreate, ...systemToCreate];
-  if (allToCreate.length > 0) {
-    await prisma.shopItem.createMany({
-      data: allToCreate.map(item => ({
-        guildId,
-        name: item.name,
-        price: item.price,
-        description: item.description,
-        stock: -1,
-        itemType: item.itemType,
-        effects: item.effects as any,
-        consumable: item.consumable,
-        usable: item.usable,
-        category: "COCK",
-      })),
-    });
-  }
-
-  // Migrate: remove old V1 cock equipment from inventories
-  const validNames = ["Chicken", ...COCK_SHOP_CATALOG.map(i => i.name)];
-  const oldV1Items = await prisma.shopItem.findMany({
-    where: {
-      guildId,
-      category: "COCK",
-      name: { notIn: validNames },
-    },
-  });
-
-  if (oldV1Items.length > 0) {
-    const oldItemIds = oldV1Items.map(i => i.id);
-    await prisma.inventory.deleteMany({
-      where: { shopItemId: { in: oldItemIds } },
-    });
-    await prisma.shopItem.deleteMany({
-      where: { id: { in: oldItemIds } },
-    });
-  }
-
-  seededCockGuilds.add(guildId);
+export async function seedCosmeticsShop(_guildId?: string) {
+  if (seededCategories.has("COSMETICS")) return;
+  await upsertCatalogItems(COSMETICS_SHOP_CATALOG);
+  seededCategories.add("COSMETICS");
 }

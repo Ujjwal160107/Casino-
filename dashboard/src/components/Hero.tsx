@@ -1,18 +1,14 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
-
 import { motion } from "framer-motion";
-import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
-import { ArrowRight, LayoutDashboard, ExternalLink } from "lucide-react";
+import { Book, ExternalLink } from "lucide-react";
 import { BackgroundParticles } from "./ui/BackgroundParticles";
 import { ScrollReveal } from "./ui/ScrollReveal";
 import { InteractiveCardDeck } from "./InteractiveCardDeck";
 
 export function Hero() {
-    const { data: session } = useSession();
     const inviteUrl = "https://discord.com/oauth2/authorize?client_id=1371816936857669702&permissions=268823672&scope=bot%20applications.commands";
 
     return (
@@ -48,7 +44,7 @@ export function Hero() {
 
                     <ScrollReveal delay={0.2} direction="left" className="mb-10 max-w-xl">
                         <p className="text-lg md:text-xl text-zinc-300 font-light leading-relaxed">
-                            Configure moderation, leveling, economy, and casino games with the most advanced dashboard for Discord.
+                            Configure moderation, leveling, economy, and casino games for your Discord community.
                         </p>
                     </ScrollReveal>
 
@@ -62,23 +58,13 @@ export function Hero() {
                             <ExternalLink size={20} />
                             Add to Discord
                         </a>
-                        {session ? (
-                            <Link
-                                href="/dashboard"
-                                className="bg-zinc-800 hover:bg-zinc-700 text-white text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 border border-white/10 flex items-center justify-center gap-2 cursor-pointer"
-                            >
-                                <LayoutDashboard size={20} />
-                                Dashboard
-                            </Link>
-                        ) : (
-                            <button
-                                onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
-                                className="bg-zinc-800 hover:bg-zinc-700 text-white text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 border border-white/10 flex items-center justify-center gap-2 cursor-pointer"
-                            >
-                                <LayoutDashboard size={20} />
-                                Dashboard
-                            </button>
-                        )}
+                        <Link
+                            href="/docs"
+                            className="bg-zinc-800 hover:bg-zinc-700 text-white text-lg font-bold px-8 py-4 rounded-xl transition-transform hover:scale-105 border border-white/10 flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                            <Book size={20} />
+                            Documentation
+                        </Link>
                     </ScrollReveal>
 
 
@@ -93,4 +79,3 @@ export function Hero() {
         </div>
     );
 }
-

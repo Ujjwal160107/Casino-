@@ -2,24 +2,25 @@ import { Message } from "discord.js";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { logToChannel } from "../../utils/discordLogger";
-import { getGuildConfig } from "../../services/guildConfigService";
 import prisma from "../../utils/prisma";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
+import { getGuildPrefix } from "../../utils/guildContext";
+import { CARD_SCORE_RULES } from "../../utils/economyConfig";
 
 export async function handleSetCreditScore(message: Message, args: string[]) {
     if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
         return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "Admins or Bot Commanders only.")] });
     }
 
-    const config = await getGuildConfig(message.guildId!);
-    const maxScore = config.maxCreditScore;
-    const minScore = 50;
+    const prefix = await getGuildPrefix(message.guildId!);
+    const maxScore = CARD_SCORE_RULES.maxScore;
+    const minScore = CARD_SCORE_RULES.minScore;
 
     if (args[0]?.toLowerCase() === "all" || args[0]?.toLowerCase() === "everyone") {
         const amountArg = args[1];
         if (!amountArg) {
             return message.reply({
-                embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}set-credit-score all <amount>\`\nExample: \`${config.prefix}set-credit-score all 500\``)]
+                embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}set-credit-score all <amount>\`\nExample: \`${prefix}set-credit-score all 500\``)]
             });
         }
         const amount = parseInt(amountArg);
@@ -50,7 +51,7 @@ export async function handleSetCreditScore(message: Message, args: string[]) {
 
     if (!targetUser || !amountArg) {
         return message.reply({
-            embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}set-credit-score @user <amount>\` or \`${config.prefix}set-credit-score all <amount>\``)]
+            embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}set-credit-score @user <amount>\` or \`${prefix}set-credit-score all <amount>\``)]
         });
     }
 

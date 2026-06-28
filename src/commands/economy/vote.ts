@@ -1,10 +1,10 @@
 import { Message, EmbedBuilder, Colors } from "discord.js";
 import prisma from "../../utils/prisma";
 import { errorEmbed } from "../../utils/embed";
-import { getGuildConfig } from "../../services/guildConfigService";
-import { Mascot } from "../../config/branding";
+import { GLOBAL_CURRENCY_EMOJI, Mascot } from "../../config/branding";
 import { ensureUserAndWallet } from "../../services/walletService";
 import fetch from "node-fetch";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 const TOPGG_BOT_ID = "1371816936857669702";
 const VOTE_LINK = `https://top.gg/bot/${TOPGG_BOT_ID}?s=0825a328ae527`;
@@ -16,7 +16,7 @@ export async function handleVote(message: Message, args: string[]) {
 
     const user = await ensureUserAndWallet(message.author.id, message.guild.id, message.author.username);
     const wallet = user.wallet!;
-    const config = await getGuildConfig(message.guild.id);
+    const prefix = await getGuildPrefix(message.guild.id);
     const voteReward = VOTE_REWARD;
     const now = new Date();
     const cooldown = 12 * 60 * 60 * 1000; // 12 Hours
@@ -102,7 +102,7 @@ export async function handleVote(message: Message, args: string[]) {
 
         const embed = new EmbedBuilder()
             .setTitle(`${Mascot.Emotes.Success} Vote Verified!`)
-            .setDescription(`Thank you for voting for **Fortuna**!\n\nYou have received **${voteReward.toLocaleString()} ${config.currencyEmoji}**.`)
+            .setDescription(`Thank you for voting for **Fortuna**!\n\nYou have received **${voteReward.toLocaleString()} ${GLOBAL_CURRENCY_EMOJI}**.`)
             .setColor(Colors.Green)
             .setFooter({ text: "Vote again in 12 hours!" });
 
@@ -113,13 +113,13 @@ export async function handleVote(message: Message, args: string[]) {
         const embed = new EmbedBuilder()
             .setTitle(`🗳️ Vote for ${message.client.user?.username || "Us"}`)
             .setDescription(
-                `Support the bot and earn **${voteReward.toLocaleString()} ${config.currencyEmoji}** every 12 hours!\n\n` +
+                `Support the bot and earn **${voteReward.toLocaleString()} ${GLOBAL_CURRENCY_EMOJI}** every 12 hours!\n\n` +
                 `**[Click Here to Vote](${VOTE_LINK})**\n` +
                 `If you're enjoying Fortuna, please consider leaving a review!\n` +
                 `**[Leave a Review](${REVIEW_LINK})**\n\n` +
                 `**Instructions:**\n` +
                 `1. Click the link above and vote.\n` +
-                `2. Come back here and run \`${config.prefix}vote\` again to claim your reward!`
+                `2. Come back here and run \`${prefix}vote\` again to claim your reward!`
             )
             .setColor(Colors.Gold)
             .setThumbnail(message.client.user?.displayAvatarURL() || "")

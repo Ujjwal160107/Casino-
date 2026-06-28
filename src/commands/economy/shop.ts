@@ -19,8 +19,9 @@ import {
 } from "discord.js";
 import fs from "fs";
 import path from "path";
-import { buyItem, getUserInventory, seedGeneralShop, seedHuntShop, seedJobShop, seedUniShop, seedCockShop } from "../../services/shopService";
+import { buyItem, getUserInventory, seedGeneralShop, seedHuntShop, seedJobShop, seedUniShop, seedCockShop, seedCosmeticsShop } from "../../services/shopService";
 import { ensureUserAndWallet } from "../../services/walletService";
+import { getCardSummary } from "../../services/creditCardService";
 import { fmtCurrency } from "../../utils/format";
 import { logToChannel } from "../../utils/discordLogger";
 import { Mascot } from "../../config/branding";
@@ -30,11 +31,95 @@ import {
   JOB_SHOP_CATALOG,
   UNI_SHOP_CATALOG,
   COCK_SHOP_CATALOG,
+  COSMETICS_SHOP_CATALOG,
   SHOP_CATEGORIES,
   ShopCategory,
   ShopCatalogItem,
 } from "../../utils/shopCatalog";
+import { isTester } from "../../utils/developerAccess";
 import { ItemEffectResult } from "../../services/effectService";
+import { ensureDeferredEphemeralReply, ensureDeferredUpdate, isInteractionExpiredError, safeEditReply, safeReply, shouldEarlyAcknowledgeInIndex, shouldIgnoreInteractionError, tryEarlyAcknowledge } from "../../utils/interactionHelpers";
+
+const SHOP_EPHEMERAL_V2 = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
+
+type ShopPanelInteraction = import("discord.js").MessageComponentInteraction;
+
+async function denyShopOwner(interaction: ShopPanelInteraction, isOwner: boolean): Promise<boolean> {
+  if (isOwner) return false;
+  await safeReply(interaction, { content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
+  return true;
+}
+
+async function replyShopInfoCard(interaction: ShopPanelInteraction, item: ShopCatalogItem, ownerId: string) {
+  if (!await ensureDeferredEphemeralReply(interaction, SHOP_EPHEMERAL_V2)) return;
+  const cardSummary = await getCardSummary(ownerId);
+  const canUseCredit = Boolean(cardSummary.card?.status === "ACTIVE");
+  await safeEditReply(interaction, buildItemInfoCard(item, ownerId, canUseCredit));
+}
+
+async function replyShopSlotError(interaction: ShopPanelInteraction, message: string) {
+  if (!await ensureDeferredEphemeralReply(interaction, SHOP_EPHEMERAL_V2)) return;
+  await safeEditReply(interaction, {
+    components: [v2Container("Shop", message, 0xE74C3C)],
+    flags: MessageFlags.IsComponentsV2,
+  });
+}
+
+function resolveShopInfoSlotItem(customId: string, ownerId: string): ShopCatalogItem | null {
+  if (!customId.startsWith("shop_info_slot:") || !customId.endsWith(`:${ownerId}`)) return null;
+
+  const parts = customId.split(":");
+  const store = parts[1];
+
+  if (store === "GENERAL") {
+    const slotPage = parseInt(parts[2], 10);
+    const slot = parseInt(parts[3], 10);
+    const pageData = GS_PAGES[slotPage];
+    if (!pageData || isNaN(slot) || slot < 1 || slot > pageData.items.length) return null;
+    return GENERAL_SHOP_CATALOG.find((i) => i.key === pageData.items[slot - 1]) ?? null;
+  }
+
+  if (store === "HUNT") {
+    const slot = parseInt(parts[3], 10);
+    if (isNaN(slot) || slot < 1 || slot > HS_ITEMS.length) return null;
+    return HUNT_SHOP_CATALOG.find((i) => i.key === HS_ITEMS[slot - 1]) ?? null;
+  }
+
+  if (store === "JOB") {
+    const slotPage = parseInt(parts[2], 10);
+    const slot = parseInt(parts[3], 10);
+    const pageItems = JS_PAGE_ITEMS[slotPage];
+    if (!pageItems || isNaN(slot) || slot < 1 || slot > pageItems.length) return null;
+    return JOB_SHOP_CATALOG.find((i) => i.key === pageItems[slot - 1]) ?? null;
+  }
+
+  if (store === "UNI") {
+    const slot = parseInt(parts[3], 10);
+    if (isNaN(slot) || slot < 1 || slot > US_PAGE_ITEMS.length) return null;
+    return UNI_SHOP_CATALOG.find((i) => i.key === US_PAGE_ITEMS[slot - 1]) ?? null;
+  }
+
+  if (store === "COCK") {
+    const slot = parseInt(parts[3], 10);
+    if (isNaN(slot) || slot < 1 || slot > CS_ITEMS.length) return null;
+    return COCK_SHOP_CATALOG.find((i) => i.key === CS_ITEMS[slot - 1]) ?? null;
+  }
+
+  if (store === "COSMETICS") {
+    const slotPage = parseInt(parts[2], 10);
+    const slot = parseInt(parts[3], 10);
+    const pageData = COS_PAGES[slotPage];
+    if (!pageData || isNaN(slot) || slot < 1 || slot > pageData.items.length) return null;
+    return COSMETICS_SHOP_CATALOG.find((i) => i.key === pageData.items[slot - 1]) ?? null;
+  }
+
+  return null;
+}
+
+async function updateShopPanel(interaction: ShopPanelInteraction, payload: Parameters<typeof safeEditReply>[1]) {
+  await ensureDeferredUpdate(interaction);
+  await safeEditReply(interaction, payload);
+}
 
 const ITEMS_PER_PAGE = 4;
 const SHOP_ACCENT_COLOR = 0x9B59B6;
@@ -51,6 +136,8 @@ const US_PAGE1_PATH   = path.join(ASSETS_DIR, "unistore.png");
 const US_MASCOT_PATH  = path.join(ASSETS_DIR, "unistore_fortuna.png");
 const CS_PAGE1_PATH   = path.join(ASSETS_DIR, "cockstore.png");
 const CS_MASCOT_PATH  = path.join(ASSETS_DIR, "cockstore_mascot.png");
+const COS_PAGE1_PATH  = path.join(ASSETS_DIR, "cosmetics_pg1.png");
+const COS_PAGE2_PATH  = path.join(ASSETS_DIR, "cosmetics_pg2.png");
 
 // Hunt Store: 9 items on a single image page
 const HS_ITEMS: string[] = [
@@ -99,6 +186,38 @@ const CS_ITEMS: string[] = [
   "feather_bandage", "training_whistle", "iron_spurs",
   "guard_vest", "champion_feed", "phoenix_serum",
 ];
+
+const COS_TOTAL_PAGES = 2;
+const COS_PAGES: Record<number, { asset: string; items: string[] }> = {
+  1: {
+    asset: COS_PAGE1_PATH,
+    items: [
+      "velvet_name_tag",
+      "lucky_pocket_charm",
+      "golden_sunglasses",
+      "neon_aura",
+      "diamond_grill",
+      "fortuna_bracelet",
+      "royal_cape",
+      "money_rain_entrance",
+      "platinum_crown",
+    ],
+  },
+  2: {
+    asset: COS_PAGE2_PATH,
+    items: [
+      "void_wings",
+      "celestial_halo",
+      "emperors_throne",
+      "fortune_dragon_cloak",
+      "galaxy_walkout",
+      "crown_of_immortals",
+      "the_diamond_moon",
+      "fortunas_signature",
+      "reality_crown",
+    ],
+  },
+};
 
 // General Store: 9 items per image page, 2 pages total
 const GS_TOTAL_PAGES = 2;
@@ -174,6 +293,7 @@ function getCatalogForCategory(category: ShopCategory): ShopCatalogItem[] {
     case "JOB":     return JOB_SHOP_CATALOG;
     case "UNI":     return UNI_SHOP_CATALOG;
     case "COCK":    return COCK_SHOP_CATALOG;
+    case "COSMETICS": return COSMETICS_SHOP_CATALOG;
     default:        return [];
   }
 }
@@ -197,6 +317,7 @@ const CATEGORY_EMOJI_STRINGS: Partial<Record<ShopCategory, string>> = {
   UNI:     Mascot.Emotes.Graduate,   // <:fortuna_graduate:...>
   COCK:    Mascot.Emotes.Chicken,    // <:cock:...>
   HUNT:    Mascot.Emotes.Gun,        // <:gun:...>
+  COSMETICS: Mascot.Emotes.Sparks,
 };
 
 function buildCategoryDropdown(currentCategory: ShopCategory, ownerId: string, disabled = false) {
@@ -578,6 +699,72 @@ function buildCockStoreMessage(ownerId: string, disabled = false) {
   } as any;
 }
 
+// ---------------------------------------------------------------------------
+// Cosmetics Store — image layout, 2 pages, numbered info buttons
+// ---------------------------------------------------------------------------
+
+function buildCosmeticsStoreMessage(page: number, ownerId: string, disabled = false) {
+  const safePage = Math.min(Math.max(page, 1), COS_TOTAL_PAGES);
+  const pageData = COS_PAGES[safePage];
+  const attachmentName = `cosmetics_pg${safePage}.png`;
+  const files: AttachmentBuilder[] = [
+    new AttachmentBuilder(pageData.asset, { name: attachmentName }),
+  ];
+
+  const container = new ContainerBuilder()
+    .setAccentColor(SHOP_ACCENT_COLOR)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## ${CATEGORY_EMOJI_STRINGS["COSMETICS"] ?? ""} Cosmetics\n-# Page ${safePage}/${COS_TOTAL_PAGES} — press a number to view flex details`,
+      ),
+    )
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder()
+          .setURL(`attachment://${attachmentName}`)
+          .setDescription(`Cosmetics Store page ${safePage}`),
+      ),
+    );
+
+  const infoRow1 = new ActionRowBuilder<ButtonBuilder>();
+  const infoRow2 = new ActionRowBuilder<ButtonBuilder>();
+  pageData.items.forEach((_, idx) => {
+    const slot = idx + 1;
+    const btn = new ButtonBuilder()
+      .setCustomId(`shop_info_slot:COSMETICS:${safePage}:${slot}:${ownerId}`)
+      .setLabel(String(slot))
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled);
+    if (slot <= 5) infoRow1.addComponents(btn);
+    else infoRow2.addComponents(btn);
+  });
+
+  const navRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`shop_page:COSMETICS:${safePage - 1}:${ownerId}`)
+      .setLabel("Previous")
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(disabled || safePage <= 1),
+    new ButtonBuilder()
+      .setCustomId(`shop_page_display_cosmetics:${ownerId}`)
+      .setLabel(`${safePage} / ${COS_TOTAL_PAGES}`)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId(`shop_page:COSMETICS:${safePage + 1}:${ownerId}`)
+      .setLabel("Next")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled || safePage >= COS_TOTAL_PAGES),
+  );
+
+  const dropdown = buildCategoryDropdown("COSMETICS", ownerId, disabled);
+  return {
+    components: [container, dropdown, infoRow1, infoRow2, navRow],
+    files,
+    flags: MessageFlags.IsComponentsV2,
+  } as any;
+}
+
 // Map item keys to their exact asset filenames in src/assets
 const ITEM_ASSET_MAP: Record<string, string> = {
   // General Store — page 1
@@ -653,7 +840,7 @@ const ITEM_ASSET_MAP: Record<string, string> = {
 };
 
 // Ephemeral info card for one item slot, with thumbnail if asset exists
-function buildItemInfoCard(item: ShopCatalogItem, ownerId: string) {
+function buildItemInfoCard(item: ShopCatalogItem, ownerId: string, canUseCredit = false) {
   const typeLabel = item.consumable ? "Consumable" : item.itemType === "EQUIPMENT" ? "Equipment" : "Collectible";
   const usableLabel = item.usable ? "Yes" : "No";
   const maxStackLabel = item.maxStack === 1 ? "1 (one-time use)" : item.maxStack ? String(item.maxStack) : "Unlimited";
@@ -716,13 +903,17 @@ function buildItemInfoCard(item: ShopCatalogItem, ownerId: string) {
 
   const buyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(buyBtn);
 
-  if (!item.creditBlocked) {
+  if (!item.creditBlocked && canUseCredit) {
     const buyCardBtn = new ButtonBuilder()
       .setCustomId(`shop_buy_card:${item.key}:${ownerId}`)
       .setLabel("Buy (Credit)")
       .setStyle(ButtonStyle.Primary)
-      .setEmoji("💳");
+      .setEmoji(Mascot.Emotes.Credit);
     buyRow.addComponents(buyCardBtn);
+  } else if (!item.creditBlocked && !canUseCredit) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("-# Credit purchases require an **ACTIVE** Fortuna Card — use `!mycards` or `!bank` → Apply."),
+    );
   }
 
   const files: AttachmentBuilder[] = [];
@@ -907,7 +1098,13 @@ async function executeBuy(
   guild: import("discord.js").Guild,
   paymentSource: "wallet" | "card" = "wallet",
 ): Promise<{ components: any[]; files: AttachmentBuilder[]; flags: number }> {
-  const { item, results, cardInfo } = await buyItem(guildId, userId, catalogItem.name, member, false, paymentSource) as any;
+  const tester = isTester(userId, member);
+  const purchase = await buyItem(guildId, userId, catalogItem.name, member, false, paymentSource) as any;
+  const { item, results, cardInfo } = purchase;
+
+  if (paymentSource === "card" && !tester && !cardInfo) {
+    throw new Error("Credit card charge failed. Make sure you have an **ACTIVE** Fortuna Card (`!mycards`).");
+  }
 
   if (item.roleId) {
     const role = guild.roles.cache.get(item.roleId);
@@ -918,7 +1115,15 @@ async function executeBuy(
     guild,
     type: "MARKET",
     title: "Shop Purchase",
-    description: `**User:** ${username}\n**Item:** ${item.name}\n**Price:** ${fmtCurrency(item.price)}`,
+    description: [
+      `**User:** ${username}`,
+      `**Item:** ${item.name}`,
+      `**Price:** ${fmtCurrency(item.price)}`,
+      `**Payment:** ${paymentSource === "card" ? "Credit Card" : "Wallet"}`,
+      paymentSource === "card" && cardInfo
+        ? `**Card balance:** ${formatAmount(cardInfo.currentBalance)} / ${formatAmount(cardInfo.creditLimit)}`
+        : null,
+    ].filter(Boolean).join("\n"),
     color: 0x00FF00,
   });
 
@@ -985,15 +1190,31 @@ async function executeBuy(
     new TextDisplayBuilder().setContent(usageHint),
   );
 
-  if (paymentSource === "card" && cardInfo) {
+  if (paymentSource === "card") {
     container.addSeparatorComponents(
       new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
     );
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `💳 **Charged to Credit Card**\nBalance: **${formatAmount(cardInfo.currentBalance)}** / ${formatAmount(cardInfo.creditLimit)} limit\nWeekly spend: **${formatAmount(cardInfo.spentThisCycle)}** / ${formatAmount(cardInfo.weeklySpendCap)} cap`,
-      ),
-    );
+    if (tester) {
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          `${Mascot.Emotes.Credit} **Tester mode** — purchase was free; your card was **not** charged.`,
+        ),
+      );
+    } else if (cardInfo) {
+      const utilization = cardInfo.creditLimit > 0
+        ? Math.round((cardInfo.currentBalance / cardInfo.creditLimit) * 100)
+        : 0;
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          [
+            `${Mascot.Emotes.Credit} **Charged to Credit Card**`,
+            `Balance owed: **${formatAmount(cardInfo.currentBalance)} / ${formatAmount(cardInfo.creditLimit)}** (${utilization}% used)`,
+            `Weekly spend cap: **${formatAmount(cardInfo.spentThisCycle)} / ${formatAmount(cardInfo.weeklySpendCap)}**`,
+            `-# View details and pay: \`!mycards\``,
+          ].join("\n"),
+        ),
+      );
+    }
   }
 
   const files: AttachmentBuilder[] = [];
@@ -1047,8 +1268,8 @@ export async function handleShop(message: Message, args: string[]) {
       }
 
       // Check credit-blocked items for card purchases
-      if (paymentSource === "card") {
-        const allCatalogs = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG];
+      if (paymentSource === "card" && !isTester(message.author.id, message.member as GuildMember)) {
+        const allCatalogs = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG, ...COSMETICS_SHOP_CATALOG];
         const catalogEntry = allCatalogs.find(c => c.name.toLowerCase() === itemName.trim().toLowerCase());
         if (catalogEntry?.creditBlocked) {
           return message.reply({
@@ -1069,6 +1290,8 @@ export async function handleShop(message: Message, args: string[]) {
           await seedUniShop(message.guildId!);
         } else if (COCK_SHOP_CATALOG.some(i => i.name.toLowerCase() === normalizedName)) {
           await seedCockShop(message.guildId!);
+        } else if (COSMETICS_SHOP_CATALOG.some(i => i.name.toLowerCase() === normalizedName)) {
+          await seedCosmeticsShop(message.guildId!);
         }
         await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
         if (!message.member) return;
@@ -1086,7 +1309,7 @@ export async function handleShop(message: Message, args: string[]) {
         });
         let confirmMsg = `You bought **${item.name}** for **${fmtCurrency(item.price)}**!`;
         if (paymentSource === "card" && cardInfo) {
-          confirmMsg += `\n\n💳 **Charged to Credit Card**\nBalance: **${formatAmount(cardInfo.currentBalance)}** / ${formatAmount(cardInfo.creditLimit)} limit\nWeekly: **${formatAmount(cardInfo.spentThisCycle)}** / ${formatAmount(cardInfo.weeklySpendCap)} cap`;
+          confirmMsg += `\n\n${Mascot.Emotes.Credit} **Charged to Credit Card**\nBalance: **${formatAmount(cardInfo.currentBalance)}** / ${formatAmount(cardInfo.creditLimit)} limit\nWeekly spend cap: **${formatAmount(cardInfo.spentThisCycle)}** / ${formatAmount(cardInfo.weeklySpendCap)}`;
         }
         await message.reply({
           components: [v2Container("Purchase Successful", confirmMsg, 0x2ECC71)],
@@ -1140,6 +1363,10 @@ export async function handleShop(message: Message, args: string[]) {
       await seedCockShop(message.guildId!);
       currentCategory = "COCK";
       currentItems = getCatalogForCategory(currentCategory);
+    } else if (sub === "cosmetics" || sub === "cosmetic" || sub === "cos") {
+      await seedCosmeticsShop(message.guildId!);
+      currentCategory = "COSMETICS";
+      currentItems = getCatalogForCategory(currentCategory);
     }
 
     const isGeneral = () => currentCategory === "GENERAL";
@@ -1147,6 +1374,7 @@ export async function handleShop(message: Message, args: string[]) {
     const isJob     = () => currentCategory === "JOB";
     const isUni     = () => currentCategory === "UNI";
     const isCock    = () => currentCategory === "COCK";
+    const isCosmetics = () => currentCategory === "COSMETICS";
 
     const getPayload = (disabled = false) => {
       if (isGeneral()) return buildGeneralStoreMessage(currentPage, ownerId, disabled);
@@ -1154,311 +1382,119 @@ export async function handleShop(message: Message, args: string[]) {
       if (isJob())     return buildJobStoreMessage(currentPage, ownerId, disabled);
       if (isUni())     return buildUniStoreMessage(ownerId, disabled);
       if (isCock())    return buildCockStoreMessage(ownerId, disabled);
+      if (isCosmetics()) return buildCosmeticsStoreMessage(currentPage, ownerId, disabled);
       return buildShopMessage(currentItems, currentPage, currentCategory, ownerId, disabled);
     };
 
     const sentMessage = await message.reply(getPayload());
 
     // No owner filter — collector sees all interactions, handles non-owner in-handler
-    const collector = sentMessage.createMessageComponentCollector();
+    const collector = sentMessage.createMessageComponentCollector({
+      time: 15 * 60 * 1000,
+      filter: (i) => i.customId.endsWith(`:${ownerId}`) || i.customId.includes(`:${ownerId}`),
+    });
 
     collector.on("collect", async (interaction) => {
+      try {
       const customId = interaction.customId;
       const isOwner = interaction.user.id === ownerId;
 
       // ── Category dropdown (owner only) ───────────────────────────────────
       if (customId === `shop_cat:${ownerId}` && interaction.isStringSelectMenu()) {
-        if (!isOwner) {
-          await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
-          return;
-        }
+        if (await denyShopOwner(interaction, isOwner)) return;
         const newCategory = interaction.values[0] as ShopCategory;
-        await interaction.deferUpdate();
+        await ensureDeferredUpdate(interaction);
         if (newCategory === "HUNT") await seedHuntShop(interaction.guildId!);
         if (newCategory === "JOB") await seedJobShop(interaction.guildId!);
         if (newCategory === "UNI") await seedUniShop(interaction.guildId!);
         if (newCategory === "COCK") await seedCockShop(interaction.guildId!);
+        if (newCategory === "COSMETICS") await seedCosmeticsShop(interaction.guildId!);
         currentCategory = newCategory;
         currentItems = getCatalogForCategory(currentCategory);
         currentPage = 1;
-        await interaction.editReply(getPayload());
+        await safeEditReply(interaction, getPayload());
         return;
       }
 
       // ── General Store page navigation: shop_page:GENERAL:<page>:<owner> ─
       if (customId.startsWith("shop_page:GENERAL:") && customId.endsWith(`:${ownerId}`)) {
-        if (!isOwner) {
-          await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
-          return;
-        }
+        if (await denyShopOwner(interaction, isOwner)) return;
         const parts = customId.split(":");
         const newPage = parseInt(parts[2], 10);
         if (!isNaN(newPage) && newPage >= 1 && newPage <= GS_TOTAL_PAGES) {
-          await interaction.deferUpdate();
           currentPage = newPage;
-          await interaction.editReply(buildGeneralStoreMessage(currentPage, ownerId));
+          await updateShopPanel(interaction, buildGeneralStoreMessage(currentPage, ownerId));
         }
         return;
       }
 
       // ── Job Store page navigation: shop_page:JOB:<page>:<owner> ─
       if (customId.startsWith("shop_page:JOB:") && customId.endsWith(`:${ownerId}`)) {
-        if (!isOwner) {
-          await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
-          return;
-        }
+        if (await denyShopOwner(interaction, isOwner)) return;
         const parts = customId.split(":");
         const newPage = parseInt(parts[2], 10);
         if (!isNaN(newPage) && newPage >= 1 && newPage <= JS_TOTAL_PAGES) {
-          await interaction.deferUpdate();
           currentPage = newPage;
-          await interaction.editReply(buildJobStoreMessage(currentPage, ownerId));
+          await updateShopPanel(interaction, buildJobStoreMessage(currentPage, ownerId));
+        }
+        return;
+      }
+
+      // ── Cosmetics Store page navigation: shop_page:COSMETICS:<page>:<owner> ─
+      if (customId.startsWith("shop_page:COSMETICS:") && customId.endsWith(`:${ownerId}`)) {
+        if (await denyShopOwner(interaction, isOwner)) return;
+        const parts = customId.split(":");
+        const newPage = parseInt(parts[2], 10);
+        if (!isNaN(newPage) && newPage >= 1 && newPage <= COS_TOTAL_PAGES) {
+          currentPage = newPage;
+          await updateShopPanel(interaction, buildCosmeticsStoreMessage(currentPage, ownerId));
         }
         return;
       }
 
       // ── Non-General prev/next ─────────────────────────────────────────────
       if (customId === `shop_prev:${ownerId}`) {
-        if (!isOwner) { await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral }); return; }
-        await interaction.deferUpdate();
+        if (await denyShopOwner(interaction, isOwner)) return;
         currentPage = Math.max(1, currentPage - 1);
-        await interaction.editReply(getPayload());
+        await updateShopPanel(interaction, getPayload());
         return;
       }
 
       if (customId === `shop_next:${ownerId}`) {
-        if (!isOwner) { await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral }); return; }
-        await interaction.deferUpdate();
+        if (await denyShopOwner(interaction, isOwner)) return;
         const totalPages = Math.max(1, Math.ceil(currentItems.length / ITEMS_PER_PAGE));
         currentPage = Math.min(totalPages, currentPage + 1);
-        await interaction.editReply(getPayload());
+        await updateShopPanel(interaction, getPayload());
         return;
       }
 
-      // ── Numbered info slot: shop_info_slot:GENERAL:<page>:<slot>:<owner> ─
-      if (customId.startsWith("shop_info_slot:GENERAL:") && customId.endsWith(`:${ownerId}`)) {
-        if (!isOwner) {
-          await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
-          return;
-        }
-        const parts = customId.split(":");
-        // format: shop_info_slot:GENERAL:<page>:<slot>:<ownerId>
-        const slotPage = parseInt(parts[2], 10);
-        const slot = parseInt(parts[3], 10);
-        const pageData = GS_PAGES[slotPage];
-        if (!pageData || isNaN(slot) || slot < 1 || slot > 9) return;
-
-        const itemKey = pageData.items[slot - 1];
-        const catalogItem = GENERAL_SHOP_CATALOG.find(i => i.key === itemKey);
-        if (!catalogItem) return;
-
-        await interaction.reply(buildItemInfoCard(catalogItem, ownerId));
-        return;
-      }
-
-      // ── Hunt Store numbered info slot: shop_info_slot:HUNT:1:<slot>:<owner> ─
-      if (customId.startsWith("shop_info_slot:HUNT:") && customId.endsWith(`:${ownerId}`)) {
-        if (!isOwner) {
-          await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
-          return;
-        }
-        const parts = customId.split(":");
-        // format: shop_info_slot:HUNT:1:<slot>:<ownerId>
-        const slot = parseInt(parts[3], 10);
-        if (isNaN(slot) || slot < 1 || slot > 9) return;
-
-        const itemKey = HS_ITEMS[slot - 1];
-        const catalogItem = HUNT_SHOP_CATALOG.find(i => i.key === itemKey);
-        if (!catalogItem) return;
-
-        await interaction.reply(buildItemInfoCard(catalogItem, ownerId));
-        return;
-      }
-
-      // ── Job Store numbered info slot: shop_info_slot:JOB:<page>:<slot>:<owner> ─
-      if (customId.startsWith("shop_info_slot:JOB:") && customId.endsWith(`:${ownerId}`)) {
-        if (!isOwner) {
-          await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
-          return;
-        }
-        const parts = customId.split(":");
-        // format: shop_info_slot:JOB:<page>:<slot>:<ownerId>
-        const slotPage = parseInt(parts[2], 10);
-        const slot = parseInt(parts[3], 10);
-        const pageItems = JS_PAGE_ITEMS[slotPage];
-        if (!pageItems || isNaN(slot) || slot < 1 || slot > pageItems.length) return;
-
-        const itemKey = pageItems[slot - 1];
-        const catalogItem = JOB_SHOP_CATALOG.find(i => i.key === itemKey);
-        if (!catalogItem) return;
-
-        await interaction.reply(buildItemInfoCard(catalogItem, ownerId));
-        return;
-      }
-
-      // ── Uni Store numbered info slot: shop_info_slot:UNI:1:<slot>:<owner> ─
-      if (customId.startsWith("shop_info_slot:UNI:") && customId.endsWith(`:${ownerId}`)) {
-        if (!isOwner) {
-          await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
-          return;
-        }
-        const parts = customId.split(":");
-        const slot = parseInt(parts[3], 10);
-        if (isNaN(slot) || slot < 1 || slot > US_PAGE_ITEMS.length) return;
-
-        const itemKey = US_PAGE_ITEMS[slot - 1];
-        const catalogItem = UNI_SHOP_CATALOG.find(i => i.key === itemKey);
-        if (!catalogItem) return;
-
-        await interaction.reply(buildItemInfoCard(catalogItem, ownerId));
-        return;
-      }
-
-      // ── Cock Store numbered info slot: shop_info_slot:COCK:1:<slot>:<owner> ─
-      if (customId.startsWith("shop_info_slot:COCK:") && customId.endsWith(`:${ownerId}`)) {
-        if (!isOwner) {
-          await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
-          return;
-        }
-        const parts = customId.split(":");
-        const slot = parseInt(parts[3], 10);
-        if (isNaN(slot) || slot < 1 || slot > CS_ITEMS.length) return;
-
-        const itemKey = CS_ITEMS[slot - 1];
-        const catalogItem = COCK_SHOP_CATALOG.find(i => i.key === itemKey);
-        if (!catalogItem) return;
-
-        await interaction.reply(buildItemInfoCard(catalogItem, ownerId));
-        return;
-      }
-
-      // ── Buy button: shop_buy:<key>:<owner> ───────────────────────────────
-      // Can appear on ephemeral info cards — any user who opened their own shop
-      if (customId.startsWith("shop_buy:") && customId.endsWith(`:${ownerId}`)) {
-        if (!isOwner) {
-          await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
-          return;
-        }
-        const itemKey = customId.split(":")[1];
-        const catalogItem = GENERAL_SHOP_CATALOG.find(i => i.key === itemKey)
-          ?? HUNT_SHOP_CATALOG.find(i => i.key === itemKey)
-          ?? JOB_SHOP_CATALOG.find(i => i.key === itemKey)
-          ?? UNI_SHOP_CATALOG.find(i => i.key === itemKey)
-          ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey)
-          ?? currentItems.find(i => i.key === itemKey);
-
+      // ── Numbered info slots (all stores) ─────────────────────────────────
+      if (customId.startsWith("shop_info_slot:") && customId.endsWith(`:${ownerId}`)) {
+        if (await denyShopOwner(interaction, isOwner)) return;
+        const catalogItem = resolveShopInfoSlotItem(customId, ownerId);
         if (!catalogItem) {
-          await interaction.reply({
-            components: [v2Container("Error", "Item not found.", 0xE74C3C)],
-            flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
-          });
+          await replyShopSlotError(interaction, "That item slot is empty or unavailable.");
           return;
         }
-
-        try {
-          await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-          await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
-          const payload = await executeBuy(
-            interaction.user.id,
-            interaction.guildId!,
-            interaction.user.tag,
-            interaction.member as GuildMember,
-            catalogItem,
-            interaction.client,
-            interaction.guild!,
-          );
-          await interaction.editReply(payload);
-        } catch (err) {
-          const errContainer = v2Container("Purchase Failed", (err as Error).message.slice(0, 1800), 0xE74C3C);
-          if (interaction.deferred || interaction.replied) {
-            await interaction.editReply({
-              components: [errContainer],
-              flags: MessageFlags.IsComponentsV2,
-            });
-          } else {
-            await interaction.reply({
-              components: [errContainer],
-              flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
-            });
-          }
-        }
+        await replyShopInfoCard(interaction, catalogItem, ownerId);
         return;
       }
 
-      // ── Credit card buy: shop_buy_card:<key>:<owner> — show confirmation ─
-      if (customId.startsWith("shop_buy_card:") && customId.endsWith(`:${ownerId}`)) {
-        if (!isOwner) {
-          await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
-          return;
-        }
-        const itemKey = customId.split(":")[1];
-        const catalogItem = GENERAL_SHOP_CATALOG.find(i => i.key === itemKey)
-          ?? HUNT_SHOP_CATALOG.find(i => i.key === itemKey)
-          ?? JOB_SHOP_CATALOG.find(i => i.key === itemKey)
-          ?? UNI_SHOP_CATALOG.find(i => i.key === itemKey)
-          ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey);
-        if (!catalogItem) return;
-
-        const confirmContainer = v2Container(
-          "💳 Confirm Credit Purchase",
-          `Charge **${formatAmount(catalogItem.price)}** to your credit card for **${catalogItem.name}**?\n\nThis will be added to your card balance and accrue interest if unpaid.`,
-          0x3498DB,
-        );
-        const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`shop_buy_card_confirm:${itemKey}:${ownerId}`)
-            .setLabel("Confirm Purchase")
-            .setStyle(ButtonStyle.Danger)
-            .setEmoji("💳"),
-          new ButtonBuilder()
-            .setCustomId(`shop_buy_card_cancel:${ownerId}`)
-            .setLabel("Cancel")
-            .setStyle(ButtonStyle.Secondary),
-        );
-
-        await interaction.reply({
-          components: [confirmContainer, confirmRow],
-          flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+      if (!interaction.replied && !interaction.deferred) {
+        await safeReply(interaction, {
+          content: "That shop button is no longer active. Open the shop again with `!shop`.",
+          flags: MessageFlags.Ephemeral,
         });
-        return;
       }
-
-      // ── Credit card confirm: shop_buy_card_confirm:<key>:<owner> ─
-      if (customId.startsWith("shop_buy_card_confirm:") && customId.endsWith(`:${ownerId}`)) {
-        if (!isOwner) return;
-        const itemKey = customId.split(":")[1];
-        const catalogItem = GENERAL_SHOP_CATALOG.find(i => i.key === itemKey)
-          ?? HUNT_SHOP_CATALOG.find(i => i.key === itemKey)
-          ?? JOB_SHOP_CATALOG.find(i => i.key === itemKey)
-          ?? UNI_SHOP_CATALOG.find(i => i.key === itemKey)
-          ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey);
-        if (!catalogItem) return;
-
-        try {
-          await interaction.deferUpdate();
-          await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
-          const payload = await executeBuy(
-            interaction.user.id,
-            interaction.guildId!,
-            interaction.user.tag,
-            interaction.member as GuildMember,
-            catalogItem,
-            interaction.client,
-            interaction.guild!,
-            "card",
-          );
-          await interaction.editReply(payload);
-        } catch (err) {
-          const errContainer = v2Container("Credit Purchase Failed", (err as Error).message.slice(0, 1800), 0xE74C3C);
-          await interaction.editReply({ components: [errContainer], flags: MessageFlags.IsComponentsV2 });
+      } catch (err) {
+        if (shouldIgnoreInteractionError(err)) return;
+        console.error("Shop collector error:", err);
+        if (!interaction.replied && !interaction.deferred) {
+          await safeReply(interaction, {
+            content: "Something went wrong with that shop button. Try `!shop` again.",
+            flags: MessageFlags.Ephemeral,
+          }).catch(() => {});
         }
-        return;
-      }
-
-      // ── Credit card cancel ─
-      if (customId.startsWith("shop_buy_card_cancel:")) {
-        await interaction.update({ components: [v2Container("Cancelled", "Credit purchase cancelled.", 0x95A5A6)], flags: MessageFlags.IsComponentsV2 });
-        return;
       }
     });
 
@@ -1480,13 +1516,12 @@ export async function handleShop(message: Message, args: string[]) {
 
 export async function handleShopBuyInteraction(interaction: import("discord.js").ButtonInteraction): Promise<void> {
   const customId = interaction.customId;
-  // customId format: shop_buy:<itemKey>:<ownerId>
   const parts = customId.split(":");
   const itemKey = parts[1];
   const ownerId = parts[2];
 
   if (interaction.user.id !== ownerId) {
-    await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
+    await safeReply(interaction, { content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -1494,19 +1529,22 @@ export async function handleShopBuyInteraction(interaction: import("discord.js")
     ?? HUNT_SHOP_CATALOG.find(i => i.key === itemKey)
     ?? JOB_SHOP_CATALOG.find(i => i.key === itemKey)
     ?? UNI_SHOP_CATALOG.find(i => i.key === itemKey)
-    ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey);
+    ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey)
+    ?? COSMETICS_SHOP_CATALOG.find(i => i.key === itemKey);
 
   if (!catalogItem) {
-    await interaction.reply({
+    await safeReply(interaction, {
       components: [v2Container("Error", "Item not found.", 0xE74C3C)],
-      flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+      flags: SHOP_EPHEMERAL_V2,
     });
     return;
   }
 
+  if (!await ensureDeferredEphemeralReply(interaction, MessageFlags.Ephemeral)) return;
+
   try {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     if (catalogItem.category === "COCK") await seedCockShop(interaction.guildId!);
+    if (catalogItem.category === "COSMETICS") await seedCosmeticsShop(interaction.guildId!);
     await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
     const payload = await executeBuy(
       interaction.user.id,
@@ -1517,14 +1555,11 @@ export async function handleShopBuyInteraction(interaction: import("discord.js")
       interaction.client,
       interaction.guild!,
     );
-    await interaction.editReply(payload);
+    await safeEditReply(interaction, payload);
   } catch (err) {
+    if (shouldIgnoreInteractionError(err)) return;
     const errContainer = v2Container("Purchase Failed", (err as Error).message.slice(0, 1800), 0xE74C3C);
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply({ components: [errContainer], flags: MessageFlags.IsComponentsV2 });
-    } else {
-      await interaction.reply({ components: [errContainer], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
-    }
+    await safeEditReply(interaction, { components: [errContainer], flags: MessageFlags.IsComponentsV2 });
   }
 }
 
@@ -1539,7 +1574,7 @@ export async function handleShopBuyCardInteraction(interaction: import("discord.
   const ownerId = parts[2];
 
   if (interaction.user.id !== ownerId) {
-    await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
+    await safeReply(interaction, { content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -1547,15 +1582,19 @@ export async function handleShopBuyCardInteraction(interaction: import("discord.
     ?? HUNT_SHOP_CATALOG.find(i => i.key === itemKey)
     ?? JOB_SHOP_CATALOG.find(i => i.key === itemKey)
     ?? UNI_SHOP_CATALOG.find(i => i.key === itemKey)
-    ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey);
+    ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey)
+    ?? COSMETICS_SHOP_CATALOG.find(i => i.key === itemKey);
 
   if (!catalogItem) {
-    await interaction.reply({ components: [v2Container("Error", "Item not found.", 0xE74C3C)], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+    await safeReply(interaction, {
+      components: [v2Container("Error", "Item not found.", 0xE74C3C)],
+      flags: SHOP_EPHEMERAL_V2,
+    });
     return;
   }
 
   const confirmContainer = v2Container(
-    "💳 Confirm Credit Purchase",
+    `${Mascot.Emotes.Credit} Confirm Credit Purchase`,
     `Charge **${formatAmount(catalogItem.price)}** to your credit card for **${catalogItem.name}**?\n\nThis will be added to your card balance and accrue interest if unpaid.`,
     0x3498DB,
   );
@@ -1564,16 +1603,30 @@ export async function handleShopBuyCardInteraction(interaction: import("discord.
       .setCustomId(`shop_buy_card_confirm:${itemKey}:${ownerId}`)
       .setLabel("Confirm Purchase")
       .setStyle(ButtonStyle.Danger)
-      .setEmoji("💳"),
+      .setEmoji(Mascot.Emotes.Credit),
     new ButtonBuilder()
       .setCustomId(`shop_buy_card_cancel:${ownerId}`)
       .setLabel("Cancel")
       .setStyle(ButtonStyle.Secondary),
   );
 
-  await interaction.reply({
+  if (!await ensureDeferredEphemeralReply(interaction, SHOP_EPHEMERAL_V2)) return;
+  await safeEditReply(interaction, {
     components: [confirmContainer, confirmRow],
-    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+    flags: MessageFlags.IsComponentsV2,
+  });
+}
+
+export async function handleShopBuyCardCancelInteraction(interaction: import("discord.js").ButtonInteraction): Promise<void> {
+  const ownerId = interaction.customId.split(":")[1];
+  if (interaction.user.id !== ownerId) {
+    await safeReply(interaction, { content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (!await ensureDeferredEphemeralReply(interaction, SHOP_EPHEMERAL_V2)) return;
+  await safeEditReply(interaction, {
+    components: [v2Container("Cancelled", "Credit purchase cancelled.", 0x95A5A6)],
+    flags: MessageFlags.IsComponentsV2,
   });
 }
 
@@ -1588,7 +1641,7 @@ export async function handleShopBuyCardConfirmInteraction(interaction: import("d
   const ownerId = parts[2];
 
   if (interaction.user.id !== ownerId) {
-    await interaction.reply({ content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
+    await safeReply(interaction, { content: "This shop belongs to someone else.", flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -1596,16 +1649,22 @@ export async function handleShopBuyCardConfirmInteraction(interaction: import("d
     ?? HUNT_SHOP_CATALOG.find(i => i.key === itemKey)
     ?? JOB_SHOP_CATALOG.find(i => i.key === itemKey)
     ?? UNI_SHOP_CATALOG.find(i => i.key === itemKey)
-    ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey);
+    ?? COCK_SHOP_CATALOG.find(i => i.key === itemKey)
+    ?? COSMETICS_SHOP_CATALOG.find(i => i.key === itemKey);
 
   if (!catalogItem) {
-    await interaction.reply({ components: [v2Container("Error", "Item not found.", 0xE74C3C)], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+    await safeReply(interaction, {
+      components: [v2Container("Error", "Item not found.", 0xE74C3C)],
+      flags: SHOP_EPHEMERAL_V2,
+    });
     return;
   }
 
+  if (!await ensureDeferredEphemeralReply(interaction, MessageFlags.Ephemeral)) return;
+
   try {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     if (catalogItem.category === "COCK") await seedCockShop(interaction.guildId!);
+    if (catalogItem.category === "COSMETICS") await seedCosmeticsShop(interaction.guildId!);
     await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
     const payload = await executeBuy(
       interaction.user.id,
@@ -1617,14 +1676,11 @@ export async function handleShopBuyCardConfirmInteraction(interaction: import("d
       interaction.guild!,
       "card",
     );
-    await interaction.editReply(payload);
+    await safeEditReply(interaction, payload);
   } catch (err) {
+    if (shouldIgnoreInteractionError(err)) return;
     const errContainer = v2Container("Credit Purchase Failed", (err as Error).message.slice(0, 1800), 0xE74C3C);
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply({ components: [errContainer], flags: MessageFlags.IsComponentsV2 });
-    } else {
-      await interaction.reply({ components: [errContainer], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
-    }
+    await safeEditReply(interaction, { components: [errContainer], flags: MessageFlags.IsComponentsV2 });
   }
 }
 
@@ -1640,24 +1696,24 @@ export async function handleShopUseInteraction(interaction: import("discord.js")
   const ownerId = parts[2];
 
   if (interaction.user.id !== ownerId) {
-    await interaction.reply({ content: "This isn't yours.", flags: MessageFlags.Ephemeral });
+    await safeReply(interaction, { content: "This isn't yours.", flags: MessageFlags.Ephemeral });
     return;
   }
 
-  const allCatalogs = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG];
+  if (!await ensureDeferredEphemeralReply(interaction, MessageFlags.Ephemeral)) return;
+
+  const allCatalogs = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG, ...COSMETICS_SHOP_CATALOG];
   const catalogItem = allCatalogs.find(i => i.key === itemKey);
 
   if (!catalogItem || !catalogItem.usable) {
-    await interaction.reply({
+    await safeEditReply(interaction, {
       components: [v2Container("Error", "This item cannot be used directly.", 0xE74C3C)],
-      flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+      flags: MessageFlags.IsComponentsV2,
     });
     return;
   }
 
   try {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
     // Verify ownership before using
     const inv = await import("../../utils/prisma").then(m =>
       m.default.inventory.findMany({
@@ -1669,7 +1725,7 @@ export async function handleShopUseInteraction(interaction: import("discord.js")
     const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
     const entry = inv.find((i: any) => normalize(i.shopItem.name) === normalize(catalogItem.name) && i.amount > 0);
     if (!entry) {
-      await interaction.editReply({
+      await safeEditReply(interaction, {
         components: [v2Container("Error", `You don't own a **${catalogItem.name}** to use.`, 0xE74C3C)],
         flags: MessageFlags.IsComponentsV2,
       });
@@ -1696,28 +1752,22 @@ export async function handleShopUseInteraction(interaction: import("discord.js")
         }
       }
       const color = result.success ? 0x2ECC71 : 0xE74C3C;
-      await interaction.editReply({
+      await safeEditReply(interaction, {
         components: [v2Container(catalogItem.name, result.message, color)],
         flags: MessageFlags.IsComponentsV2,
       });
     } else {
-      await interaction.editReply({
+      await safeEditReply(interaction, {
         components: [v2Container("Error", "This item has no special effect.", 0xE74C3C)],
         flags: MessageFlags.IsComponentsV2,
       });
     }
   } catch (err) {
+    if (isInteractionExpiredError(err)) return;
     const errMsg = (err as Error).message.slice(0, 1800);
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply({
-        components: [v2Container("Error", errMsg, 0xE74C3C)],
-        flags: MessageFlags.IsComponentsV2,
-      });
-    } else {
-      await interaction.reply({
-        components: [v2Container("Error", errMsg, 0xE74C3C)],
-        flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
-      });
-    }
+    await safeEditReply(interaction, {
+      components: [v2Container("Error", errMsg, 0xE74C3C)],
+      flags: MessageFlags.IsComponentsV2,
+    });
   }
 }

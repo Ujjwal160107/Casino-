@@ -1,5 +1,6 @@
 import prisma from "../utils/prisma";
 import { redisService } from "./redisService";
+import { isTester } from "../utils/developerAccess";
 
 type CooldownResult = {
   active: boolean;
@@ -18,6 +19,7 @@ export function formatDiscordRelativeTime(expiresAt: Date) {
 
 export async function checkCooldown(discordId: string, commandName: string): Promise<CooldownResult> {
   const key = getCooldownKey(discordId, commandName);
+  if (isTester(discordId)) return { active: false, key, remainingSeconds: 0 };
 
   try {
     const ttl = await redisService.getInstance().ttl(key);
@@ -70,6 +72,7 @@ export async function checkCooldown(discordId: string, commandName: string): Pro
 export async function setCooldown(discordId: string, commandName: string, cooldownSeconds: number): Promise<CooldownResult> {
   const key = getCooldownKey(discordId, commandName);
   const expiresAt = new Date(Date.now() + cooldownSeconds * 1000);
+  if (isTester(discordId)) return { active: false, key, expiresAt: new Date(), remainingSeconds: 0 };
 
   try {
     const result = await redisService.getInstance().set(key, expiresAt.toISOString(), "EX", cooldownSeconds, "NX");

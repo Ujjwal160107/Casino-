@@ -42,6 +42,7 @@ const FEED_SHORTHANDS: Record<string, string> = {
 
 function findCatalogKeyByName(name: string): string | null {
   const normalized = name.trim().toLowerCase();
+  if (normalized === "komodo venom flask") return "komodo_venom_flask";
   const all = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG];
   return all.find(i => i.name.toLowerCase() === normalized)?.key ?? null;
 }

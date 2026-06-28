@@ -20,6 +20,7 @@ import { ZOO_CAPACITY, RARITY_INCOME, ZOO_PROPERTY_DEFS } from "../../utils/anim
 import { fmtCurrency } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import prisma from "../../utils/prisma";
+import { AnimalEmojis, Mascot } from "../../config/branding";
 
 const RARITY_COLOR: Record<string, string> = {
   Common: "⬜",
@@ -67,7 +68,7 @@ export async function buildZooContainer(
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `## 🦁 Your Zoo\n` +
+      `## ${Mascot.Emotes.Sparks} Your Zoo\n` +
       `**${slots.length}/${maxSlots}** animal types | **+${fmtCurrency(ratePerHour)}/hr** | **~${fmtCurrency(ratePerHour * 24)}/day** max`
     )
   );
@@ -97,7 +98,7 @@ export async function buildZooContainer(
   } else {
     for (let i = 0; i < slots.length; i++) {
       const slot = slots[i];
-      const emojiDisplay = emojiInline(slot.def.emojiKey, guild) ?? slot.def.emoji;
+      const emojiDisplay = emojiInline(slot.def.emojiKey, guild) ?? AnimalEmojis[slot.def.key] ?? "";
 
       if (i > 0) {
         container.addSeparatorComponents(
@@ -108,8 +109,8 @@ export async function buildZooContainer(
       const section = new SectionBuilder()
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
-            `${RARITY_COLOR[slot.def.rarity]} **${slot.count}×** ${emojiDisplay} **${slot.def.name}** — ${slot.def.rarity}\n` +
-            `+${fmtCurrency(slot.incomePerHour)}/hr (${slot.count}× ${fmtCurrency(RARITY_INCOME[slot.def.rarity])})`
+            `**${slot.count}x** ${emojiDisplay} **${slot.def.name}** — ${slot.def.rarity}\n` +
+            `${Mascot.Emotes.Currency} +${fmtCurrency(slot.incomePerHour)}/hr (${slot.count}x ${fmtCurrency(RARITY_INCOME[slot.def.rarity])})`
           ),
         )
         .setButtonAccessory(
@@ -158,7 +159,7 @@ export async function handleZoo(message: Message, _args: string[]) {
 
     noZooContainer.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `## 🦁 No Zoo Found\n\nYou don't own a zoo yet! Purchase a zoo property to start housing animals and earning passive income.`
+        `## ${Mascot.Emotes.Sparks} No Zoo Found\n\nYou don't own a zoo yet! Purchase a zoo property to start housing animals and earning passive income.`
       )
     );
     noZooContainer.addSeparatorComponents(

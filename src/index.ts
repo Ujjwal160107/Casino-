@@ -7,6 +7,7 @@ import {
   Client,
   GatewayIntentBits,
   Interaction,
+  MessageFlags,
   Partials,
   REST,
   Routes
@@ -14,12 +15,12 @@ import {
 import prisma from "./utils/prisma";
 import { routeMessage } from "./commandRouter";
 import { getGuildSettings } from "./services/guildSettingsService";
-import { safeInteractionReply } from "./utils/interactionHelpers";
+import { isInteractionExpiredError, safeInteractionReply, shouldEarlyAcknowledgeInIndex, shouldIgnoreInteractionError, tryEarlyAcknowledge, ensureDeferredUpdate, safeEditReply, safeReply } from "./utils/interactionHelpers";
 import { initEmojiRegistry, listEmojiKeys } from "./utils/emojiRegistry";
 import { handleBankInteraction } from "./handlers/bankInteractionHandler";
 import { handleMarketInteraction } from "./handlers/marketInteractionHandler";
 import { handleInventoryInteraction } from "./handlers/inventoryInteractionHandler";
-import { handleShopBuyInteraction, handleShopUseInteraction, handleShopBuyCardInteraction, handleShopBuyCardConfirmInteraction } from "./commands/economy/shop";
+import { handleShopBuyInteraction, handleShopUseInteraction, handleShopBuyCardInteraction, handleShopBuyCardConfirmInteraction, handleShopBuyCardCancelInteraction } from "./commands/economy/shop";
 import { guildCreateListener } from "./listeners/guildCreateListener";
 import { Mascot } from "./config/branding";
 import {
@@ -118,7 +119,21 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 
     const id = (interaction as any).customId || "";
 
-    if (id.startsWith("bank_") || id.startsWith("bank:") || id.startsWith("loan_") || id.startsWith("invest_") || id.startsWith("repay_")) {
+    if (interaction.isModalSubmit() && id.startsWith("inv2_market_modal:")) {
+      const { handleInv2ModalSubmit } = require("./commands/economy/inventory");
+      if (await handleInv2ModalSubmit(interaction as import("discord.js").ModalSubmitInteraction)) return;
+    }
+
+    if (interaction.isButton()) {
+      const { handleInv2EphemeralInteraction } = require("./commands/economy/inventory");
+      if (await handleInv2EphemeralInteraction(interaction as import("discord.js").ButtonInteraction)) return;
+    }
+
+    if ((interaction.isButton() || interaction.isStringSelectMenu()) && shouldEarlyAcknowledgeInIndex(id)) {
+      await tryEarlyAcknowledge(interaction, id);
+    }
+
+    if (id.startsWith("bank_") || id.startsWith("bank:") || id.startsWith("invest_")) {
       return await handleBankInteraction(interaction);
     }
 
@@ -127,22 +142,23 @@ client.on("interactionCreate", async (interaction: Interaction) => {
       const listingId = parts[1];
       const ownerId = parts[2];
       if (interaction.user.id !== ownerId) {
-        await interaction.reply({ content: "Not yours.", ephemeral: true });
+        await safeReply(interaction, { content: "Not yours.", flags: MessageFlags.Ephemeral });
         return;
       }
       try {
         const { buyListing } = require("./services/marketService");
-        await interaction.deferUpdate();
+        await ensureDeferredUpdate(interaction);
         const result = await buyListing(ownerId, listingId);
-        await interaction.editReply({
+        await safeEditReply(interaction, {
           content: `✅ Bought **${result.itemName}** (x${result.amount}) for **${result.fees.buyerTotal.toLocaleString()}**!`,
           components: [],
         });
       } catch (err: any) {
+        if (isInteractionExpiredError(err)) return;
         if (interaction.deferred || interaction.replied) {
-          await interaction.editReply({ content: `❌ ${err.message}`, components: [] });
+          await safeEditReply(interaction, { content: `❌ ${err.message}`, components: [] });
         } else {
-          await interaction.reply({ content: `❌ ${err.message}`, ephemeral: true });
+          await safeReply(interaction, { content: `❌ ${err.message}`, flags: MessageFlags.Ephemeral });
         }
       }
       return;
@@ -178,6 +194,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
       return await handleAskInteraction(interaction);
     }
 
+    if (id.startsWith("crime:")) {
+      const { handleCrimeInteraction } = require("./handlers/crimeInteractionHandler");
+      return await handleCrimeInteraction(interaction);
+    }
+
     if (id === "pay_bail") {
       const { handleJailInteraction } = require("./handlers/jailInteractionHandler");
       return await handleJailInteraction(interaction);
@@ -190,6 +211,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 
     if (id.startsWith("shop_buy_card_confirm:") && interaction.isButton()) {
       return await handleShopBuyCardConfirmInteraction(interaction as import("discord.js").ButtonInteraction);
+    }
+
+    if (id.startsWith("shop_buy_card_cancel:") && interaction.isButton()) {
+      return await handleShopBuyCardCancelInteraction(interaction as import("discord.js").ButtonInteraction);
     }
 
     if (id.startsWith("shop_buy_card:") && interaction.isButton()) {
@@ -208,6 +233,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
       return await handleGlobalEconomyReminderInteraction(interaction as any);
     }
   } catch (err) {
+    if (shouldIgnoreInteractionError(err)) return;
     console.error("Interaction error:", err);
     await safeInteractionReply(interaction, {
       content: "Internal error while processing interaction.",

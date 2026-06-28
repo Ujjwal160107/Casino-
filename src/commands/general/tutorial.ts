@@ -8,14 +8,14 @@ import {
 } from "discord.js";
 import * as path from "path";
 import { Mascot } from "../../config/branding";
-import { getGuildConfig } from "../../services/guildConfigService";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleTutorial(message: Message) {
     const bannerPath = path.join(process.cwd(), "src", "assets", "guide_banner.png");
     const attachment = new AttachmentBuilder(bannerPath, { name: "guide_banner.png" });
 
-    const config = await getGuildConfig(message.guildId!);
-    const prefix = config.prefix || "!";
+    const prefix = await getGuildPrefix(message.guildId!);
+    
 
     const mainEmbed = new EmbedBuilder()
         .setTitle(`${Mascot.Emotes.University} ${Mascot.Name} - Tutorial`)
@@ -146,7 +146,7 @@ export async function handleTutorial(message: Message) {
                     .setDescription(
                         `Spend your hard-earned cash on items.\n\n` +
                         `**Shopping:**\n` +
-                        `${Mascot.Emotes.Shop} \`${prefix}shop\` - View global bot items.\n` +
+                        `${Mascot.Emotes.Shop} \`${prefix}shop\` - View shared catalog items.\n` +
                         `🏪 \`${prefix}store\` - View **server-specific** items added by your server admins.\n\n` +
                         `*Server items are unique to each community!*`
                     )

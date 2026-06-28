@@ -1,11 +1,11 @@
 import { Message, EmbedBuilder, Colors } from "discord.js";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { creditGamePayout, debitGameBet } from "../../services/gameService";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { errorEmbed } from "../../utils/embed";
 import { Mascot } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 // --- Types ---
 interface RRPlayer {
@@ -33,8 +33,7 @@ const MAX_PLAYERS = 6;
 const LOBBY_TIME = 60 * 1000; // 60 seconds to join
 
 export async function handleRussianRoulette(message: Message, args: string[]) {
-    const config = await getGuildConfig(message.guildId!);
-    const currency = config.currencyEmoji;
+    const prefix = await getGuildPrefix(message.guildId!);
     const sub = args[0]?.toLowerCase();
     const lobby = waitingLobbies.get(message.channelId);
 
@@ -51,12 +50,12 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
         if (isNaN(bet) || bet <= 0) {
             return message.reply({ embeds: [errorEmbed(message.author, "Invalid Bet", "Please specify a valid bet amount.")] });
         }
-        const { min, max } = getGameBetLimits(config, "russian_roulette");
+        const { min, max } = getGameBetLimits("russian_roulette");
         if (bet < min) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Russian Roulette is **${fmtCurrency(min, currency)}**.`)] });
+            return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Russian Roulette is **${fmtCurrency(min)}**.`)] });
         }
         if (bet > max) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Russian Roulette is **${fmtCurrency(max, currency)}**.`)] });
+            return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Russian Roulette is **${fmtCurrency(max)}**.`)] });
         }
         if (user.wallet!.balance < bet) {
             return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You can't afford this bet.")] });
@@ -82,8 +81,8 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
         };
 
         const embed = new EmbedBuilder()
-            .setTitle(`${Mascot.Emotes.Gun} Russian Roulette | Bet: ${fmtCurrency(bet, currency)}`)
-            .setDescription(`**${message.author.username}** has loaded the gun!\n\nType \`${config.prefix}rr join\` to play.\nType \`${config.prefix}rr start\` to begin immediately.`)
+            .setTitle(`${Mascot.Emotes.Gun} Russian Roulette | Bet: ${fmtCurrency(bet)}`)
+            .setDescription(`**${message.author.username}** has loaded the gun!\n\nType \`${prefix}rr join\` to play.\nType \`${prefix}rr start\` to begin immediately.`)
             .addFields({ name: "Players (1/6)", value: `1. ${message.author.username}` })
             .setColor(Colors.DarkRed)
             .setFooter({ text: "Lobby closes in 60s" });
@@ -110,7 +109,7 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
     // --- JOIN ---
     if (sub === "join") {
         if (!lobby || lobby.status !== "WAITING") {
-            return message.reply({ embeds: [errorEmbed(message.author, "No Lobby", "There is no open lobby in this channel. Start one with `" + config.prefix + "rr start <amount>`!")] });
+            return message.reply({ embeds: [errorEmbed(message.author, "No Lobby", "There is no open lobby in this channel. Start one with `" + prefix + "rr start <amount>`!")] });
         }
         if (lobby.players.some(p => p.id === message.author.id)) {
             return message.reply({ embeds: [errorEmbed(message.author, "Already Joined", "You are already in the game.")] });
@@ -121,7 +120,7 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
 
         const user = await ensureUserAndWallet(message.author.id, message.guildId!, message.author.username);
         if (user.wallet!.balance < lobby.betAmount) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", `You need **${fmtCurrency(lobby.betAmount, currency)}** to join.`)] });
+            return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", `You need **${fmtCurrency(lobby.betAmount)}** to join.`)] });
         }
 
         await debitGameBet(user.wallet!.id, lobby.betAmount, {
@@ -162,9 +161,9 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
     const helpEmbed = new EmbedBuilder()
         .setTitle(`${Mascot.Emotes.Gun} Russian Roulette Help`)
         .setDescription(`High stakes, one bullet. Survivor takes the dead man's share.\n\n` +
-            `\`${config.prefix}rr start <amount>\` - Host a game\n` +
-            `\`${config.prefix}rr join\` - Join a game\n` +
-            `\`${config.prefix}rr force\` - Start game immediately (Host only)`)
+            `\`${prefix}rr start <amount>\` - Host a game\n` +
+            `\`${prefix}rr join\` - Join a game\n` +
+            `\`${prefix}rr force\` - Start game immediately (Host only)`)
         .setColor(Colors.DarkButNotBlack);
     return message.reply({ embeds: [helpEmbed] });
 }
@@ -197,8 +196,7 @@ async function startGame(channelId: string, message: Message) {
     if (!lobby) return;
 
     lobby.status = "PLAYING";
-    const config = await getGuildConfig(message.guildId!);
-    const currency = config.currencyEmoji;
+    const prefix = await getGuildPrefix(message.guildId!);
 
     // Shuffle players
     const players = lobby.players.sort(() => Math.random() - 0.5);
@@ -300,13 +298,13 @@ async function startGame(channelId: string, message: Message) {
                 guild: message.guild!,
                 type: "ECONOMY",
                 title: "Russian Roulette Result",
-                description: `**Eliminated:** ${deadPlayer?.username}\n**Survivors:** ${winners.length}\n**Pot:** ${fmtCurrency(pot, currency)}\n**Win/Person:** ${fmtCurrency(winAmount, currency)}`,
+                description: `**Eliminated:** ${deadPlayer?.username}\n**Survivors:** ${winners.length}\n**Pot:** ${fmtCurrency(pot)}\n**Win/Person:** ${fmtCurrency(winAmount)}`,
                 color: Colors.DarkRed,
                 thumbnail: message.guild?.iconURL() || undefined
             }).catch(() => { });
         });
 
-        const winMsg = winners.map(w => `**${w.username}** (+${fmtCurrency(winAmount - lobby.betAmount, currency)})`).join(", ");
+        const winMsg = winners.map(w => `**${w.username}** (+${fmtCurrency(winAmount - lobby.betAmount)})`).join(", ");
 
         const finalEmbed = new EmbedBuilder()
             .setTitle(`${Mascot.Emotes.Rip} Game Over`)

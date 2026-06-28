@@ -32,7 +32,7 @@ export function Footer() {
                             <FooterLink href="/premium">Premium</FooterLink>
                             <FooterLink href="https://top.gg/bot/1371816936857669702?s=0825a328ae527">Vote</FooterLink>
                             <FooterLink href="https://discord.gg/Y5P44UCH2Y">Support</FooterLink>
-                            <FooterLink href="/dashboard">Dashboard</FooterLink>
+                            <FooterLink href="/docs">Documentation</FooterLink>
                         </ul>
                     </div>
 

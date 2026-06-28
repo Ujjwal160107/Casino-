@@ -1,6 +1,5 @@
 import { Interaction, ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Message, TextChannel, MessageFlags, ContainerBuilder, TextDisplayBuilder } from "discord.js";
 import { enroll, claimScholarship, dropout } from "../services/educationService";
-import { getGuildConfig } from "../services/guildConfigService";
 import { fmtCurrency, formatDuration } from "../utils/format";
 import { Mascot, getEmoteUrl } from "../config/branding";
 import prisma from "../utils/prisma";
@@ -13,6 +12,18 @@ import { redisService } from "../services/redisService";
 import { getRequiredGearKey } from "../services/jobService";
 import { JOB_SHOP_CATALOG } from "../utils/shopCatalog";
 import { seedJobShop } from "../services/shopService";
+import { getGuildPrefix } from "../utils/guildContext";
+import { globalCatalogGuildFilter } from "../utils/globalCatalog";
+import { MAX_SAFE_BALANCE } from "../utils/economyConfig";
+import {
+    ensureDeferredEphemeralReply,
+    ensureDeferredUpdate,
+    safeDeferReply,
+    safeEditReply,
+    safeFollowUp,
+    safeReply,
+    safeUpdate,
+} from "../utils/interactionHelpers";
 
 function textContainer(title: string, body: string, color = 0x2ECC71) {
     return new ContainerBuilder()
@@ -46,45 +57,48 @@ async function handleButton(interaction: ButtonInteraction) {
         const paymentMethod = parts[4] === "card" ? "card" : "wallet";
 
         if (targetUserId && targetUserId !== user.id) {
-            return interaction.reply({ content: `${Mascot.Emotes.Fail} This interaction is not for you.`, ephemeral: true });
+            await safeReply(interaction, {
+                content: `${Mascot.Emotes.Fail} This interaction is not for you.`,
+                flags: MessageFlags.Ephemeral,
+            });
+            return;
         }
 
-        await interaction.deferReply({ ephemeral: false });
+        if (!await ensureDeferredEphemeralReply(interaction)) return;
 
         try {
             const result = await enroll(user.id, guild.id, degreeId, paymentMethod);
-            const config = await getGuildConfig(guild.id);
 
             const embed = new EmbedBuilder()
                 .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
                 .setTitle(`${Mascot.Emotes.Accept} Enrollment Successful`)
                 .setDescription(`You have successfully enrolled in **${result.degree.name}**!`)
                 .addFields(
-                    { name: "Tuition Paid", value: fmtCurrency(result.degree.tuitionPerSem, config.currencyEmoji) },
+                    { name: "Tuition Paid", value: fmtCurrency(result.degree.tuitionPerSem) },
                     { name: "Payment Method", value: paymentMethod === "card" ? "Fortuna Card" : "Wallet" }
                 )
                 .setColor("#2ECC71");
 
-            await interaction.editReply({ embeds: [embed] });
+            await safeEditReply(interaction, { embeds: [embed] });
 
         } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Enrollment Failed**: ${err.message}` });
+            await safeEditReply(interaction, { content: `${Mascot.Emotes.Fail} **Enrollment Failed**: ${err.message}` });
         }
     }
     else if (customId.startsWith("relax:")) {
         const [, ownerId, optionId] = customId.split(":");
         if (ownerId !== user.id) {
-            return interaction.reply({
+            return safeReply(interaction, {
                 components: [textContainer("Relax Session", "This relax dashboard belongs to someone else.", 0xE74C3C)],
                 flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
             });
         }
 
-        await interaction.deferUpdate();
+        if (!await ensureDeferredUpdate(interaction)) return;
 
         const lockKey = `${user.id}:${optionId}`;
         if (activeRelaxSelections.has(lockKey)) {
-            return interaction.editReply({
+            return safeEditReply(interaction, {
                 components: [textContainer("Relax In Progress", "Your relax activity is already being processed.", 0xF1C40F)],
                 flags: MessageFlags.IsComponentsV2,
             });
@@ -93,26 +107,26 @@ async function handleButton(interaction: ButtonInteraction) {
         try {
             activeRelaxSelections.add(lockKey);
             const result = await applyRelaxOption(user.id, user.username, optionId);
-            const config = await getGuildConfig(guild.id);
+            const prefix = await getGuildPrefix(guild.id);
             const dashboard = await buildRelaxDashboard(user.id, guild.id, user.username);
 
             dashboard.container.addTextDisplayComponents(
                 new TextDisplayBuilder().setContent(
                     `**${Mascot.Emotes.Accept} ${result.option.name} complete.**\n` +
-                    `Paid ${fmtCurrency(result.cost, config.currencyEmoji)}.\n` +
-                    `Wallet: ${fmtCurrency(result.previousWalletBalance, config.currencyEmoji)} -> ${fmtCurrency(result.walletBalance, config.currencyEmoji)}\n` +
+                    `Paid ${fmtCurrency(result.cost)}.\n` +
+                    `Wallet: ${fmtCurrency(result.previousWalletBalance)} -> ${fmtCurrency(result.walletBalance)}\n` +
                     `Job Stress: ${result.previousJobStress}/100 -> ${result.jobStress}/100\n` +
                     `Education Stress: ${result.previousEducationStress === null ? "Not enrolled" : `${result.previousEducationStress}/100 -> ${result.educationStress}/100`}`,
                 ),
             );
 
-            await interaction.editReply({
+            await safeEditReply(interaction, {
                 components: [dashboard.container],
                 flags: MessageFlags.IsComponentsV2,
             });
         } catch (err: any) {
             const snapshot = await getRelaxSnapshot(user.id, user.username);
-            await interaction.editReply({
+            await safeEditReply(interaction, {
                 components: [
                     textContainer(
                         "Relax Failed",
@@ -129,20 +143,19 @@ async function handleButton(interaction: ButtonInteraction) {
     else if (customId.startsWith("claim_scholarship_")) {
         const milestone = parseInt(customId.replace("claim_scholarship_", ""));
 
-        await interaction.deferReply({ ephemeral: true });
+        if (!await ensureDeferredEphemeralReply(interaction)) return;
 
         try {
             const amount = await claimScholarship(user.id, guild.id, milestone);
-            const config = await getGuildConfig(guild.id);
 
             const embed = new EmbedBuilder()
                 .setTitle(`${Mascot.Emotes.MoneyBag} Scholarship Claimed!`)
-                .setDescription(`You claimed **${fmtCurrency(amount, config.currencyEmoji)}** for reaching **${milestone}% Education XP**!`)
+                .setDescription(`You claimed **${fmtCurrency(amount)}** for reaching **${milestone}% Education XP**!`)
                 .setColor("#F1C40F");
 
-            await interaction.editReply({ embeds: [embed] });
+            await safeEditReply(interaction, { embeds: [embed] });
         } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Claim Failed**: ${err.message}` });
+            await safeEditReply(interaction, { content: `${Mascot.Emotes.Fail} **Claim Failed**: ${err.message}` });
         }
     }
     else if (customId.startsWith("edu_stress_") || customId.startsWith("stress_") || customId.startsWith("confirm_edu_stress_") || customId.startsWith("confirm_stress_")) {
@@ -154,20 +167,20 @@ async function handleButton(interaction: ButtonInteraction) {
         };
         const optionId = optionByLegacyActivity[activity] ?? "gym_session";
 
-        await interaction.deferUpdate().catch(async () => {
-            if (!interaction.replied && !interaction.deferred) await interaction.deferReply({ ephemeral: true });
-        });
+        if (!await ensureDeferredUpdate(interaction)) {
+            if (!await ensureDeferredEphemeralReply(interaction)) return;
+        }
 
         try {
             await applyRelaxOption(user.id, user.username, optionId);
             const dashboard = await buildRelaxDashboard(user.id, guild.id, user.username);
-            await interaction.editReply({
+            await safeEditReply(interaction, {
                 components: [dashboard.container],
                 embeds: [],
                 flags: MessageFlags.IsComponentsV2,
             });
         } catch (err: any) {
-            await interaction.editReply({
+            await safeEditReply(interaction, {
                 components: [textContainer("Relax Failed", `${Mascot.Emotes.Fail} ${err.message}`, 0xE74C3C)],
                 embeds: [],
                 flags: MessageFlags.IsComponentsV2,
@@ -175,10 +188,10 @@ async function handleButton(interaction: ButtonInteraction) {
         }
     }
     else if (customId === "cancel_stress") {
-        await interaction.update({ content: `${Mascot.Emotes.Decline} Activity cancelled.`, embeds: [], components: [] });
+        await safeUpdate(interaction, { content: `${Mascot.Emotes.Decline} Activity cancelled.`, embeds: [], components: [] });
     }
     else if (customId === "dropout_confirm") {
-        await interaction.deferUpdate();
+        if (!await ensureDeferredUpdate(interaction)) return;
         try {
             const res = await dropout(user.id, guild.id);
 
@@ -188,18 +201,18 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setColor("#E74C3C")
                 .setThumbnail(getEmoteUrl(Mascot.Emotes.Shocked));
 
-            await interaction.editReply({ embeds: [embed], components: [] });
+            await safeEditReply(interaction, { embeds: [embed], components: [] });
 
         } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Dropout Failed**: ${err.message}`, components: [] });
+            await safeEditReply(interaction, { content: `${Mascot.Emotes.Fail} **Dropout Failed**: ${err.message}`, components: [] });
         }
     }
     else if (customId === "dropout_cancel") {
-        await interaction.update({ content: `${Mascot.Emotes.Decline} Dropout cancelled. Phew!`, embeds: [], components: [] });
+        await safeUpdate(interaction, { content: `${Mascot.Emotes.Decline} Dropout cancelled. Phew!`, embeds: [], components: [] });
     }
     // JOB HANDLERS
     else if (customId === "work_resign") {
-        await interaction.deferReply({ ephemeral: true });
+        if (!await ensureDeferredEphemeralReply(interaction)) return;
 
         const shockedUrl = getEmoteUrl(Mascot.Emotes.Shocked);
         const embed = new EmbedBuilder()
@@ -215,15 +228,15 @@ async function handleButton(interaction: ButtonInteraction) {
             new ButtonBuilder().setCustomId("work_resign_cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
         );
 
-        await interaction.editReply({ embeds: [embed], components: [row] });
+        await safeEditReply(interaction, { embeds: [embed], components: [row] });
     }
     else if (customId.startsWith("work_promote_")) {
-        await interaction.deferReply({ ephemeral: true });
+        if (!await ensureDeferredEphemeralReply(interaction)) return;
 
         const requestedNextJobId = customId.replace("work_promote_", "");
         const freshUser = await prisma.user.findUnique({ where: { discordId: user.id } });
         if (!freshUser || !freshUser.jobId) {
-            return interaction.editReply({ content: "You don't have a job to promote from." });
+            return safeEditReply(interaction, { content: "You don't have a job to promote from." });
         }
 
         const { checkPromotion: _checkPromo, getJob: _getJob } = require("../services/jobService");
@@ -234,11 +247,11 @@ async function handleButton(interaction: ButtonInteraction) {
             if (promoCheck.missingXp > 0) parts.push(`**${promoCheck.missingXp} more XP**`);
             if (promoCheck.missingShifts > 0) parts.push(`**${promoCheck.missingShifts} more shifts**`);
             const missing = parts.length > 0 ? parts.join(" and ") : "requirements not met";
-            return interaction.editReply({ content: `You need ${missing} before you can be promoted.` });
+            return safeEditReply(interaction, { content: `You need ${missing} before you can be promoted.` });
         }
 
         if (promoCheck.nextJob.id !== requestedNextJobId) {
-            return interaction.editReply({ content: "This promotion button is outdated. Run `!work` again." });
+            return safeEditReply(interaction, { content: "This promotion button is outdated. Run `!work` again." });
         }
 
         const prevJob = _getJob(freshUser.jobId);
@@ -253,15 +266,13 @@ async function handleButton(interaction: ButtonInteraction) {
             }
         });
 
-        const { getGuildConfig: _getConfig } = require("../services/guildConfigService");
-        const cfg = await _getConfig(guild.id);
-
+                
         const promoEmbed = new EmbedBuilder()
             .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
             .setTitle(`${Mascot.Emotes.JobPromotion} Promoted!`)
             .setDescription(
                 `**${prevJob?.title ?? "Previous Role"}** → **${nextJob.title}**\n\n` +
-                `**New Pay:** ${fmtCurrency(nextJob.pay, cfg.currencyEmoji)}/shift\n` +
+                `**New Pay:** ${fmtCurrency(nextJob.pay)}/shift\n` +
                 `**Sector:** ${nextJob.sector.charAt(0).toUpperCase() + nextJob.sector.slice(1)}\n` +
                 `**Level:** ${nextJob.level}`
             )
@@ -277,10 +288,10 @@ async function handleButton(interaction: ButtonInteraction) {
             thumbnail: user.displayAvatarURL(),
         }).catch(() => {});
 
-        return interaction.editReply({ embeds: [promoEmbed] });
+        return safeEditReply(interaction, { embeds: [promoEmbed] });
     }
     else if (customId === "work_resign_confirm") {
-        await interaction.deferUpdate();
+        if (!await ensureDeferredUpdate(interaction)) return;
         try {
             await prisma.user.update({
                 where: { discordId: user.id },
@@ -292,7 +303,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setDescription("**You have resigned.**\n\nYou are now unemployed. Your career progress has been reset.")
                 .setColor("#95A5A6");
 
-            await interaction.editReply({ embeds: [embed], components: [] });
+            await safeEditReply(interaction, { embeds: [embed], components: [] });
 
             // Log resignation
             logToChannel(interaction.client, {
@@ -307,11 +318,11 @@ async function handleButton(interaction: ButtonInteraction) {
                 color: 0xE74C3C
             });
         } catch (e: any) {
-            await interaction.editReply({ content: `Error: ${e.message}`, components: [] });
+            await safeEditReply(interaction, { content: `Error: ${e.message}`, components: [] });
         }
     }
     else if (customId === "work_resign_cancel") {
-        await interaction.update({ content: `${Mascot.Emotes.Success} Cancelled resignation. Get back to work!`, embeds: [], components: [] });
+        await safeUpdate(interaction, { content: `${Mascot.Emotes.Success} Cancelled resignation. Get back to work!`, embeds: [], components: [] });
     }
     else if (customId.startsWith("work_event_choice_")) {
         const parts = customId.split("_"); // work_event_choice_eventId_choiceIdx
@@ -330,7 +341,7 @@ async function handleButton(interaction: ButtonInteraction) {
         const event = WORK_EVENTS.find((e: any) => e.id === targetEventId);
 
         if (!event) {
-            return interaction.update({ content: "Event expired or invalid.", embeds: [], components: [] });
+            return safeUpdate(interaction, { content: "Event expired or invalid.", embeds: [], components: [] });
         }
 
         const choice = event.choices[choiceIdx];
@@ -340,9 +351,9 @@ async function handleButton(interaction: ButtonInteraction) {
         const tieBoost = tieData?.active ? 10 : 0;
         let success = Math.random() * 100 < (choice.successChance + tieBoost);
 
-        await interaction.deferUpdate();
+        if (!await ensureDeferredUpdate(interaction)) return;
 
-        const config = await getGuildConfig(guild.id);
+        const prefix = await getGuildPrefix(guild.id);
         const userData = await prisma.user.findUnique({
             where: { discordId: user.id },
             include: { wallet: true }
@@ -393,7 +404,7 @@ async function handleButton(interaction: ButtonInteraction) {
         if (success) {
             earnings = Math.floor(basePay * (money || 0));
             earnings = Math.floor(earnings * eventRepData.tier.payBonus); // Apply rep pay bonus
-            if (config.walletLimit && userData.wallet && userData.wallet.balance + earnings > config.walletLimit) {
+            if (MAX_SAFE_BALANCE && userData.wallet && userData.wallet.balance + earnings > MAX_SAFE_BALANCE) {
                 earnings = 0;
                 eventNotes.push("⚠️ Wallet Limit Reached! Earned 0 coins.");
             }
@@ -431,7 +442,11 @@ async function handleButton(interaction: ButtonInteraction) {
             await seedJob(guild.id);
             const gearItem = JOB_CAT.find((i: any) => i.key === eventGearKey);
             if (gearItem) {
-                const gearInDb = await prisma.shopItem.findFirst({ where: { guildId: guild.id, name: { equals: gearItem.name, mode: "insensitive" } } });
+                const gearInDb = await prisma.shopItem.findFirst({
+                    where: globalCatalogGuildFilter({
+                        name: { equals: gearItem.name, mode: "insensitive" },
+                    }),
+                });
                 const invRow = gearInDb ? await prisma.inventory.findUnique({ where: { userId_shopItemId: { userId: userData.discordId, shopItemId: gearInDb.id } } }) : null;
                 if (invRow) {
                     let wear = !success && !pagerSaved ? 3 + Math.floor(Math.random() * 6) : 0;
@@ -522,7 +537,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
         const resEmbed = new EmbedBuilder()
             .setTitle(success ? `${Mascot.Emotes.Success} Event Resolved` : pagerSaved ? `${Mascot.Emotes.Alert} Event Saved` : `${Mascot.Emotes.Fail} Event Failed`)
-            .setDescription(`**${choice.label}**\n${msg}\n\n**Result:**\n${Mascot.Emotes.MoneyBag} ${fmtCurrency(earnings, config.currencyEmoji)}\nXP: ${xpGain > 0 ? '+' : ''}${xpGain}\n${Mascot.Emotes.Alert} +${stressGain} Stress`)
+            .setDescription(`**${choice.label}**\n${msg}\n\n**Result:**\n${Mascot.Emotes.MoneyBag} ${fmtCurrency(earnings)}\nXP: ${xpGain > 0 ? '+' : ''}${xpGain}\n${Mascot.Emotes.Alert} +${stressGain} Stress`)
             .setColor(color as any);
 
         const eventRows: ActionRowBuilder<ButtonBuilder>[] = [];
@@ -554,7 +569,7 @@ async function handleButton(interaction: ButtonInteraction) {
         if (eventDemoField) resEmbed.addFields(eventDemoField);
         if (eventDemoField?.name.startsWith("🚨")) resEmbed.setColor("#E74C3C");
 
-        await interaction.editReply({ embeds: [resEmbed], components: eventRows });
+        await safeEditReply(interaction, { embeds: [resEmbed], components: eventRows });
 
         // Log it
         logToChannel(interaction.client, {
@@ -564,7 +579,7 @@ async function handleButton(interaction: ButtonInteraction) {
             description: `**${user.username}** encountered: ${event.title}`,
             fields: [
                 { name: "Choice", value: choice.label, inline: true },
-                { name: "Earnings", value: fmtCurrency(earnings, config.currencyEmoji), inline: true }
+                { name: "Earnings", value: fmtCurrency(earnings), inline: true }
             ],
             thumbnail: user.displayAvatarURL(),
             color: success ? 0x2ECC71 : 0xE74C3C
@@ -577,9 +592,9 @@ async function handleButton(interaction: ButtonInteraction) {
 
 
     else if (customId.startsWith("promote_confirm_")) {
-        try {
-            await interaction.deferReply({ ephemeral: true });
+        if (!await ensureDeferredEphemeralReply(interaction)) return;
 
+        try {
             const nextJobId = customId.replace("promote_confirm_", "");
             // Import Job Service Safely
             let jobService;
@@ -587,20 +602,19 @@ async function handleButton(interaction: ButtonInteraction) {
                 jobService = require("../services/jobService");
             } catch (err) {
                 console.error("Failed to require jobService:", err);
-                return interaction.editReply({ content: "System Error: Job Service unavailable." });
+                return safeEditReply(interaction, { content: "System Error: Job Service unavailable." });
             }
 
             const { getJob, getJobAction } = jobService;
             const nextJob = getJob(nextJobId);
 
             if (!nextJob) {
-                return interaction.editReply({ content: `Error: Job definition for '${nextJobId}' not found.` });
+                return safeEditReply(interaction, { content: `Error: Job definition for '${nextJobId}' not found.` });
             }
 
             // Fetch config if not already available in this scope
-            const { getGuildConfig } = require("../services/guildConfigService");
-            const config = await getGuildConfig(guild.id);
-            const prefix = config?.prefix || "!";
+                        const prefix = await getGuildPrefix(guild.id);
+            
 
             // DO NOT AUTO PROMOTE. Tell user to apply.
             const embed = new EmbedBuilder()
@@ -613,19 +627,18 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setColor("#F1C40F") // Gold
                 .setThumbnail(getEmoteUrl(Mascot.Emotes.Success));
 
-            await interaction.editReply({ embeds: [embed] });
+            await safeEditReply(interaction, { embeds: [embed] });
 
         } catch (err: any) {
             console.error("Promotion Error:", err);
-            // If already deferred, use editReply
-            try { await interaction.editReply({ content: `Error: ${err.message}` }); } catch (e) { }
+            await safeEditReply(interaction, { content: `Error: ${err.message}` });
         }
     }
     else if (customId === "work_shift") {
         // Defer immediately to prevent timeout (Unknown Interaction)
         // We use ephemeral: false because the game is intended to be public.
         // This means validation errors will also be public, which is a necessary trade-off to prevent crashes.
-        await interaction.deferReply({ ephemeral: false });
+        if (!await safeDeferReply(interaction)) return;
 
         // Import here to avoid circular dependencies if any
         const { getJob, getJobPay, checkPromotion, checkDemotion, getWorkEvent } = require("../services/jobService");
@@ -638,13 +651,13 @@ async function handleButton(interaction: ButtonInteraction) {
         });
         if (!userData || !userData.jobId) {
             await interaction.deleteReply().catch(() => { });
-            return interaction.followUp({ content: "You don't have a job!", ephemeral: true });
+            return safeFollowUp(interaction, { content: "You don't have a job!", flags: MessageFlags.Ephemeral });
         }
 
         const job = getJob(userData.jobId);
         if (!job) {
             await interaction.deleteReply().catch(() => { });
-            return interaction.followUp({ content: "Invalid job.", ephemeral: true });
+            return safeFollowUp(interaction, { content: "Invalid job.", flags: MessageFlags.Ephemeral });
         }
 
         // Gear check — required equipment must be owned and not broken before shift proceeds
@@ -657,7 +670,9 @@ async function handleButton(interaction: ButtonInteraction) {
             if (gearCatalogItem) {
                 gearCatalogName = gearCatalogItem.name;
                 const gearInDb = await prisma.shopItem.findFirst({
-                    where: { guildId: guild.id, name: { equals: gearCatalogItem.name, mode: "insensitive" } }
+                    where: globalCatalogGuildFilter({
+                        name: { equals: gearCatalogItem.name, mode: "insensitive" },
+                    }),
                 });
                 const invRow = gearInDb
                     ? await prisma.inventory.findUnique({
@@ -667,17 +682,17 @@ async function handleButton(interaction: ButtonInteraction) {
                 if (!invRow || invRow.amount < 1) {
                     const sectorDisplay = job.sector.charAt(0).toUpperCase() + job.sector.slice(1);
                     await interaction.deleteReply().catch(() => { });
-                    return interaction.followUp({
+                    return safeFollowUp(interaction, {
                         content: `You need a **${gearCatalogItem.name}** to work ${sectorDisplay} jobs. Buy it from the Job Store (\`!shop job\`).`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral,
                     });
                 }
                 const durability = (invRow.meta as any)?.durability ?? 100;
                 if (durability <= 0) {
                     await interaction.deleteReply().catch(() => { });
-                    return interaction.followUp({
+                    return safeFollowUp(interaction, {
                         content: `Your **${gearCatalogItem.name}** is broken (0/100). Use a **Repair Coupon** before working.`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral,
                     });
                 }
                 gearInvRow = { id: invRow.id, amount: invRow.amount, meta: invRow.meta };
@@ -685,15 +700,15 @@ async function handleButton(interaction: ButtonInteraction) {
         }
 
         // Cooldown check
-        const config = await getGuildConfig(guild.id);
+        const prefix = await getGuildPrefix(guild.id);
 
         // Check Wallet Limit Check BEFORE shift starts
-        if (config.walletLimit && userData.wallet && userData.wallet.balance >= config.walletLimit) {
+        if (MAX_SAFE_BALANCE && userData.wallet && userData.wallet.balance >= MAX_SAFE_BALANCE) {
             await interaction.deleteReply().catch(() => { });
-            return interaction.followUp({ content: `${Mascot.Emotes.Fail} Your wallet is full! Deposit money to the bank before working.`, ephemeral: true });
+            return safeFollowUp(interaction, { content: `${Mascot.Emotes.Fail} Your wallet is full! Deposit money to the bank before working.`, flags: MessageFlags.Ephemeral });
         }
 
-        const cooldownSeconds = config.jobCooldown ?? 3600;
+        const cooldownSeconds = 3600;
 
         // Check Active Effects (Permanent Buffs)
         const activeEffects = await prisma.activeEffect.findMany({
@@ -723,10 +738,10 @@ async function handleButton(interaction: ButtonInteraction) {
         const cooldownMs = finalCooldown * 1000;
 
         const { isTester: _isTesterWork } = require("../utils/developerAccess");
-        if (now - lastShift < cooldownMs && !_isTesterWork(user.id)) {
+        if (now - lastShift < cooldownMs && !_isTesterWork(user.id, interaction.member)) {
             const canWorkAt = Math.floor((lastShift + cooldownMs) / 1000);
             await interaction.deleteReply().catch(() => { });
-            return interaction.followUp({ content: `${Mascot.Emotes.Angry} You are tired! You can work again <t:${canWorkAt}:R>.`, ephemeral: true });
+            return safeFollowUp(interaction, { content: `${Mascot.Emotes.Angry} You are tired! You can work again <t:${canWorkAt}:R>.`, flags: MessageFlags.Ephemeral });
         }
 
         // --- STRESS CHECK ---
@@ -743,7 +758,7 @@ async function handleButton(interaction: ButtonInteraction) {
                     }
                 });
 
-                const prefix = config?.prefix || "!";
+                
 
                 const burnoutEmbed = new EmbedBuilder()
                     .setTitle(`${Mascot.Emotes.Alert} BURNOUT!`)
@@ -752,7 +767,7 @@ async function handleButton(interaction: ButtonInteraction) {
                     .setThumbnail(getEmoteUrl(Mascot.Emotes.Fail));
 
                 await interaction.deleteReply().catch(() => { });
-                return interaction.followUp({ embeds: [burnoutEmbed], ephemeral: true });
+                return safeFollowUp(interaction, { embeds: [burnoutEmbed], flags: MessageFlags.Ephemeral });
             }
         }
 
@@ -785,7 +800,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(rows);
 
                 await recordRecentId(user.id, "event", event.id);
-                return interaction.editReply({ embeds: [evEmbed], components: [row] });
+                return safeEditReply(interaction, { embeds: [evEmbed], components: [row] });
             }
         }
 
@@ -809,13 +824,13 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setColor("#3498DB")
                 .setFooter({ text: `Memorize this for ${game.previewTime} seconds!` });
 
-            reply = await interaction.editReply({ embeds: [previewEmbed] }); // Removed fetchReply as editReply returns Message or boolean/APIMessage
+            reply = await safeEditReply(interaction, { embeds: [previewEmbed] });
 
             // Wait
             await new Promise(resolve => setTimeout(resolve, game.previewTime! * 1000));
 
             // Update to Question
-            await interaction.editReply({ embeds: [embed] });
+            await safeEditReply(interaction, { embeds: [embed] });
         }
 
         // --- BUTTON GAME ---
@@ -832,13 +847,10 @@ async function handleButton(interaction: ButtonInteraction) {
             // Since we already deferred, we always use editReply
             // If reply was set by preview logic, we edit.
             // If not set, we still edit the deferred message.
-            reply = await interaction.editReply({ embeds: [embed], components: [row] });
+            await safeEditReply(interaction, { embeds: [embed], components: [row] });
 
             try {
-                // If reply is not a message (failed edit?), fallback to fetchReply?
-                // editReply returns Message if successful in d.js v14?
-                // Actually editReply resolves to Message.
-                if (!reply) reply = await interaction.fetchReply();
+                reply = await interaction.fetchReply();
 
                 const i = await reply.awaitMessageComponent({
                     componentType: ComponentType.Button,
@@ -857,7 +869,7 @@ async function handleButton(interaction: ButtonInteraction) {
         else {
             // TYPING GAME
             // We just edit the embed to show the question
-            reply = await interaction.editReply({ embeds: [embed], components: [] });
+            reply = await safeEditReply(interaction, { embeds: [embed], components: [] });
 
             if (interaction.channel) {
                 try {
@@ -960,7 +972,7 @@ async function handleButton(interaction: ButtonInteraction) {
             if (tieData?.active) {
                 const tieBonus = Math.floor(amount * 0.10);
                 amount += tieBonus;
-                jobEffectNotes.push(`Lucky Tie: +${fmtCurrency(tieBonus, config?.currencyEmoji)} bonus`);
+                jobEffectNotes.push(`Lucky Tie: +${fmtCurrency(tieBonus)} bonus`);
             }
 
             // Corporate Blessing: 40% chance of 2-3x payout; on fail +25 stress and extra gear wear
@@ -989,7 +1001,7 @@ async function handleButton(interaction: ButtonInteraction) {
             // Yes, userData is defined at line 501 in the `work_shift` block.
             // Wait, loop back: `userData` at line 501 includes wallet now due to my previous edit?
             // YES.
-            if (config.walletLimit && userData.wallet && userData.wallet.balance + amount > config.walletLimit) {
+            if (MAX_SAFE_BALANCE && userData.wallet && userData.wallet.balance + amount > MAX_SAFE_BALANCE) {
                 amount = 0;
                 walletFull = true;
             }
@@ -1023,9 +1035,9 @@ async function handleButton(interaction: ButtonInteraction) {
             const { applyIncomeTax } = await import("../services/taxService");
             const workTax = walletFull ? { net: 0, taxPaid: 0, shielded: false } : await applyIncomeTax(user.id, amount);
 
-            let earningsText = `${fmtCurrency(amount, config?.currencyEmoji)}\n(Base Pay + ${streakBonusPct}% Streak Bonus)`;
+            let earningsText = `${fmtCurrency(amount)}\n(Base Pay + ${streakBonusPct}% Streak Bonus)`;
             if (walletFull) {
-                earningsText = `~~${fmtCurrency(amount, config?.currencyEmoji)}~~ 0\n(⚠️ Wallet Limit Reached)`;
+                earningsText = `~~${fmtCurrency(amount)}~~ 0\n(⚠️ Wallet Limit Reached)`;
             }
             // --- Gear durability wear ---
             if (gearInvRow && gearCatalogName) {
@@ -1094,7 +1106,7 @@ async function handleButton(interaction: ButtonInteraction) {
             if (!walletFull) {
                 winEmbed.addFields(workTax.shielded
                     ? { name: "Tax", value: "🛡️ Shielded", inline: true }
-                    : { name: "Tax (8%)", value: `-${fmtCurrency(workTax.taxPaid, config?.currencyEmoji)}`, inline: true }
+                    : { name: "Tax (8%)", value: `-${fmtCurrency(workTax.taxPaid)}`, inline: true }
                 );
             }
 
@@ -1123,7 +1135,7 @@ async function handleButton(interaction: ButtonInteraction) {
             }
 
             // Disable buttons on the original game embed
-            await interaction.editReply({ components: [] });
+            await safeEditReply(interaction, { components: [] });
 
             // Create Work Log
             await prisma.workLog.create({
@@ -1144,7 +1156,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 description: `**${user.username}** finished a shift as **${job.title}**.`,
                 fields: [
                     { name: "User", value: `<@${user.id}>`, inline: true },
-                    { name: "Earnings", value: fmtCurrency(amount, config?.currencyEmoji), inline: true },
+                    { name: "Earnings", value: fmtCurrency(amount), inline: true },
                     { name: "Job", value: job.title, inline: true },
                     { name: "Streak", value: `${newStreak}`, inline: true }
                 ],
@@ -1158,7 +1170,7 @@ async function handleButton(interaction: ButtonInteraction) {
             if (userMessage) {
                 await (userMessage as Message).reply({ embeds: [winEmbed], components: rows });
             } else {
-                await interaction.followUp({ embeds: [winEmbed], components: rows });
+                await safeFollowUp(interaction, { embeds: [winEmbed], components: rows });
             }
 
         } else {
@@ -1194,7 +1206,7 @@ async function handleButton(interaction: ButtonInteraction) {
             }
 
             // Disable buttons on the original game embed
-            await interaction.editReply({ components: [] });
+            await safeEditReply(interaction, { components: [] });
 
             // Create Work Log
             await prisma.workLog.create({
@@ -1225,7 +1237,7 @@ async function handleButton(interaction: ButtonInteraction) {
             if (userMessage) {
                 await (userMessage as Message).reply({ embeds: [failEmbed] });
             } else {
-                await interaction.followUp({ embeds: [failEmbed] });
+                await safeFollowUp(interaction, { embeds: [failEmbed] });
             }
         }
     }

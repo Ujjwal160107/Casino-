@@ -15,9 +15,9 @@ import {
 import { JOBS, JobDefinition, getJob, getJobApplicationStatus, getJobsBySector, getJobPaySync } from "../../services/jobService";
 import { Mascot } from "../../config/branding";
 import { fmtCurrency } from "../../utils/format";
-import { getGuildConfig } from "../../services/guildConfigService";
 import prisma from "../../utils/prisma";
 import { startJobApplicationFromInteraction } from "./apply";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 const SECTORS: JobDefinition["sector"][] = ["tech", "medical", "business", "legal", "service", "trade", "freelance"];
 const JOBS_PER_PAGE = 5;
@@ -95,7 +95,7 @@ function buildMenuContainer(prefix: string, ownerId: string) {
     return container;
 }
 
-function buildSectorContainer(sector: JobDefinition["sector"], page: number, config: any, user: any, ownerId: string) {
+function buildSectorContainer(sector: JobDefinition["sector"], page: number, prefix: string, user: any, ownerId: string) {
     const jobs = getJobsBySector(sector);
     const totalPages = Math.max(1, Math.ceil(jobs.length / JOBS_PER_PAGE));
     const safePage = Math.min(Math.max(page, 0), totalPages - 1);
@@ -126,7 +126,7 @@ function buildSectorContainer(sector: JobDefinition["sector"], page: number, con
                             new TextDisplayBuilder().setContent(
                                 [
                                     `### ${job.emoji} ${job.title}`,
-      `Pay per shift: **${fmtCurrency(getJobPaySync(job), config?.currencyEmoji)}**`,
+      `Pay per shift: **${fmtCurrency(getJobPaySync(job))}**`,
                                     `Requirement: **${requirementText}**`,
                                     `Career tier: **${job.careerTier}**`,
                                 ].join("\n"),
@@ -170,7 +170,7 @@ function buildSectorRow(ownerId: string, page: number, totalPages: number) {
 export async function handleJobs(message: Message) {
     if (!message.guild) return;
 
-    const config = await getGuildConfig(message.guild.id);
+    const prefix = await getGuildPrefix(message.guild.id);
     const user = await prisma.user.findUnique({
         where: { discordId: message.author.id },
         include: { degrees: { include: { degree: true } } }
@@ -184,12 +184,12 @@ export async function handleJobs(message: Message) {
     const render = (): any => {
         if (currentView === "MENU" || !selectedSector) {
             return {
-                components: [buildMenuContainer(config?.prefix || "!", message.author.id)],
+                components: [buildMenuContainer(prefix, message.author.id)],
                 flags: MessageFlags.IsComponentsV2,
             };
         }
 
-        const sectorPayload = buildSectorContainer(selectedSector, currentPage, config, user, message.author.id);
+        const sectorPayload = buildSectorContainer(selectedSector, currentPage, prefix, user, message.author.id);
         currentPage = sectorPayload.safePage;
         return {
             components: [
@@ -244,6 +244,6 @@ export async function handleJobs(message: Message) {
     });
 
     collector.on("end", () => {
-        reply.edit({ components: [currentView === "MENU" || !selectedSector ? buildMenuContainer(config?.prefix || "!", message.author.id) : buildSectorContainer(selectedSector, currentPage, config, user, message.author.id).container] }).catch(() => { });
+        reply.edit({ components: [currentView === "MENU" || !selectedSector ? buildMenuContainer(prefix, message.author.id) : buildSectorContainer(selectedSector, currentPage, prefix, user, message.author.id).container] }).catch(() => { });
     });
 }

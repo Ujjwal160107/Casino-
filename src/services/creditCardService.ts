@@ -1,5 +1,5 @@
 import prisma, { runWithRetry } from "../utils/prisma";
-import { PrismaClient } from "@prisma/client";
+import { CreditCard, PrismaClient } from "@prisma/client";
 import {
   calculateMinimumDue,
   CARD_SCORE_RULES,
@@ -12,6 +12,7 @@ import {
   MAX_SAFE_BALANCE
 } from "../utils/economyConfig";
 import { getUserCareerTier } from "./jobService";
+import { fmtCurrency } from "../utils/format";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -27,6 +28,7 @@ function requireIntAmount(amount: number) {
 
 function cardDataFromTier(userId: string, tier: CardTierConfig) {
   const now = new Date();
+  const nextStatement = nextWeek(now);
   return {
     userId,
     tier: tier.tier,
@@ -43,9 +45,32 @@ function cardDataFromTier(userId: string, tier: CardTierConfig) {
     paidThisCycle: 0,
     dueSatisfiedThisCycle: false,
     missStreak: 0,
-    nextStatementAt: nextWeek(now),
-    currentCycleKey: getCycleKey(now)
+    nextStatementAt: nextStatement,
+    dueAt: nextStatement,
+    currentCycleKey: getCycleKey(now),
   };
+}
+
+export function getCardDisplaySnapshot(card: CreditCard) {
+  const tier = getCardTierConfig(card.tier);
+  const cycleEndsAt = card.dueAt ?? card.nextStatementAt;
+  return {
+    amountOwedNow: card.currentBalance,
+    utilizationPct: card.creditLimit > 0 ? card.currentBalance / card.creditLimit : 0,
+    projectedMinimumDue:
+      card.currentBalance > 0 ? calculateMinimumDue(card.currentBalance, tier) : 0,
+    cycleEndsAt,
+  };
+}
+
+export function getCardPayMinimumAmount(
+  card: CreditCard,
+  openStatement?: { minimumDue: number; amountPaid: number; status: string } | null,
+) {
+  if (openStatement?.status === "OPEN") {
+    return Math.max(0, openStatement.minimumDue - openStatement.amountPaid);
+  }
+  return getCardDisplaySnapshot(card).projectedMinimumDue;
 }
 
 function cardTierUpdateData(tier: CardTierConfig) {
@@ -81,7 +106,13 @@ export async function getCardSummary(discordId: string) {
 
   const careerTier = user ? getUserCareerTier(user) : 0;
   const eligibleTier = user ? getEligibleCardTier(user, careerTier) : null;
-  return { user, card, careerTier, eligibleTier };
+  const openStatement = card
+    ? await prisma.cardStatement.findFirst({
+        where: { cardId: card.id, status: "OPEN" },
+        orderBy: { statementAt: "desc" },
+      })
+    : null;
+  return { user, card, careerTier, eligibleTier, openStatement };
 }
 
 export async function getCardEligibilitySummary(discordId: string) {
@@ -227,7 +258,7 @@ export async function payCard(discordId: string, amount: number) {
       ]);
       if (!card) throw new Error("You do not have a card.");
       if (!wallet) throw new Error("Wallet not found.");
-      if (wallet.balance < paymentAmount) throw new Error("Insufficient wallet balance.");
+      if (wallet.balance < paymentAmount) throw new Error("Insufficient wallet balance. Card payments use your wallet — use withdraw to move money from your bank first.");
       if (card.currentBalance <= 0) throw new Error("Your card has no balance to pay.");
 
       const appliedAmount = Math.min(paymentAmount, card.currentBalance);
@@ -293,8 +324,13 @@ export async function withdrawFromCard(discordId: string, amount: number) {
       if (!wallet) throw new Error("Wallet not found.");
       if (card.status !== "ACTIVE") throw new Error("Only active cards can be used for withdrawals.");
       if (card.currentBalance + withdrawAmount > card.creditLimit) throw new Error("This withdrawal would exceed your credit limit.");
-      if (card.withdrawnThisCycle + withdrawAmount > card.weeklyWithdrawCap) throw new Error("This withdrawal would exceed your weekly card withdrawal cap.");
-      if (wallet.balance + withdrawAmount > MAX_SAFE_BALANCE) throw new Error("Your wallet is at the global safety cap.");
+      if (card.withdrawnThisCycle + withdrawAmount > card.weeklyWithdrawCap) {
+        const remaining = Math.max(0, card.weeklyWithdrawCap - card.withdrawnThisCycle);
+        throw new Error(
+          `This withdrawal would exceed your weekly withdraw cap. Remaining this cycle: **${fmtCurrency(remaining)}**.`,
+        );
+      }
+      if (wallet.balance + withdrawAmount > MAX_SAFE_BALANCE) throw new Error("Your wallet is at the maximum balance limit.");
 
       const updatedWallet = await trx.wallet.update({
         where: { id: wallet.id },
@@ -340,7 +376,12 @@ export async function chargeCardPurchaseTx(trx: any, discordId: string, amount: 
   if (!card) throw new Error("You do not have a card.");
   if (card.status !== "ACTIVE") throw new Error("Only active cards can be used for purchases.");
   if (card.currentBalance + purchaseAmount > card.creditLimit) throw new Error("This purchase would exceed your credit limit.");
-  if (card.spentThisCycle + purchaseAmount > card.weeklySpendCap) throw new Error("This purchase would exceed your weekly card spend cap.");
+  if (card.spentThisCycle + purchaseAmount > card.weeklySpendCap) {
+    const remaining = Math.max(0, card.weeklySpendCap - card.spentThisCycle);
+    throw new Error(
+      `This purchase would exceed your weekly spend cap. Remaining this cycle: **${fmtCurrency(remaining)}** (${fmtCurrency(card.spentThisCycle)} / ${fmtCurrency(card.weeklySpendCap)} used).`,
+    );
+  }
 
   const updatedCard = await trx.creditCard.update({
     where: { id: card.id },

@@ -2,6 +2,29 @@ import prisma from "../utils/prisma";
 import { MAX_SAFE_BALANCE, STARTING_WALLET_BALANCE } from "../utils/economyConfig";
 import { questBus } from "./questEvents";
 
+function isTransientWriteConflict(error: any) {
+  const message = `${error?.message ?? ""} ${error?.code ?? ""}`.toLowerCase();
+  return message.includes("write conflict")
+    || message.includes("deadlock")
+    || message.includes("transaction failed")
+    || message.includes("please retry your transaction")
+    || message.includes("p2034");
+}
+
+async function withTransactionRetry<T>(operation: () => Promise<T>, retries = 4): Promise<T> {
+  let lastError: any;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      if (!isTransientWriteConflict(error) || attempt === retries - 1) break;
+      await new Promise((resolve) => setTimeout(resolve, 75 + Math.random() * 175 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
 export async function ensureUserAndWallet(discordId: string, _guildId: string, username: string) {
   let user = await prisma.user.findUnique({
     where: { discordId },
@@ -106,7 +129,7 @@ export async function transferMoney(fromDiscordId: string, toDiscordId: string, 
 export async function addBalance(discordId: string, username: string, amount: number, type = "income", meta: any = {}, earned = true) {
   if (amount <= 0) throw new Error("Amount must be positive.");
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await withTransactionRetry(() => prisma.$transaction(async (tx) => {
     let user = await tx.user.findUnique({
       where: { discordId },
       include: { wallet: true }
@@ -160,7 +183,7 @@ export async function addBalance(discordId: string, username: string, amount: nu
       appliedAmount,
       capped
     };
-  });
+  }));
 
   // Garnishment: deduct 25% of earned income toward delinquent/locked card debt
   if (earned && result.appliedAmount > 0) {
@@ -168,10 +191,10 @@ export async function addBalance(discordId: string, username: string, amount: nu
       const { applyGarnishment } = await import("./creditCardService");
       const { garnished } = await applyGarnishment(discordId, result.appliedAmount);
       if (garnished > 0) {
-        await prisma.wallet.update({
+        await withTransactionRetry(() => prisma.wallet.update({
           where: { id: result.walletId },
           data: { balance: { decrement: garnished } }
-        });
+        }));
         result.newBalance -= garnished;
         (result as any).garnished = garnished;
       }
@@ -188,7 +211,7 @@ export async function addBalance(discordId: string, username: string, amount: nu
 export async function removeBalance(discordId: string, amount: number, type = "remove", meta: any = {}) {
   if (amount <= 0) throw new Error("Amount must be positive.");
 
-  return prisma.$transaction(async (tx) => {
+  return withTransactionRetry(() => prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({
       where: { discordId },
       include: { wallet: true }
@@ -230,5 +253,5 @@ export async function removeBalance(discordId: string, amount: number, type = "r
       requestedAmount: amount,
       removedAmount
     };
-  });
+  }));
 }

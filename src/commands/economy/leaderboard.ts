@@ -31,9 +31,9 @@ const TITLES: Record<LbType, string> = {
 };
 
 const SUBTITLES: Record<LbType, string> = {
-    net: "Richest players globally · wallet + bank",
-    cash: "Highest wallet balance globally",
-    employees: "Most shifts worked globally",
+    net: "Richest players · wallet + bank",
+    cash: "Highest wallet balance",
+    employees: "Most shifts worked",
 };
 
 function lbId(type: LbType, ownerId: string) {
@@ -75,7 +75,7 @@ function buildYourRankText(users: any[], ownerId: string, type: LbType): string 
     const val = type === "employees"
         ? `${((u as any).shiftsWorked || 0).toLocaleString()} shifts`
         : fmtCurrency((u.wallet?.balance ?? 0) + (type === "net" ? (u.bank?.balance ?? 0) : 0));
-    return `${Mascot.Emotes.Think} You are ranked **#${idx + 1}** globally — ${val}`;
+    return `${Mascot.Emotes.Think} You are ranked **#${idx + 1}** — ${val}`;
 }
 
 function buildTabRow(active: LbType, ownerId: string, disabled = false) {

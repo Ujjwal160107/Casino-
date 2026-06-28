@@ -20,14 +20,14 @@ export async function handleDeposit(message: Message, args: string[]) {
   try {
     const { actualAmount, capped } = await depositToBank(wallet.id, user.discordId, amount);
     const updatedBank = await getBankByUserId(user.discordId);
-    const partialMsg = capped ? " (Global Safety Cap Reached)" : "";
+    const partialMsg = capped ? " (Wallet cap reached)" : "";
 
     return message.reply({
       embeds: [
         successEmbed(
           message.author,
           capped ? "Partial Deposit" : "Deposit Successful",
-          `Deposited **${fmtCurrency(actualAmount)}**${partialMsg}.\nGlobal Bank: **${fmtCurrency(updatedBank?.balance ?? 0)}**`
+          `Deposited **${fmtCurrency(actualAmount)}**${partialMsg}.\nBank balance: **${fmtCurrency(updatedBank?.balance ?? 0)}**`
         )
       ]
     });

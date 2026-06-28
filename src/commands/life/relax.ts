@@ -11,9 +11,9 @@ import {
   TextDisplayBuilder
 } from "discord.js";
 import { Mascot } from "../../config/branding";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { getRelaxSnapshot, listRelaxOptions } from "../../services/relaxService";
 import { fmtCurrency } from "../../utils/format";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 const RELAX_ACCENT_COLOR = 0x2ECC71;
 
@@ -28,7 +28,7 @@ export function buildRelaxCustomId(ownerId: string, optionId: string) {
 }
 
 export async function buildRelaxDashboard(ownerId: string, guildId: string, username: string) {
-  const config = await getGuildConfig(guildId);
+  const prefix = await getGuildPrefix(guildId);
   const snapshot = await getRelaxSnapshot(ownerId, username);
   const totalStress = snapshot.jobStress + (snapshot.educationStress ?? 0);
 
@@ -37,7 +37,7 @@ export async function buildRelaxDashboard(ownerId: string, guildId: string, user
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Meditation} Relax & Recover`),
       new TextDisplayBuilder().setContent(
-        `**Wallet:** ${fmtCurrency(snapshot.walletBalance, config.currencyEmoji)}\n` +
+        `**Wallet:** ${fmtCurrency(snapshot.walletBalance)}\n` +
         `**Job Stress:** ${snapshot.jobStress}/100\n` +
         `**Education Stress:** ${snapshot.hasEducation ? `${snapshot.educationStress}/100` : "Not enrolled"}`,
       ),
@@ -61,7 +61,7 @@ export async function buildRelaxDashboard(ownerId: string, guildId: string, user
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
               `### ${option.name}\n` +
-              `**Cost:** ${fmtCurrency(option.cost, config.currencyEmoji)}\n` +
+              `**Cost:** ${fmtCurrency(option.cost)}\n` +
               `**Reduces:** Job -${option.jobStressReduction}, Education -${option.educationStressReduction}\n` +
               `**Status:** ${status}`,
             ),

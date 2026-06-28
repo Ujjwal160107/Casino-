@@ -4,13 +4,13 @@ import { transferAnyFunds } from "../../services/transferService";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { fmtAmount, fmtCurrency, parseSmartAmount } from "../../utils/format";
 import { logToChannel } from "../../utils/discordLogger";
-import { getGuildConfig } from "../../services/guildConfigService";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleTransfer(message: Message, args: string[]) {
   try {
-    const config = await getGuildConfig(message.guildId!);
+    const prefix = await getGuildPrefix(message.guildId!);
     if (args.length < 2) {
-      return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}transfer @user <amount>\``)] });
+      return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}transfer @user <amount>\``)] });
     }
     const targetMention = args[0];
     const amountString = args[1];
@@ -33,7 +33,7 @@ export async function handleTransfer(message: Message, args: string[]) {
         guild: message.guild!,
         type: "ECONOMY",
         title: "Transfer",
-        description: `**From:** <@${sender.discordId}>\n**To:** <@${toId}>\n**Amount:** ${fmtCurrency(amount, config.currencyEmoji)}\n**Tax:** ${taxResult.shielded ? "🛡️ Shielded" : fmtCurrency(taxResult.taxPaid, config.currencyEmoji)}\n**Received:** ${fmtCurrency(taxResult.net, config.currencyEmoji)}`,
+        description: `**From:** <@${sender.discordId}>\n**To:** <@${toId}>\n**Amount:** ${fmtCurrency(amount)}\n**Tax:** ${taxResult.shielded ? "🛡️ Shielded" : fmtCurrency(taxResult.taxPaid)}\n**Received:** ${fmtCurrency(taxResult.net)}`,
         color: 0x00FFFF
       });
 

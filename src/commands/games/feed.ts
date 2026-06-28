@@ -1,10 +1,10 @@
 import { Message, EmbedBuilder } from "discord.js";
-import { getGuildConfig } from "../../services/guildConfigService";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleFeed(message: Message, args: string[]) {
     if (!message.guildId) return;
-    const config = await getGuildConfig(message.guildId);
-    const prefix = config?.prefix || "!";
+    const prefix = await getGuildPrefix(message.guildId);
+    
 
     const embed = new EmbedBuilder()
         .setColor("#F39C12")

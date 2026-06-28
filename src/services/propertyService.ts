@@ -1,6 +1,8 @@
 import prisma from "../utils/prisma";
 import { Property, OwnedProperty } from "@prisma/client";
 import { ZOO_PROPERTY_DEFS, ZOO_CAPACITY, RARITY_INCOME, getAnimal } from "../utils/animalCatalog";
+import { isTester } from "../utils/developerAccess";
+import { GLOBAL_CATALOG_GUILD_ID } from "../utils/globalCatalog";
 
 // --- Regular property catalog ---
 export const REGULAR_PROPERTY_CATALOG: {
@@ -18,26 +20,22 @@ export const ZOO_KEYS = new Set(Object.keys(ZOO_CAPACITY));
 
 export class PropertyService {
 
-  static async getAllProperties(guildId: string): Promise<Property[]> {
+  static async getAllProperties(_guildId?: string): Promise<Property[]> {
     return prisma.property.findMany({
-      where: { guildId, isPublic: true },
+      where: { isPublic: true },
       orderBy: { price: "asc" },
     });
   }
 
-  static async getPropertyByKey(guildId: string, key: string): Promise<Property | null> {
+  static async getPropertyByKey(_guildId: string, key: string): Promise<Property | null> {
     return prisma.property.findUnique({
-      where: { guildId_key: { guildId, key } },
+      where: { key },
     });
   }
 
-  static async getOwnedProperties(discordId: string, guildId?: string): Promise<(OwnedProperty & { property: Property })[]> {
-    const where: any = { userId: discordId };
-    if (guildId) {
-      where.property = { guildId };
-    }
+  static async getOwnedProperties(discordId: string, _guildId?: string): Promise<(OwnedProperty & { property: Property })[]> {
     return prisma.ownedProperty.findMany({
-      where,
+      where: { userId: discordId },
       include: { property: true },
     });
   }
@@ -93,31 +91,39 @@ export class PropertyService {
     });
   }
 
-  // Admin
-  static async createProperty(guildId: string, key: string, name: string, price: number, income: number): Promise<Property> {
-    const existing = await this.getPropertyByKey(guildId, key);
+  // Admin (legacy — catalog is code-owned in V2)
+  static async createProperty(_guildId: string, key: string, name: string, price: number, income: number): Promise<Property> {
+    const existing = await this.getPropertyByKey(_guildId, key);
     if (existing) throw new Error(`Property with key '${key}' already exists.`);
     return prisma.property.create({
-      data: { guildId, key: key.toLowerCase(), name, description: `A lovely ${name}`, basePrice: price, price, incomePerCycle: income, totalSold: 0 },
+      data: {
+        guildId: GLOBAL_CATALOG_GUILD_ID,
+        key: key.toLowerCase(),
+        name,
+        description: `A lovely ${name}`,
+        basePrice: price,
+        price,
+        incomePerCycle: income,
+        totalSold: 0,
+      },
     });
   }
 
-  static async deleteProperty(guildId: string, key: string) {
-    return prisma.property.delete({ where: { guildId_key: { guildId, key } } });
+  static async deleteProperty(_guildId: string, key: string) {
+    return prisma.property.delete({ where: { key } });
   }
 
-  static async editProperty(guildId: string, key: string, data: Partial<Property>) {
-    return prisma.property.update({ where: { guildId_key: { guildId, key } }, data });
+  static async editProperty(_guildId: string, key: string, data: Partial<Property>) {
+    return prisma.property.update({ where: { key }, data });
   }
 }
 
 // --- Seeding ---
 
-const seededGuilds = new Set<string>();
+let globalPropertiesSeeded = false;
 
-export async function seedGlobalProperties(guildId: string): Promise<void> {
-  if (seededGuilds.has(guildId)) return;
-  seededGuilds.add(guildId);
+export async function seedGlobalProperties(_guildId?: string): Promise<void> {
+  if (globalPropertiesSeeded) return;
 
   const allDefs = [
     ...REGULAR_PROPERTY_CATALOG.map(p => ({
@@ -131,26 +137,33 @@ export async function seedGlobalProperties(guildId: string): Promise<void> {
   ];
 
   for (const def of allDefs) {
-    const existing = await prisma.property.findUnique({
-      where: { guildId_key: { guildId, key: def.key } },
+    await prisma.property.upsert({
+      where: { key: def.key },
+      create: {
+        guildId: GLOBAL_CATALOG_GUILD_ID,
+        key: def.key,
+        name: def.name,
+        description: def.description,
+        basePrice: def.price,
+        price: def.price,
+        incomePerCycle: def.incomePerCycle,
+        incomeCycleHours: def.incomeCycleHours,
+        totalSold: 0,
+      },
+      update: {
+        name: def.name,
+        description: def.description,
+        basePrice: def.price,
+        incomePerCycle: def.incomePerCycle,
+        incomeCycleHours: def.incomeCycleHours,
+      },
     });
-    if (!existing) {
-      await prisma.property.create({
-        data: { guildId, key: def.key, name: def.name, description: def.description, basePrice: def.price, price: def.price, incomePerCycle: def.incomePerCycle, incomeCycleHours: def.incomeCycleHours, totalSold: 0 },
-      });
-    } else if (existing.basePrice !== def.price || existing.incomePerCycle !== def.incomePerCycle) {
-      // Update price/income if catalog changed
-      await prisma.property.update({
-        where: { id: existing.id },
-        data: { basePrice: def.price, incomePerCycle: def.incomePerCycle, incomeCycleHours: def.incomeCycleHours },
-      });
-    }
   }
+
+  globalPropertiesSeeded = true;
 }
 
-// Keep seedZooProperties for backwards compat (calls seedGlobalProperties)
-const seededZooGuilds = new Set<string>();
-export async function seedZooProperties(guildId: string): Promise<void> {
+export async function seedZooProperties(guildId?: string): Promise<void> {
   await seedGlobalProperties(guildId);
 }
 
@@ -163,11 +176,11 @@ export interface CollectIncomeResult {
   zooTotal: number;
   grandTotal: number;
   nothingReady: boolean;
-  nextPropertyCollect: Date | null; // earliest next property collection time
-  nextZooCollect: Date | null;      // next zoo collection time
+  nextPropertyCollect: Date | null;
+  nextZooCollect: Date | null;
 }
 
-export async function collectIncome(discordId: string, guildId: string): Promise<CollectIncomeResult> {
+export async function collectIncome(discordId: string, _guildId: string): Promise<CollectIncomeResult> {
   const now = new Date();
   const result: CollectIncomeResult = {
     propertyBreakdown: [],
@@ -180,15 +193,17 @@ export async function collectIncome(discordId: string, guildId: string): Promise
     nextZooCollect: null,
   };
 
-  // --- Regular property income ---
   const allOwned = await prisma.ownedProperty.findMany({
-    where: { userId: discordId, property: { guildId, NOT: { key: { in: Array.from(ZOO_KEYS) } } } },
+    where: {
+      userId: discordId,
+      property: { NOT: { key: { in: Array.from(ZOO_KEYS) } } },
+    },
     include: { property: true },
   });
 
   const collectable = allOwned.filter(op => {
     const cycleMs = op.property.incomeCycleHours * 3_600_000;
-    return now.getTime() - op.lastCollected.getTime() >= cycleMs;
+    return isTester(discordId) || now.getTime() - op.lastCollected.getTime() >= cycleMs;
   });
 
   const notReady = allOwned.filter(op => !collectable.includes(op));
@@ -207,20 +222,20 @@ export async function collectIncome(discordId: string, guildId: string): Promise
     await prisma.ownedProperty.update({ where: { id: op.id }, data: { lastCollected: now } });
   }
 
-  // --- Zoo income ---
   const user = await prisma.user.findUnique({ where: { discordId } });
   const lastClaim = user?.lastZooClaim ?? null;
   const ZOO_COOLDOWN_MS = 24 * 3_600_000;
 
-  if (lastClaim && now.getTime() - lastClaim.getTime() < ZOO_COOLDOWN_MS) {
+  if (lastClaim && now.getTime() - lastClaim.getTime() < ZOO_COOLDOWN_MS && !isTester(discordId)) {
     result.nextZooCollect = new Date(lastClaim.getTime() + ZOO_COOLDOWN_MS);
   } else {
-    // Calculate zoo income from animals
     const zooAnimals = await prisma.caughtAnimal.findMany({ where: { discordId, inZoo: true } });
     if (zooAnimals.length > 0) {
-      const hoursSinceLastClaim = lastClaim
-        ? Math.min(24, Math.floor((now.getTime() - lastClaim.getTime()) / 3_600_000))
-        : 24;
+      const hoursSinceLastClaim = isTester(discordId)
+        ? 24
+        : lastClaim
+          ? Math.min(24, Math.floor((now.getTime() - lastClaim.getTime()) / 3_600_000))
+          : 24;
 
       for (const animal of zooAnimals) {
         const def = getAnimal(animal.animalKey);
@@ -239,7 +254,6 @@ export async function collectIncome(discordId: string, guildId: string): Promise
   result.grandTotal = result.propertyTotal + result.zooTotal;
   result.nothingReady = result.grandTotal === 0;
 
-  // Credit wallet
   if (result.grandTotal > 0) {
     await prisma.wallet.update({
       where: { userId: discordId },

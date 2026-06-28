@@ -86,7 +86,7 @@ export async function handleIncome(message: Message) {
   const amount = Math.floor(randomInt(config.payoutMin, config.payoutMax) * luckyCoinMult);
   const result = await addBalance(message.author.id, message.author.username, amount, `${commandKey}_income`, { command: commandKey }, true);
   const winMessages = commandKey === "beg" ? BEG_WIN_MESSAGES : SLUT_WIN_MESSAGES;
-  const capNotice = result.capped ? "\n\nYour wallet hit the global safety cap, so part of this payout was withheld." : "";
+  const capNotice = result.capped ? "\n\nYour wallet hit the maximum balance limit, so part of this payout was withheld." : "";
 
   const embed = successEmbed(
     message.author,

@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { NavGroup, NavLink, SectionHeader } from "@/components/docs/SharedDocs";
-import { Shield, Book, UserPlus, Briefcase, GraduationCap, TrendingUp, HelpCircle, Link as LinkIcon, Star, Dna, ShoppingBag, Landmark, Heart, Swords, Layout } from "lucide-react";
+import { Shield, Book, UserPlus, Briefcase, GraduationCap, TrendingUp, HelpCircle, Link as LinkIcon, Star, Dna, ShoppingBag, Landmark, Heart, Swords } from "lucide-react";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
 import { GeneralSidebar } from "@/components/GeneralSidebar";
@@ -100,12 +100,12 @@ export default function DocsPage() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                                 <div>
-                                    <h4 className="text-white font-bold mb-2 text-lg">🏦 Loans</h4>
-                                    <p className="text-sm text-zinc-400 mb-2">Need quick cash? Take out a loan backed by your Credit Score.</p>
+                                    <h4 className="text-white font-bold mb-2 text-lg">💳 Fortuna Cards</h4>
+                                    <p className="text-sm text-zinc-400 mb-2">Credit purchases and weekly billing — not old bank loans.</p>
                                     <ul className="list-disc list-inside text-sm text-zinc-400">
-                                        <li>Higher Credit Score = Bigger Loans</li>
-                                        <li>Miss payments = Score drops</li>
-                                        <li>Use <code className="text-zinc-300">!bank</code> to manage/repay loans.</li>
+                                        <li><code className="text-zinc-300">!mycards</code> — balance, due date, pay dashboard</li>
+                                        <li><code className="text-zinc-300">!bank</code> → Cards — apply and browse tiers</li>
+                                        <li>Shop <strong>Buy (Credit)</strong> charges your ACTIVE card</li>
                                     </ul>
                                 </div>
                                 <div>
@@ -264,66 +264,21 @@ export default function DocsPage() {
 
 
 
-                    {/* Dashboard Guide */}
-                    <section id="dashboard-guide">
-                        <SectionHeader icon={<Layout />} title="Dashboard Guide" />
-                        <GlassCard className="p-8 space-y-8">
-                            <div>
-                                <h4 className="text-xl font-bold text-white mb-4">Getting Started</h4>
-                                <p className="text-zinc-300 leading-relaxed mb-4">
-                                    The Fortuna Dashboard is your command center. Access it at <code className="bg-white/10 px-1 rounded">/dashboard</code> to manage your server's economy settings, shop items, and administrative logs.
-                                </p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="bg-black/20 p-4 rounded-lg border border-white/5">
-                                        <strong className="text-violet-400 block mb-1">Config & Settings</strong>
-                                        <p className="text-sm text-zinc-400">Customize currency symbols, starting balances, and cooldowns.</p>
-                                    </div>
-                                    <div className="bg-black/20 p-4 rounded-lg border border-white/5">
-                                        <strong className="text-violet-400 block mb-1">Shop Management</strong>
-                                        <p className="text-sm text-zinc-400">Create custom items, set prices, and manage stock easily.</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <h4 className="text-lg font-bold text-white">Key Features</h4>
-                                <ul className="space-y-3 text-zinc-300">
-                                    <li className="flex gap-3">
-                                        <span className="text-violet-400 font-bold">1.</span>
-                                        <span><strong>Income Settings:</strong> Adjust how much money users earn from chatting, working, or begging.</span>
-                                    </li>
-                                    <li className="flex gap-3">
-                                        <span className="text-violet-400 font-bold">2.</span>
-                                        <span><strong>Admin Logs:</strong> View a detailed history of all economy transactions (add-money, transfers, shop purchases) to catch exploiters.</span>
-                                    </li>
-                                    <li className="flex gap-3">
-                                        <span className="text-violet-400 font-bold">3.</span>
-                                        <span><strong>Casino Drops:</strong> Schedule random money drops in specific channels to engage your community.</span>
-                                    </li>
-                                    <li className="flex gap-3">
-                                        <span className="text-violet-400 font-bold">4.</span>
-                                        <span><strong>Robbery Limits:</strong> Set maximum steal amounts and fail rates to keep the economy balanced.</span>
-                                    </li>
-                                </ul>
-                            </div>
-                        </GlassCard>
-                    </section>
-
                     {/* FAQ */}
                     <section id="faq">
                         <SectionHeader icon={<HelpCircle />} title="Frequently Asked Questions" />
                         <div className="space-y-4">
                             <FAQItem
                                 question="How do I add custom items to the shop?"
-                                answer="Go to the Dashboard > Shop > Create Item. You can set the name, price, description, and even require specific roles to buy it."
+                                answer="Use the !admin-dashboard command in Discord, then navigate to Shop to create items. You can set the name, price, description, and even require specific roles to buy it."
                             />
                             <FAQItem
                                 question="Can I reset the economy?"
-                                answer="Yes, but be careful! Use the '!reset-economy' command or the 'Dangerous Actions' section in the Dashboard. This cannot be undone."
+                                answer="Yes, but be careful! Use the '!reset-economy' command in Discord. This cannot be undone."
                             />
                             <FAQItem
                                 question="Why aren't my users earning money from chatting?"
-                                answer="Check your 'Chat Money' settings in the Dashboard. Ensure the feature is enabled and that you haven't set the cooldown too high. Also, check if the bot has permission to view the channels."
+                                answer="Check your 'Chat Money' settings via !admin-dashboard in Discord. Ensure the feature is enabled and that you haven't set the cooldown too high. Also, check if the bot has permission to view the channels."
                             />
                             <FAQItem
                                 question="What is 'Stress' and how does it work?"
@@ -376,7 +331,6 @@ export default function DocsPage() {
                             <Link href="/docs/commands" className="text-violet-400 hover:text-violet-300 font-bold flex items-center gap-2 py-1">
                                 <LinkIcon size={14} /> Full Command List
                             </Link>
-                            <NavLink href="#dashboard-guide">Dashboard Guide</NavLink>
                             <NavLink href="#faq">FAQ</NavLink>
                         </NavGroup>
                     </div>

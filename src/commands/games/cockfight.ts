@@ -19,8 +19,8 @@ import {
     ThumbnailBuilder
 } from "discord.js";
 import prisma from "../../utils/prisma";
+import { globalCatalogGuildFilter } from "../../utils/globalCatalog";
 import { errorEmbed } from "../../utils/embed";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { generateVsImage, generateWinnerImage } from "../../utils/imageUtils";
 import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage, acquireActiveGameLock, releaseActiveGameLock } from "../../services/casinoCooldownService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
@@ -31,6 +31,9 @@ import { ensureUserAndWallet } from "../../services/walletService";
 import { creditGamePayout, debitGameBet } from "../../services/gameService";
 import { seedCockShop } from "../../services/shopService";
 import { questBus } from "../../services/questEvents";
+import { redisService } from "../../services/redisService";
+import { getGuildPrefix } from "../../utils/guildContext";
+import { GAME_UI_TIMINGS } from "../../utils/economyConfig";
 
 
 const EMOJI_CHICKEN = GameConfig.Emojis.Chicken;
@@ -115,7 +118,7 @@ function buildSideBetRow(fightId: string, p1Name: string, p2Name: string, disabl
 
 export async function handleCockFight(message: Message, args: string[]) {
     if (!message.guild || !message.member) return;
-    const config = await getGuildConfig(message.guild.id);
+    const prefix = await getGuildPrefix(message.guild.id);
     await seedCockShop(message.guild.id);
 
     const targetUser = message.mentions.users.first();
@@ -125,7 +128,7 @@ export async function handleCockFight(message: Message, args: string[]) {
 
     if (!targetUser || !rawAmount) {
         return message.reply({
-            embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}cockfight @user <amount>\`\nMin Bet logic applies.`)]
+            embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}cockfight @user <amount>\`\nMin Bet logic applies.`)]
         });
     }
 
@@ -143,12 +146,12 @@ export async function handleCockFight(message: Message, args: string[]) {
         return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please enter a valid positive integer (e.g. 100, 10k, 1e5).")] });
     }
 
-    const { min, max } = getGameBetLimits(config, "cockfight");
+    const { min, max } = getGameBetLimits("cockfight");
     if (betAmount < min) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Cockfight is **${fmtCurrency(min, config.currencyEmoji)}**.`)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Cockfight is **${fmtCurrency(min)}**.`)] });
     }
     if (betAmount > max) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Cockfight is **${fmtCurrency(max, config.currencyEmoji)}**.`)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Cockfight is **${fmtCurrency(max)}**.`)] });
     }
 
     // Cooldown Check for Challenger
@@ -163,10 +166,9 @@ export async function handleCockFight(message: Message, args: string[]) {
     }
 
     const shopItem = await prisma.shopItem.findFirst({
-        where: {
-            guildId: message.guild.id,
-            name: { equals: "Chicken", mode: "insensitive" }
-        }
+        where: globalCatalogGuildFilter({
+            name: { equals: "Chicken", mode: "insensitive" },
+        }),
     });
 
     if (!shopItem) {
@@ -190,7 +192,7 @@ export async function handleCockFight(message: Message, args: string[]) {
 
     const challengerMeta = (invChallenger.meta as any) || {};
     if (challengerMeta.critical) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Critical", `Your chicken is in **critical condition**! Use \`${config.prefix}use phoenix serum\` to save it.`)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Critical", `Your chicken is in **critical condition**! Use \`${prefix}use phoenix serum\` to save it.`)] });
     }
     if (challengerMeta.training) {
         const endTime = Math.floor(challengerMeta.training.endTime / 1000);
@@ -199,7 +201,7 @@ export async function handleCockFight(message: Message, args: string[]) {
         });
     }
     if (challengerMeta.injured) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Injured", `Your chicken is injured! Heal it via \`${config.prefix}chicken\` or \`${config.prefix}use feather bandage\`.`)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Injured", `Your chicken is injured! Heal it via \`${prefix}chicken\` or \`${prefix}use feather bandage\`.`)] });
     }
 
     const invTarget = await prisma.inventory.findUnique({
@@ -225,11 +227,11 @@ export async function handleCockFight(message: Message, args: string[]) {
     }
 
     if (!challenger.wallet || challenger.wallet.balance < betAmount) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", `You only have **${fmtCurrency(challenger.wallet?.balance ?? 0, config.currencyEmoji)}** in your wallet.`)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", `You only have **${fmtCurrency(challenger.wallet?.balance ?? 0)}** in your wallet.`)] });
     }
 
     if (!target.wallet || target.wallet.balance < betAmount) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Opponent Funds", `${targetName} needs **${fmtCurrency(betAmount, config.currencyEmoji)}** in their wallet to accept.`)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Opponent Funds", `${targetName} needs **${fmtCurrency(betAmount)}** in their wallet to accept.`)] });
     }
 
     // Active-game lock acquired AFTER all validation — so failed checks never lock the user out
@@ -252,7 +254,7 @@ export async function handleCockFight(message: Message, args: string[]) {
             `**${targetName}**'s Chicken:`,
             formatChickenStats(targetMeta, targetMeta.level || 0),
             ``,
-            `Bet: **${fmtCurrency(betAmount, config.currencyEmoji)}**`,
+            `Bet: **${fmtCurrency(betAmount)}**`,
             `⚠️ Loser's chicken will be injured (2h) with equipment broken. Small permadeath chance.`,
             `The opponent must accept within 30 seconds.`
         ].join("\n")
@@ -417,8 +419,8 @@ async function runCockFight(
 ) {
     const guildId = originalMsg.guild!.id;
     const channelId = originalMsg.channelId;
-    const config = await getGuildConfig(guildId);
-    const { min, max } = getGameBetLimits(config, "cockfight");
+    const prefix = await getGuildPrefix(guildId);
+    const { min, max } = getGameBetLimits("cockfight");
     const fightId = `${originalMsg.id}:${p1.user.id}:${p2.user.id}`;
     let p1BetDebited = false;
     let settled = false;
@@ -463,7 +465,7 @@ async function runCockFight(
     let pot = bet * 2;
     const sideBets: SideBet[] = [];
 
-    const betTimeSeconds = config.cockfightBetTime || 60; // Default 60s
+    const betTimeSeconds = GAME_UI_TIMINGS.cockfightBetSeconds; // Default 60s
     const betTimeMs = betTimeSeconds * 1000;
 
     // --- GENERATE VS IMAGE ---
@@ -475,8 +477,8 @@ async function runCockFight(
     function buildBettingContainer() {
         const p1Total = sideBets.filter(b => b.target === "p1").reduce((a, b) => a + b.amount, 0);
         const p2Total = sideBets.filter(b => b.target === "p2").reduce((a, b) => a + b.amount, 0);
-        let p1List = sideBets.filter(b => b.target === "p1").map(b => `${b.displayName} (${fmtCurrency(b.amount, config.currencyEmoji)})`).join("\n") || "No bets yet.";
-        let p2List = sideBets.filter(b => b.target === "p2").map(b => `${b.displayName} (${fmtCurrency(b.amount, config.currencyEmoji)})`).join("\n") || "No bets yet.";
+        let p1List = sideBets.filter(b => b.target === "p1").map(b => `${b.displayName} (${fmtCurrency(b.amount)})`).join("\n") || "No bets yet.";
+        let p2List = sideBets.filter(b => b.target === "p2").map(b => `${b.displayName} (${fmtCurrency(b.amount)})`).join("\n") || "No bets yet.";
         if (p1List.length > 900) p1List = `${p1List.slice(0, 890)}...`;
         if (p2List.length > 900) p2List = `${p2List.slice(0, 890)}...`;
 
@@ -484,7 +486,7 @@ async function runCockFight(
             `${EMOJI_CHICKEN} Cockfight Betting`,
             [
                 `Fight: **${p1.displayName}** vs **${p2.displayName}**`,
-                `Main pot: **${fmtCurrency(pot, config.currencyEmoji)}**`,
+                `Main pot: **${fmtCurrency(pot)}**`,
                 `Side bets close in **${betTimeSeconds}s**.`,
                 "You can place one side bet. Fighters cannot side bet."
             ].join("\n"),
@@ -494,10 +496,10 @@ async function runCockFight(
             container,
             "Arena Matchup",
             [
-                `**${p1.displayName}** side total: **${fmtCurrency(p1Total, config.currencyEmoji)}**`,
+                `**${p1.displayName}** side total: **${fmtCurrency(p1Total)}**`,
                 p1List,
                 "",
-                `**${p2.displayName}** side total: **${fmtCurrency(p2Total, config.currencyEmoji)}**`,
+                `**${p2.displayName}** side total: **${fmtCurrency(p2Total)}**`,
                 p2List
             ].join("\n"),
             "vs.png",
@@ -560,11 +562,11 @@ async function runCockFight(
                 return;
             }
             if (amount < min) {
-                await submit.editReply({ content: `The minimum Cockfight bet is **${fmtCurrency(min, config.currencyEmoji)}**.` });
+                await submit.editReply({ content: `The minimum Cockfight bet is **${fmtCurrency(min)}**.` });
                 return;
             }
             if (amount > max) {
-                await submit.editReply({ content: `The maximum Cockfight bet is **${fmtCurrency(max, config.currencyEmoji)}**.` });
+                await submit.editReply({ content: `The maximum Cockfight bet is **${fmtCurrency(max)}**.` });
                 return;
             }
 
@@ -574,7 +576,7 @@ async function runCockFight(
             }
 
             if (!user.wallet || user.wallet.balance < amount) {
-                await submit.editReply({ content: `Insufficient funds. Needed **${fmtCurrency(amount, config.currencyEmoji)}** but you have **${fmtCurrency(user.wallet?.balance ?? 0, config.currencyEmoji)}**.` });
+                await submit.editReply({ content: `Insufficient funds. Needed **${fmtCurrency(amount)}** but you have **${fmtCurrency(user.wallet?.balance ?? 0)}**.` });
                 return;
             }
 
@@ -601,7 +603,7 @@ async function runCockFight(
             sideBets.push({ userId: submit.user.id, displayName, amount, target, walletId: user.wallet.id });
             pot += amount;
 
-            await submit.editReply({ content: `Placed bet of **${fmtCurrency(amount, config.currencyEmoji)}** on **${targetName}**!` });
+            await submit.editReply({ content: `Placed bet of **${fmtCurrency(amount)}** on **${targetName}**!` });
 
             if (!bettingClosed) {
                 await gameMsg.edit({
@@ -646,8 +648,15 @@ async function runCockFight(
         const p1Stats = calculateTotalStats({ str: p1Meta.strength || 0, agi: p1Meta.agility || 0, def: p1Meta.defense || 0 }, p1Meta.trait, p1Equips);
         const p2Stats = calculateTotalStats({ str: p2Meta.strength || 0, agi: p2Meta.agility || 0, def: p2Meta.defense || 0 }, p2Meta.trait, p2Equips);
 
-        const p1Score = calculateCombatScore(p1Level, p1Stats);
-        const p2Score = calculateCombatScore(p2Level, p2Stats);
+        const [p1CraftedDefense, p2CraftedDefense] = await Promise.all([
+            redisService.get<{ reduction: number }>(`crafted_cock_defense:${p1Id}`),
+            redisService.get<{ reduction: number }>(`crafted_cock_defense:${p2Id}`),
+        ]);
+
+        const p1Score = Math.floor(calculateCombatScore(p1Level, p1Stats) * (p1CraftedDefense ? 1.08 : 1));
+        const p2Score = Math.floor(calculateCombatScore(p2Level, p2Stats) * (p2CraftedDefense ? 1.08 : 1));
+        if (p1CraftedDefense) await redisService.del(`crafted_cock_defense:${p1Id}`);
+        if (p2CraftedDefense) await redisService.del(`crafted_cock_defense:${p2Id}`);
 
         const winChancePercent = getWinChance(p1Score, p2Score);
         const p1Chance = winChancePercent / 100;
@@ -745,7 +754,7 @@ async function runCockFight(
                 walletId: b.walletId,
                 displayName: b.displayName
             });
-            sideWinnersDetails.push(`${b.displayName}: +${fmtCurrency(payout, config.currencyEmoji)}`);
+            sideWinnersDetails.push(`${b.displayName}: +${fmtCurrency(payout)}`);
         }
 
         settled = true;
@@ -929,15 +938,15 @@ async function runCockFight(
         if (isCritical && !survivedByEffect) {
             deathMessage = [
                 `${EMOJI_RIP} **CRITICAL CONDITION!** ${loser.displayName}'s chicken is dying!`,
-                `⏰ You have **24 hours** to save it with \`${config.prefix}use phoenix serum\``,
+                `⏰ You have **24 hours** to save it with \`${prefix}use phoenix serum\``,
                 `💀 If the timer expires, your chicken is **permanently lost**.`,
                 `💥 Equipment destroyed.`,
             ].join("\n");
         } else if (usedDeathSave) {
             deathMessage = [
                 `🛡️ **SAVED!** ${loser.displayName}'s chicken was saved from critical by a **Death Save** effect!`,
-                `<:clinic:1453972244610154507> Injured for **${recoveryHours.toFixed(1)}h**. Coin heal: **${fmtCurrency(coinHealCost, config.currencyEmoji)}**`,
-                `-# Or use \`${config.prefix}use feather bandage\` for instant heal`,
+                `<:clinic:1453972244610154507> Injured for **${recoveryHours.toFixed(1)}h**. Coin heal: **${fmtCurrency(coinHealCost)}**`,
+                `-# Or use \`${prefix}use feather bandage\` for instant heal`,
             ].join("\n");
         } else {
             const vestNote = equipmentSaved
@@ -945,7 +954,7 @@ async function runCockFight(
                 : "\n💥 Equipment broken!";
             deathMessage = [
                 `<:clinic:1453972244610154507> **INJURED!** ${loser.displayName}'s chicken is hospitalized for **${recoveryHours.toFixed(1)}h**.${vestNote}`,
-                `-# Coin heal: **${fmtCurrency(coinHealCost, config.currencyEmoji)}** | \`${config.prefix}use feather bandage\` | \`${config.prefix}use phoenix serum\``,
+                `-# Coin heal: **${fmtCurrency(coinHealCost)}** | \`${prefix}use feather bandage\` | \`${prefix}use phoenix serum\``,
             ].join("\n");
         }
 
@@ -971,8 +980,8 @@ async function runCockFight(
                 `- Winner level: **${winnerLevel}** ${leveledUp ? `-> **${newLevel}** (level up)` : `(XP +${XP_PER_WIN})`}`,
                 `- Progress: ${progressBar}`,
                 `- Win chance: **${displayWinChance.toFixed(1)}%**`,
-                `- Main payout: **${fmtCurrency(mainWinnerPayout, config.currencyEmoji)}**`,
-                `- Total pot: **${fmtCurrency(pot, config.currencyEmoji)}**`,
+                `- Main payout: **${fmtCurrency(mainWinnerPayout)}**`,
+                `- Total pot: **${fmtCurrency(pot)}**`,
                 `- Side ROI: **${sidePayoutRatio.toFixed(2)}x**`
             ].join("\n"),
             winnerIsP1 ? 0x2ECC71 : 0xE74C3C
@@ -986,7 +995,7 @@ async function runCockFight(
                 guild: originalMsg.guild!,
                 type: "ECONOMY",
                 title: "Cockfight Result",
-                description: `**Winner:** ${winner.displayName}\n**Loser:** ${loser.displayName}\n**Pot:** ${fmtCurrency(pot, config.currencyEmoji)}\n**Outcome:** ${(isCritical && !survivedByEffect) ? "CRITICAL" : "INJURY"}\n**Winner Level:** ${newLevel}`,
+                description: `**Winner:** ${winner.displayName}\n**Loser:** ${loser.displayName}\n**Pot:** ${fmtCurrency(pot)}\n**Outcome:** ${(isCritical && !survivedByEffect) ? "CRITICAL" : "INJURY"}\n**Winner Level:** ${newLevel}`,
                 color: logColor,
                 thumbnail: winner.user.displayAvatarURL()
             }).catch(() => { });

@@ -15,9 +15,10 @@ import { getSectorReputation } from "../../services/jobReputationService";
 import { JOB_SHOP_CATALOG } from "../../utils/shopCatalog";
 import { seedJobShop } from "../../services/shopService";
 import { Mascot } from "../../config/branding";
+import { globalCatalogGuildFilter } from "../../utils/globalCatalog";
 import prisma from "../../utils/prisma";
 import { fmtCurrency } from "../../utils/format";
-import { getGuildConfig } from "../../services/guildConfigService";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 function hexColorToNumber(color: unknown, fallback = 0x9B59B6) {
     if (typeof color === "number") return color;
@@ -41,7 +42,7 @@ function getStressColor(stress: number) {
 
 export async function handleWork(message: Message) {
     if (!message.guild) return;
-    const config = await getGuildConfig(message.guild.id);
+    const prefix = await getGuildPrefix(message.guild.id);
 
     const user = await prisma.user.findUnique({
         where: { discordId: message.author.id }
@@ -54,7 +55,7 @@ export async function handleWork(message: Message) {
             .setAccentColor(0x95A5A6)
             .addTextDisplayComponents(
                 new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.JobWorking} Employment Status`),
-                new TextDisplayBuilder().setContent(`**Position:** Unemployed\nUse \`${config?.prefix || "!"}jobs\` to browse available careers and apply.`)
+                new TextDisplayBuilder().setContent(`**Position:** Unemployed\nUse \`${prefix}jobs\` to browse available careers and apply.`)
             );
         return message.reply({ components: [container], flags: MessageFlags.IsComponentsV2 });
     }
@@ -83,7 +84,9 @@ export async function handleWork(message: Message) {
         const gearCatalogItem = JOB_SHOP_CATALOG.find(i => i.key === gearKey);
         if (gearCatalogItem) {
             const gearInDb = await prisma.shopItem.findFirst({
-                where: { guildId: message.guildId, name: { equals: gearCatalogItem.name, mode: "insensitive" } }
+                where: globalCatalogGuildFilter({
+                    name: { equals: gearCatalogItem.name, mode: "insensitive" },
+                }),
             });
             const invRow = gearInDb
                 ? await prisma.inventory.findUnique({
@@ -133,7 +136,7 @@ export async function handleWork(message: Message) {
                     new TextDisplayBuilder().setContent(`## ${job.emoji} ${job.title}`),
                     new TextDisplayBuilder().setContent(
                         `**Sector:** ${capitalize(job.sector)} | **Level:** ${job.level}\n` +
-                        `**Pay:** ${fmtCurrency(getJobPaySync(job), config?.currencyEmoji)}/shift`
+                        `**Pay:** ${fmtCurrency(getJobPaySync(job))}/shift`
                     )
                 )
                 .setThumbnailAccessory((thumbnail) =>

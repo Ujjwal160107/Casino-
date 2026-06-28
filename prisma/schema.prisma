@@ -52,9 +52,6 @@ model User {
   // Ban System
   isBanned    Boolean  @default(false)
   banExpiresAt DateTime?
-
-  loans       Loan[]
-  isLoanBanned Boolean @default(false)
   investments Investment[]
   listings    MarketListing[]
   activeEffects ActiveEffect[]
@@ -249,6 +246,7 @@ model Job {
 model ShopItem {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   guildId      String
+  catalogKey   String?  @unique
   name         String
   description  String   @default("No description")
   price        Float
@@ -317,18 +315,6 @@ model Bank {
   updatedAt DateTime @updatedAt
 }
 
-model Loan {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  user           User     @relation(fields: [userId], references: [discordId])
-  userId         String
-  amount         Float
-  totalRepayment Float    // Principal + Interest
-  interestRate   Int      // Stored as percentage (e.g., 5 for 5%)
-  dueDate        DateTime
-  status         String   // ACTIVE, PAID, DEFAULTED
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-}
 
 model Investment {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -395,6 +381,7 @@ model ActiveEffect {
 model Degree {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
   guildId         String
+  catalogKey      String?  @unique
   name            String
   type            String   // HS, ASSOCIATE, BACHELORS, MASTERS, PHD, TRADE, CERTIFICATE
   
@@ -463,7 +450,8 @@ model UserDegree {
   degree          Degree   @relation(fields: [degreeId], references: [id])
   degreeId        String   @db.ObjectId
   
-  finalGpa        Float
+  finalGpa        Float    // Legacy field; new graduations store XP in finalXp
+  finalXp         Int?
   obtainedAt      DateTime @default(now())
   
   @@unique([userId, degreeId])
@@ -501,7 +489,7 @@ model Property {
   owners      OwnedProperty[]
   listings    MarketListing[] // Relations
 
-  @@unique([guildId, key])
+  @@unique([key])
 }
 
 model OwnedProperty {
@@ -683,5 +671,15 @@ model UserCraftUnlock {
 
   @@unique([userId, recipeKey])
   @@index([userId])
+}
+
+model AskBlock {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
 }
 

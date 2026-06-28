@@ -6,13 +6,13 @@ import prisma from "../../utils/prisma";
 import { errorEmbed } from "../../utils/embed";
 import { logToChannel } from "../../utils/discordLogger";
 import { redisService } from "../../services/redisService";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleApply(message: Message, args: string[]) {
     if (!message.guild) return;
 
-    const { getGuildConfig } = require("../../services/guildConfigService");
-    const config = await getGuildConfig(message.guild.id);
-    const prefix = config?.prefix || "!";
+        const prefix = await getGuildPrefix(message.guild.id);
+    
     const jobQuery = args.join(" ").trim();
 
     if (!jobQuery) return message.reply(`Usage: \`${prefix}apply <job name>\``);

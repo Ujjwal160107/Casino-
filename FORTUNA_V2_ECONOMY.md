@@ -1,6 +1,6 @@
 # Fortuna V2 Economy Reference
 
-Last updated: 2026-05-15
+Last updated: 2026-06-21
 
 This file documents the current Fortuna V2 economy values and rules. It is intended as a handoff/reference document for future work, especially when continuing the V1 to V2 migration.
 
@@ -20,6 +20,16 @@ Fortuna V2 uses a global user economy.
 - `guildId` is only valid for server prefix, Discord context, and transaction metadata.
 - Per-server economy customization has been removed.
 - Per-server prefix remains supported through `GuildSettings`.
+
+## Global Catalogs
+
+Shop items, properties, and degrees are **backend-owned** and stored once under sentinel `guildId: "global"`.
+
+- Catalog definitions live in code (`shopCatalog.ts`, `propertyService.ts`, `economyConfig.ts` / `educationService.ts`).
+- DB rows are keyed globally via `catalogKey` (shop/degrees) or `key` (properties).
+- All guilds share the same catalog; no per-guild shop/property/degree seeding is required.
+- Admin mutators (`!shop-add`, `!reset-shop`, `!manage-property`, `!setdegree`) are retired — edit code constants instead.
+- Migration script: `npx ts-node src/scripts/migrateGlobalCatalog.ts` (run once before enabling unique indexes on existing DBs).
 
 ## Currency
 
@@ -96,20 +106,42 @@ These are global user rewards, not per-server rewards.
 
 ## Degrees
 
-Degree prices:
+Education progression uses **XP only** (GPA is deprecated).
+
+Degree prices (from `DEGREE_PRICES` in `economyConfig.ts`):
 
 | Degree | Cost |
 | --- | ---: |
-| High School Diploma | 300,000 |
-| Trade License | 450,000 |
-| BA Fine Arts | 1,200,000 |
-| BS Computer Science | 1,500,000 |
-| Bachelor of Laws (LLB) | 1,800,000 |
-| MBBS | 5,000,000 |
+| High School Diploma | 150,000 |
+| Trade License | 300,000 |
+| BA Fine Arts | 900,000 |
+| BS Computer Science | 1,200,000 |
+| Bachelor of Laws (LLB) | 2,500,000 |
+| MBBS | 4,000,000 |
 | Master of Laws (LLM) | 6,000,000 |
-| Doctor of Medicine (MD) / Ph.D. | 12,000,000 |
+| Doctor of Medicine (MD) / Ph.D. | 10,000,000 |
 
 Education should use these constants instead of local hardcoded tuition values.
+
+## Game Bet Limits
+
+From `GAME_BET_LIMITS` in `economyConfig.ts`:
+
+| Setting | Value |
+| --- | ---: |
+| Default minimum bet | 10,000 |
+| Default maximum bet | 1,000,000 |
+
+Per-game maximum bets:
+
+| Game | Max bet |
+| --- | ---: |
+| coinflip | 500,000 |
+| slots | 750,000 |
+| blackjack | 1,000,000 |
+| roulette | 1,000,000 |
+| russian_roulette / rr | 750,000 |
+| cockfight / chicken | 1,000,000 |
 
 ## Jobs
 
@@ -256,6 +288,21 @@ Card image assets:
 - `src/assets/platinum_card.png`
 - `src/assets/black_card.png`
 
+### Commands
+
+| Command | Purpose |
+| --- | --- |
+| `!mycards` | Full card dashboard: balance owed, due date, projected minimum, recent activity, pay buttons |
+| `!card pay <amount>` | Pay from wallet toward card balance (text fallback) |
+| `!card issue` | Issue your first eligible card |
+| `!credit` | Credit score summary + My Cards dashboard |
+| `!bank` → Cards | Apply, browse tiers, manage card |
+| `!shop` → Buy (Credit) | Charge shop purchase to ACTIVE card |
+
+Billing cycle: **7 days**. Due date is set when the card is issued and refreshed each statement. Minimum due = `max(12% of balance, tier floor)` via `calculateMinimumDue()`.
+
+Shop hunt consumables (one use, next hunt): **Camouflage Kit** (Rare+ boost), **Bait Box** (≥2 animals), **Echo Whistle** (35% echo best catch).
+
 ## Banking Notes
 
 Current V2 direction:
@@ -267,13 +314,10 @@ Current V2 direction:
 
 Legacy compatibility constants still exist in `BANKING_CONFIG`:
 
-- loan interest rate
 - FD interest rate
 - RD interest rate
-- old loan tiers
-- old max active loans
 
-Treat these as compatibility leftovers unless a scoped pass intentionally removes or migrates them.
+Old bank loans are **retired**. Card balance is the user's credit debt for net worth.
 
 ## Games Economy
 

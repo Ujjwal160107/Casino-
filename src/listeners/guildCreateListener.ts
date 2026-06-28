@@ -26,7 +26,6 @@ export const guildCreateListener = (client: Client) => {
         .addFields(
           { name: "Getting Started", value: "Use `!help` to browse commands and `!set-prefix` if you want a different prefix.", inline: false },
           { name: "Documentation", value: `[Docs](${Mascot.Links.Docs})`, inline: true },
-          { name: "Dashboard", value: `[Web Dashboard](${Mascot.Links.Dashboard})`, inline: true },
           { name: "Support", value: `[Support Server](${Mascot.Links.Support})`, inline: true }
         )
         .setColor(0x9b59b6)
@@ -35,7 +34,6 @@ export const guildCreateListener = (client: Client) => {
         .setTimestamp();
 
       const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setLabel("Open Dashboard").setStyle(ButtonStyle.Link).setURL(Mascot.Links.Dashboard),
         new ButtonBuilder().setLabel("Documentation").setStyle(ButtonStyle.Link).setURL(Mascot.Links.Docs),
         new ButtonBuilder().setLabel("Support Server").setStyle(ButtonStyle.Link).setURL(Mascot.Links.Support)
       );

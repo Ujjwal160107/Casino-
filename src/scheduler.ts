@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { Client } from "discord.js";
-import { processAllInvestments, processOverdueLoans } from "./services/bankingService";
+import { processAllInvestments } from "./services/bankingService";
 import { processWeeklyCardSettlement } from "./services/creditCardService";
 import { removeTemporaryRoles } from "./services/effectService";
 import { updateMarket } from "./services/stockService";
@@ -23,11 +23,6 @@ export function initScheduler(client: Client) {
     try {
       const processedCount = await processAllInvestments();
       console.log(`Processed ${processedCount} matured investments.`);
-
-      const loanCount = await processOverdueLoans();
-      if (loanCount > 0) {
-        console.log(`Processed ${loanCount} overdue loans.`);
-      }
 
       await removeTemporaryRoles(client);
       await processVoteReminders(client).catch((err) => console.error("Vote Reminder error:", err));
@@ -59,8 +54,11 @@ export function initScheduler(client: Client) {
   cron.schedule("0 */6 * * *", async () => {
     try {
       const { expireOldListings } = require("./services/marketService");
+      const { expireOldHuntPartListings } = require("./services/huntPartService");
       const expired = await expireOldListings();
+      const expiredParts = await expireOldHuntPartListings();
       if (expired > 0) console.log(`Expired ${expired} market listing(s). Items returned to sellers.`);
+      if (expiredParts > 0) console.log(`Expired ${expiredParts} animal part listing(s). Parts returned to sellers.`);
     } catch (err) {
       console.error("Market listing expiry failed:", err);
     }

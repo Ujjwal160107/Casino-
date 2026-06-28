@@ -31,7 +31,7 @@ export async function handleWeekly(message: Message) {
     const result = await addBalance(message.author.id, message.author.username, amount, "weekly_reward", { command: reward.commandName }, true);
     const { questBus } = require("../../services/questEvents");
     questBus.emit("social:claim_weekly", { discordId: message.author.id });
-    const capNotice = result.capped ? "\n\nYour wallet is at the global safety cap, so only part of the reward could be added." : "";
+    const capNotice = result.capped ? "\n\nYour wallet is at the maximum balance limit, so only part of the reward could be added." : "";
 
     const tax = await applyIncomeTax(message.author.id, result.appliedAmount);
     const taxField = tax.shielded

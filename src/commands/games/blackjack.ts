@@ -1,7 +1,6 @@
 import { Message, EmbedBuilder, Colors, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ButtonInteraction } from "discord.js";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { placeBetWithTransaction } from "../../services/gameService";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage, acquireActiveGameLock, releaseActiveGameLock } from "../../services/casinoCooldownService";
@@ -11,6 +10,7 @@ import { Mascot, getEmoteUrl } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { questBus } from "../../services/questEvents";
 import { checkLuckyCoin, checkCrownOfGreed, recordPotentialSoulLedgerLoss, getCurrentLuck } from "../../services/shopBuffs";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export type Card = { suit: string; rank: string; value: number };
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
@@ -138,24 +138,16 @@ export async function handleBlackjack(message: Message, args: string[]) {
         return message.reply({ embeds: [errorEmbed(message.author, "Invalid Bet", "Please enter a valid amount (e.g., 500, 1k, all).")] });
     }
     const amount = bet;
-    const config = await getGuildConfig(message.guildId!);
-    const { min, max } = getGameBetLimits(config, "blackjack");
+    const prefix = await getGuildPrefix(message.guildId!);
+    const { min, max } = getGameBetLimits("blackjack");
 
     const eCasino = "<a:casino:1445732641545654383>";
-    let currencyEmoji = config.currencyEmoji;
-    if (/^\d+$/.test(currencyEmoji)) {
-        const e = message.guild?.emojis.cache.get(currencyEmoji);
-        currencyEmoji = e ? e.toString() : "💰";
-    }
-    if (currencyEmoji === "1445732360204193824") {
-        currencyEmoji = "<a:money:1445732360204193824>";
-    }
 
     if (amount < min) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Blackjack is **${fmtCurrency(min, currencyEmoji)}**.`)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Blackjack is **${fmtCurrency(min)}**.`)] });
     }
     if (amount > max) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Blackjack is **${fmtCurrency(max, currencyEmoji)}**.`)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Blackjack is **${fmtCurrency(max)}**.`)] });
     }
     const cd = await checkCasinoCooldown("blackjack", message.author.id);
     if (cd.active) {
@@ -223,9 +215,9 @@ export async function handleBlackjack(message: Message, args: string[]) {
         const pScore = calculateScore(playerHand);
         const dScore = reveal ? calculateScore(dealerHand) : calculateScore(dealerHand.slice(1));
         const embed = new EmbedBuilder().setTitle(`${eCasino} Blackjack Table`).setColor(gameOver ? (payout > currentBet ? Colors.Green : (payout === currentBet ? Colors.Yellow : Colors.Red)) : Colors.Blue).addFields({ name: `Your Hand (${pScore})`, value: formatHand(playerHand), inline: true }, { name: `Dealer's Hand (${dScore})`, value: formatHand(dealerHand, !reveal), inline: true });
-        let statusText = `**Bet:** ${fmtCurrency(currentBet, currencyEmoji)}`;
+        let statusText = `**Bet:** ${fmtCurrency(currentBet)}`;
         if (gameOver) {
-            statusText += `\n\n**${result}**\n${payout > 0 ? `**Payout:** ${fmtCurrency(payout, currencyEmoji)}` : ""}`;
+            statusText += `\n\n**${result}**\n${payout > 0 ? `**Payout:** ${fmtCurrency(payout)}` : ""}`;
 
             const winUrl = getEmoteUrl(Mascot.Emotes.Money);
             const failUrl = getEmoteUrl(Mascot.Emotes.Fail);
@@ -351,7 +343,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
                     guild: message.guild!,
                     type: "ECONOMY",
                     title: "Blackjack Game",
-                    description: `**User:** ${message.author.toString()}\n**Result:** ${result}\n**Bet:** ${fmtCurrency(currentBet, currencyEmoji)}\n**Payout:** ${fmtCurrency(payout, currencyEmoji)}`,
+                    description: `**User:** ${message.author.toString()}\n**Result:** ${result}\n**Bet:** ${fmtCurrency(currentBet)}\n**Payout:** ${fmtCurrency(payout)}`,
                     color: payout > currentBet ? 0x00FF00 : (payout === currentBet ? 0xFFFF00 : 0xFF0000),
                     thumbnail: message.author.displayAvatarURL()
                 }).catch(() => { });

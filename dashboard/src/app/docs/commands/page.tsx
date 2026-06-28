@@ -201,13 +201,10 @@ export default function CommandsPage() {
                             </div>
 
                             <div>
-                                <h3 className="text-lg font-bold text-violet-400 mb-4 border-b border-white/10 pb-2">Credit & Loans</h3>
+                                <h3 className="text-lg font-bold text-violet-400 mb-4 border-b border-white/10 pb-2">Credit & Cards</h3>
                                 <div className="grid grid-cols-1 gap-3">
-                                    <CommandCard cmd="!manage-credit" desc="Configure credit score rules." />
-                                    <CommandCard cmd="!set-credit-score" args="<@user> <score>" desc="Manually adjust a user's score." />
-                                    <CommandCard cmd="!config-credit-tier" desc="Define interest rates per tier." />
-                                    <CommandCard cmd="!loan-ban" args="<@user>" desc="Block a user from taking loans." />
-                                    <CommandCard cmd="!reset-loans" desc="Wipe all active loan data." />
+                                    <CommandCard cmd="!set-credit-score" args="<@user> <score>" desc="Manually adjust a user's credit score." />
+                                    <CommandCard cmd="!mycards" desc="View card balance, due date, and pay dashboard." />
                                 </div>
                             </div>
 

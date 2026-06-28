@@ -1,18 +1,19 @@
 import { Message, EmbedBuilder } from "discord.js";
 import prisma from "../../utils/prisma";
 import { errorEmbed } from "../../utils/embed";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { getEquipmentSlot } from "../../utils/gameUtils";
 import { GameConfig, EquipmentSlot } from "../../config/gameConfig";
 import { Mascot } from "../../config/branding";
+import { getGuildPrefix } from "../../utils/guildContext";
+import { globalCatalogGuildFilter } from "../../utils/globalCatalog";
 
 export async function handleEquip(message: Message, args: string[]) {
     if (!message.guild || !message.member) return;
-    const config = await getGuildConfig(message.guild.id);
+    const prefix = await getGuildPrefix(message.guild.id);
     const itemName = args.join(" ");
 
     if (!itemName) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}equip <item name>\``)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}equip <item name>\``)] });
     }
 
     const guildId = message.guild.id;
@@ -26,7 +27,9 @@ export async function handleEquip(message: Message, args: string[]) {
 
     // 2. Find Item in Inventory
     const shopItem = await prisma.shopItem.findFirst({
-        where: { guildId, name: { equals: itemName, mode: "insensitive" } }
+        where: globalCatalogGuildFilter({
+            name: { equals: itemName, mode: "insensitive" },
+        }),
     });
 
     if (!shopItem) return message.reply({ embeds: [errorEmbed(user, "Item Not Found", "That item does not exist via shop.")] });
@@ -48,7 +51,11 @@ export async function handleEquip(message: Message, args: string[]) {
     }
 
     // 4. Get Chicken
-    const chickenItem = await prisma.shopItem.findFirst({ where: { name: { equals: "Chicken", mode: "insensitive" }, guildId } });
+    const chickenItem = await prisma.shopItem.findFirst({
+        where: globalCatalogGuildFilter({
+            name: { equals: "Chicken", mode: "insensitive" },
+        }),
+    });
     if (!chickenItem) return message.reply("Chicken not configured.");
 
     const chickenInv = await prisma.inventory.findUnique({
@@ -94,7 +101,7 @@ export async function handleEquip(message: Message, args: string[]) {
             { name: "Slot", value: slotName, inline: true },
             { name: "Replaced", value: oldItem, inline: true }
         )
-        .setFooter({ text: `Check stats with ${config.prefix}chicken` });
+        .setFooter({ text: `Check stats with ${prefix}chicken` });
 
     return message.reply({ embeds: [embed] });
 }

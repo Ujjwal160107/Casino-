@@ -13,8 +13,10 @@ import {
   applyLossModifiers,
   checkCrownOfGreed,
 } from "./shopBuffs";
+import { globalCatalogGuildFilter } from "../utils/globalCatalog";
 import { isTester } from "../utils/developerAccess";
 import { HUNT_CRAFT_RECIPES, getUnlockedRecipeKeys } from "./huntCraftService";
+import { DEFAULT_STUDY_COOLDOWN_SECONDS } from "../utils/economyConfig";
 
 export interface ShopItemUseResult {
   success: boolean;
@@ -47,8 +49,6 @@ export async function handleSpecialItemUse(
       return handleCounterfeitKit(discordId, guildId);
     case "tax_shield":
       return handleTaxShield(discordId, guildId);
-    case "loan_forgiveness_note":
-      return handleLoanForgivenessNote(discordId, guildId);
     case "treasure_map":
       return handleTreasureMap(discordId, guildId);
     // New page 2 items
@@ -130,6 +130,12 @@ export async function handleSpecialItemUse(
       return handleCockEquip(itemKey, discordId, guildId);
     case "komodo_venom_flask":
       return handleKomodoVenomFlask(discordId, targetId, member);
+    case "echo_whistle":
+      return handleEchoWhistle(discordId);
+    case "bait_box":
+      return handleBaitBox(discordId);
+    case "camouflage_kit":
+      return handleCamouflageKit(discordId);
     case "rare_blueprint":
       return handleRareBlueprint(discordId);
     case "legendary_blueprint":
@@ -164,6 +170,32 @@ async function handleThiefGloves(discordId: string, guildId: string): Promise<Sh
   return {
     success: true,
     message: `**Thieves Gloves equipped!** Your robbery earnings are boosted by **25%** for the next 6 attempts (6hr max).`,
+  };
+}
+
+const HUNT_BUFF_TTL_SECONDS = 24 * 3600;
+
+async function handleEchoWhistle(discordId: string): Promise<ShopItemUseResult> {
+  await redisService.set(`hunt_echo_whistle:${discordId}`, { active: true }, HUNT_BUFF_TTL_SECONDS);
+  return {
+    success: true,
+    message: "**Echo Whistle activated!** After your next hunt, there is a **35%** chance to attract one extra animal matching your best catch.",
+  };
+}
+
+async function handleBaitBox(discordId: string): Promise<ShopItemUseResult> {
+  await redisService.set(`hunt_bait_box:${discordId}`, { active: true }, HUNT_BUFF_TTL_SECONDS);
+  return {
+    success: true,
+    message: "**Bait Box set!** Your next hunt will attract **at least 2 animals**.",
+  };
+}
+
+async function handleCamouflageKit(discordId: string): Promise<ShopItemUseResult> {
+  await redisService.set(`hunt_camouflage:${discordId}`, { active: true }, HUNT_BUFF_TTL_SECONDS);
+  return {
+    success: true,
+    message: "**Camouflage Kit activated!** Rare and Legendary catch rates are boosted for your **next hunt**.",
   };
 }
 
@@ -301,27 +333,6 @@ async function handleTaxShield(discordId: string, guildId: string): Promise<Shop
   return {
     success: true,
     message: `**Tax Shield active!** You are exempt from all transaction taxes for **1 hour**.`,
-  };
-}
-
-async function handleLoanForgivenessNote(discordId: string, guildId: string): Promise<ShopItemUseResult> {
-  const user = await prisma.user.findUnique({ where: { discordId } }) as any;
-
-  if (!user) {
-    return { success: false, message: "User not found." };
-  }
-
-  const oldScore = user.creditScore;
-  const newScore = Math.min(850, oldScore + 50);
-
-  await prisma.user.update({
-    where: { discordId },
-    data: { creditScore: newScore },
-  });
-
-  return {
-    success: true,
-    message: `**Loan Forgiveness processed!**\n\nCredit Score: **${oldScore}** → **${newScore}** (+${newScore - oldScore} points)`,
   };
 }
 
@@ -498,7 +509,9 @@ async function handlePandoraBox(discordId: string, guildId: string): Promise<Sho
     const grantableItems = ["tax_shield", "bandage", "counterfeit_kit", "lucky_coin", "padlock"];
     const itemKey = grantableItems[Math.floor(Math.random() * grantableItems.length)];
     const shopItem = await prisma.shopItem.findFirst({
-      where: { name: { equals: itemKey.replace(/_/g, " "), mode: "insensitive" }, guildId },
+      where: globalCatalogGuildFilter({
+        name: { equals: itemKey.replace(/_/g, " "), mode: "insensitive" },
+      }),
     });
 
     if (shopItem) {
@@ -684,7 +697,9 @@ async function handleRepairCoupon(discordId: string, guildId: string): Promise<S
   for (const catalogItem of gearCatalogItems) {
     // Look up the ShopItem in DB by exact catalog name
     const gearInDb = await prisma.shopItem.findFirst({
-      where: { guildId, name: { equals: catalogItem.name, mode: "insensitive" } },
+      where: globalCatalogGuildFilter({
+        name: { equals: catalogItem.name, mode: "insensitive" },
+      }),
     });
     if (!gearInDb) continue;
 
@@ -839,9 +854,7 @@ async function handleCoffeeThermos(discordId: string, guildId: string): Promise<
     return { success: true, message: `You drink the coffee... but you didn't have a cooldown. **Wasted!**` };
   }
 
-  const { getGuildConfig } = await import("./guildConfigService");
-  const config = await getGuildConfig(guildId);
-  const cooldownMs = ((config as any)?.studyCooldown ?? 300) * 1000;
+  const cooldownMs = DEFAULT_STUDY_COOLDOWN_SECONDS * 1000;
   const elapsed = Date.now() - new Date(edu.lastStudy).getTime();
 
   if (elapsed >= cooldownMs) {
@@ -917,9 +930,11 @@ async function handleScholarshipLetter(discordId: string): Promise<ShopItemUseRe
 // Cock Store Handlers
 // ---------------------------------------------------------------------------
 
-async function getChickenMeta(discordId: string, guildId: string) {
+async function getChickenMeta(discordId: string, _guildId: string) {
   const chickenItem = await prisma.shopItem.findFirst({
-    where: { name: { equals: "Chicken", mode: "insensitive" }, guildId },
+    where: globalCatalogGuildFilter({
+      name: { equals: "Chicken", mode: "insensitive" },
+    }),
   });
   if (!chickenItem) return { chickenInv: null, meta: {} as any };
 
@@ -1083,7 +1098,9 @@ async function handleCockEquip(itemKey: string, discordId: string, guildId: stri
   if (!equipInfo) return { success: false, shouldConsume: false, message: "Item not equippable." };
 
   const shopItem = await prisma.shopItem.findFirst({
-    where: { guildId, name: { equals: equipInfo.name, mode: "insensitive" } },
+    where: globalCatalogGuildFilter({
+      name: { equals: equipInfo.name, mode: "insensitive" },
+    }),
   });
 
   if (!meta.equipment) meta.equipment = {};

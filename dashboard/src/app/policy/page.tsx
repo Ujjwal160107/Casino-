@@ -61,7 +61,7 @@ export default function PolicyPage() {
                                 <p className="text-zinc-400 mb-2">We collect data that you voluntarily submit through direct interaction with the Service:</p>
                                 <ul className="list-disc pl-5 space-y-2 text-zinc-400">
                                     <li><strong className="text-zinc-200">Identity Data:</strong> Discord User ID, Username, Discriminator, and Avatar URL.</li>
-                                    <li><strong className="text-zinc-200">Transaction Data:</strong> Records of virtual currency transactions, inventory acquisitions, bank deposits, and loans.</li>
+                                    <li><strong className="text-zinc-200">Transaction Data:</strong> Records of virtual currency transactions, inventory acquisitions, bank deposits, and credit card activity.</li>
                                     <li><strong className="text-zinc-200">Configuration Data:</strong> Server-specific settings, preferences, and permissions configured by administrative users.</li>
                                 </ul>
                             </div>

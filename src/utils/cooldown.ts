@@ -1,7 +1,18 @@
+import { TESTER_IDS, BOT_DEVELOPER_ID } from "./developerAccess";
+
 const cooldowns = new Map<string, number>();
 const dynamicCooldowns = new Map<string, number>(); // Stores lastUsed timestamp
 
+function testerKeyBypass(key: string) {
+  if (key.includes(BOT_DEVELOPER_ID)) return true;
+  for (const testerId of TESTER_IDS) {
+    if (key.includes(testerId)) return true;
+  }
+  return false;
+}
+
 export function checkCooldown(key: string, seconds: number): number {
+  if (testerKeyBypass(key)) return 0;
   const now = Date.now();
   const expiresAt = cooldowns.get(key) ?? 0;
   if (now < expiresAt) {
@@ -12,6 +23,7 @@ export function checkCooldown(key: string, seconds: number): number {
 }
 
 export function checkDynamicCooldown(key: string, durationSeconds: number): number {
+  if (testerKeyBypass(key)) return 0;
   const now = Date.now();
   const lastUsed = dynamicCooldowns.get(key) ?? 0;
   // If duration changed, this calculation adapts immediately
@@ -27,6 +39,7 @@ export function checkDynamicCooldown(key: string, durationSeconds: number): numb
 }
 
 export function setCooldown(key: string, secondsFromNow: number) {
+  if (testerKeyBypass(key)) return;
   cooldowns.set(key, Date.now() + secondsFromNow * 1000);
 }
 

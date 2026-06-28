@@ -22,7 +22,9 @@ import {
 import { ensureBankingUser } from "../../services/bankService";
 import {
     applyForCardTier,
+    getCardDisplaySnapshot,
     getCardEligibilitySummary,
+    getCardPayMinimumAmount,
     issueCard,
     upgradeCard,
 } from "../../services/creditCardService";
@@ -33,6 +35,7 @@ import {
     getCardTierConfig,
 } from "../../utils/economyConfig";
 import { fmtCurrency, parseSmartAmount } from "../../utils/format";
+import { getGuildPrefix } from "../../utils/guildContext";
 import { Mascot } from "../../config/branding";
 
 const BANK_ACCENT_COLOR = 0x9B59B6;
@@ -40,7 +43,7 @@ const CARD_ACCENT_COLOR = 0x5865F2;
 
 export const data = {
     name: "bank",
-    description: "Manage your global finances: bank balance, investments, credit score, and cards.",
+    description: "Manage your finances: bank balance, investments, credit score, and cards.",
 };
 
 type FinancialSummary = Awaited<ReturnType<typeof getFinancialSummary>>;
@@ -127,6 +130,116 @@ function buildBankSectionNavRow(ownerId: string) {
             .setLabel("Cards")
             .setStyle(ButtonStyle.Primary),
     );
+}
+
+function formatCardTransactionLine(tx: { type: string; amount: number; meta: unknown; createdAt: Date }) {
+    const meta = (tx.meta ?? {}) as Record<string, unknown>;
+    const when = `<t:${Math.floor(tx.createdAt.getTime() / 1000)}:d>`;
+    switch (tx.type) {
+        case "PURCHASE":
+            return `${when} · Purchase **${fmtCurrency(tx.amount)}**${meta.itemName ? ` — ${meta.itemName}` : ""}`;
+        case "PAYMENT":
+            return `${when} · Payment **${fmtCurrency(tx.amount)}**`;
+        case "WITHDRAW":
+            return `${when} · Withdraw **${fmtCurrency(tx.amount)}**`;
+        case "INTEREST":
+            return `${when} · Interest **${fmtCurrency(tx.amount)}**`;
+        case "STATEMENT":
+            return `${when} · Statement **${fmtCurrency(tx.amount)}**`;
+        case "GARNISHMENT":
+            return `${when} · Garnishment **${fmtCurrency(tx.amount)}**`;
+        default:
+            return `${when} · ${tx.type} **${fmtCurrency(tx.amount)}**`;
+    }
+}
+
+function buildCardPayRow(
+    card: NonNullable<CardEligibilitySummary["card"]>,
+    ownerId: string,
+    _openStatement: CardEligibilitySummary["openStatement"],
+) {
+    const canPay = card.currentBalance > 0;
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+            .setCustomId(bankId("card_pay_min", ownerId))
+            .setLabel("Pay Minimum")
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji(Mascot.Emotes.Credit)
+            .setDisabled(!canPay),
+        new ButtonBuilder()
+            .setCustomId(bankId("card_pay_full", ownerId))
+            .setLabel("Pay Full Balance")
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(!canPay),
+        new ButtonBuilder()
+            .setCustomId(bankId("card_pay_custom", ownerId))
+            .setLabel("Pay Custom")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(!canPay),
+    );
+}
+
+function buildCardMineActionRow(ownerId: string) {
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+            .setCustomId(bankId("cards_my_refresh", ownerId))
+            .setLabel("Refresh")
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji(Mascot.Emotes.Refresh),
+    );
+}
+
+function buildCardMineBody(summary: CardEligibilitySummary, prefix: string) {
+    const card = summary.card!;
+    const tier = getCardTierConfig(card.tier);
+    const userScore = summary.user?.creditScore ?? 500;
+    const snap = getCardDisplaySnapshot(card);
+    const openStatement = summary.openStatement;
+    const utilization = Math.round(snap.utilizationPct * 100);
+    const dueTs = snap.cycleEndsAt
+        ? `<t:${Math.floor(snap.cycleEndsAt.getTime() / 1000)}:F> (<t:${Math.floor(snap.cycleEndsAt.getTime() / 1000)}:R>)`
+        : "Pending first cycle";
+    const payMin = getCardPayMinimumAmount(card, openStatement);
+
+    const lines = [
+        `### ${formatTierName(card.tier)} Card`,
+        `Credit score required: **${tier.reqScore}** · Your score: **${userScore}**`,
+        `Status: **${card.status}**`,
+        `Balance owed: **${fmtCurrency(card.currentBalance)} / ${fmtCurrency(card.creditLimit)}** (${utilization}% used)`,
+        `Projected minimum due: **${fmtCurrency(payMin)}**`,
+        `Payment due (cycle ends): **${dueTs}**`,
+        `Last statement balance: **${fmtCurrency(card.statementBalance)}**`,
+        `Weekly spend cap: **${fmtCurrency(card.spentThisCycle)} / ${fmtCurrency(card.weeklySpendCap)}**`,
+        `Weekly withdraw cap: **${fmtCurrency(card.withdrawnThisCycle)} / ${fmtCurrency(card.weeklyWithdrawCap)}**`,
+        `-# Card payments use **wallet** balance. Move funds from bank with \`${prefix}withdraw\` first.`,
+    ];
+
+    if (card.status === "DELINQUENT") {
+        lines.push("", `${Mascot.Emotes.Fail} **Delinquent** — pay at least the minimum before the payment due date to avoid further penalties.`);
+    }
+    if (card.status === "LOCKED") {
+        lines.push("", `${Mascot.Emotes.Lock} **Locked** — pay off your full balance to rehabilitate your card.`);
+    }
+
+    if (openStatement) {
+        const stmtDue = `<t:${Math.floor(openStatement.dueAt.getTime() / 1000)}:F>`;
+        lines.push(
+            "",
+            `**Open statement (${openStatement.cycleKey})**`,
+            `Balance: **${fmtCurrency(openStatement.statementBalance)}** · Paid: **${fmtCurrency(openStatement.amountPaid)}** · Min due: **${fmtCurrency(openStatement.minimumDue)}** · Due: **${stmtDue}**`,
+        );
+    }
+
+    const txs = card.transactions ?? [];
+    if (txs.length > 0) {
+        lines.push("", "**Recent activity**", ...txs.slice(0, 5).map(formatCardTransactionLine));
+    }
+
+    if (card.currentBalance <= 0) {
+        lines.push("", "-# No balance due right now.");
+    }
+
+    return lines.join("\n");
 }
 
 function buildCardNavRow(activeView: BankCardView, ownerId: string) {
@@ -251,13 +364,13 @@ function addCardTierSections(container: ContainerBuilder, summary: CardEligibili
             new TextDisplayBuilder().setContent(
                 [
                     `### ${formatTierName(tier.tier)} Card`,
-                    `Required score: **${tier.reqScore}**`,
+                    `Credit score required: **${tier.reqScore}**`,
                     `Required career tier: **${tier.reqCareerTier}**`,
                     `Credit limit: **${fmtCurrency(tier.creditLimit)}**`,
                     `Weekly interest: **${tier.weeklyInterestPct}%**`,
                     `Minimum due: **${formatMinimumDueRule(tier)}**`,
-                    `Spend cap: **${fmtCurrency(tier.weeklySpendCap)}**`,
-                    `Withdraw cap: **${fmtCurrency(tier.weeklyWithdrawCap)}**`,
+                    `Weekly spend cap: **${fmtCurrency(tier.weeklySpendCap)}**`,
+                    `Weekly withdraw cap: **${fmtCurrency(tier.weeklyWithdrawCap)}**`,
                     `Status: **${formatTierEligibility(tier, summary)}**`,
                 ].join("\n"),
             ),
@@ -275,8 +388,10 @@ export async function buildBankCardsPayload(
     discordId: string,
     displayName: string,
     view: BankCardView = "catalog",
+    guildId?: string,
 ) {
     const summary = await getCardEligibilitySummary(discordId);
+    const prefix = guildId ? await getGuildPrefix(guildId) : "!";
     const files: AttachmentBuilder[] = [];
     const container = new ContainerBuilder().setAccentColor(CARD_ACCENT_COLOR);
 
@@ -285,23 +400,16 @@ export async function buildBankCardsPayload(
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${displayName}'s Fortuna Cards`));
 
         if (!card) {
-            container.addTextDisplayComponents(new TextDisplayBuilder().setContent("You do not have a Fortuna Card yet."));
+            const userScore = summary.user?.creditScore ?? 500;
+            container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                `You do not have a Fortuna Card yet.\n**Starter** requires credit score **${getCardTierConfig("STARTER").reqScore}** · Your score: **${userScore}**\nUse **Apply for Cards** or \`!card issue\`.`,
+            ));
         } else {
-            const dueText = card.dueAt ? `<t:${Math.floor(card.dueAt.getTime() / 1000)}:R>` : "No due date yet";
             container.addTextDisplayComponents(
-                new TextDisplayBuilder().setContent(
-                    [
-                        `### ${formatTierName(card.tier)} Card`,
-                        `Status: **${card.status}**`,
-                        `Balance: **${fmtCurrency(card.currentBalance)} / ${fmtCurrency(card.creditLimit)}**`,
-                        `Statement balance: **${fmtCurrency(card.statementBalance)}**`,
-                        `Minimum due: **${fmtCurrency(card.minimumDue)}**`,
-                        `Due date: **${dueText}**`,
-                        `Spend used this cycle: **${fmtCurrency(card.spentThisCycle)} / ${fmtCurrency(card.weeklySpendCap)}**`,
-                        `Withdraw used this cycle: **${fmtCurrency(card.withdrawnThisCycle)} / ${fmtCurrency(card.weeklyWithdrawCap)}**`,
-                    ].join("\n"),
-                ),
+                new TextDisplayBuilder().setContent(buildCardMineBody(summary, prefix)),
             );
+            container.addActionRowComponents(buildCardPayRow(card, discordId, summary.openStatement));
+            container.addActionRowComponents(buildCardMineActionRow(discordId));
         }
 
         container.addActionRowComponents(buildCardNavRow("mine", discordId));
@@ -337,7 +445,7 @@ export async function buildBankCardsPayload(
                     [
                         `### ${formatTierName(row.tier.tier)} Card`,
                         `Status: **${status}**${missing}`,
-                        `Required score: **${row.tier.reqScore}**`,
+                        `Credit score required: **${row.tier.reqScore}**`,
                         `Required career tier: **${row.tier.reqCareerTier}**`,
                         `Credit limit: **${fmtCurrency(row.tier.creditLimit)}**`,
                     ].join("\n"),
@@ -358,11 +466,17 @@ export async function buildBankCardsPayload(
 
     container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent("## Fortuna Cards"),
-        new TextDisplayBuilder().setContent("Browse card tiers, check eligibility, and manage your current card from the bank."),
+        new TextDisplayBuilder().setContent(
+            `Browse card tiers and requirements. Each tier needs a minimum credit score and career tier to apply.\nYour credit score: **${summary.user?.creditScore ?? 500}**`,
+        ),
     );
     addCardTierSections(container, summary, files);
     container.addActionRowComponents(buildCardNavRow("catalog", discordId));
     return { components: [container], files };
+}
+
+export async function buildMyCardsPayload(discordId: string, displayName: string, guildId?: string) {
+    return buildBankCardsPayload(discordId, displayName, "mine", guildId);
 }
 
 export async function applyBestEligibleCard(discordId: string) {
@@ -391,8 +505,8 @@ export function buildBankMainContainer(
         .setAccentColor(BANK_ACCENT_COLOR)
         .addSectionComponents(
             buildBankHeaderSection(
-                `${displayName}'s Global Financial Dashboard`,
-                "Manage your global wallet, bank, investments, credit score, and cards.",
+                `${displayName}'s Financial Dashboard`,
+                "Manage your wallet, bank, investments, credit score, and cards.",
                 avatarUrl,
             ),
         )
@@ -433,7 +547,7 @@ export function buildBankInvestmentsContainer(
         .setAccentColor(0x2ECC71)
         .addSectionComponents(
             buildBankHeaderSection(
-                `${displayName}'s Global Investment Portfolio`,
+                `${displayName}'s Investment Portfolio`,
                 `FD Rate: **${BANKING_CONFIG.fdInterestRate}% APR**\nRD Rate: **${BANKING_CONFIG.rdInterestRate}% APR**`,
                 avatarUrl,
             ),
@@ -534,7 +648,7 @@ export async function execute(message: Message | any, args: string[]) {
     }
 
     if (subCommand === "cards" || subCommand === "card") {
-        const payload = await buildBankCardsPayload(user.id, displayName);
+        const payload = await buildBankCardsPayload(user.id, displayName, "catalog", message.guildId!);
         return message.reply({
             ...payload,
             flags: MessageFlags.IsComponentsV2,

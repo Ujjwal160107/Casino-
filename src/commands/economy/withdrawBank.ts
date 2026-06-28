@@ -22,14 +22,14 @@ export async function handleWithdrawBank(message: Message, args: string[]) {
   try {
     const result = await withdrawFromBank(user.wallet!.id, user.discordId, amount);
     const updated = await getBankByUserId(user.discordId);
-    const partialMsg = result.capped ? " (Global Safety Cap Reached)" : "";
+    const partialMsg = result.capped ? " (Wallet cap reached)" : "";
 
     return message.reply({
       embeds: [
         successEmbed(
           message.author,
           result.capped ? "Partial Withdraw" : "Withdraw Successful",
-          `Withdrew **${fmtCurrency(result.actualAmount)}**${partialMsg} from bank.\nRemaining global bank balance: **${fmtCurrency(updated?.balance ?? 0)}**`
+          `Withdrew **${fmtCurrency(result.actualAmount)}**${partialMsg} from bank.\nRemaining bank balance: **${fmtCurrency(updated?.balance ?? 0)}**`
         )
       ]
     });

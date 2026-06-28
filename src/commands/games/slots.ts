@@ -2,13 +2,13 @@ import { ContainerBuilder, Message, MessageFlags, TextDisplayBuilder } from "dis
 import { Mascot } from "../../config/branding";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { placeBetWithTransaction } from "../../services/gameService";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { errorEmbed } from "../../utils/embed";
 import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage } from "../../services/casinoCooldownService";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { questBus } from "../../services/questEvents";
 import { checkLuckyCoin, checkCrownOfGreed, recordPotentialSoulLedgerLoss, getCurrentLuck } from "../../services/shopBuffs";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export const CHERRY = "<:cherri:1446428169786622053>";
 export const BANANA = "<:banano:1446428190837968989>";
@@ -76,21 +76,21 @@ export function getSpinResultWithLuck(luck: number): { reels: string[], win: boo
 }
 
 export async function handleSlots(message: Message, args: string[]) {
-  const config = await getGuildConfig(message.guildId!);
+  const prefix = await getGuildPrefix(message.guildId!);
   const user = await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
   const amount = parseBetAmount(args[0], user.wallet!.balance);
-  const emoji = config.currencyEmoji;
+  
 
   if (!Number.isInteger(amount) || amount <= 0) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Invalid Bet", `Usage: \`${config.prefix}slots <amount>\``)] });
+    return message.reply({ embeds: [errorEmbed(message.author, "Invalid Bet", `Usage: \`${prefix}slots <amount>\``)] });
   }
 
-  const { min, max } = getGameBetLimits(config, "slots");
+  const { min, max } = getGameBetLimits("slots");
   if (amount < min) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Slots is **${fmtCurrency(min, emoji)}**.`)] });
+    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Slots is **${fmtCurrency(min)}**.`)] });
   }
   if (amount > max) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Slots is **${fmtCurrency(max, emoji)}**.`)] });
+    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Slots is **${fmtCurrency(max)}**.`)] });
   }
 
   const cd = await checkCasinoCooldown("slots", message.author.id);
@@ -150,7 +150,7 @@ export async function handleSlots(message: Message, args: string[]) {
       guild: message.guild!,
       type: "ECONOMY",
       title: "Slots Game",
-      description: `**User:** ${message.author.toString()}\n**Reels:** [ ${reel1} | ${reel2} | ${reel3} ]\n**Bet:** ${fmtCurrency(amount, emoji)}\n**Payout:** ${fmtCurrency(payout, emoji)}`,
+      description: `**User:** ${message.author.toString()}\n**Reels:** [ ${reel1} | ${reel2} | ${reel3} ]\n**Bet:** ${fmtCurrency(amount)}\n**Payout:** ${fmtCurrency(payout)}`,
       color: win ? 0x00FF00 : 0xFF0000,
       thumbnail: message.author.displayAvatarURL()
     }).catch(() => { });
@@ -160,9 +160,9 @@ export async function handleSlots(message: Message, args: string[]) {
   const body = [
     `### [ ${reel1} | ${reel2} | ${reel3} ]`,
     win
-      ? `Jackpot: **${fmtCurrency(payout, emoji)}** (x${result.multiplier})`
-      : `Lost: **${fmtCurrency(amount, emoji)}**`,
-    `Wallet: **${fmtCurrency(wallet, emoji)}**`
+      ? `Jackpot: **${fmtCurrency(payout)}** (x${result.multiplier})`
+      : `Lost: **${fmtCurrency(amount)}**`,
+    `Wallet: **${fmtCurrency(wallet)}**`
   ].join("\n");
 
   return message.reply({

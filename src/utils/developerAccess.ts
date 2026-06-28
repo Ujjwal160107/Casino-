@@ -1,3 +1,5 @@
+import type { GuildMember } from "discord.js";
+
 export const BOT_DEVELOPER_ID = "1288340046449086567";
 
 // Testing role: these users bypass cooldowns, can buy anything regardless of balance,
@@ -5,10 +7,31 @@ export const BOT_DEVELOPER_ID = "1288340046449086567";
 export const TESTER_IDS = new Set<string>([
   "711955153196155011",
   "761118244198285313",
+  "849330483313115168",
 ]);
 
-export function isTester(userId: string): boolean {
+export const TESTER_ROLE_IDS = new Set<string>([
+  // Add tester role IDs here. Users with any of these roles bypass cooldowns and shop costs.
+]);
+
+export function isTester(userId: string, member?: GuildMember | null): boolean {
+  if (member && TESTER_ROLE_IDS.size > 0) {
+    const hasTesterRole = [...TESTER_ROLE_IDS].some((roleId) => member.roles.cache.has(roleId));
+    if (hasTesterRole) return true;
+  }
+  if (member) {
+    const hasTesterName = member.roles.cache.some((role) => {
+      const name = role.name.toLowerCase();
+      return name === "tester" || name === "testers";
+    });
+    if (hasTesterName) return true;
+  }
   return TESTER_IDS.has(userId) || userId === BOT_DEVELOPER_ID;
+}
+
+export function isTesterMember(member?: GuildMember | null): boolean {
+  if (!member) return false;
+  return isTester(member.id, member);
 }
 
 export const DEVELOPER_ONLY_COMMAND_MESSAGE = "This command is restricted to the bot developer.";

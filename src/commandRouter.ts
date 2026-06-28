@@ -4,7 +4,6 @@ import { checkJailStatus } from "./services/jailService";
 import { handleHelp } from "./commands/general/help";
 import { handleCasinoGuide } from "./commands/general/casinoGuide";
 import { handleTutorial } from "./commands/general/tutorial";
-import { handleDashboard } from "./commands/general/dashboard";
 import { handleSetPrefix } from "./commands/admin/setPrefix";
 import { handleAddEmoji } from "./commands/admin/addEmoji";
 import { handleBalance } from "./commands/economy/balance";
@@ -22,7 +21,6 @@ import {
   myPropertiesHandler,
   collectRentHandler
 } from "./commands/economy/properties";
-import { managePropertyHandler } from "./commands/admin/adminProperty";
 import { handleProfile } from "./commands/economy/profile";
 import { handleLeaderboard } from "./commands/economy/leaderboard";
 import { execute as handleBank } from "./commands/economy/bank";
@@ -34,8 +32,6 @@ import { handleAddMoney } from "./commands/admin/addMoney";
 import { handleSetMoney } from "./commands/admin/setMoney";
 import { handleRemoveMoney } from "./commands/admin/removeMoney";
 import { handleResetEconomy } from "./commands/admin/resetEconomy";
-import { handleAddShopItem } from "./commands/admin/addShopItem";
-import { handleManageShop } from "./commands/admin/manageShop";
 import { handleGlobalAnnouncementPreview, handleGlobalAnnouncementSend } from "./commands/admin/globalAnnouncement";
 import { handleBet, handleRouletteMenu } from "./commands/games/roulette";
 import { handleBlackjack } from "./commands/games/blackjack";
@@ -103,7 +99,13 @@ const LEGACY_REMOVED_COMMANDS = new Set([
   "view-credit-tiers", "viewcredittiers", "delete-credit-tier", "deletecredittier",
   "loan-ban", "loanban", "loan-unban", "loanunban", "reset-loans", "resetloans",
   "factory-reset", "factoryreset",
-  "test"
+  "test",
+  "shop-add", "add-shop-item", "addshopitem",
+  "manage-item", "edit-item", "del-item", "edit-shop", "delete-shop",
+  "remove-item", "delete-item", "remove-inv", "clear-inv",
+  "reset-shop", "resetshop", "reset-store", "resetstore",
+  "manage-property", "manageproperty", "property-admin", "propertyadmin",
+  "set-degree-cost", "setdegreecost", "setdegree", "settuition",
 ]);
 
 function normalizeCommand(command: string, args: string[]) {
@@ -261,8 +263,6 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     }
     case "help":
       return handleHelp(message);
-    case "dashboard":
-      return handleDashboard(message);
     case "casino":
     case "games":
     case "casinoguide":
@@ -287,6 +287,12 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "credit-card": {
       const { handleCard } = require("./commands/economy/card");
       return handleCard(message, args);
+    }
+    case "my cards":
+    case "my-cards":
+    case "mycard": {
+      const { handleMyCards } = require("./commands/economy/card");
+      return handleMyCards(message);
     }
     case "deposit":
       return handleDeposit(message, args);
@@ -407,27 +413,6 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleRemoveMoney(message, args);
     case "reset-economy":
       return handleResetEconomy(message, args);
-    case "shop-add":
-    case "add-shop-item":
-      return handleAddShopItem(message, args);
-    case "manage-item":
-    case "edit-item":
-    case "del-item":
-    case "edit-shop":
-    case "delete-shop":
-      return handleManageShop(message, args);
-    case "remove-item":
-    case "delete-item":
-    case "remove-inv":
-    case "clear-inv": {
-      const { handleRemoveItem } = require("./commands/admin/removeItem");
-      return handleRemoveItem(message, args);
-    }
-    case "reset-shop":
-    case "reset-store": {
-      const { handleResetShop } = require("./commands/admin/resetShop");
-      return handleResetShop(message, args);
-    }
     case "global-announcement-preview":
     case "fortuna-global-preview":
       return handleGlobalAnnouncementPreview(message);
@@ -456,6 +441,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const { handleSetCreditScore } = require("./commands/admin/manageCreditScore");
       return handleSetCreditScore(message, args);
     }
+    case "ask":
     case "ask-money":
     case "askmoney": {
       const { handleAsk } = require("./commands/economy/ask");
@@ -522,7 +508,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     }
     case "study": {
       const { handleStudy } = require("./commands/life/study");
-      return handleStudy(message);
+      return handleStudy(message, args);
     }
     case "enroll": {
       const { handleEnroll } = require("./commands/life/enroll");
@@ -578,11 +564,6 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "collectrent":
     case "rent":
       return collectRentHandler(message);
-    case "manage-property":
-    case "manageproperty":
-    case "property-admin":
-    case "propertyadmin":
-      return managePropertyHandler(message, args);
     case "manage-uni":
     case "manageuni":
     case "uni-admin":
@@ -614,19 +595,12 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const { handleGrantDegree } = require("./commands/admin/educationAdmin");
       return handleGrantDegree(message, args);
     }
-    case "set-degree-cost":
-    case "setdegreecost":
-    case "setdegree":
-    case "settuition": {
-      const { handleSetDegreeCost } = require("./commands/admin/educationAdmin");
-      return handleSetDegreeCost(message, args);
-    }
     default: {
       const validCommands = [
-        "balance", "bank", "card", "deposit", "withdraw", "transfer",
+        "balance", "bank", "card", "mycards", "deposit", "withdraw", "transfer",
         "work", "crime", "beg", "slut", "rob", "shop", "inventory", "profile",
         "leaderboard", "bet", "blackjack", "coinflip", "slots", "cockfight",
-        "credit", "ask-money", "set-prefix", "help", "guide", "jobs", "education", "relax"
+        "credit", "ask", "ask-money", "set-prefix", "help", "guide", "jobs", "education", "relax"
       ];
 
       const thinkUrl = getEmoteUrl(Mascot.Emotes.Think);

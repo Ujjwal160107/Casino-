@@ -98,9 +98,22 @@ export async function hunt(
     weights.Common = Math.max(0, weights.Common - legendaryBoostRow.legendaryBonus);
   }
 
+  const camouflageActive = await redisService.get<{ active: boolean }>(`hunt_camouflage:${discordId}`);
+  if (camouflageActive?.active) {
+    weights.Rare = Math.min(0.40, weights.Rare + 0.10);
+    weights.Legendary = Math.min(0.20, weights.Legendary + 0.05);
+    weights.Common = Math.max(0, weights.Common - 0.15);
+  }
+
+  const baitActive = await redisService.get<{ active: boolean }>(`hunt_bait_box:${discordId}`);
+  const echoActive = await redisService.get<{ active: boolean }>(`hunt_echo_whistle:${discordId}`);
+
   // Roll a number of distinct rarity outcomes based on rifle tier
   // Each rarity outcome produces a random species + OWO-style quantity
-  const rarityCount = randomInt(tier.minAnimals, tier.maxAnimals);
+  let rarityCount = randomInt(tier.minAnimals, tier.maxAnimals);
+  if (baitActive?.active) {
+    rarityCount = Math.max(2, rarityCount);
+  }
   const grouped: Map<string, { def: AnimalDefinition; count: number; ids: string[] }> = new Map();
 
   for (let i = 0; i < rarityCount; i++) {
@@ -109,6 +122,25 @@ export async function hunt(
     const def = pool[Math.floor(Math.random() * pool.length)];
     const qty = randomInt(RARITY_QUANTITIES[rarity].min, RARITY_QUANTITIES[rarity].max);
 
+    const existing = grouped.get(def.key);
+    if (existing) {
+      existing.count += qty;
+    } else {
+      grouped.set(def.key, { def, count: qty, ids: [] });
+    }
+  }
+
+  if (echoActive?.active && grouped.size > 0 && Math.random() < 0.35) {
+    const rarityOrder: AnimalRarity[] = ["Common", "Uncommon", "Rare", "Legendary"];
+    let bestRarity: AnimalRarity = "Common";
+    for (const entry of grouped.values()) {
+      if (rarityOrder.indexOf(entry.def.rarity) > rarityOrder.indexOf(bestRarity)) {
+        bestRarity = entry.def.rarity;
+      }
+    }
+    const pool = getAnimalsByRarity(bestRarity);
+    const def = pool[Math.floor(Math.random() * pool.length)];
+    const qty = randomInt(RARITY_QUANTITIES[bestRarity].min, RARITY_QUANTITIES[bestRarity].max);
     const existing = grouped.get(def.key);
     if (existing) {
       existing.count += qty;
@@ -151,6 +183,15 @@ export async function hunt(
   if (legendaryBoostRow) {
     await redisService.del(`crafted_hunt_legendary_boost:${discordId}`);
     await prisma.activeEffect.deleteMany({ where: { userId: discordId, effectType: "hunt_legendary_boost" } });
+  }
+  if (camouflageActive?.active) {
+    await redisService.del(`hunt_camouflage:${discordId}`);
+  }
+  if (baitActive?.active) {
+    await redisService.del(`hunt_bait_box:${discordId}`);
+  }
+  if (echoActive?.active) {
+    await redisService.del(`hunt_echo_whistle:${discordId}`);
   }
 
   const groups: HuntGroup[] = Array.from(grouped.values()).map((e) => ({

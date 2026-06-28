@@ -10,7 +10,6 @@ import {
 } from "discord.js";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { placeBetWithTransaction } from "../../services/gameService";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { errorEmbed } from "../../utils/embed";
 import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage, acquireActiveGameLock, releaseActiveGameLock } from "../../services/casinoCooldownService";
@@ -18,6 +17,7 @@ import { Mascot } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { questBus } from "../../services/questEvents";
 import { checkLuckyCoin, applyLuckToChance, checkCrownOfGreed, recordPotentialSoulLedgerLoss } from "../../services/shopBuffs";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 const COINFLIP_ACCENT = 0xF1C40F;
 
@@ -65,13 +65,13 @@ function parseCoinChoice(choiceRaw: string): "heads" | "tails" | null {
 }
 
 export async function handleCoinflip(message: Message, args: string[]) {
-  const config = await getGuildConfig(message.guildId!);
+  const prefix = await getGuildPrefix(message.guildId!);
   const amountStr = args[0];
   const choiceRaw = (args[1] || "").toLowerCase();
 
   if (!amountStr) {
     return message.reply({
-      embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}coinflip <amount> [h/t]\`\nExample: \`${config.prefix}coinflip 1000 h\``)],
+      embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}coinflip <amount> [h/t]\`\nExample: \`${prefix}coinflip 1000 h\``)],
     });
   }
 
@@ -81,7 +81,7 @@ export async function handleCoinflip(message: Message, args: string[]) {
     return message.reply({ embeds: [errorEmbed(message.author, "Invalid Wager", "Please bet a valid whole amount.")] });
   }
 
-  const emoji = config.currencyEmoji;
+  
   const immediateChoice = choiceRaw ? parseCoinChoice(choiceRaw) : null;
   if (choiceRaw && !immediateChoice) {
     return message.reply({ embeds: [errorEmbed(message.author, "Invalid Choice", "Please choose `heads` or `tails`.")] });
@@ -97,12 +97,12 @@ export async function handleCoinflip(message: Message, args: string[]) {
     return;
   }
 
-  const { min, max } = getGameBetLimits(config, "coinflip");
+  const { min, max } = getGameBetLimits("coinflip");
   if (amount < min) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Coinflip is **${fmtCurrency(min, emoji)}**.`)] });
+    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Coinflip is **${fmtCurrency(min)}**.`)] });
   }
   if (amount > max) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Coinflip is **${fmtCurrency(max, emoji)}**.`)] });
+    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Coinflip is **${fmtCurrency(max)}**.`)] });
   }
   if (!user.wallet || user.wallet.balance < amount) {
     return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You don't have enough money in your wallet.")] });
@@ -167,7 +167,7 @@ export async function handleCoinflip(message: Message, args: string[]) {
         guild: message.guild!,
         type: "ECONOMY",
         title: "Coinflip Game",
-        description: `**User:** ${message.author.toString()}\n**Choice:** ${choice.toUpperCase()}\n**Result:** ${result.toUpperCase()}\n**Bet:** ${fmtCurrency(amount, emoji)}\n**Payout:** ${fmtCurrency(payout, emoji)}`,
+        description: `**User:** ${message.author.toString()}\n**Choice:** ${choice.toUpperCase()}\n**Result:** ${result.toUpperCase()}\n**Bet:** ${fmtCurrency(amount)}\n**Payout:** ${fmtCurrency(payout)}`,
         color: didWin ? 0x00FF00 : 0xFF0000,
         thumbnail: message.author.displayAvatarURL()
       }).catch(() => { });
@@ -177,9 +177,9 @@ export async function handleCoinflip(message: Message, args: string[]) {
     const body = [
       `Choice: **${choice.toUpperCase()}**`,
       `Result: **${result.toUpperCase()}**`,
-      `Bet: **${fmtCurrency(amount, emoji)}**`,
-      didWin ? `Payout: **${fmtCurrency(payout, emoji)}**` : `Lost: **${fmtCurrency(effectiveStake, emoji)}**`,
-      `Wallet: **${fmtCurrency(finalWalletBalance, emoji)}**`
+      `Bet: **${fmtCurrency(amount)}**`,
+      didWin ? `Payout: **${fmtCurrency(payout)}**` : `Lost: **${fmtCurrency(effectiveStake)}**`,
+      `Wallet: **${fmtCurrency(finalWalletBalance)}**`
     ].join("\n");
 
     return {
@@ -197,7 +197,7 @@ export async function handleCoinflip(message: Message, args: string[]) {
 
   const prompt = buildCoinflipContainer(
     "Coinflip",
-    [`Bet: **${fmtCurrency(amount, emoji)}**`, "Choose heads or tails to flip.", `Only you can use these buttons. Tip: \`coinflip ${amountStr} h\` or \`t\` to skip this step.`].join("\n")
+    [`Bet: **${fmtCurrency(amount)}**`, "Choose heads or tails to flip.", `Only you can use these buttons. Tip: \`coinflip ${amountStr} h\` or \`t\` to skip this step.`].join("\n")
   );
   const msg = await message.reply({ components: [prompt, buildChoiceRow(message.author.id)], flags: MessageFlags.IsComponentsV2 });
   let settled = false;

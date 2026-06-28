@@ -3,6 +3,18 @@ export const DEFAULT_JAIL_FINE = 1_000;
 export const DEFAULT_JAIL_TIME_SECONDS = 600;
 export const DEFAULT_STUDY_COOLDOWN_SECONDS = 300;
 
+export const GAME_UI_TIMINGS = {
+  cockfightBetSeconds: 60,
+  rouletteSpinSeconds: 4,
+} as const;
+
+export const MARRIAGE_CONFIG = {
+  enabled: true,
+  cost: 0,
+  divorceCost: 0,
+  cooldownSeconds: 0,
+} as const;
+
 export const TIME_GATED_REWARDS = {
   daily: {
     commandName: "daily",
@@ -19,6 +31,21 @@ export const TIME_GATED_REWARDS = {
     amount: 4_000_000,
     cooldownSeconds: 30 * 24 * 60 * 60
   }
+} as const;
+
+export const GAME_BET_LIMITS = {
+  defaultMin: 10_000,
+  defaultMax: 1_000_000,
+  perGameMax: {
+    coinflip: 500_000,
+    slots: 750_000,
+    blackjack: 1_000_000,
+    roulette: 1_000_000,
+    russian_roulette: 750_000,
+    rr: 750_000,
+    cockfight: 1_000_000,
+    chicken: 1_000_000,
+  },
 } as const;
 
 export const DEGREE_PRICES = {
@@ -73,12 +100,12 @@ export const GRINDING_COMMANDS = {
   },
   crime: {
     commandName: "crime",
-    cooldownSeconds: 300,
+    cooldownSeconds: 3600,
     winRate: 0.35,
-    payoutMin: 35_000,
-    payoutMax: 90_000,
-    fineMin: 15_000,
-    fineMax: 40_000
+    payoutMin: 100_000,
+    payoutMax: 220_000,
+    fineMin: 60_000,
+    fineMax: 140_000
   }
 } as const;
 
@@ -156,19 +183,8 @@ export const TAX_CONFIG = {
 } as const;
 
 export const BANKING_CONFIG = {
-  loanInterestRate: 5,
   fdInterestRate: 10,
-  rdInterestRate: 8,
-  maxActiveLoans: 1,
-  minCreditScore: 0,
-  maxCreditScore: 2_000,
-  creditScoreReward: 10,
-  creditScorePenalty: 20,
-  defaultLoanTiers: [
-    { minScore: 0, maxLoan: 5_000, maxDays: 3 },
-    { minScore: 500, maxLoan: 25_000, maxDays: 7 },
-    { minScore: 800, maxLoan: 100_000, maxDays: 14 }
-  ]
+  rdInterestRate: 8
 } as const;
 
 export const CARD_SCORE_RULES = {

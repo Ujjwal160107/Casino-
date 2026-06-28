@@ -76,6 +76,7 @@ export async function getCasinoCooldownDuration(gameKey: string, discordId: stri
 }
 
 export async function setCasinoCooldown(gameKey: string, discordId: string, guildId?: string): Promise<void> {
+  if (isTester(discordId)) return;
   try {
     const duration = await getCasinoCooldownDuration(gameKey, discordId, guildId);
     if (duration <= 0) return;
