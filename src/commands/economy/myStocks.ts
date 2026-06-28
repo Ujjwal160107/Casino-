@@ -7,7 +7,7 @@ import { errorEmbed } from "../../utils/embed";
 export async function handleMyStocks(message: Message) {
     if (!message.guildId) return;
 
-    const pf = await getPortfolio(message.guildId, message.author.id);
+    const pf = await getPortfolio(message.author.id);
     if (!pf || pf.holdings.length === 0) {
         return message.reply({ embeds: [errorEmbed(message.author, "Portfolio Empty", "You don't own any stocks.")] });
     }
