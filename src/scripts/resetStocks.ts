@@ -1,29 +1,28 @@
-
+// src/scripts/resetStocks.ts
 import { PrismaClient } from "@prisma/client";
+import { initGlobalMarket } from "../services/stockService";
 
 const prisma = new PrismaClient();
 
 async function main() {
-    console.log("🗑️ Wiping legacy Stock data...");
-    try {
-        // Delete all stocks (this will also delete linked Holdings due to Cascade if configured, 
-        // but check schema. Holdings delete is separate usually, but let's wipe stocks first).
-        // Actually schema has: StockHolding -> Stock. If I delete Stock, I might need to delete Holdings first.
+  console.log("🗑️  Wiping stock data for global migration...");
+  try {
+    await prisma.stockHolding.deleteMany({});
+    console.log("✅ Cleared StockHoldings");
+    await prisma.stockEvent.deleteMany({});
+    console.log("✅ Cleared StockEvents");
+    await prisma.stock.deleteMany({});
+    console.log("✅ Cleared Stocks");
 
-        // First delete holdings to be safe
-        await prisma.stockHolding.deleteMany({});
-        console.log("✅ Cleared StockHoldings");
-
-        // Then delete stocks
-        await prisma.stock.deleteMany({});
-        console.log("✅ Cleared Stocks");
-
-        console.log("🚀 Database is clean. Restart the server now.");
-    } catch (e) {
-        console.error("Error wiping data:", e);
-    } finally {
-        await prisma.$disconnect();
-    }
+    await initGlobalMarket();
+    const count = await prisma.stock.count();
+    console.log(`🚀 Seeded ${count} global stocks. Migration complete.`);
+  } catch (e) {
+    console.error("Error during stock migration:", e);
+    process.exitCode = 1;
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 main();

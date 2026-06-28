@@ -2,9 +2,9 @@
 
 export const TICK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
-// Baseline per-tick noise (mean slightly negative = house edge for doing nothing)
-export const BASELINE_MIN_PCT = -1.5;
-export const BASELINE_MAX_PCT = 1.2;
+// Baseline per-tick noise (mean negative = house edge for doing nothing)
+export const BASELINE_MIN_PCT = -3.0;
+export const BASELINE_MAX_PCT = 0.5;
 
 // Chance per tick a stock starts a new event (scaled up by volatility)
 export const EVENT_BASE_CHANCE = 0.3;
@@ -41,11 +41,11 @@ export interface EventDef {
 }
 
 export const EVENT_POOL: EventDef[] = [
-  { type: "MINOR_DIP",  direction: "DOWN", telegraphed: false, weight: 34, minPct: 3,  maxPct: 8,  minTicks: 1, maxTicks: 1 },
-  { type: "MINOR_GAIN", direction: "UP",   telegraphed: false, weight: 30, minPct: 2,  maxPct: 6,  minTicks: 1, maxTicks: 1 },
-  { type: "SLUMP",      direction: "DOWN", telegraphed: true,  weight: 14, minPct: 2,  maxPct: 4,  minTicks: 3, maxTicks: 6 },
-  { type: "RALLY",      direction: "UP",   telegraphed: true,  weight: 12, minPct: 8,  maxPct: 20, minTicks: 1, maxTicks: 1 },
-  { type: "CRASH",      direction: "DOWN", telegraphed: true,  weight: 8,  minPct: 15, maxPct: 35, minTicks: 1, maxTicks: 1 },
+  { type: "MINOR_DIP",  direction: "DOWN", telegraphed: false, weight: 38, minPct: 3,  maxPct: 8,  minTicks: 1, maxTicks: 1 },
+  { type: "MINOR_GAIN", direction: "UP",   telegraphed: false, weight: 25, minPct: 2,  maxPct: 6,  minTicks: 1, maxTicks: 1 },
+  { type: "SLUMP",      direction: "DOWN", telegraphed: true,  weight: 16, minPct: 2,  maxPct: 4,  minTicks: 3, maxTicks: 6 },
+  { type: "RALLY",      direction: "UP",   telegraphed: true,  weight: 10, minPct: 8,  maxPct: 20, minTicks: 1, maxTicks: 1 },
+  { type: "CRASH",      direction: "DOWN", telegraphed: true,  weight: 9,  minPct: 15, maxPct: 35, minTicks: 1, maxTicks: 1 },
   { type: "BOOM",       direction: "UP",   telegraphed: true,  weight: 2,  minPct: 20, maxPct: 45, minTicks: 1, maxTicks: 1 },
 ];
 
