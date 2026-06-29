@@ -348,8 +348,9 @@ check("forecast hit", resolveForecast(() => 0.1) === true);
 check("forecast miss", resolveForecast(() => 0.9) === false);
 
 // slippage: buy fills above, sell below; cap respected
-const buy = computeFill(100, 10, 1000, "BUY");
-const sell = computeFill(100, 10, 1000, "SELL");
+// qty=100, liquidity=1000 => 5% impact, large enough to survive rounding
+const buy = computeFill(100, 100, 1000, "BUY");
+const sell = computeFill(100, 100, 1000, "SELL");
 check("buy above", buy.avgPrice > 100);
 check("sell below", sell.avgPrice < 100);
 check("impact cap", computeImpact(1e9, 1) === SLIPPAGE_MAX);

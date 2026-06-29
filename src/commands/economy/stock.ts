@@ -94,11 +94,11 @@ async function buildMarketContainer(prefix: string) {
         )
         .setButtonAccessory(
           new ButtonBuilder()
-            .setCustomId(`stock_info_${stock.symbol}`)
-            .setLabel(stock.symbol)
-            .setStyle(ButtonStyle.Secondary)
+            .setCustomId(`stock_buy:${stock.symbol}`)
+            .setLabel(stock.status === "ACTIVE" ? `Buy ${stock.symbol}` : "Sell only")
+            .setStyle(stock.status === "ACTIVE" ? ButtonStyle.Success : ButtonStyle.Secondary)
             .setEmoji(trend)
-            .setDisabled(true),
+            .setDisabled(stock.status !== "ACTIVE"),
         ),
     );
     if (index < stocks.length - 1) container.addSeparatorComponents(separator());
