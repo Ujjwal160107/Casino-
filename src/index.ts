@@ -189,6 +189,16 @@ client.on("interactionCreate", async (interaction: Interaction) => {
       return await handleLifeInteraction(interaction);
     }
 
+    if (id.startsWith("help:")) {
+      const { handleHelpInteraction } = require("./commands/general/help");
+      return await handleHelpInteraction(interaction);
+    }
+
+    if (id.startsWith("tut:")) {
+      const { handleTutorialInteraction } = require("./commands/general/tutorial");
+      return await handleTutorialInteraction(interaction);
+    }
+
     if (id.startsWith("ask_")) {
       const { handleAskInteraction } = require("./handlers/askInteractionHandler");
       return await handleAskInteraction(interaction);
@@ -227,6 +237,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 
     if (id.startsWith("shop_use:") && interaction.isButton()) {
       return await handleShopUseInteraction(interaction as import("discord.js").ButtonInteraction);
+    }
+
+    if (id.startsWith("stock_buy:") || id.startsWith("stock_buy_modal:")) {
+      const { handleStockInteraction } = require("./handlers/stockInteractionHandler");
+      return await handleStockInteraction(interaction);
     }
 
     if (id === "global_economy_form_filled") {
