@@ -1,43 +1,39 @@
 import type { Metadata } from "next";
-import { Inter, Poppins, Orbitron } from "next/font/google";
+import { Bricolage_Grotesque, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Toaster } from "sonner";
 import { CursorSpotlight } from "@/components/CursorSpotlight";
 import { AmbientBackground } from "@/components/AmbientBackground";
 
-
-const inter = Inter({
-  variable: "--font-inter",
+const display = Bricolage_Grotesque({
   subsets: ["latin"],
+  variable: "--font-bricolage",
 });
-
-const poppins = Poppins({
-  variable: "--font-poppins",
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const orbitron = Orbitron({
-  variable: "--font-orbitron",
-  subsets: ["latin"],
+  variable: "--font-jetbrains",
 });
 
 export const metadata: Metadata = {
-  title: "Fortuna Admin",
-  description: "Admin Dashboard for Fortuna Bot",
+  title: {
+    default: "Fortuna — Get rich. Go broke. Repeat.",
+    template: "%s · Fortuna",
+  },
+  description:
+    "Fortuna is an economy and casino inside Discord — one wallet across every server. Work jobs, earn degrees, build credit, and bet it all on black.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${inter.variable} ${poppins.variable} ${orbitron.variable} antialiased font-sans`}
-      >
+    <html
+      lang="en"
+      className={`${display.variable} ${inter.variable} ${jetbrains.variable}`}
+    >
+      <body className="bg-bg font-body text-ink antialiased">
         <Providers>
           <AmbientBackground />
           <CursorSpotlight />

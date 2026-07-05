@@ -1,207 +1,45 @@
 @import "tailwindcss";
 
-@theme inline {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-poppins), system-ui, sans-serif;
-  --font-orbitron: var(--font-orbitron), system-ui, sans-serif;
+@theme {
+  --color-bg: #0e0f13;
+  --color-panel: #15171c;
+  --color-panel-2: #1b1e24;
+  --color-line: #26282f;
+  --color-ink: #f2f3f5;
+  --color-muted: #9ba0aa;
+  --color-gold: #ffb627;
+  --color-gold-deep: #e09b00;
+  --color-felt: #2f9e6e;
+  --color-chip: #e5484d;
+  --color-card-blue: #4c8dff;
 
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
-
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-}
-
-:root {
-  /* Casino Luxury Theme - Vibrant Light-Blue Edition */
-
-  /* Base Background - Lighter Midnight Blue */
-  --background: 222 47% 10%;
-  /* Slightly lighter than before, but preserving dark mode feel */
-  /* User asked for "light blue make it a bit light" - let's try a rich Slate-900 equivalent */
-  --background: 220 35% 13%;
-
-  /* Ultra Bright Foreground */
-  --foreground: 0 0% 100%;
-  /* Pure White */
-
-  /* Glass Cards */
-  --card: 220 35% 17%;
-  /* Lighter card background */
-  --card-foreground: 0 0% 100%;
-
-  --popover: 220 35% 17%;
-  --popover-foreground: 0 0% 100%;
-
-  /* Neon Gold Primary */
-  --primary: 48 100% 50%;
-  /* #ffd700 */
-  --primary-foreground: 0 0% 0%;
-
-  /* Vibrant Cyan Secondary */
-  --secondary: 190 100% 50%;
-  /* #00e5ff */
-  --secondary-foreground: 222 47% 11%;
-
-  /* Muted */
-  --muted: 215 25% 20%;
-  --muted-foreground: 0 0% 100%;
-
-  /* Accents */
-  --accent: 217 33% 20%;
-  --accent-foreground: 48 100% 50%;
-
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
-
-  --border: 0 0% 0%;
-  --input: 0 0% 0%;
-  --ring: 48 100% 50%;
-
-  --radius: 0.75rem;
-
-  /* Custom Neon Variables */
-  --neon-gold: rgba(255, 215, 0, 0.6);
-  --neon-blue: rgba(0, 229, 255, 0.4);
-}
-
-/* Glassmorphism Utilities - Vibrant Glow */
-.glass {
-  background: rgba(30, 41, 59, 0.4);
-  /* Lighter base */
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
-}
-
-.glass-card {
-  background: linear-gradient(145deg,
-      rgba(51, 65, 85, 0.6) 0%,
-      /* Slate-700ish */
-      rgba(30, 41, 59, 0.5) 100%
-      /* Slate-800ish */
-    );
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 0, 0, 0.8);
-  box-shadow:
-    0 4px 24px -1px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(0, 0, 0, 0.5);
-  transition: all 0.3s ease;
-}
-
-.glass-card:hover {
-  background: linear-gradient(145deg,
-      rgba(51, 65, 85, 0.8) 0%,
-      rgba(30, 41, 59, 0.7) 100%);
-  border-color: rgba(0, 0, 0, 0.9);
-}
-
-/* Inputs with Glow Focus */
-/* Inputs with Glow Focus */
-input,
-select,
-textarea {
-  border-color: #000000 !important;
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  border-color: rgba(255, 255, 255, 0.4) !important;
-  box-shadow: none !important;
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
 
 body {
-  /* Use a transparent background here so the base color can be managed by a lower layer if needed, 
-     but actually applying the color here acts as the 'canvas'. 
-     The z-[-1] fixed element will be painted ON TOP of this background color 
-     but BEHIND the flow content. This is correct. 
-     The issue might be opacity of the ambient elements. */
-  background-color: hsl(var(--background));
-  color: #ffffff;
-  font-family: 'Inter', sans-serif;
-  background-attachment: fixed;
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-body);
 }
 
-/* Typography Overrides - Force Bright White */
-h1,
-h2,
-h3,
-h4,
-.font-display {
-  color: #ffffff !important;
-  text-shadow: 0 2px 15px rgba(0, 0, 0, 0.3);
-  /* Softer shadow, cleaner look */
+::selection {
+  background-color: color-mix(in srgb, var(--color-gold) 30%, transparent);
 }
 
-h1 {
-  /* Remove gradient for pure white per request */
-  background: none;
-  -webkit-background-clip: unset;
-  background-clip: unset;
-  color: #ffffff !important;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: hsl(var(--background));
-}
-
-::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 9999px;
-  border: 2px solid hsl(var(--background));
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
-
-/* Utility Animations */
-@keyframes pulse-glow {
-
-  0%,
-  100% {
-    box-shadow: 0 0 15px rgba(255, 215, 0, 0.2);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
-
-  50% {
-    box-shadow: 0 0 25px rgba(255, 215, 0, 0.4);
-  }
-}
-
-.animate-glow {
-  animation: pulse-glow 3s infinite;
 }
