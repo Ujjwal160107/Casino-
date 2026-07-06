@@ -63,7 +63,7 @@ export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
             <div className="relative hidden md:block">
               <button
                 onClick={() => setMenuOpen((v) => !v)}
-                aria-haspopup="menu"
+                aria-haspopup="true"
                 aria-expanded={menuOpen}
                 className="flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-panel px-2 py-1.5 transition-colors hover:border-gold/40"
               >

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { signIn, signOut } from "next-auth/react";
 import { X } from "lucide-react";
 import { INVITE_URL } from "@/lib/links";
@@ -19,19 +19,64 @@ const LINKS = [
 ];
 
 export function MobileSidebar({ isOpen, onClose, user }: MobileSidebarProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
+
+    // Move focus into the dialog, remembering where it came from.
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    closeButtonRef.current?.focus();
+
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      // Trap Tab / Shift+Tab inside the dialog.
+      const container = containerRef.current;
+      if (!container) return;
+      const focusables = container.querySelectorAll<HTMLElement>(
+        "a[href], button:not([disabled])"
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      const inside = active instanceof HTMLElement && container.contains(active);
+
+      if (e.shiftKey) {
+        if (!inside || active === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (!inside || active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      // Restore focus to the element that opened the dialog.
+      previousFocusRef.current?.focus();
+      previousFocusRef.current = null;
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return (
     <div
+      ref={containerRef}
       role="dialog"
       aria-modal="true"
       aria-label="Mobile navigation"
@@ -40,6 +85,7 @@ export function MobileSidebar({ isOpen, onClose, user }: MobileSidebarProps) {
       <div className="flex h-16 items-center justify-between border-b border-line px-6">
         <span className="font-display text-lg font-bold text-ink">FORTUNA</span>
         <button
+          ref={closeButtonRef}
           onClick={onClose}
           className="flex h-11 w-11 cursor-pointer items-center justify-center text-muted"
           aria-label="Close menu"
