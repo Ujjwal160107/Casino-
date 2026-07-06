@@ -63,6 +63,7 @@ Hand-built, pixel-faithful fake Discord message component: avatar, bot name + AP
    - **Credit cards:** real card art from bot `src/assets/*_card.png` (copy assets into `dashboard/public/`); 4 tiers with real limits (Starter 1.5M → Black 60M), the weekly statement cycle, and the threat of garnishment. This is Fortuna's signature system — sell the consequences.
    - **Life sim:** work/study `DiscordMockup`; 8 degrees, 20+ jobs, career tiers, stress and the `!relax` economy.
 5. **"Your first 10 minutes"** — beginner path strip, 4 steps as flat cards: `!start` (1,000 Fortunes) → `!work` → `!daily` (100,000) → first bet (`!blackjack 10000`). Each step links to relevant docs module.
+5b. **Screenshot gallery ("Straight from the table")** — 3 real-bot-screenshot slots (`!profile`, `!bank`, `!cockfight`) rendered by a `ScreenshotSlot` component: shows the image when the owner drops the file into `public/screenshots/`, until then a labeled flat placeholder. Real screenshots, not mockups — the genre convention Tatsu/Dank Memer use.
 6. **Player reviews** — real top.gg reviews (existing `TopGGReviews` data source), restyled as flat quote cards. Keep `lib/topgg-reviews.ts`, `lib/cache.ts`, `lib/redis.ts`.
 7. **Final CTA + footer** — in-voice CTA banner ("Stop scrolling. Start grinding." + Add to Discord), then 4-column footer mini-sitemap: Play (Commands, Casino docs, Leaderboards docs), Learn (Docs, Getting Started, Changelog), Community (Support server, Vote on top.gg), Legal (Terms, Privacy). Copyright line. No dead links.
 
@@ -100,6 +101,7 @@ Module → content mapping (from inventory):
 
 1. Title + in-voice tagline
 2. **"For Beginners" callout** — visually distinct felt-green panel: plain-language "what is this system", the first 2–3 commands to try, and one warning/tip. This satisfies the required beginners field on every module.
+2b. **Bot screenshot slot** — every module page carries a `ScreenshotSlot` (`/screenshots/docs-<slug>.png`): real screenshot when the file exists, labeled placeholder until then.
 3. "How it works" sections (structured prose)
 4. Key-numbers tables (payouts, prices, tiers, cooldowns — all values from the inventory appendix, never invented)
 5. Related commands list (each linking to `/commands#anchor`)

@@ -40,7 +40,7 @@
 | 4 | `src/content/modules/{getting-started,economy,bank-and-credit,casino}.ts`, `src/content/modules/index.ts` | — | — |
 | 5 | `src/content/modules/{jobs-and-careers,education,items-and-shop,hunting-and-animals,investments,life-and-social}.ts` | `src/content/modules/index.ts` | — |
 | 6 | `src/lib/links.ts` | `src/components/LandingNavbar.tsx`, `src/components/Footer.tsx`, `src/components/MobileSidebar.tsx` (full rewrites) | — |
-| 7 | `src/components/landing/{Hero,WhatYouDo,FeatureSplit,LandingFeatures,BeginnerPath,FinalCTA}.tsx` | `src/app/page.tsx`, `src/components/landing/TopGGReviews.tsx` | old `src/components/Hero.tsx` |
+| 7 | `src/components/ui/ScreenshotSlot.tsx`, `src/components/landing/{Hero,WhatYouDo,FeatureSplit,LandingFeatures,BeginnerPath,ScreenshotGallery,FinalCTA}.tsx`, `public/screenshots/` | `src/app/page.tsx`, `src/components/landing/TopGGReviews.tsx` | old `src/components/Hero.tsx` |
 | 8 | `src/app/commands/page.tsx` (new file at this path), `src/components/commands/CommandsExplorer.tsx` | — | — |
 | 9 | `src/app/docs/[module]/page.tsx`, `src/components/docs/{DocsSidebar,ModuleRenderer}.tsx` | `src/app/docs/page.tsx` (full rewrite), `next.config.ts` (redirect) | — |
 | 10 | — | `src/app/changelog/page.tsx`, `src/app/policy/page.tsx`, `src/app/terms/page.tsx` (restyle in place) | — |
@@ -562,6 +562,12 @@ export interface ModuleDoc {
     firstCommands: string[];
     tip: string;
   };
+  /**
+   * Real bot screenshot for this module. Rendered by ScreenshotSlot:
+   * shows the image if the file exists under public/, otherwise a labeled
+   * flat placeholder the owner can fill later.
+   */
+  screenshot?: { src: string; alt: string; caption?: string };
   sections: DocSection[];
   /** Command ids (from commands.ts) listed on this page */
   commandIds: string[];
@@ -728,6 +734,7 @@ Writing rules for ALL module files (Tasks 4 and 5):
 - `sections` = 3–6 `DocSection`s per module, each `body` paragraph 2–4 sentences. Use `table` for any set of ≥3 numbers.
 - `commandIds` must reference ids that exist in `commands.ts` (Task 3 list).
 - V2 framing everywhere: "your balance follows you to every server", wallet-only gambling, prefix is the only per-server setting.
+- Every module includes a screenshot placeholder: `screenshot: { src: "/screenshots/docs-<slug>.png", alt: "<Title> in Discord" }`. The image files don't exist yet — the site renders a labeled placeholder slot until the owner drops real bot screenshots into `dashboard/public/screenshots/`.
 
 - [ ] **Step 1: Create `dashboard/src/content/modules/getting-started.ts`** — complete file, use verbatim:
 
@@ -743,6 +750,10 @@ const gettingStarted: ModuleDoc = {
     what: "Fortuna is an economy and casino that lives inside Discord. You earn Fortunes (the currency), work jobs, study for degrees, build credit — and gamble it all away if you like. Your account is yours, not the server's: the same wallet follows you to every server Fortuna is in.",
     firstCommands: ["!start", "!help", "!tutorial"],
     tip: "Everything runs on the ! prefix by default. If a server changed it, mention the bot and it will tell you the prefix.",
+  },
+  screenshot: {
+    src: "/screenshots/docs-getting-started.png",
+    alt: "Getting started with Fortuna in Discord",
   },
   sections: [
     {
@@ -1356,12 +1367,15 @@ git commit -m "feat(web): flat navbar, footer, mobile menu; drop dead premium/te
 ### Task 7: Landing page rebuild
 
 **Files:**
+- Create: `dashboard/src/components/ui/ScreenshotSlot.tsx`
 - Create: `dashboard/src/components/landing/Hero.tsx`
 - Create: `dashboard/src/components/landing/WhatYouDo.tsx`
 - Create: `dashboard/src/components/landing/FeatureSplit.tsx`
 - Create: `dashboard/src/components/landing/LandingFeatures.tsx`
 - Create: `dashboard/src/components/landing/BeginnerPath.tsx`
+- Create: `dashboard/src/components/landing/ScreenshotGallery.tsx`
 - Create: `dashboard/src/components/landing/FinalCTA.tsx`
+- Create: `dashboard/public/screenshots/` (empty dir with `.gitkeep` — owner drops real bot screenshots here later)
 - Modify (replace entire file): `dashboard/src/app/page.tsx`
 - Modify (restyle, keep data logic): `dashboard/src/components/landing/TopGGReviews.tsx`
 - Delete: `dashboard/src/components/Hero.tsx` (the old hero — its only consumer was `page.tsx`)
@@ -1371,6 +1385,70 @@ git commit -m "feat(web): flat navbar, footer, mobile menu; drop dead premium/te
 - Produces: default export page at `/`.
 
 **Before writing UI code: load the `frontend-design` and `ui-ux-pro-max` skills.**
+
+- [ ] **Step 0a: Create `dashboard/src/components/ui/ScreenshotSlot.tsx`** — server component; shows the real image when the file exists under `public/`, otherwise a labeled flat placeholder (never breaks, never 404s):
+
+```tsx
+import fs from "node:fs";
+import path from "node:path";
+import Image from "next/image";
+import { cn } from "@/lib/utils";
+
+export function ScreenshotSlot({
+  src,
+  alt,
+  caption,
+  className,
+}: {
+  /** public path, e.g. "/screenshots/bank.png" */
+  src: string;
+  alt: string;
+  caption?: string;
+  className?: string;
+}) {
+  const exists = fs.existsSync(path.join(process.cwd(), "public", src));
+
+  if (!exists) {
+    return (
+      <figure className={className}>
+        <div className="flex aspect-video items-center justify-center rounded-2xl border border-dashed border-line bg-panel px-6 text-center">
+          <div>
+            <p className="font-mono text-sm text-muted">bot screenshot slot</p>
+            <p className="mt-1 text-xs text-muted">
+              drop <span className="font-mono text-ink">{src}</span> into
+              public/ and it appears here
+            </p>
+          </div>
+        </div>
+        {caption && (
+          <figcaption className="mt-2 text-center text-sm text-muted">
+            {caption}
+          </figcaption>
+        )}
+      </figure>
+    );
+  }
+
+  return (
+    <figure className={className}>
+      <div className={cn("relative aspect-video overflow-hidden rounded-2xl border border-line bg-panel")}>
+        <Image src={src} alt={alt} fill className="object-cover" />
+      </div>
+      {caption && (
+        <figcaption className="mt-2 text-center text-sm text-muted">
+          {caption}
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+```
+
+- [ ] **Step 0b: Create the screenshots directory:**
+
+```bash
+mkdir -p dashboard/public/screenshots && touch dashboard/public/screenshots/.gitkeep
+```
 
 - [ ] **Step 1: Create `dashboard/src/components/landing/Hero.tsx`:**
 
@@ -1739,6 +1817,51 @@ export function BeginnerPath() {
 }
 ```
 
+- [ ] **Step 5b: Create `dashboard/src/components/landing/ScreenshotGallery.tsx`** — real-bot-screenshot section with placeholder slots the owner fills later:
+
+```tsx
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { ScreenshotSlot } from "@/components/ui/ScreenshotSlot";
+import { FadeUp } from "@/components/ui/FadeUp";
+
+const SHOTS = [
+  {
+    src: "/screenshots/landing-profile.png",
+    alt: "A Fortuna player profile in Discord",
+    caption: "!profile — the whole empire on one card",
+  },
+  {
+    src: "/screenshots/landing-bank.png",
+    alt: "The Fortuna bank dashboard in Discord",
+    caption: "!bank — savings, deposits, and your credit card",
+  },
+  {
+    src: "/screenshots/landing-cockfight.png",
+    alt: "A Fortuna cockfight match in Discord",
+    caption: "!cockfight — side bets open for 60 seconds",
+  },
+];
+
+export function ScreenshotGallery() {
+  return (
+    <section className="mx-auto max-w-6xl px-6 py-20">
+      <SectionHeader
+        eyebrow="The real thing"
+        title="Straight from the table"
+        sub="Actual Fortuna, running in actual servers. No mockups in this section."
+      />
+      <div className="grid gap-6 md:grid-cols-3">
+        {SHOTS.map((s, i) => (
+          <FadeUp key={s.src} delay={i * 0.06}>
+            <ScreenshotSlot {...s} />
+          </FadeUp>
+        ))}
+      </div>
+    </section>
+  );
+}
+```
+
 - [ ] **Step 6: Create `dashboard/src/components/landing/FinalCTA.tsx`:**
 
 ```tsx
@@ -1780,6 +1903,7 @@ import { Hero } from "@/components/landing/Hero";
 import { WhatYouDo } from "@/components/landing/WhatYouDo";
 import { LandingFeatures } from "@/components/landing/LandingFeatures";
 import { BeginnerPath } from "@/components/landing/BeginnerPath";
+import { ScreenshotGallery } from "@/components/landing/ScreenshotGallery";
 import { TopGGReviews } from "@/components/landing/TopGGReviews";
 import { FinalCTA } from "@/components/landing/FinalCTA";
 
@@ -1793,6 +1917,7 @@ export default async function Home() {
       <WhatYouDo />
       <LandingFeatures />
       <BeginnerPath />
+      <ScreenshotGallery />
       <TopGGReviews />
       <FinalCTA />
       <Footer />
@@ -2174,6 +2299,7 @@ import type { ModuleDoc } from "@/content/types";
 import { getCommand } from "@/content/commands";
 import { Panel } from "@/components/ui/Panel";
 import { CommandString } from "@/components/ui/CommandString";
+import { ScreenshotSlot } from "@/components/ui/ScreenshotSlot";
 
 function ModuleIcon({ name, className }: { name: string; className?: string }) {
   const Icon =
@@ -2209,6 +2335,16 @@ export function ModuleRenderer({ doc }: { doc: ModuleDoc }) {
           {doc.forBeginners.tip}
         </p>
       </Panel>
+
+      {/* Bot screenshot (placeholder until the owner drops the file) */}
+      {doc.screenshot && (
+        <ScreenshotSlot
+          className="mt-8"
+          src={doc.screenshot.src}
+          alt={doc.screenshot.alt}
+          caption={doc.screenshot.caption}
+        />
+      )}
 
       {/* Sections */}
       {doc.sections.map((s) => (
