@@ -13,6 +13,15 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  async redirects() {
+    return [
+      {
+        source: "/docs/commands",
+        destination: "/commands",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
