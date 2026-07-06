@@ -21,6 +21,9 @@ export default async function ChangelogPage() {
       <LandingNavbar user={session?.user} />
 
       <div className="mx-auto max-w-3xl px-6 pb-24 pt-16">
+        <p className="mb-2 font-mono text-sm font-medium uppercase tracking-widest text-gold">
+          Latest Release
+        </p>
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-ink">
           Changelog
         </h1>
