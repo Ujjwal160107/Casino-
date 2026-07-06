@@ -5,11 +5,10 @@ export function FinalCTA() {
     <section className="border-t border-line bg-panel/40">
       <div className="mx-auto max-w-6xl px-6 py-24 text-center">
         <h2 className="font-display text-4xl font-extrabold tracking-tight text-ink md:text-5xl">
-          Stop scrolling. Start grinding.
+          Stop scrolling. Start living.
         </h2>
         <p className="mx-auto mt-4 max-w-md text-lg text-muted">
-          The table's open and the seat is free. What happens after that is on
-          you.
+          Your second life is one invite away. The dealer's already shuffling.
         </p>
         <a
           href={INVITE_URL}

@@ -14,33 +14,44 @@ const CARDS = [
   { src: "/cards/black_card.png", alt: "Black card", rot: "rotate-6" },
 ];
 
+const PROPERTIES = [
+  { src: "/art/shack.png", alt: "A rundown shack — the first rung", rot: "-rotate-6" },
+  { src: "/art/house.png", alt: "A suburban house", rot: "-rotate-2" },
+  { src: "/art/mansion.png", alt: "A luxury mansion", rot: "rotate-2" },
+  { src: "/art/private-island.png", alt: "A private island — the top rung", rot: "rotate-6" },
+];
+
 export function LandingFeatures() {
   return (
     <section className="border-y border-line bg-panel/40">
       <FeatureSplit
-        eyebrow="The casino"
-        title="Six games. Published odds. No mercy."
-        body="Every payout table is public and every bet comes from your wallet — the bank can't save you and the credit card isn't allowed in the building."
+        eyebrow="Start at the bottom"
+        title="Study. Work. Get promoted. Repeat."
+        body="Eight degrees gate twenty-plus jobs across six sectors. Shifts pay up to 450,000 — and build stress you'll pay to burn off. It's capitalism with a dealer's smile."
         bullets={[
-          "Blackjack pays 2.5x, dealer hits to 17",
-          "Roulette single number pays x36",
-          "Slots top out at 20x on triple sevens",
-          "Russian roulette: 2–6 players, last one standing takes the pot",
+          "8 degrees from 150k to 10M",
+          "20+ jobs across six sectors",
+          "Shifts pay up to 450,000 (taxed 8%)",
+          "Stress is real — !relax costs 25k to 350k",
         ]}
         media={
           <DiscordMockup>
-            <MockMessage author="mara">
-              <p className="font-mono">!bet 100000 red</p>
+            <MockMessage author="dev_ansh">
+              <p className="font-mono">!work</p>
             </MockMessage>
             <MockMessage author="Lady Fortuna" isBot>
-              <MockEmbed title="Roulette" accent="#e5484d">
+              <MockEmbed title="Shift complete — Senior Engineer" accent="#2f9e6e">
                 <p>
-                  The ball lands on <strong>17 black</strong>.
+                  You shipped on a Friday. Paid <strong>231,150</strong> after
+                  tax.
                 </p>
                 <p className="mt-1 text-[#949ba4]">
-                  100,000 to the house. Reds pay 2x. Numbers pay 36x.
+                  Job stress +12 · try !relax before it costs you
                 </p>
               </MockEmbed>
+              <MockButtons
+                buttons={[{ label: "View career", style: "secondary" }]}
+              />
             </MockMessage>
           </DiscordMockup>
         }
@@ -74,33 +85,60 @@ export function LandingFeatures() {
       />
 
       <FeatureSplit
-        eyebrow="The life sim"
-        title="Study. Work. Stress. Relax. Repeat."
-        body="Eight degrees gate twenty-plus jobs across six sectors. Shifts pay up to 450,000 — and build stress you'll pay to burn off. It's capitalism with a dealer's smile."
+        eyebrow="Own things"
+        title="From shack to private island."
+        body="Buy the shack, flip your way up, and let the rent do the working. Between the zoo, the market, and the bank's deposits, your money earns even when you don't."
         bullets={[
-          "Degrees from 150k (High School) to 10M (MD/PhD)",
-          "Careers from waiter to Chief of Medicine",
-          "Stress is real: relax options from 25k to 350k",
-          "8% income tax on wages. Nobody escapes it.",
+          "Properties pay rent while you're offline",
+          "A zoo that earns by rarity — feed it well",
+          "One stock market shared by every server, prices tick every 30 min",
+          "FD 10% and RD 8% at the bank",
+        ]}
+        media={
+          <div className="flex items-center justify-center overflow-hidden py-6">
+            {PROPERTIES.map((p, i) => (
+              <div
+                key={p.src}
+                className={`${p.rot} ${i > 0 ? "-ml-4 sm:-ml-8" : ""} relative aspect-square w-[76px] shrink-0 overflow-hidden rounded-xl border border-line bg-panel sm:w-[140px]`}
+              >
+                <Image
+                  src={p.src}
+                  alt={p.alt}
+                  fill
+                  sizes="140px"
+                  className="object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        }
+      />
+
+      <FeatureSplit
+        flip
+        eyebrow="And when you're feeling lucky"
+        title="Six games. Published odds. No mercy."
+        body="Every payout table is public and every bet comes from your wallet — the bank can't save you and the credit card isn't allowed in the building."
+        bullets={[
+          "Blackjack pays 2.5x, dealer hits to 17",
+          "Roulette single number pays x36",
+          "Slots top out at 20x on triple sevens",
+          "Russian roulette: 2–6 players, last one standing takes the pot",
         ]}
         media={
           <DiscordMockup>
-            <MockMessage author="dev_ansh">
-              <p className="font-mono">!work</p>
+            <MockMessage author="mara">
+              <p className="font-mono">!bet 100000 red</p>
             </MockMessage>
             <MockMessage author="Lady Fortuna" isBot>
-              <MockEmbed title="Shift complete — Senior Engineer" accent="#2f9e6e">
+              <MockEmbed title="Roulette" accent="#e5484d">
                 <p>
-                  You shipped on a Friday. Paid <strong>231,150</strong> after
-                  tax.
+                  The ball lands on <strong>17 black</strong>.
                 </p>
                 <p className="mt-1 text-[#949ba4]">
-                  Job stress +12 · try !relax before it costs you
+                  100,000 to the house. Reds pay 2x. Numbers pay 36x.
                 </p>
               </MockEmbed>
-              <MockButtons
-                buttons={[{ label: "View career", style: "secondary" }]}
-              />
             </MockMessage>
           </DiscordMockup>
         }

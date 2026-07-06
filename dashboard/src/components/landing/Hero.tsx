@@ -11,17 +11,18 @@ export function Hero() {
   return (
     <section className="mx-auto grid max-w-6xl items-center gap-14 px-6 pb-24 pt-20 lg:grid-cols-2">
       <div>
-        <h1 className="font-display text-5xl font-extrabold leading-[1.02] tracking-tight text-ink md:text-7xl">
-          Get rich.
+        <h1 className="font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-ink sm:text-5xl md:text-6xl">
+          Study. Work.
           <br />
-          <span className="text-gold">Go broke.</span>
+          Marry.
           <br />
-          Repeat.
+          <span className="text-gold">Go broke anyway.</span>
         </h1>
         <p className="mt-6 max-w-lg text-lg leading-relaxed text-muted">
-          Fortuna is an economy and casino inside Discord — one wallet across
-          every server. Work jobs, earn degrees, build credit, and bet it all
-          on black.
+          Fortuna is a life simulator inside Discord. Earn degrees, climb
+          careers, build credit, marry rich, hunt tigers, ride the stock
+          market — and blow it all at the casino if you must. One life, every
+          server.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <a
@@ -42,31 +43,40 @@ export function Hero() {
           </a>
         </div>
         <p className="mt-6 font-mono text-sm text-muted">
-          6 casino games · 8 degrees · 4 credit cards · 1 wallet everywhere
+          9 systems · 65 commands · 8 degrees · 20+ jobs · 4 credit cards · 6
+          casino games
         </p>
       </div>
 
       <FadeUp>
         <DiscordMockup>
           <MockMessage author="riko">
-            <p className="font-mono">!blackjack 250000</p>
+            <p className="font-mono">!profile</p>
           </MockMessage>
           <MockMessage author="Lady Fortuna" isBot>
-            <MockEmbed title="Blackjack — 250,000 on the line">
+            <MockEmbed title="riko — Overview">
               <p>
-                Dealer shows <strong>K♠</strong>
+                Career: <strong>Senior Engineer</strong> (Tier 3)
               </p>
               <p>
-                Your hand: <strong>A♥ 9♣</strong> — 20
+                Education: <strong>BS Computer Science</strong>
               </p>
-              <p className="mt-1 text-[#949ba4]">
-                Blackjack pays 2.5x. Dealer hits to 17.
+              <p>
+                Spouse: <strong>mara</strong>
               </p>
+              <p>
+                Net worth: <strong>48,220,540 Fortunes</strong>
+              </p>
+              <p>
+                Job stress: <strong>34/100</strong>
+              </p>
+              <p className="mt-1 text-[#949ba4]">One account. Every server.</p>
             </MockEmbed>
             <MockButtons
               buttons={[
-                { label: "Hit", style: "primary" },
-                { label: "Stand", style: "success" },
+                { label: "Wealth", style: "primary" },
+                { label: "Career", style: "secondary" },
+                { label: "Relationship", style: "secondary" },
               ]}
             />
           </MockMessage>

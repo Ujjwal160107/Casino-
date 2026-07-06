@@ -3,7 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/landing/Hero";
-import { WhatYouDo } from "@/components/landing/WhatYouDo";
+import { ModuleShowcase } from "@/components/landing/ModuleShowcase";
 import { LandingFeatures } from "@/components/landing/LandingFeatures";
 import { BeginnerPath } from "@/components/landing/BeginnerPath";
 import { ScreenshotGallery } from "@/components/landing/ScreenshotGallery";
@@ -17,7 +17,7 @@ export default async function Home() {
     <main className="min-h-screen bg-bg">
       <LandingNavbar user={session?.user} />
       <Hero />
-      <WhatYouDo />
+      <ModuleShowcase />
       <LandingFeatures />
       <BeginnerPath />
       <ScreenshotGallery />

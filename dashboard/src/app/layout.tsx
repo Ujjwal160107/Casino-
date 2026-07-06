@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     template: "%s · Fortuna",
   },
   description:
-    "Fortuna is an economy and casino inside Discord — one wallet across every server. Work jobs, earn degrees, build credit, and bet it all on black.",
+    "Fortuna is a life simulator inside Discord — careers, degrees, credit cards, marriage, stocks, hunting, and a casino. One wallet across every server.",
 };
 
 export default function RootLayout({
