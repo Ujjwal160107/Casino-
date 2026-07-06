@@ -49,6 +49,12 @@ export interface ModuleDoc {
     firstCommands: string[];
     tip: string;
   };
+  /**
+   * Real bot screenshot for this module. Rendered by ScreenshotSlot:
+   * shows the image if the file exists under public/, otherwise a labeled
+   * flat placeholder the owner can fill later.
+   */
+  screenshot?: { src: string; alt: string; caption?: string };
   sections: DocSection[];
   /** Command ids (from commands.ts) listed on this page */
   commandIds: string[];
