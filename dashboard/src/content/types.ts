@@ -14,7 +14,7 @@ export interface Command {
   usage: string;
   args?: { name: string; desc: string }[];
   examples: string[];
-  /** human-readable, e.g. "30 min (shared casino cooldown)" */
+  /** human-readable, e.g. "30 min (casino cooldown, per game)" */
   cooldown?: string;
   keyNumbers?: { label: string; value: string }[];
   /** true when the command opens buttons/menus/modals */

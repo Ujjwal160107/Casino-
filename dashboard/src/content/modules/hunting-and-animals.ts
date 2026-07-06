@@ -39,7 +39,7 @@ const huntingAndAnimals: ModuleDoc = {
     {
       heading: "Cockfights",
       body: [
-        "!cockfight pits two trained birds against each other in stat-based combat, with a 60-second window for side bets before the fight resolves. Max bet is 1,000,000, and the shared casino cooldown runs 45 minutes after.",
+        "!cockfight pits two trained birds against each other in stat-based combat, with a 60-second window for side bets before the fight resolves. Max bet is 1,000,000, and its casino cooldown runs 45 minutes after.",
         "Whatever your hunts and fights leave behind doesn't have to sit in a drawer — animal parts move on the Black Market via !market, same fees and limits as everything else there.",
       ],
     },

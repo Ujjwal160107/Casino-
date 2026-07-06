@@ -45,7 +45,7 @@ export function Footer() {
         <div className="col-span-2 space-y-3">
           <p className="font-display text-xl font-bold text-ink">FORTUNA</p>
           <p className="max-w-xs text-sm leading-relaxed text-muted">
-            An economy and casino inside Discord. One wallet across every
+            A life simulator inside Discord. One wallet across every
             server. The house appreciates your business.
           </p>
         </div>

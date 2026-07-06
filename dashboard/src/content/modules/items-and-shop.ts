@@ -47,7 +47,7 @@ const itemsAndShop: ModuleDoc = {
   commandIds: ["shop", "inventory", "use", "equip", "iteminfo", "market"],
   proTips: [
     "Check !iteminfo before you buy anything from HUNT or COSMETICS you don't recognize — the description tells you exactly what it does, no guessing required.",
-    "!shop buy card keeps wallet cash free for the casino, but every dollar spent this way sits on your statement until you pay it down.",
+    "!shop buy card keeps wallet cash free for the casino, but every Fortune spent this way sits on your statement until you pay it down.",
     "List early on the Black Market — a 7-day expiry means a slow sale is a wasted slot, and you're capped at 5 at a time.",
   ],
 };

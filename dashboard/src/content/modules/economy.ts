@@ -25,7 +25,7 @@ const economy: ModuleDoc = {
     {
       heading: "Claim your income",
       body: [
-        "Four commands pay you just for showing up: !daily, !weekly, !monthly, and !vote for backing Fortuna on top.gg. Daily is the only one that skips the taxman entirely — everything else takes a cut before it hits your wallet.",
+        "Four commands pay you just for showing up: !daily, !weekly, !monthly, and !vote for backing Fortuna on top.gg. Daily and vote payouts skip the taxman — weekly and monthly take an 8% cut before they hit your wallet.",
         "Stack them: claim daily every day, weekly every week, monthly every month, and vote every 12 hours if you can. None of them cost anything to attempt, so missing one is just money left on the table.",
       ],
       table: {

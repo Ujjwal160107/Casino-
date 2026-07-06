@@ -551,7 +551,7 @@ export const COMMANDS: Command[] = [
       { name: "h|t", desc: "Optional call — heads or tails — or use the buttons." },
     ],
     examples: ["!coinflip 20000 h", "!coinflip 20000"],
-    cooldown: "20 min (shared casino cooldown)",
+    cooldown: "20 min (casino cooldown, per game)",
     keyNumbers: [
       { label: "Win pays", value: "2x" },
       { label: "Bets", value: "10,000 – 500,000" },
@@ -568,7 +568,7 @@ export const COMMANDS: Command[] = [
     usage: "!slots <amount>",
     args: [{ name: "amount", desc: "Wallet amount to stake (10,000 – 750,000)." }],
     examples: ["!slots 50000"],
-    cooldown: "25 min (shared casino cooldown)",
+    cooldown: "25 min (casino cooldown, per game)",
     keyNumbers: [
       { label: "7️⃣ pays", value: "20x (0.5% odds)" },
       { label: "💎 pays", value: "10x (1.5% odds)" },
@@ -590,7 +590,7 @@ export const COMMANDS: Command[] = [
       { name: "bet", desc: "Wallet amount to stake (10,000 – 1,000,000)." },
     ],
     examples: ["!blackjack 250000", "!bj 10000"],
-    cooldown: "30 min (shared casino cooldown)",
+    cooldown: "30 min (casino cooldown, per game)",
     keyNumbers: [
       { label: "Blackjack pays", value: "2.5x" },
       { label: "Win pays", value: "2x" },
@@ -612,7 +612,7 @@ export const COMMANDS: Command[] = [
       { name: "space", desc: "Number, color, range, dozen, or column — e.g. red, 17, 1-12." },
     ],
     examples: ["!bet 50000 red", "!bet 50000 17"],
-    cooldown: "30 min (shared casino cooldown)",
+    cooldown: "30 min (casino cooldown, per game)",
     keyNumbers: [
       { label: "Single number", value: "x36" },
       { label: "Dozens/columns", value: "x3" },
@@ -665,7 +665,7 @@ export const COMMANDS: Command[] = [
     usage: "!cockfight <amount>",
     args: [{ name: "amount", desc: "Wallet amount to stake (10,000 – 1,000,000)." }],
     examples: ["!cockfight 100000"],
-    cooldown: "45 min (shared casino cooldown)",
+    cooldown: "45 min (casino cooldown, per game)",
     keyNumbers: [
       { label: "Bet window", value: "60 sec" },
       { label: "Bets", value: "10,000 – 1,000,000" },

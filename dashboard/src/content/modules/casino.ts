@@ -19,13 +19,13 @@ const casino: ModuleDoc = {
       heading: "House rules",
       body: [
         "Every casino bet comes from your wallet — never your bank, never a credit card. If it's not in your wallet, you can't bet it.",
-        "The floor-wide minimum bet is 10,000 Fortunes, and you can only run one active game at a time — starting a new one while another is in progress locks for 5 minutes. On top of that, each game has its own shared casino cooldown, so pace yourself.",
+        "The floor-wide minimum bet is 10,000 Fortunes, and you can only run one active game at a time — starting a new one while another is in progress locks for 5 minutes. On top of that, each game tracks its own cooldown, and that cooldown follows your account across every server, so pace yourself.",
       ],
     },
     {
       heading: "Cooldowns & limits",
       body: [
-        "Min bet across the board is 10,000. Cooldowns are per game, not shared globally, so a coinflip cooldown doesn't stop you from sitting down at blackjack.",
+        "Min bet across the board is 10,000. Cooldowns are per game, not shared between games, so a coinflip cooldown doesn't stop you from sitting down at blackjack — but each cooldown is shared across every server, since your account is global.",
       ],
       table: {
         title: "Cooldowns & max bets",
