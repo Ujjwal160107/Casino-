@@ -7,7 +7,7 @@ import { Panel } from "@/components/ui/Panel";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
-  description: "Legally Binding User Agreement",
+  description: "The user agreement for the Fortuna bot and website.",
 };
 
 export default async function TermsPage() {
@@ -22,25 +22,34 @@ export default async function TermsPage() {
           Terms of Service
         </h1>
         <p className="mt-3 text-lg leading-relaxed text-muted">
-          Legally Binding User Agreement
+          The user agreement for the Fortuna bot and website.
         </p>
         <p className="mt-2 text-sm text-muted">
-          Effective Date: February 3, 2026
+          Effective Date: July 6, 2026
         </p>
 
         <div className="mt-10 space-y-6">
           <Panel className="p-8">
             <p className="leading-relaxed text-muted">
               THESE TERMS OF SERVICE (&quot;TERMS&quot;) CONSTITUTE A BINDING
-              LEGAL AGREEMENT BETWEEN YOU AND THE FORTUNA BOT DEVELOPMENT
-              TEAM. BY INVITING THE BOT TO A SERVER, EXECUTING ANY COMMAND, OR
-              ACCESSING THE DASHBOARD, YOU UNCONDITIONALLY ACCEPT AND AGREE TO
-              BE BOUND BY THESE TERMS. IF YOU DO NOT AGREE TO THESE TERMS, YOU
-              ARE EXPRESSLY PROHIBITED FROM USING THE SERVICE.
+              AGREEMENT BETWEEN YOU AND THE FORTUNA DEVELOPMENT TEAM. BY
+              INVITING THE BOT TO A SERVER, EXECUTING ANY COMMAND, OR SIGNING
+              IN TO THIS WEBSITE, YOU ACCEPT AND AGREE TO BE BOUND BY THESE
+              TERMS. IF YOU DO NOT AGREE TO THESE TERMS, DO NOT USE THE
+              SERVICE.
             </p>
           </Panel>
 
-          <TermSection title="1. License Grant and Restrictions">
+          <TermSection title="1. Eligibility">
+            <p>
+              You may use the Service only if you meet Discord&apos;s minimum
+              age requirement (13 years, or higher where your local law
+              requires) and are not barred from using the Service under
+              applicable law or a prior enforcement action by us.
+            </p>
+          </TermSection>
+
+          <TermSection title="2. License Grant and Restrictions">
             <p>
               Subject to your compliance with these Terms, we grant you a
               limited, non-exclusive, non-sublicensable, revocable,
@@ -69,34 +78,49 @@ export default async function TermsPage() {
             </ul>
           </TermSection>
 
-          <TermSection title="2. Virtual Assets and Economy">
+          <TermSection title="3. Virtual Economy and Simulated Gambling">
             <p>
               The Service simulates an economic system involving virtual
-              currency, items, experience points, and other attributes
-              (&quot;Virtual Assets&quot;).
+              currency (&quot;Fortunes&quot;), items, properties, stocks,
+              credit products, and other attributes (&quot;Virtual
+              Assets&quot;). Your account and Virtual Assets are global: one
+              account per Discord user, shared across every server where the
+              bot operates.
             </p>
             <ul className="list-disc space-y-2 pl-5">
               <li>
-                <strong className="text-ink">No Ownership Rights:</strong> You
-                acknowledge that you do not own the Virtual Assets. You
-                possess a limited license to use them within the Service.
+                <strong className="text-ink">No real-world value:</strong>{" "}
+                Virtual Assets have strictly no monetary value. They cannot
+                be purchased for, exchanged into, or redeemed for legal
+                tender, real-world goods, or services, and any attempt to
+                trade them for real-world value is prohibited.
               </li>
               <li>
-                <strong className="text-ink">No Real World Value:</strong>{" "}
-                Virtual Assets have strictly no monetary value and cannot be
-                exchanged for legal tender, real-world goods, or services.
+                <strong className="text-ink">
+                  Simulated gambling only:
+                </strong>{" "}
+                casino-style games within the Service (including blackjack,
+                roulette, slots, and coinflip) are games of chance played
+                exclusively with virtual currency. The Service does not offer
+                real-money gambling, wagering, or prizes of monetary value,
+                and is not a gambling service.
               </li>
               <li>
-                <strong className="text-ink">Right to Modify:</strong> We
-                reserve the absolute right to manage, regulate, control,
-                modify, or eliminate Virtual Assets at our sole discretion,
-                with or without notice, and shall have no liability to you or
-                any third party for the exercise of such rights.
+                <strong className="text-ink">No ownership rights:</strong>{" "}
+                you do not own Virtual Assets; you hold a limited license to
+                use them within the Service.
+              </li>
+              <li>
+                <strong className="text-ink">Right to modify:</strong> we
+                reserve the right to manage, regulate, rebalance, modify, or
+                eliminate Virtual Assets at our sole discretion, with or
+                without notice, and shall have no liability to you or any
+                third party for exercising that right.
               </li>
             </ul>
           </TermSection>
 
-          <TermSection title="3. User Conduct and Prohibitions">
+          <TermSection title="4. User Conduct and Prohibitions">
             <p>
               You agree not to engage in any of the following prohibited
               activities:
@@ -104,36 +128,41 @@ export default async function TermsPage() {
             <ul className="list-disc space-y-2 pl-5">
               <li>
                 <strong className="text-ink">Exploitation:</strong>{" "}
-                Identifying and utilizing bugs, glitches, or vulnerabilities
-                to gain an unfair advantage (&quot;exploits&quot;). All bugs
-                must be reported immediately.
+                identifying and using bugs, glitches, or vulnerabilities to
+                gain an unfair advantage. Bugs must be reported via the
+                Support Server.
               </li>
               <li>
-                <strong className="text-ink">Automation:</strong> Using
-                &quot;bots,&quot; &quot;macros,&quot; &quot;scripts,&quot; or
-                other automated means to interact with the Service.
+                <strong className="text-ink">Automation:</strong> using
+                bots, macros, scripts, self-bots, or other automated means to
+                interact with the Service.
               </li>
               <li>
-                <strong className="text-ink">Deceptive Practices:</strong>{" "}
-                Engaging in scams, social engineering, or defrauding other
-                users within the trading system.
+                <strong className="text-ink">Multi-accounting:</strong>{" "}
+                using alternate Discord accounts to farm rewards, transfer
+                wealth to yourself, or evade enforcement actions.
+              </li>
+              <li>
+                <strong className="text-ink">Deceptive practices:</strong>{" "}
+                scams, social engineering, or defrauding other users in
+                trades, transfers, or the in-game marketplace.
               </li>
               <li>
                 <strong className="text-ink">
-                  Violation of Discord TOS:
+                  Violation of Discord&apos;s terms:
                 </strong>{" "}
-                Using the Service in any manner that violates the Discord
+                using the Service in any manner that violates the Discord
                 Terms of Service or Community Guidelines.
               </li>
             </ul>
             <p className="text-chip">
-              Violation of these prohibitions may result in immediate
-              termination of your license, account suspension, or a
-              permanent ban from the Service without recourse.
+              Violation of these prohibitions may result in confiscation of
+              Virtual Assets, account suspension, or a permanent ban from the
+              Service, at our sole discretion and without prior notice.
             </p>
           </TermSection>
 
-          <TermSection title="4. Indemnification">
+          <TermSection title="5. Indemnification">
             <p>
               You agree to indemnify, defend, and hold harmless the Service
               Provider, its affiliates, officers, directors, employees,
@@ -146,7 +175,7 @@ export default async function TermsPage() {
             </p>
           </TermSection>
 
-          <TermSection title="5. Disclaimer of Warranties">
+          <TermSection title="6. Disclaimer of Warranties">
             <p className="text-xs font-bold uppercase tracking-widest text-muted">
               IMPORTANT
             </p>
@@ -157,39 +186,41 @@ export default async function TermsPage() {
               WARRANTIES, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF
               MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
               NON-INFRINGEMENT, AND COURSE OF DEALING. WE DO NOT WARRANT THAT
-              THE SERVICE WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE.
+              THE SERVICE WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE, OR
+              THAT VIRTUAL ASSETS, BALANCES, OR PROGRESS WILL BE PRESERVED.
             </p>
           </TermSection>
 
-          <TermSection title="6. Limitation of Liability">
+          <TermSection title="7. Limitation of Liability">
             <p className="uppercase">
               TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT
               SHALL THE SERVICE PROVIDER BE LIABLE FOR ANY INDIRECT,
               PUNITIVE, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR EXEMPLARY
               DAMAGES, INCLUDING WITHOUT LIMITATION DAMAGES FOR LOSS OF
-              PROFITS, GOODWILL, USE, DATA, OR OTHER INTANGIBLE LOSSES,
-              ARISING OUT OF OR RELATING TO THE USE OF, OR INABILITY TO USE,
-              THE SERVICE.
+              PROFITS, GOODWILL, USE, DATA, VIRTUAL ASSETS, OR OTHER
+              INTANGIBLE LOSSES, ARISING OUT OF OR RELATING TO THE USE OF, OR
+              INABILITY TO USE, THE SERVICE.
             </p>
           </TermSection>
 
-          <TermSection title="7. Governing Law and Dispute Resolution">
+          <TermSection title="8. Governing Law and Dispute Resolution">
             <p>
               These Terms shall be governed by and construed in accordance
-              with the laws of the United States of America, without regard
-              to its conflict of law principles. Any dispute arising from or
-              relating to the subject matter of these Terms shall be finally
-              settled by arbitration or in a court of competent jurisdiction.
+              with the laws of the jurisdiction in which the Service Provider
+              is established, without regard to conflict of law principles.
+              Any dispute arising from or relating to the subject matter of
+              these Terms shall be finally settled by arbitration or in a
+              court of competent jurisdiction.
             </p>
           </TermSection>
 
-          <TermSection title="8. Modifications">
+          <TermSection title="9. Modifications">
             <p>
               We reserve the right to modify or replace these Terms at any
               time. If a revision is material, we will provide at least 30
               days&apos; notice prior to any new terms taking effect. What
               constitutes a material change will be determined at our sole
-              discretion. By continuing to access or use our Service after
+              discretion. By continuing to access or use the Service after
               those revisions become effective, you agree to be bound by the
               revised terms.
             </p>

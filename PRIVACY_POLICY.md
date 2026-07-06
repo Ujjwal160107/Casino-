@@ -40,8 +40,8 @@ We use administrative, technical, and physical security measures to help protect
 You have control over your data:
 *   **Access:** You can view all data stored about you by using the `!profile`, `!balance`, and `!inventory` commands.
 *   **Deletion:**
-    *   **User Data:** You may request the deletion of your account data by contacting the bot developers in our Support Server.
-    *   **Guild Data:** Server Administrators can delete all data associated with their server using the `!reset-economy` command.
+    *   **User Data:** You may request the permanent deletion of your account data by contacting the bot developers in our Support Server. Your account is shared across all servers, so deletion removes your economy data everywhere the bot operates and cannot be undone.
+    *   **Guild Data:** The only per-server data Fortuna stores is the server's ID and its chosen command prefix; this is removed on request or when the bot leaves the server.
 
 ## 6. Children's Privacy
 
