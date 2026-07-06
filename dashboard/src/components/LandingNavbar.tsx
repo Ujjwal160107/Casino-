@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { signIn, signOut } from "next-auth/react";
 import { LogOut, Menu } from "lucide-react";
 import { MobileSidebar } from "./MobileSidebar";
@@ -22,6 +22,15 @@ interface LandingNavbarProps {
 export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen]);
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-bg">
@@ -54,7 +63,9 @@ export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
             <div className="relative hidden md:block">
               <button
                 onClick={() => setMenuOpen((v) => !v)}
-                className="flex items-center gap-2 rounded-lg border border-line bg-panel px-2 py-1.5 transition-colors hover:border-gold/40"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-panel px-2 py-1.5 transition-colors hover:border-gold/40"
               >
                 {user.image ? (
                   <Image
@@ -78,9 +89,9 @@ export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
                   <div className="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-xl border border-line bg-panel">
                     <button
                       onClick={() => signOut({ callbackUrl: "/" })}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-chip transition-colors hover:bg-panel-2"
+                      className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left text-sm text-chip transition-colors hover:bg-panel-2"
                     >
-                      <LogOut size={15} />
+                      <LogOut size={15} aria-hidden="true" />
                       Cash out (sign out)
                     </button>
                   </div>
@@ -95,7 +106,7 @@ export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
             !hideLogin && (
               <button
                 onClick={() => signIn("discord", { callbackUrl: "/" })}
-                className="hidden rounded-lg border border-line px-4 py-2 text-sm font-medium text-muted transition-colors hover:border-gold/40 hover:text-ink md:block"
+                className="hidden min-h-11 cursor-pointer items-center rounded-lg border border-line px-4 text-sm font-medium text-muted transition-colors hover:border-gold/40 hover:text-ink md:flex"
               >
                 Log in
               </button>
@@ -106,17 +117,19 @@ export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
             href={INVITE_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden rounded-lg bg-gold px-4 py-2 text-sm font-bold text-bg transition-colors hover:bg-gold-deep md:block"
+            className="hidden min-h-11 items-center rounded-lg bg-gold px-4 text-sm font-bold text-bg transition-colors hover:bg-gold-deep md:flex"
           >
             Add to Discord
           </a>
 
           <button
             onClick={() => setMobileOpen(true)}
-            className="p-2 text-muted transition-colors hover:text-ink md:hidden"
+            className="flex h-11 w-11 cursor-pointer items-center justify-center text-muted transition-colors hover:text-ink md:hidden"
             aria-label="Open menu"
+            aria-haspopup="dialog"
+            aria-expanded={mobileOpen}
           >
-            <Menu size={22} />
+            <Menu size={22} aria-hidden="true" />
           </button>
         </div>
       </nav>

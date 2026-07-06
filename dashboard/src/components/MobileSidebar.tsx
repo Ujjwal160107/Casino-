@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { signIn, signOut } from "next-auth/react";
 import { X } from "lucide-react";
 import { INVITE_URL } from "@/lib/links";
@@ -18,18 +19,32 @@ const LINKS = [
 ];
 
 export function MobileSidebar({ isOpen, onClose, user }: MobileSidebarProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] bg-bg md:hidden">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mobile navigation"
+      className="fixed inset-0 z-[60] overscroll-contain bg-bg md:hidden"
+    >
       <div className="flex h-16 items-center justify-between border-b border-line px-6">
         <span className="font-display text-lg font-bold text-ink">FORTUNA</span>
         <button
           onClick={onClose}
-          className="p-2 text-muted"
+          className="flex h-11 w-11 cursor-pointer items-center justify-center text-muted"
           aria-label="Close menu"
         >
-          <X size={22} />
+          <X size={22} aria-hidden="true" />
         </button>
       </div>
       <div className="flex flex-col gap-1 p-6">
@@ -54,14 +69,14 @@ export function MobileSidebar({ isOpen, onClose, user }: MobileSidebarProps) {
         {user ? (
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
-            className="mt-2 rounded-lg border border-line px-4 py-3 text-sm font-medium text-chip"
+            className="mt-2 cursor-pointer rounded-lg border border-line px-4 py-3 text-sm font-medium text-chip"
           >
             Sign out
           </button>
         ) : (
           <button
             onClick={() => signIn("discord", { callbackUrl: "/" })}
-            className="mt-2 rounded-lg border border-line px-4 py-3 text-sm font-medium text-muted"
+            className="mt-2 cursor-pointer rounded-lg border border-line px-4 py-3 text-sm font-medium text-muted"
           >
             Log in with Discord
           </button>

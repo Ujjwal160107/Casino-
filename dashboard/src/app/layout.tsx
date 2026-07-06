@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
@@ -16,11 +16,16 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Fortuna — Get rich. Go broke. Repeat.",
+    default: "Fortuna — The Discord life simulator",
     template: "%s · Fortuna",
   },
   description:
     "Fortuna is a life simulator inside Discord — careers, degrees, credit cards, marriage, stocks, hunting, and a casino. One wallet across every server.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0e0f13",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({

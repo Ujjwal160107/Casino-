@@ -17,6 +17,7 @@ export function DocsSidebar({ modules }: { modules: ModuleDoc[] }) {
           <Link
             key={m.slug}
             href={href}
+            aria-current={active ? "page" : undefined}
             className={cn(
               "block rounded-lg px-3 py-2 text-sm font-medium transition-colors",
               active

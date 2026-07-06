@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,12 +12,20 @@ export function CommandString({
   className?: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(command);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 1500);
     } catch {
       // clipboard unavailable — do nothing
     }
@@ -35,10 +43,13 @@ export function CommandString({
     >
       {command}
       {copied ? (
-        <Check size={14} className="text-felt" />
+        <Check size={14} aria-hidden="true" className="text-felt" />
       ) : (
-        <Copy size={14} className="text-muted group-hover:text-gold" />
+        <Copy size={14} aria-hidden="true" className="text-muted group-hover:text-gold" />
       )}
+      <span className="sr-only" aria-live="polite">
+        {copied ? "Copied to clipboard" : ""}
+      </span>
     </button>
   );
 }

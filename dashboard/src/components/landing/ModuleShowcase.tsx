@@ -64,8 +64,8 @@ const MODULES = [
   },
   {
     title: "Investments",
-    img: "/art/mansion.png",
-    alt: "A luxury mansion property",
+    img: "/art/stock-market.jpg",
+    alt: "A stock market ticker display",
     href: "/docs/investments",
     blurb: "Stocks tick every 30 minutes. Property pays while you sleep.",
     cmd: "!stock",

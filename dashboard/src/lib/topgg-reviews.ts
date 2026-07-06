@@ -51,7 +51,7 @@ function getDefaultReviews() {
             id: "2",
             username: "ServerOwner_99",
             avatar: "",
-            content: "Great add-on for my community. Keeps everyone engaged with the shop and games.",
+            content: "Great add-on for my community. The shop and games keep people coming back.",
             score: 5,
             date: new Date().toISOString()
         }

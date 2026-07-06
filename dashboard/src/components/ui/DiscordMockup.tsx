@@ -20,6 +20,7 @@ export function DiscordMockup({
         "rounded-2xl border border-line bg-[#313338] p-4 text-left text-[15px] leading-relaxed",
         className
       )}
+      role="img"
       aria-label="Preview of Fortuna running in Discord"
     >
       <div className="space-y-4">{children}</div>

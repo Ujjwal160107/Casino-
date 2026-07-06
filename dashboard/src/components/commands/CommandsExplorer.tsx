@@ -58,7 +58,7 @@ export function CommandsExplorer({ commands }: { commands: Command[] }) {
               key={f}
               onClick={() => setModule(f)}
               className={cn(
-                "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+                "flex min-h-11 items-center rounded-full border px-4 text-sm font-medium transition-colors",
                 module === f
                   ? "border-gold bg-gold text-bg"
                   : "border-line bg-panel text-muted hover:text-ink"
@@ -104,6 +104,7 @@ export function CommandsExplorer({ commands }: { commands: Command[] }) {
                   {c.interactive && <Tag color="blue">buttons</Tag>}
                   <ChevronDown
                     size={16}
+                    aria-hidden="true"
                     className={cn(
                       "text-muted transition-transform",
                       isOpen && "rotate-180"
