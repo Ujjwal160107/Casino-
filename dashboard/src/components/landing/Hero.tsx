@@ -38,8 +38,7 @@ export function Hero() {
           </a>
         </div>
         <p className="mt-6 font-mono text-sm text-muted">
-          9 systems · 65 commands · 8 degrees · 20+ jobs · 4 credit cards · 6
-          casino games
+          A full economy, casino, and career sim — all in one bot.
         </p>
       </div>
 
