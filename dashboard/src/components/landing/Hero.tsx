@@ -1,9 +1,4 @@
-import {
-  DiscordMockup,
-  MockButtons,
-  MockEmbed,
-  MockMessage,
-} from "@/components/ui/DiscordMockup";
+import Image from "next/image";
 import { FadeUp } from "@/components/ui/FadeUp";
 import { INVITE_URL, SUPPORT_URL } from "@/lib/links";
 
@@ -49,38 +44,19 @@ export function Hero() {
       </div>
 
       <FadeUp>
-        <DiscordMockup>
-          <MockMessage author="riko">
-            <p className="font-mono">!profile</p>
-          </MockMessage>
-          <MockMessage author="Lady Fortuna" isBot>
-            <MockEmbed title="riko — Overview">
-              <p>
-                Career: <strong>Senior Engineer</strong> (Tier 3)
-              </p>
-              <p>
-                Education: <strong>BS Computer Science</strong>
-              </p>
-              <p>
-                Spouse: <strong>mara</strong>
-              </p>
-              <p>
-                Net worth: <strong>48,220,540 Fortunes</strong>
-              </p>
-              <p>
-                Job stress: <strong>34/100</strong>
-              </p>
-              <p className="mt-1 text-[#949ba4]">One account. Every server.</p>
-            </MockEmbed>
-            <MockButtons
-              buttons={[
-                { label: "Wealth", style: "primary" },
-                { label: "Career", style: "secondary" },
-                { label: "Relationship", style: "secondary" },
-              ]}
-            />
-          </MockMessage>
-        </DiscordMockup>
+        <figure>
+          <Image
+            src="/fortuna_world.jpg"
+            alt="The world of Fortuna — casino, stock exchange, social hub, and police station in one pixel-art city"
+            width={1024}
+            height={572}
+            priority
+            className="h-auto w-full rounded-2xl border border-line"
+          />
+          <figcaption className="mt-3 text-center text-sm text-muted">
+            The world of Fortuna — every district is a module.
+          </figcaption>
+        </figure>
       </FadeUp>
     </section>
   );
