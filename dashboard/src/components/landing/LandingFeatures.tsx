@@ -8,10 +8,10 @@ import {
 import { FeatureSplit } from "./FeatureSplit";
 
 const CARDS = [
-  { src: "/cards/starter_card.png", alt: "Starter card", rot: "-rotate-6" },
-  { src: "/cards/gold_card.png", alt: "Gold card", rot: "-rotate-2" },
-  { src: "/cards/platinum_card.png", alt: "Platinum card", rot: "rotate-2" },
-  { src: "/cards/black_card.png", alt: "Black card", rot: "rotate-6" },
+  { src: "/cards/starter_card.png", alt: "Starter card", rot: "-rotate-3" },
+  { src: "/cards/gold_card.png", alt: "Gold card", rot: "-rotate-1" },
+  { src: "/cards/platinum_card.png", alt: "Platinum card", rot: "rotate-1" },
+  { src: "/cards/black_card.png", alt: "Black card", rot: "rotate-3" },
 ];
 
 const PROPERTIES = [
@@ -69,16 +69,20 @@ export function LandingFeatures() {
           "Cards can never fund gambling. House rules.",
         ]}
         media={
-          <div className="flex items-center justify-center overflow-hidden py-6">
+          <div className="flex items-center justify-center px-2 py-6">
             {CARDS.map((c, i) => (
-              <Image
+              <div
                 key={c.src}
-                src={c.src}
-                alt={c.alt}
-                width={190}
-                height={120}
-                className={`${c.rot} ${i > 0 ? "-ml-7 sm:-ml-16" : ""} h-auto w-[86px] rounded-xl border border-line sm:w-[190px]`}
-              />
+                className={`${c.rot} ${i > 0 ? "-ml-6 sm:-ml-14" : ""} relative aspect-[16/10] w-[84px] shrink-0 overflow-hidden rounded-lg sm:w-[168px]`}
+              >
+                <Image
+                  src={c.src}
+                  alt={c.alt}
+                  fill
+                  sizes="190px"
+                  className="scale-[1.3] object-cover"
+                />
+              </div>
             ))}
           </div>
         }
