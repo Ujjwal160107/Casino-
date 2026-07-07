@@ -82,7 +82,7 @@ const MODULES = [
 
 export function ModuleShowcase() {
   return (
-    <section className="mx-auto max-w-6xl px-6 py-20">
+    <section className="mx-auto max-w-7xl px-6 py-16">
       <SectionHeader
         eyebrow="What's in the box"
         title="Nine systems. One economy."

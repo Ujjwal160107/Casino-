@@ -37,7 +37,7 @@ export async function TopGGReviews() {
     const shown = reviews.slice(0, 6);
 
     return (
-        <section className="mx-auto max-w-6xl px-6 py-20">
+        <section className="mx-auto max-w-7xl px-6 py-16">
             <SectionHeader
                 eyebrow="Word on the street"
                 title="What players say"
