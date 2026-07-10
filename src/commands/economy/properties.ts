@@ -47,6 +47,10 @@ function resolvePropertyAsset(key: string): { filePath: string; attachmentName: 
   const assetDirs = [
     path.resolve(process.cwd(), "src", "assets"),
     path.resolve(process.cwd(), "assets"),
+    // Relative to this module so assets resolve whether the bot runs from
+    // src (ts-node) or a compiled dist build, regardless of cwd.
+    path.resolve(__dirname, "..", "..", "..", "src", "assets"),
+    path.resolve(__dirname, "..", "..", "assets"),
   ];
   for (const dir of assetDirs) {
     const filePath = [".png", ".jpg", ".jpeg", ".webp"]
@@ -153,29 +157,38 @@ export function buildPropertiesMarketContainer(
 
         const typeLabel = isZoo ? "Zoo Property" : "Regular Property";
 
-        const section = new SectionBuilder()
-            .addTextDisplayComponents(
-                new TextDisplayBuilder().setContent(
-                    `### ${property.name}\n-# ${typeLabel}`,
-                ),
-                new TextDisplayBuilder().setContent(
-                    `Price: **${fmtCurrency(property.price)}**\n${incomeLabel}`,
-                ),
-            );
-
         const asset = resolvePropertyAsset(property.key);
+
         if (asset) {
-            section.setThumbnailAccessory(
-                new ThumbnailBuilder()
-                    .setURL(`attachment://${asset.attachmentName}`)
-                    .setDescription(property.name),
-            );
+            // A Section is only valid with an accessory, so we only use one
+            // when we actually have a thumbnail to attach.
+            const section = new SectionBuilder()
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(
+                        `### ${property.name}\n-# ${typeLabel}`,
+                    ),
+                    new TextDisplayBuilder().setContent(
+                        `Price: **${fmtCurrency(property.price)}**\n${incomeLabel}`,
+                    ),
+                )
+                .setThumbnailAccessory(
+                    new ThumbnailBuilder()
+                        .setURL(`attachment://${asset.attachmentName}`)
+                        .setDescription(property.name),
+                );
             if (!files.find(f => (f as any).name === asset.attachmentName)) {
                 files.push(new AttachmentBuilder(asset.filePath, { name: asset.attachmentName }));
             }
+            container.addSectionComponents(section);
+        } else {
+            // No asset for this key (e.g. an admin-created or legacy property).
+            // Render as plain text — an accessory-less Section is rejected by Discord.
+            container.addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(
+                    `### ${property.name}\n-# ${typeLabel}\nPrice: **${fmtCurrency(property.price)}**\n${incomeLabel}`,
+                ),
+            );
         }
-
-        container.addSectionComponents(section);
 
         if (index < visibleProperties.length - 1) {
             container.addSeparatorComponents(
