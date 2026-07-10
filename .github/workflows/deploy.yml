@@ -39,9 +39,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger VPS Deploy Webhook
+        env:
+          COMMIT_REF: ${{ github.ref }}
+          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
+          payload=$(jq -n \
+            --arg ref "$COMMIT_REF" \
+            --arg sha "$COMMIT_SHA" \
+            --arg message "$COMMIT_MESSAGE" \
+            '{ref: $ref, sha: $sha, message: $message}')
           curl -s -o /dev/null -w "%{http_code}" \
             -X POST "${{ secrets.DEPLOY_WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
             -H "X-Deploy-Secret: ${{ secrets.DEPLOY_SECRET }}" \
-            -d '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}", "message": "${{ github.event.head_commit.message }}"}'
+            -d "$payload"
