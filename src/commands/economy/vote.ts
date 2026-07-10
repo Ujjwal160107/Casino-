@@ -9,7 +9,7 @@ import { getGuildPrefix } from "../../utils/guildContext";
 const TOPGG_BOT_ID = "1371816936857669702";
 const VOTE_LINK = `https://top.gg/bot/${TOPGG_BOT_ID}?s=0825a328ae527`;
 const REVIEW_LINK = `https://top.gg/bot/${TOPGG_BOT_ID}#reviews`; // Assuming this is correct based on user request
-const VOTE_REWARD = 5_000;
+const VOTE_REWARD = 100_000;
 
 export async function handleVote(message: Message, args: string[]) {
     if (!message.guild || !message.member) return;
