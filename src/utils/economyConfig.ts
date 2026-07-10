@@ -114,7 +114,6 @@ export const ROB_CONFIG = {
   successRate: 0.45,
   stealPctMin: 0.08,
   stealPctMax: 0.20,
-  stealCap: 250_000,
   failPenaltyMin: 60_000,
   failPenaltyMax: 120_000
 } as const;

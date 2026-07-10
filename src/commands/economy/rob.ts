@@ -100,9 +100,8 @@ export async function handleRob(message: Message, args: string[]) {
 
             const percent = randomFloat(ROB_CONFIG.stealPctMin, ROB_CONFIG.stealPctMax);
             const requestedSteal = Math.floor(victim.wallet.balance * percent * robMult);
-            const capSteal = Math.min(requestedSteal, ROB_CONFIG.stealCap);
             const availableSpace = Math.max(0, MAX_SAFE_BALANCE - robber.wallet.balance);
-            const robAmount = Math.min(capSteal, availableSpace);
+            const robAmount = Math.min(requestedSteal, availableSpace);
             if (robAmount <= 0) throw new Error("Your wallet is at the maximum balance limit.");
 
             await tx.wallet.update({ where: { id: victim.wallet.id }, data: { balance: { decrement: robAmount } } });
