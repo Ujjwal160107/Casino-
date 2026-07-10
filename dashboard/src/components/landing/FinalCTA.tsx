@@ -3,7 +3,7 @@ import { INVITE_URL } from "@/lib/links";
 export function FinalCTA() {
   return (
     <section className="border-t border-line bg-panel/40">
-      <div className="mx-auto max-w-7xl px-6 py-16 text-center">
+      <div className="mx-auto max-w-[90rem] px-6 py-16 text-center">
         <h2 className="font-display text-4xl font-extrabold tracking-tight text-ink md:text-5xl">
           Stop scrolling. Start living.
         </h2>

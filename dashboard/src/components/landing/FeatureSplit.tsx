@@ -17,7 +17,7 @@ export function FeatureSplit({
   flip?: boolean;
 }) {
   return (
-    <div className="mx-auto grid max-w-7xl items-center gap-12 px-6 py-16 lg:grid-cols-2">
+    <div className="mx-auto grid max-w-[90rem] items-center gap-12 px-6 py-16 lg:grid-cols-2">
       <div className={cn(flip && "lg:order-2")}>
         <p className="mb-2 font-mono text-sm font-medium uppercase tracking-widest text-gold">
           {eyebrow}

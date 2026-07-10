@@ -4,7 +4,7 @@ import { INVITE_URL, SUPPORT_URL } from "@/lib/links";
 
 export function Hero() {
   return (
-    <section className="mx-auto grid max-w-7xl items-center gap-10 px-6 py-12 lg:grid-cols-2">
+    <section className="mx-auto grid max-w-[90rem] items-center gap-12 px-6 pb-16 pt-20 lg:grid-cols-2">
       <div>
         <h1 className="font-display text-[2rem] font-extrabold leading-[1.06] tracking-tight text-ink sm:text-5xl md:text-6xl">
           Study. Work. Marry.
