@@ -11,7 +11,7 @@ const gettingStarted: ModuleDoc = {
     tip: "Everything runs on the ! prefix by default. If a server changed it, mention the bot and it will tell you the prefix.",
   },
   screenshot: {
-    src: "/fortuna_world.jpg",
+    src: "/fortuna_world_v2.jpg",
     alt: "The world of Fortuna — casino, stock exchange, social hub, and police station in one pixel-art city",
     caption: "The world of Fortuna — every district is a module",
     aspect: "aspect-[256/143]",

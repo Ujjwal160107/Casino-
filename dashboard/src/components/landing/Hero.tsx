@@ -43,7 +43,7 @@ export function Hero() {
       <FadeUp className="w-full">
         <figure>
           <Image
-            src="/fortuna_world.jpg"
+            src="/fortuna_world_v2.jpg"
             alt="The world of Fortuna — casino, stock exchange, social hub, and police station in one pixel-art city"
             width={1024}
             height={572}
