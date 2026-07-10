@@ -167,7 +167,7 @@ function normalizeCommand(command: string, args: string[]) {
     roulette: "bet",
     roul: "bet",
     bj: "blackjack",
-    cf: "cockfight",
+    cf: "coinflip",
     chicken: "chicken"
   } as Record<string, string>)[normalized] ?? normalized;
 }

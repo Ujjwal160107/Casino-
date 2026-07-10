@@ -31,6 +31,7 @@ export async function handleSpecialItemUse(
   guildId: string,
   member?: GuildMember,
   targetId?: string,
+  extraArg?: string,
 ): Promise<ShopItemUseResult | null> {
   switch (itemKey) {
     case "lucky_coin":
@@ -136,6 +137,8 @@ export async function handleSpecialItemUse(
       return handleBaitBox(discordId);
     case "camouflage_kit":
       return handleCamouflageKit(discordId);
+    case "hunters_compass":
+      return handleHuntersCompass(discordId, extraArg);
     case "rare_blueprint":
       return handleRareBlueprint(discordId);
     case "legendary_blueprint":
@@ -196,6 +199,40 @@ async function handleCamouflageKit(discordId: string): Promise<ShopItemUseResult
   return {
     success: true,
     message: "**Camouflage Kit activated!** Rare and Legendary catch rates are boosted for your **next hunt**.",
+  };
+}
+
+async function handleHuntersCompass(discordId: string, mode?: string): Promise<ShopItemUseResult> {
+  const normalizedMode = mode === "safer" ? "safe" : mode === "riskier" ? "risky" : mode;
+  if (normalizedMode !== "safe" && normalizedMode !== "risky") {
+    return {
+      success: false,
+      shouldConsume: false,
+      message:
+        "Choose a path: `use hunters compass risky` (**+8% Rare, +4% Legendary**) or `use hunters compass safe` (**+15% Uncommon**). Once per day.",
+    };
+  }
+
+  const cdKey = `hunters_compass_cd:${discordId}`;
+  const onCooldown = await redisService.get<{ until: number }>(cdKey);
+  if (onCooldown && !isTester(discordId)) {
+    const expiresAt = Math.floor(onCooldown.until / 1000);
+    return { success: false, shouldConsume: false, message: `The Hunter's Compass is still recalibrating! Available <t:${expiresAt}:R>.` };
+  }
+
+  await redisService.set(`hunt_compass:${discordId}`, { mode: normalizedMode }, HUNT_BUFF_TTL_SECONDS);
+  if (!isTester(discordId)) {
+    await redisService.set(cdKey, { until: Date.now() + 86_400_000 }, 86400);
+  }
+
+  const pathDesc =
+    normalizedMode === "risky"
+      ? "**Risky path** — +8% Rare and +4% Legendary odds"
+      : "**Safe path** — +15% Uncommon odds";
+  return {
+    success: true,
+    shouldConsume: false,
+    message: `🧭 **The Hunter's Compass points the way!** ${pathDesc} on your next hunt (expires in 24h).`,
   };
 }
 

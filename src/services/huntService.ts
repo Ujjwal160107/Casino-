@@ -105,6 +105,16 @@ export async function hunt(
     weights.Common = Math.max(0, weights.Common - 0.15);
   }
 
+  const compassActive = await redisService.get<{ mode: "safe" | "risky" }>(`hunt_compass:${discordId}`);
+  if (compassActive?.mode === "risky") {
+    weights.Rare = Math.min(0.40, weights.Rare + 0.08);
+    weights.Legendary = Math.min(0.20, weights.Legendary + 0.04);
+    weights.Common = Math.max(0, weights.Common - 0.12);
+  } else if (compassActive?.mode === "safe") {
+    weights.Uncommon = weights.Uncommon + 0.15;
+    weights.Common = Math.max(0, weights.Common - 0.15);
+  }
+
   const baitActive = await redisService.get<{ active: boolean }>(`hunt_bait_box:${discordId}`);
   const echoActive = await redisService.get<{ active: boolean }>(`hunt_echo_whistle:${discordId}`);
 
@@ -186,6 +196,9 @@ export async function hunt(
   }
   if (camouflageActive?.active) {
     await redisService.del(`hunt_camouflage:${discordId}`);
+  }
+  if (compassActive?.mode) {
+    await redisService.del(`hunt_compass:${discordId}`);
   }
   if (baitActive?.active) {
     await redisService.del(`hunt_bait_box:${discordId}`);

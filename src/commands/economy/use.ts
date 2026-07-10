@@ -44,8 +44,25 @@ function findCatalogKeyByName(name: string): string | null {
   const normalized = name.trim().toLowerCase();
   if (normalized === "komodo venom flask") return "komodo_venom_flask";
   const all = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG];
-  return all.find(i => i.name.toLowerCase() === normalized)?.key ?? null;
+  const stripApostrophes = (s: string) => s.replace(/['’]/g, "");
+  return (
+    all.find(i => i.name.toLowerCase() === normalized)?.key ??
+    all.find(i => stripApostrophes(i.name.toLowerCase()) === stripApostrophes(normalized))?.key ??
+    null
+  );
 }
+
+function getCatalogNameByKey(key: string): string | null {
+  const all = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG];
+  return all.find(i => i.key === key)?.name ?? null;
+}
+
+const HUNT_PATH_MODES: Record<string, string> = {
+  safe: "safe",
+  safer: "safe",
+  risky: "risky",
+  riskier: "risky",
+};
 
 /** Removes one unit of an item from inventory. Deletes the row if it was the last unit. */
 async function consumeInventoryItem(discordId: string, itemName: string): Promise<void> {
@@ -108,7 +125,7 @@ export async function handleUse(message: Message, args: string[]) {
     }
   }
 
-  const { itemName, targetId } = parseTargetAndItemName(resolvedArgs);
+  let { itemName, targetId } = parseTargetAndItemName(resolvedArgs);
 
   if (!itemName) {
     return message.reply({
@@ -118,7 +135,22 @@ export async function handleUse(message: Message, args: string[]) {
   }
 
   // Resolve catalog key first — if it's a special item, we run validation BEFORE consuming
-  const catalogKey = findCatalogKeyByName(itemName);
+  let catalogKey = findCatalogKeyByName(itemName);
+
+  // Hunter's Compass takes a trailing path argument: "use hunters compass risky|safe"
+  let extraArg: string | undefined;
+  if (!catalogKey) {
+    const words = itemName.trim().split(/\s+/);
+    const lastWord = words[words.length - 1]?.toLowerCase();
+    if (words.length > 1 && HUNT_PATH_MODES[lastWord]) {
+      const strippedName = words.slice(0, -1).join(" ");
+      if (findCatalogKeyByName(strippedName) === "hunters_compass") {
+        catalogKey = "hunters_compass";
+        itemName = strippedName;
+        extraArg = HUNT_PATH_MODES[lastWord];
+      }
+    }
+  }
 
   if (catalogKey) {
     if (catalogKey === "soul_ledger") {
@@ -158,13 +190,15 @@ export async function handleUse(message: Message, args: string[]) {
 
     // Verify the user actually owns this item before running the handler
     const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+    const canonicalName = getCatalogNameByKey(catalogKey) ?? itemName;
     const inv = await prisma.inventory.findMany({
       where: { userId: message.author.id },
       include: { shopItem: true },
     }) as any[];
 
     const entry = inv.find((i: any) =>
-      normalize(i.shopItem.name) === normalize(itemName) && i.amount > 0
+      (normalize(i.shopItem.name) === normalize(itemName) ||
+        normalize(i.shopItem.name) === normalize(canonicalName)) && i.amount > 0
     );
 
     if (!entry) {
@@ -228,13 +262,14 @@ export async function handleUse(message: Message, args: string[]) {
         message.guildId!,
         message.member,
         targetId ?? undefined,
+        extraArg,
       );
 
       if (specialResult) {
         // Consume only if the handler says to (defaults to true)
         const shouldConsume = specialResult.success && specialResult.shouldConsume !== false;
         if (shouldConsume) {
-          await consumeInventoryItem(message.author.id, itemName);
+          await consumeInventoryItem(message.author.id, entry.shopItem.name);
         }
 
         const color = specialResult.success ? 0x2ECC71 : 0xE74C3C;
