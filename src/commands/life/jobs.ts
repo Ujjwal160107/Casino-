@@ -1,207 +1,249 @@
-import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, InteractionCollector, ButtonInteraction } from "discord.js";
-import { JOBS, JobDefinition, getJobsBySector, getJobPaySync } from "../../services/jobService";
-import { Mascot, getEmoteUrl } from "../../config/branding";
+import {
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonInteraction,
+    ButtonStyle,
+    ComponentType,
+    ContainerBuilder,
+    Message,
+    MessageFlags,
+    SectionBuilder,
+    SeparatorBuilder,
+    SeparatorSpacingSize,
+    TextDisplayBuilder,
+} from "discord.js";
+import { JOBS, JobDefinition, getJob, getJobApplicationStatus, getJobsBySector, getJobPaySync } from "../../services/jobService";
+import { Mascot } from "../../config/branding";
 import { fmtCurrency } from "../../utils/format";
-import { getGuildConfig } from "../../services/guildConfigService";
+import prisma from "../../utils/prisma";
+import { startJobApplicationFromInteraction } from "./apply";
+import { getGuildPrefix } from "../../utils/guildContext";
 
-const SECTORS: JobDefinition['sector'][] = ["tech", "medical", "business", "legal", "service", "trade", "freelance"];
+const SECTORS: JobDefinition["sector"][] = ["tech", "medical", "business", "legal", "service", "trade", "freelance"];
+const JOBS_PER_PAGE = 5;
+const JOBS_ACCENT_COLOR = 0x9B59B6;
+
+function jobsId(action: string, ownerId: string, detail?: string) {
+    return detail ? `jobs:${action}:${detail}:${ownerId}` : `jobs:${action}:${ownerId}`;
+}
+
+function parseJobsId(customId: string) {
+    const [, action, maybeDetail, maybeOwner] = customId.split(":");
+    return maybeOwner
+        ? { action, detail: maybeDetail, ownerId: maybeOwner }
+        : { action, detail: null as string | null, ownerId: maybeDetail ?? null };
+}
+
+function separator() {
+    return new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
+}
+
+function getSectorInfo(sector: JobDefinition["sector"]) {
+    switch (sector) {
+        case "tech": return { name: "Technology", emoji: Mascot.Emotes.JobTech, desc: "Software, engineering, and AI." };
+        case "medical": return { name: "Medical", emoji: Mascot.Emotes.JobMedical, desc: "Healthcare, surgery, and hospital leadership." };
+        case "business": return { name: "Business", emoji: Mascot.Emotes.JobBusiness, desc: "Sales, finance, and management." };
+        case "legal": return { name: "Legal", emoji: Mascot.Emotes.JobLegal, desc: "Law, advocacy, and firm leadership." };
+        case "service": return { name: "Service", emoji: Mascot.Emotes.JobService, desc: "Hospitality and food service." };
+        case "trade": return { name: "Skilled Trade", emoji: Mascot.Emotes.JobTrade, desc: "Mechanics and hands-on licensed work." };
+        case "freelance": return { name: "Freelance", emoji: Mascot.Emotes.JobWorking, desc: "Flexible no-degree gig work." };
+    }
+}
+
+function formatRequirement(job: JobDefinition) {
+    const requirements: string[] = [];
+    if (job.reqDegrees.length > 0) requirements.push(`Degree: ${job.reqDegrees.join(", ")}`);
+    if (job.reqJobId) {
+        const previousJob = JOBS.find((item) => item.id === job.reqJobId);
+        requirements.push(`Requires job: ${previousJob?.title ?? job.reqJobId}`);
+    }
+    if (job.reqXp) requirements.push(`XP: ${job.reqXp}`);
+    return requirements.length ? requirements.join("\n") : "No degree required";
+}
+
+function buildMenuContainer(prefix: string, ownerId: string) {
+    const container = new ContainerBuilder()
+        .setAccentColor(JOBS_ACCENT_COLOR)
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.JobWorking} Career Center`),
+            new TextDisplayBuilder().setContent(`Browse V2 jobs by field. Apply with the job buttons or \`${prefix}apply <job name>\`.`),
+        )
+        .addSeparatorComponents(separator());
+
+    for (const sector of SECTORS) {
+        const info = getSectorInfo(sector);
+        const jobs = getJobsBySector(sector);
+        container
+            .addSectionComponents(
+                new SectionBuilder()
+                    .addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(
+                            `### ${info.emoji} ${info.name}\n${info.desc}\nJobs: **${jobs.length}**`,
+                        ),
+                    )
+                    .setButtonAccessory(
+                        new ButtonBuilder()
+                            .setCustomId(jobsId("sector", ownerId, sector))
+                            .setLabel("Browse")
+                            .setEmoji(info.emoji)
+                            .setStyle(ButtonStyle.Secondary),
+                    ),
+            )
+            .addSeparatorComponents(separator());
+    }
+
+    return container;
+}
+
+function buildSectorContainer(sector: JobDefinition["sector"], page: number, prefix: string, user: any, ownerId: string) {
+    const jobs = getJobsBySector(sector);
+    const totalPages = Math.max(1, Math.ceil(jobs.length / JOBS_PER_PAGE));
+    const safePage = Math.min(Math.max(page, 0), totalPages - 1);
+    const info = getSectorInfo(sector);
+    const displayedJobs = jobs.slice(safePage * JOBS_PER_PAGE, safePage * JOBS_PER_PAGE + JOBS_PER_PAGE);
+
+    const container = new ContainerBuilder()
+        .setAccentColor(JOBS_ACCENT_COLOR)
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`## ${info.emoji} ${info.name} Careers`),
+            new TextDisplayBuilder().setContent(`${info.desc}\nPage **${safePage + 1}** of **${totalPages}**`),
+        )
+        .addSeparatorComponents(separator());
+
+    if (displayedJobs.length === 0) {
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent("No jobs available in this field yet."));
+    } else {
+        for (const job of displayedJobs) {
+            const status = getJobApplicationStatus(user, job);
+            const buttonLabel = status.canApply ? "Apply" : status.label;
+            const buttonStyle = status.canApply ? ButtonStyle.Success : ButtonStyle.Secondary;
+            const requirementText = status.canApply ? formatRequirement(job) : `${formatRequirement(job)}\nStatus: ${status.missing.join(", ")}`;
+
+            container
+                .addSectionComponents(
+                    new SectionBuilder()
+                        .addTextDisplayComponents(
+                            new TextDisplayBuilder().setContent(
+                                [
+                                    `### ${job.emoji} ${job.title}`,
+      `Pay per shift: **${fmtCurrency(getJobPaySync(job))}**`,
+                                    `Requirement: **${requirementText}**`,
+                                    `Career tier: **${job.careerTier}**`,
+                                ].join("\n"),
+                            ),
+                        )
+                        .setButtonAccessory(
+                            new ButtonBuilder()
+                                .setCustomId(jobsId("apply", ownerId, job.id))
+                                .setLabel(buttonLabel)
+                                .setStyle(buttonStyle)
+                                .setEmoji(status.canApply ? Mascot.Emotes.Accept : Mascot.Emotes.Lock)
+                                .setDisabled(!status.canApply),
+                        ),
+                )
+                .addSeparatorComponents(separator());
+        }
+    }
+
+    return { container, totalPages, safePage };
+}
+
+function buildSectorRow(ownerId: string, page: number, totalPages: number) {
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+            .setCustomId(jobsId("prev", ownerId))
+            .setLabel("Prev")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page === 0),
+        new ButtonBuilder()
+            .setCustomId(jobsId("menu", ownerId))
+            .setLabel("Main Menu")
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(jobsId("next", ownerId))
+            .setLabel("Next")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page >= totalPages - 1),
+    );
+}
 
 export async function handleJobs(message: Message) {
     if (!message.guild) return;
-    const config = await getGuildConfig(message.guild.id);
 
-    // State
-    let currentView: "MENU" | "SECTOR" = "MENU";
-    let selectedSector: JobDefinition['sector'] | null = null;
-    let currentPage = 0;
-    const JOBS_PER_PAGE = 5;
-
-    // --- HELPERS ---
-
-    const getSectorInfo = (sector: string) => {
-        switch (sector) {
-            case "tech": return { name: "Technology", emoji: Mascot.Emotes.JobTech, desc: "Software, Engineering, AI" };
-            case "medical": return { name: "Medical", emoji: Mascot.Emotes.JobMedical, desc: "Doctors, Surgery, Health" };
-            case "business": return { name: "Business", emoji: Mascot.Emotes.JobBusiness, desc: "Finance, Sales, Management" };
-            case "legal": return { name: "Legal", emoji: Mascot.Emotes.JobLegal, desc: "Law, Justice, Defense" };
-            case "service": return { name: "Service", emoji: Mascot.Emotes.JobService, desc: "Hospitality, Food, Care" };
-            case "trade": return { name: "Skilled Trade", emoji: Mascot.Emotes.JobTrade, desc: "Mechanics, Plumbing, Craft" };
-            case "freelance": return { name: "Freelance", emoji: Mascot.Emotes.JobWorking, desc: "Gig Economy, Self-Employed" };
-            default: return { name: sector, emoji: "❓", desc: "Unknown Sector" };
-        }
-    };
-
-    // --- EMBED GENERATORS ---
-
-    const generateMenuEmbed = () => {
-        const embed = new EmbedBuilder()
-            .setTitle(`${Mascot.Emotes.JobWorking} Career Center`)
-            .setDescription(`Welcome to the **${Mascot.Name}** Job Board!\n\nSelect a **Career Field** below to browse available positions.\nUse \`${config?.prefix}apply <job_id>\` to start your career.`)
-            .setColor(Mascot.Colors.Base as any)
-            .setThumbnail(getEmoteUrl(Mascot.Emotes.JobWorking) || null)
-            .setFooter({ text: "Choose a path to view details" });
-
-        // Add a concise list of sectors in description for quick reading
-        return embed;
-    };
-
-    const generateSectorEmbed = (sector: JobDefinition['sector'], page: number) => {
-        const jobs = getJobsBySector(sector);
-        const totalPages = Math.ceil(jobs.length / JOBS_PER_PAGE);
-        const info = getSectorInfo(sector);
-
-        const start = page * JOBS_PER_PAGE;
-        const end = start + JOBS_PER_PAGE;
-        const displayedJobs = jobs.slice(start, end);
-
-        const embed = new EmbedBuilder()
-            .setTitle(`${info.emoji} ${info.name} Careers`)
-            .setDescription(`**${info.desc}**\n\nPage ${page + 1} of ${totalPages}`)
-            .setColor(Mascot.Colors.Base as any)
-            .setThumbnail(getEmoteUrl(info.emoji) || null);
-
-        for (const job of displayedJobs) {
-            let reqText = "Degree: None";
-            if (job.reqDegrees && job.reqDegrees.length > 0) reqText = `Degree: ${job.reqDegrees.join(", ")}`;
-
-            if (job.reqJobId) {
-                const prevJob = JOBS.find(j => j.id === job.reqJobId);
-                const prevTitle = prevJob ? prevJob.title : job.reqJobId;
-                reqText += `\nRequires: ${prevTitle}`;
-            }
-
-            embed.addFields({
-                name: `${job.title} (\`${job.id}\`)`,
-                value: `**${fmtCurrency(getJobPaySync(job, config), config?.currencyEmoji)}** / shift ${reqText}`,
-                inline: false
-            });
-        }
-
-        if (displayedJobs.length === 0) {
-            embed.setDescription("No jobs available in this sector yet.");
-        }
-
-        return embed;
-    };
-
-    // --- COMPONENT GENERATORS ---
-
-    const generateMenuComponents = () => {
-        // Create rows of buttons (Max 5 per row)
-        // Row 1: Tech, Med, Biz, Legal
-        // Row 2: Service, Trade, Freelance
-
-        const row1 = new ActionRowBuilder<ButtonBuilder>()
-            .addComponents(
-                new ButtonBuilder().setCustomId("sector_tech").setLabel("Tech").setEmoji(Mascot.Emotes.JobTech).setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId("sector_medical").setLabel("Medical").setEmoji(Mascot.Emotes.JobMedical).setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId("sector_business").setLabel("Business").setEmoji(Mascot.Emotes.JobBusiness).setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId("sector_legal").setLabel("Legal").setEmoji(Mascot.Emotes.JobLegal).setStyle(ButtonStyle.Secondary),
-            );
-
-        const row2 = new ActionRowBuilder<ButtonBuilder>()
-            .addComponents(
-                new ButtonBuilder().setCustomId("sector_service").setLabel("Service").setEmoji(Mascot.Emotes.JobService).setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId("sector_trade").setLabel("Trades").setEmoji(Mascot.Emotes.JobTrade).setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId("sector_freelance").setLabel("Freelance").setEmoji(Mascot.Emotes.JobWorking).setStyle(ButtonStyle.Secondary),
-            );
-
-        return [row1, row2];
-    };
-
-    const generateSectorComponents = (sector: JobDefinition['sector'], page: number) => {
-        const jobs = getJobsBySector(sector);
-        const totalPages = Math.ceil(jobs.length / JOBS_PER_PAGE);
-
-        const navRow = new ActionRowBuilder<ButtonBuilder>();
-
-        // Previous
-        navRow.addComponents(
-            new ButtonBuilder()
-                .setCustomId("jobs_prev")
-                .setLabel("⬅️ Prev")
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(page === 0)
-        );
-
-        // Back to Menu (Center)
-        navRow.addComponents(
-            new ButtonBuilder()
-                .setCustomId("jobs_back")
-                .setLabel("🏠 Main Menu")
-                .setStyle(ButtonStyle.Primary)
-        );
-
-        // Next
-        navRow.addComponents(
-            new ButtonBuilder()
-                .setCustomId("jobs_next")
-                .setLabel("Next ➡️")
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(page >= totalPages - 1)
-        );
-
-        return [navRow];
-    };
-
-    // --- INITIAL SEND ---
-
-    const reply = await message.reply({
-        embeds: [generateMenuEmbed()],
-        components: generateMenuComponents()
+    const prefix = await getGuildPrefix(message.guild.id);
+    const user = await prisma.user.findUnique({
+        where: { discordId: message.author.id },
+        include: { degrees: { include: { degree: true } } }
     });
+    if (!user) return;
 
-    // --- COLLECTOR ---
+    let currentView: "MENU" | "SECTOR" = "MENU";
+    let selectedSector: JobDefinition["sector"] | null = null;
+    let currentPage = 0;
+
+    const render = (): any => {
+        if (currentView === "MENU" || !selectedSector) {
+            return {
+                components: [buildMenuContainer(prefix, message.author.id)],
+                flags: MessageFlags.IsComponentsV2,
+            };
+        }
+
+        const sectorPayload = buildSectorContainer(selectedSector, currentPage, prefix, user, message.author.id);
+        currentPage = sectorPayload.safePage;
+        return {
+            components: [
+                sectorPayload.container,
+                buildSectorRow(message.author.id, currentPage, sectorPayload.totalPages),
+            ],
+            flags: MessageFlags.IsComponentsV2,
+        };
+    };
+
+    const reply = await message.reply(render());
 
     const collector = reply.createMessageComponentCollector({
         componentType: ComponentType.Button,
-        time: 300000, // 5 minutes
-        filter: (i) => i.user.id === message.author.id
+        time: 300000,
+        filter: (interaction) => interaction.user.id === message.author.id,
     });
 
-    collector.on('collect', async (i: ButtonInteraction) => {
-        // Handle Interactions
-        if (i.customId.startsWith("sector_")) {
-            // Switch to Sector View
-            const sectorName = i.customId.replace("sector_", "") as JobDefinition['sector'];
-            if (SECTORS.includes(sectorName)) {
-                currentView = "SECTOR";
-                selectedSector = sectorName;
-                currentPage = 0;
-            }
+    collector.on("collect", async (interaction: ButtonInteraction) => {
+        const parsed = parseJobsId(interaction.customId);
+        if (parsed.ownerId && parsed.ownerId !== interaction.user.id) {
+            await interaction.reply({
+                content: "This jobs browser belongs to another user.",
+                ephemeral: true,
+            });
+            return;
         }
-        else if (i.customId === "jobs_back") {
-            // Switch to Menu
+
+        if (parsed.action === "sector" && parsed.detail && SECTORS.includes(parsed.detail as JobDefinition["sector"])) {
+            currentView = "SECTOR";
+            selectedSector = parsed.detail as JobDefinition["sector"];
+            currentPage = 0;
+        } else if (parsed.action === "menu") {
             currentView = "MENU";
             selectedSector = null;
             currentPage = 0;
-        }
-        else if (i.customId === "jobs_prev") {
-            if (currentView === "SECTOR") currentPage = Math.max(0, currentPage - 1);
-        }
-        else if (i.customId === "jobs_next") {
-            if (currentView === "SECTOR") currentPage++;
+        } else if (parsed.action === "prev") {
+            currentPage = Math.max(0, currentPage - 1);
+        } else if (parsed.action === "next") {
+            currentPage += 1;
+        } else if (parsed.action === "apply" && parsed.detail) {
+            const job = getJob(parsed.detail);
+            if (!job) {
+                await interaction.reply({ content: "That job is no longer available.", ephemeral: true });
+                return;
+            }
+            await startJobApplicationFromInteraction(interaction, job);
+            return;
         }
 
-        // Update UI
-        try {
-            if (currentView === "MENU") {
-                await i.update({
-                    embeds: [generateMenuEmbed()],
-                    components: generateMenuComponents()
-                });
-            } else if (currentView === "SECTOR" && selectedSector) {
-                await i.update({
-                    embeds: [generateSectorEmbed(selectedSector, currentPage)],
-                    components: generateSectorComponents(selectedSector, currentPage)
-                });
-            }
-        } catch (e) {
-            console.error("Failed to update jobs interaction:", e);
-        }
+        await interaction.update(render());
     });
 
-    collector.on('end', () => {
-        reply.edit({ components: [] }).catch(() => { });
+    collector.on("end", () => {
+        reply.edit({ components: [currentView === "MENU" || !selectedSector ? buildMenuContainer(prefix, message.author.id) : buildSectorContainer(selectedSector, currentPage, prefix, user, message.author.id).container] }).catch(() => { });
     });
 }

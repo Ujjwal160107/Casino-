@@ -1,11 +1,13 @@
 
 import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ButtonInteraction } from "discord.js";
 import prisma from "../../utils/prisma";
+import { globalCatalogGuildFilter } from "../../utils/globalCatalog";
 import { errorEmbed } from "../../utils/embed";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { calculateTotalStats, calculateCombatScore, getWinChance } from "../../utils/gameUtils";
 import { GameConfig } from "../../config/gameConfig";
 import { Mascot } from "../../config/branding";
+import { ensureUserAndWallet } from "../../services/walletService";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 const EMOJI_CHICKEN = GameConfig.Emojis.Chicken;
 const EMOJI_XP = GameConfig.Emojis.XpFull;
@@ -45,10 +47,12 @@ export async function handleChicken(message: Message, args: string[]) {
 
 async function handleTop(message: Message) {
     const guildId = message.guildId!;
-    const config = await getGuildConfig(guildId);
+    const prefix = await getGuildPrefix(guildId);
 
     const shopItem = await prisma.shopItem.findFirst({
-        where: { name: { equals: "Chicken", mode: "insensitive" }, guildId }
+        where: globalCatalogGuildFilter({
+            name: { equals: "Chicken", mode: "insensitive" },
+        })
     });
 
     if (!shopItem) return message.reply("Chicken item not configured in shop.");
@@ -100,15 +104,15 @@ async function handleTop(message: Message) {
         .setColor("#FFD700")
         .setTitle(`${EMOJI_TROPHY} Chicken Leaderboard`)
         .setDescription(description || "No active chickens.")
-        .setFooter({ text: `Use ${config.prefix}chicken top to see this list.` });
+        .setFooter({ text: `Use ${prefix}chicken top to see this list.` });
 
     return message.reply({ embeds: [embed] });
 }
 
 async function handleName(message: Message, args: string[]) {
-    const config = await getGuildConfig(message.guildId!);
+    const prefix = await getGuildPrefix(message.guildId!);
     if (args.length < 1) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}chicken name <New Name>\``)] });
+        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}chicken name <New Name>\``)] });
     }
 
     const newName = args.join(" ");
@@ -120,16 +124,18 @@ async function handleName(message: Message, args: string[]) {
     const user = message.author;
 
     const shopItem = await prisma.shopItem.findFirst({
-        where: { name: { equals: "Chicken", mode: "insensitive" }, guildId }
+        where: globalCatalogGuildFilter({
+            name: { equals: "Chicken", mode: "insensitive" },
+        })
     });
 
     if (!shopItem) return message.reply("Chicken item not configured in shop.");
 
-    const userDb = await prisma.user.findFirst({ where: { discordId: user.id, guildId } });
+    const userDb = await prisma.user.findUnique({ where: { discordId: user.id } });
     if (!userDb) return message.reply("User not found.");
 
     const inventoryItem = await prisma.inventory.findUnique({
-        where: { userId_shopItemId: { userId: userDb.id, shopItemId: shopItem.id } }
+        where: { userId_shopItemId: { userId: userDb.discordId, shopItemId: shopItem.id } }
     });
 
     if (!inventoryItem || inventoryItem.amount < 1) {
@@ -156,7 +162,7 @@ async function handleName(message: Message, args: string[]) {
 }
 
 async function handleTraitsInfo(message: Message) {
-    const config = await getGuildConfig(message.guildId!);
+    const prefix = await getGuildPrefix(message.guildId!);
 
     // Trait Definitions
     const traits = [
@@ -173,7 +179,7 @@ async function handleTraitsInfo(message: Message) {
         .setColor("#3498db")
         .setTitle("🧬 Chicken Traits")
         .setDescription(`Chickens are born with a random trait that affects their combat stats.\n\n${description}`)
-        .setFooter({ text: `Traits are permanent and assigned at birth. Use ${config.prefix}chicken traits` });
+        .setFooter({ text: `Traits are permanent and assigned at birth. Use ${prefix}chicken traits` });
 
     return message.reply({ embeds: [embed] });
 }
@@ -185,17 +191,17 @@ async function handleView(message: Message, args: string[]) {
     if (!guildId) return;
 
     try {
-        const config = await getGuildConfig(guildId);
-        const userData = await prisma.user.findUnique({
-            where: { discordId_guildId: { discordId: user.id, guildId } }
-        });
+        const prefix = await getGuildPrefix(guildId);
+        const userData = await prisma.user.findUnique({ where: { discordId: user.id } });
 
         if (!userData) {
             return message.reply({ embeds: [errorEmbed(user, "Error", "User not found.")] });
         }
 
         const shopItem = await prisma.shopItem.findFirst({
-            where: { name: { equals: "Chicken", mode: "insensitive" }, guildId }
+            where: globalCatalogGuildFilter({
+            name: { equals: "Chicken", mode: "insensitive" },
+        })
         });
 
         if (!shopItem) {
@@ -203,7 +209,7 @@ async function handleView(message: Message, args: string[]) {
         }
 
         const inventoryItem = await prisma.inventory.findUnique({
-            where: { userId_shopItemId: { userId: userData.id, shopItemId: shopItem.id } }
+            where: { userId_shopItemId: { userId: userData.discordId, shopItemId: shopItem.id } }
         });
 
         if (!inventoryItem) {
@@ -326,7 +332,7 @@ async function handleView(message: Message, args: string[]) {
                     if (i.customId === "train_speedup") {
                         try {
                             await prisma.$transaction(async (tx) => {
-                                const u = await tx.user.findUnique({ where: { id: userData.id }, include: { wallet: true } });
+                                const u = await tx.user.findUnique({ where: { discordId: userData.discordId }, include: { wallet: true } });
                                 if (!u || (u.wallet?.balance || 0) < speedUpCost) {
                                     throw new Error("Insufficient funds");
                                 }
@@ -379,28 +385,59 @@ async function handleView(message: Message, args: string[]) {
         }
         // --- END TRAINING CHECK ---
 
+        // --- CRITICAL STATE CHECK (24h death window) ---
+        if (meta.critical) {
+            const now = Date.now();
+            if (now >= meta.critical.endTime) {
+                // Timer expired → permadeath
+                await prisma.inventory.delete({ where: { id: inventoryItem.id } });
+                const embed = new EmbedBuilder()
+                    .setColor("#000000")
+                    .setTitle("💀 Your Chicken Has Died")
+                    .setDescription("The critical window expired. Your chicken could not be saved.\n\nRest in peace. You can buy a new chicken from the Cock Store.");
+                return message.reply({ embeds: [embed] });
+            }
+
+            const endTimeUnix = Math.floor(meta.critical.endTime / 1000);
+            const embed = new EmbedBuilder()
+                .setColor("#8B0000")
+                .setTitle("💀 CRITICAL CONDITION")
+                .setDescription(
+                    `Your chicken is **dying** and will be lost permanently if not saved!\n\n` +
+                    `⏰ **Death in:** <t:${endTimeUnix}:R>\n\n` +
+                    `**Only a Phoenix Serum can save it.**\n` +
+                    `\`${prefix}use phoenix serum\`\n\n` +
+                    `-# No coin heal available. No other items work. Act fast.`
+                );
+            return message.reply({ embeds: [embed] });
+        }
+
         // --- INJURY CHECK ---
         const activeInjury = meta.injured;
         if (activeInjury) {
             const now = Date.now();
             if (now >= activeInjury.endTime) {
-                // Auto-healed
                 delete meta.injured;
                 await prisma.inventory.update({ where: { id: inventoryItem.id }, data: { meta } });
-                // Fallthrough to normal view
             } else {
-                // Still Injured
                 const endTimeUnix = Math.floor(activeInjury.endTime / 1000);
-                const healCost = (config as any).chickenHealCost ?? 500;
+                const recoveryHours = activeInjury.recoveryHours ?? 2;
+                const healCost = Math.floor(50_000 * (recoveryHours / 2));
 
                 const embed = new EmbedBuilder()
                     .setColor("#E74C3C")
                     .setTitle("<:clinic:1453972244610154507> Veterinary Clinic")
-                    .setDescription(`Your chicken is **Injured** and cannot fight or train.\n\n<a:bandaid:1453972442300154018> Recovers <t:${endTimeUnix}:R>`)
-                    .addFields({ name: "Instant Heal", value: `Pay **${healCost}** coins to heal instantly.` });
+                    .setDescription(
+                        `Your chicken is **Injured** and cannot fight or train.\n\n` +
+                        `<a:bandaid:1453972442300154018> Recovers <t:${endTimeUnix}:R> (${recoveryHours.toFixed(1)}h total)`
+                    )
+                    .addFields(
+                        { name: "💰 Coin Heal", value: `Pay **${healCost.toLocaleString()}** coins to heal instantly.`, inline: true },
+                        { name: "🏪 Cock Store", value: `\`${prefix}use feather bandage\` — Instant heal\n\`${prefix}use phoenix serum\` — Full recovery`, inline: false },
+                    );
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                    new ButtonBuilder().setCustomId("chicken_heal").setLabel(`Heal (${healCost})`).setStyle(ButtonStyle.Success).setEmoji("<:medicine:1453973645675200727>")
+                    new ButtonBuilder().setCustomId("chicken_heal").setLabel(`Heal (${healCost.toLocaleString()})`).setStyle(ButtonStyle.Success).setEmoji("<:medicine:1453973645675200727>")
                 );
 
                 const reply = await message.reply({ embeds: [embed], components: [row] });
@@ -412,7 +449,7 @@ async function handleView(message: Message, args: string[]) {
                     if (i.customId === "chicken_heal") {
                         try {
                             await prisma.$transaction(async (tx) => {
-                                const u = await tx.user.findUnique({ where: { id: userData.id }, include: { wallet: true } });
+                                const u = await tx.user.findUnique({ where: { discordId: userData.discordId }, include: { wallet: true } });
                                 if (!u || (u.wallet?.balance || 0) < healCost) {
                                     throw new Error("Insufficient funds");
                                 }
@@ -421,7 +458,6 @@ async function handleView(message: Message, args: string[]) {
                                     data: { balance: { decrement: healCost } }
                                 });
 
-                                // Fetch latest to ensure still injured
                                 const freshInv = await tx.inventory.findUnique({ where: { id: inventoryItem.id } });
                                 const freshMeta = (freshInv?.meta as any) || {};
                                 delete freshMeta.injured;
@@ -434,7 +470,7 @@ async function handleView(message: Message, args: string[]) {
 
                             await i.update({ content: `${Mascot.Emotes.Accept} Your chicken has been healed!`, embeds: [], components: [] });
                         } catch (e) {
-                            await i.reply({ content: `Heal failed. You might lack funds (${healCost}) or an error occurred.`, ephemeral: true });
+                            await i.reply({ content: `Heal failed. You might lack funds (${healCost.toLocaleString()}) or an error occurred.`, ephemeral: true });
                         }
                     }
                 });
@@ -512,7 +548,7 @@ Vs Lvl 10: **${getProb(10)}%**
 `, inline: false
                 }
             )
-            .setFooter({ text: `Use ${config.prefix}chicken name <name> to rename!` });
+            .setFooter({ text: `Use ${prefix}chicken name <name> to rename!` });
 
         return message.reply({ embeds: [embed] });
 
@@ -557,12 +593,12 @@ function drawStatBar(baseValue: number, traitBonus: number) {
 
 async function handleTrain(message: Message, args: string[]) {
     const stat = args[0]?.toLowerCase();
-    const config = await getGuildConfig(message.guildId!);
+    const prefix = await getGuildPrefix(message.guildId!);
     const validStats = ["strength", "agility", "defense"];
 
     if (!validStats.includes(stat)) {
         return message.reply({
-            embeds: [errorEmbed(message.author, "Invalid Stat", `Usage: \`${config.prefix}chicken train <strength|agility|defense>\`\nValid stats: Strength, Agility, Defense.`)]
+            embeds: [errorEmbed(message.author, "Invalid Stat", `Usage: \`${prefix}chicken train <strength|agility|defense>\`\nValid stats: Strength, Agility, Defense.`)]
         });
     }
 
@@ -570,7 +606,11 @@ async function handleTrain(message: Message, args: string[]) {
     const user = message.author;
 
     // 2. Get Chicken to Check Level
-    const shopItem = await prisma.shopItem.findFirst({ where: { name: { equals: "Chicken", mode: "insensitive" }, guildId } });
+    const shopItem = await prisma.shopItem.findFirst({
+        where: globalCatalogGuildFilter({
+            name: { equals: "Chicken", mode: "insensitive" },
+        }),
+    });
     if (!shopItem) return message.reply("Chicken item missing.");
 
     const inv = await prisma.inventory.findUnique({ where: { userId_shopItemId: { userId: await getUserId(user.id, guildId), shopItemId: shopItem.id } } });
@@ -578,18 +618,21 @@ async function handleTrain(message: Message, args: string[]) {
 
     const meta = (inv.meta as any) || {};
 
-    // Check if already training or injured
+    // Check if already training, injured, or critical
+    if (meta.critical) {
+        return message.reply(`Your chicken is in **critical condition**! Use \`${prefix}use phoenix serum\` to save it.`);
+    }
     if (meta.training) {
-        return message.reply(`Your chicken is already training! Check \`${config.prefix}chicken\`.`);
+        return message.reply(`Your chicken is already training! Check \`${prefix}chicken\`.`);
     }
     if (meta.injured) {
-        return message.reply(`Your chicken is injured! Visit the \`${config.prefix}chicken\` dashboard to heal.`);
+        return message.reply(`Your chicken is injured! Use \`${prefix}use feather bandage\` or coin-heal via \`${prefix}chicken\`.`);
     }
 
     const level = meta.level || 0;
 
-    const baseCost = (config as any).chickenTrainBaseCost || 500;
-    const trainMult = (config as any).chickenTrainMultiplier || 0.5;
+    const baseCost = 500;
+    const trainMult = 0.5;
 
     // Dynamic Cost & Time
     const cost = Math.floor(baseCost * (1 + level * trainMult));
@@ -631,7 +674,7 @@ async function handleTrain(message: Message, args: string[]) {
             // Re-check funds transactionally
             try {
                 await prisma.$transaction(async (tx) => {
-                    const u = await tx.user.findUnique({ where: { id: inv.userId }, include: { wallet: true } });
+                    const u = await tx.user.findUnique({ where: { discordId: inv.userId }, include: { wallet: true } });
                     if (!u || !u.wallet || u.wallet.balance < cost) {
                         throw new Error("Insufficient funds.");
                     }
@@ -654,6 +697,9 @@ async function handleTrain(message: Message, args: string[]) {
                         data: { meta: newMeta }
                     });
                 });
+
+                const { questBus } = require("../../services/questEvents");
+                questBus.emit("cockfight:train", { discordId: user.id });
 
                 const endTimeUnix = Math.floor((Date.now() + durationMs) / 1000);
 
@@ -715,9 +761,6 @@ async function handleTrain(message: Message, args: string[]) {
 }
 
 async function getUserId(discordId: string, guildId: string): Promise<string> {
-    let user = await prisma.user.findUnique({ where: { discordId_guildId: { discordId, guildId } } });
-    if (!user) { // Should exist if they have a chicken, but safe check
-        user = await prisma.user.create({ data: { discordId, guildId, username: "Unknown", wallet: { create: {} }, bank: { create: {} } } });
-    }
-    return user.id;
+    const user = await ensureUserAndWallet(discordId, guildId, "Unknown");
+    return user.discordId;
 }

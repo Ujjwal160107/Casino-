@@ -1,64 +1,153 @@
 import { Message } from "discord.js";
 import prisma from "../../utils/prisma";
-import { ensureUserAndWallet } from "../../services/walletService";
-import { getGuildConfig } from "../../services/guildConfigService";
-import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
+import { ensureBankingUser } from "../../services/bankService";
+import { checkCooldown, formatDiscordRelativeTime, setCooldown } from "../../services/cooldownService";
+import { ROB_CONFIG, MAX_SAFE_BALANCE } from "../../utils/economyConfig";
+import {
+    checkThiefGloves,
+    checkPadlock,
+    applyLuckToChance,
+    checkEclipseMask,
+    checkDemonicVulnerability,
+    checkCrownOfGreed,
+    recordPotentialSoulLedgerLoss,
+} from "../../services/shopBuffs";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { fmtCurrency } from "../../utils/format";
-import { Mascot, getEmoteUrl } from "../../config/branding";
-import { jailUser } from "../../services/jailService";
+import { redisService } from "../../services/redisService";
+
+function randomInt(min: number, max: number) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randomFloat(min: number, max: number) {
+    return Math.random() * (max - min) + min;
+}
 
 export async function handleRob(message: Message, args: string[]) {
     const targetUser = message.mentions.members?.first();
     if (!targetUser) return message.reply({ embeds: [errorEmbed(message.author, "Error", "Mention a user to rob.")] });
     if (targetUser.id === message.author.id) return message.reply({ embeds: [errorEmbed(message.author, "Error", "You cannot rob yourself.")] });
     if (targetUser.user.bot) return message.reply({ embeds: [errorEmbed(message.author, "Error", "Bots are broke.")] });
-    const config = await getGuildConfig(message.guildId!);
-    const emoji = config.currencyEmoji;
-    const cdKey = `rob:${message.guildId}:${message.author.id}`;
 
-    const remaining = checkCooldown(cdKey, config.robCooldown);
-    if (remaining > 0) {
-        const expire = getCooldownExpiry(cdKey);
-        const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
-
-        // Custom cooldown embed with Angry thumbnail
-        const embed = errorEmbed(message.author, "Cooldown", `Wait <t:${ts}:R>.`);
-        // errorEmbed sets Fail thumbnail by default. We want Angry.
-        const angryUrl = getEmoteUrl(Mascot.Emotes.Angry);
-        if (angryUrl) embed.setThumbnail(angryUrl);
-
-        return message.reply({ embeds: [embed] });
+    const cooldown = await checkCooldown(message.author.id, "rob");
+    if (cooldown.active && cooldown.expiresAt) {
+        return message.reply({
+            embeds: [errorEmbed(message.author, "Cooldown", `Wait ${formatDiscordRelativeTime(cooldown.expiresAt)}.`)]
+        });
     }
-    const isImmune = targetUser.roles.cache.some(r => config.robImmuneRoles.includes(r.id));
-    if (isImmune) return message.reply({ embeds: [errorEmbed(message.author, "Failed", `**${targetUser.displayName}** is immune!`)] });
-    const robber = await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
-    const victim = await ensureUserAndWallet(targetUser.id, message.guildId!, targetUser.user.tag);
-    if (!victim.wallet || victim.wallet.balance <= 0) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Failed", "Target has no money.")] });
+
+    const reserved = await setCooldown(message.author.id, "rob", ROB_CONFIG.cooldownSeconds);
+    if (reserved.active && reserved.expiresAt) {
+        return message.reply({
+            embeds: [errorEmbed(message.author, "Cooldown", `Wait ${formatDiscordRelativeTime(reserved.expiresAt)}.`)]
+        });
     }
-    const roll = Math.random() * 100;
-    if (roll < config.robSuccessPct) {
-        const percent = Math.floor(Math.random() * 41) + 10;
-        const robAmount = Math.floor((victim.wallet.balance * percent) / 100);
-        await prisma.$transaction([prisma.wallet.update({ where: { id: victim.wallet.id }, data: { balance: { decrement: robAmount } } }), prisma.transaction.create({ data: { walletId: victim.wallet.id, amount: -robAmount, type: "robbed_by", meta: { robber: robber.discordId } } }), prisma.wallet.update({ where: { id: robber.wallet!.id }, data: { balance: { increment: robAmount } } }), prisma.transaction.create({ data: { walletId: robber.wallet!.id, amount: robAmount, type: "rob_win", meta: { victim: victim.discordId }, isEarned: true } })]);
-        return message.reply({ embeds: [successEmbed(message.author, "Robbery Successful! 🥷", `${Mascot.Emotes.Money} Stole **${fmtCurrency(robAmount, emoji)}** from **${targetUser.displayName}**!`)] });
-    } else {
-        const releaseTime = await jailUser(robber.id, message.guildId!);
 
-        let fineAmount = Math.max(Math.floor((robber.wallet!.balance * config.robFinePct) / 100), 50);
-        let msg = `You paid a fine of **${fmtCurrency(fineAmount, emoji)}** and have been **sent to jail**!`;
+    await ensureBankingUser(message.author.id, message.author.username);
+    await ensureBankingUser(targetUser.id, targetUser.user.username);
 
-        // PERK: Legal Partner (10% Discount)
-        if (robber.jobId === "law_partner") {
-            const discount = Math.floor(fineAmount * 0.10);
-            fineAmount -= discount;
-            msg = `You paid a fine of **${fmtCurrency(fineAmount, emoji)}** and have been **sent to jail**!\n(⚖️ **Legal Partner Discount**: -${fmtCurrency(discount, emoji)})`;
+    const victimPadlocked = await checkPadlock(targetUser.id);
+    if (victimPadlocked) {
+        return message.reply({
+            embeds: [errorEmbed(message.author, "Robbery Blocked!", `**${targetUser.displayName}** has a **Padlock** active — their wallet is protected. Your attempt was foiled.`)]
+        });
+    }
+
+    const craftedDefense = await redisService.get<{ active: boolean }>(`crafted_rob_defense:${targetUser.id}`);
+    if (craftedDefense?.active) {
+        await redisService.del(`crafted_rob_defense:${targetUser.id}`);
+        return message.reply({
+            embeds: [errorEmbed(message.author, "Robbery Blocked!", `**${targetUser.displayName}** had Crocodile Hide Armor active. It blocked your robbery attempt.`)]
+        });
+    }
+
+    // Pre-fetch all item states before success roll
+    const [eclipseActive, demonicVuln] = await Promise.all([
+        checkEclipseMask(message.author.id),       // consumed here regardless of outcome
+        checkDemonicVulnerability(targetUser.id),   // not consumed, just checked
+    ]);
+
+    // Compute final success chance
+    let successChance: number = ROB_CONFIG.successRate;
+    successChance = await applyLuckToChance(message.author.id, successChance, 0.05);
+    if (demonicVuln) successChance += 0.05;   // demonic vulnerability makes target easier to rob
+    if (eclipseActive) successChance += 0.12; // eclipse mask bonus
+    successChance = Math.min(0.85, Math.max(0.05, successChance));
+
+    const success = Math.random() < successChance;
+
+    if (success) {
+        const thiefMult = await checkThiefGloves(message.author.id);
+        // Eclipse loot bonus (+15% on success)
+        const eclipseLootMult = eclipseActive ? 1.15 : 1;
+        // Demonic vulnerability optional loot boost (up to +10%)
+        const demonicLootMult = demonicVuln ? 1.05 : 1;
+        const craftedRobBoost = await redisService.get<{ multiplier: number }>(`crafted_rob_boost:${message.author.id}`);
+        const craftedRobMult = craftedRobBoost?.multiplier ?? 1;
+        const robMult = thiefMult * eclipseLootMult * demonicLootMult * craftedRobMult;
+        if (craftedRobBoost) await redisService.del(`crafted_rob_boost:${message.author.id}`);
+        // NOTE: Crown of Greed does NOT apply to rob proceeds (PvP transfer)
+
+        const result = await prisma.$transaction(async (tx) => {
+            const [robber, victim] = await Promise.all([
+                tx.user.findUnique({ where: { discordId: message.author.id }, include: { wallet: true } }),
+                tx.user.findUnique({ where: { discordId: targetUser.id }, include: { wallet: true } })
+            ]);
+
+            if (!robber?.wallet) throw new Error("Robber wallet not found.");
+            if (!victim?.wallet || victim.wallet.balance <= 0) throw new Error("Target has no money.");
+
+            const percent = randomFloat(ROB_CONFIG.stealPctMin, ROB_CONFIG.stealPctMax);
+            const requestedSteal = Math.floor(victim.wallet.balance * percent * robMult);
+            const capSteal = Math.min(requestedSteal, ROB_CONFIG.stealCap);
+            const availableSpace = Math.max(0, MAX_SAFE_BALANCE - robber.wallet.balance);
+            const robAmount = Math.min(capSteal, availableSpace);
+            if (robAmount <= 0) throw new Error("Your wallet is at the maximum balance limit.");
+
+            await tx.wallet.update({ where: { id: victim.wallet.id }, data: { balance: { decrement: robAmount } } });
+            await tx.transaction.create({ data: { walletId: victim.wallet.id, amount: -robAmount, type: "robbed_by", meta: { robber: robber.discordId, percent } } });
+            const updatedWallet = await tx.wallet.update({ where: { id: robber.wallet.id }, data: { balance: { increment: robAmount } } });
+            await tx.transaction.create({ data: { walletId: robber.wallet.id, amount: robAmount, type: "rob_win", meta: { victim: victim.discordId, percent }, isEarned: true } });
+
+            return { robAmount, updatedWallet, percent };
+        });
+
+        return message.reply({
+            embeds: [successEmbed(message.author, "Robbery Successful!", `Stole **${fmtCurrency(result.robAmount)}** from **${targetUser.displayName}**!\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**${craftedRobBoost ? "\n\nWolf Fang Dagger boosted the loot." : ""}`)]
+        });
+    }
+
+    // Failure path
+    const basePenalty = randomInt(ROB_CONFIG.failPenaltyMin, ROB_CONFIG.failPenaltyMax);
+    const crownLoss = await checkCrownOfGreed(message.author.id);
+
+    const result = await prisma.$transaction(async (tx) => {
+        const robber = await tx.user.findUnique({ where: { discordId: message.author.id }, include: { wallet: true } });
+        if (!robber?.wallet) throw new Error("Wallet not found.");
+
+        let penalty = Math.floor(basePenalty * crownLoss);
+        // Eclipse mask extra penalty on failure
+        if (eclipseActive) {
+            const extraPenalty = randomInt(300_000, 900_000);
+            penalty += extraPenalty;
+        }
+        const actualPenalty = Math.min(penalty, robber.wallet.balance);
+        const updatedWallet = actualPenalty > 0
+            ? await tx.wallet.update({ where: { id: robber.wallet.id }, data: { balance: { decrement: actualPenalty } } })
+            : robber.wallet;
+
+        if (actualPenalty > 0) {
+            await tx.transaction.create({ data: { walletId: robber.wallet.id, amount: -actualPenalty, type: "rob_fine", meta: { victim: targetUser.id, requestedPenalty: basePenalty } } });
         }
 
-        msg += `\n\n👮 **Sentence:** <t:${Math.floor(releaseTime.getTime() / 1000)}:R>`;
+        return { actualPenalty, updatedWallet };
+    });
 
-        await prisma.$transaction([prisma.wallet.update({ where: { id: robber.wallet!.id }, data: { balance: { decrement: fineAmount } } }), prisma.transaction.create({ data: { walletId: robber.wallet!.id, amount: -fineAmount, type: "rob_fine", meta: { victim: victim.discordId } } })]);
-        return message.reply({ embeds: [errorEmbed(message.author, "Caught! 🚔", msg)] });
-    }
+    await recordPotentialSoulLedgerLoss(message.author.id, result.actualPenalty);
+
+    const eclipseNote = eclipseActive ? "\n\nThe Eclipse Mask's backlash added an extra penalty." : "";
+    return message.reply({
+        embeds: [errorEmbed(message.author, "Caught!", `The robbery failed and cost you **${fmtCurrency(result.actualPenalty)}**.${eclipseNote}\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**`)]
+    });
 }

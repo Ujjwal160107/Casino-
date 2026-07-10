@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc && node src/scripts/copyAssets.js",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
     "prisma:push": "npx prisma db push",
     "prisma:generate": "npx prisma generate",

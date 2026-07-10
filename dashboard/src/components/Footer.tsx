@@ -1,99 +1,91 @@
-"use client";
-
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
+import { INVITE_URL, SUPPORT_URL, VOTE_URL } from "@/lib/links";
+
+const COLUMNS: {
+  title: string;
+  links: { href: string; label: string; external?: boolean }[];
+}[] = [
+  {
+    title: "Play",
+    links: [
+      { href: "/commands", label: "Commands" },
+      { href: "/docs/casino", label: "Casino games" },
+      { href: "/docs/bank-and-credit", label: "Credit cards" },
+    ],
+  },
+  {
+    title: "Learn",
+    links: [
+      { href: "/docs", label: "Docs" },
+      { href: "/docs/getting-started", label: "Getting started" },
+      { href: "/changelog", label: "Changelog" },
+    ],
+  },
+  {
+    title: "Community",
+    links: [
+      { href: SUPPORT_URL, label: "Support server", external: true },
+      { href: VOTE_URL, label: "Vote on top.gg", external: true },
+      { href: INVITE_URL, label: "Add to Discord", external: true },
+    ],
+  },
+  {
+    title: "Legal",
+    links: [
+      { href: "/terms", label: "Terms" },
+      { href: "/policy", label: "Privacy" },
+    ],
+  },
+];
 
 export function Footer() {
-    return (
-        <footer className="w-full bg-[#0a0a0a] border-t border-white/10 relative z-50 pt-10 pb-6">
-            <div className="max-w-7xl mx-auto px-6">
-
-                {/* Main Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8 mb-10">
-
-                    {/* Brand Column (2 cols wide) */}
-                    <div className="lg:col-span-2 space-y-4">
-                        <h2 className="text-2xl font-bold text-white tracking-wide">FORTUNA</h2>
-                        <p className="text-zinc-500 text-sm leading-relaxed max-w-xs">
-                            The ultimate economy and casino experience for your Discord server. Level up your community today.
-                        </p>
-                        <div className="flex items-center gap-4 pt-2">
-                            <SocialIcon href="https://discord.gg/Y5P44UCH2Y" icon={<MessageCircle size={18} />} />
-                        </div>
-                    </div>
-
-                    {/* Spacer (1 col) - optional for layout balance */}
-                    <div className="hidden lg:block lg:col-span-1"></div>
-
-                    {/* Resources */}
-                    <div>
-                        <h3 className="text-white font-bold mb-4">Resources</h3>
-                        <ul className="space-y-2">
-                            <FooterLink href="/premium">Premium</FooterLink>
-                            <FooterLink href="https://top.gg/bot/1371816936857669702?s=0825a328ae527">Vote</FooterLink>
-                            <FooterLink href="https://discord.gg/Y5P44UCH2Y">Support</FooterLink>
-                            <FooterLink href="/dashboard">Dashboard</FooterLink>
-                        </ul>
-                    </div>
-
-                    {/* Legal */}
-                    <div>
-                        <h3 className="text-white font-bold mb-4">Legal</h3>
-                        <ul className="space-y-2">
-                            <FooterLink href="/terms">Terms</FooterLink>
-                            <FooterLink href="/policy">Privacy</FooterLink>
-                            <FooterLink href="/refund">Refund</FooterLink>
-                        </ul>
-                    </div>
-
-                    {/* Connect */}
-                    <div>
-                        <h3 className="text-white font-bold mb-4">Connect</h3>
-                        <ul className="space-y-2">
-                            <FooterLink href="https://discord.gg/Y5P44UCH2Y">Discord</FooterLink>
-
-                        </ul>
-                    </div>
-
-                </div>
-
-                {/* Bottom Bar */}
-                <div className="border-t border-white/10 pt-8 flex flex-col items-center justify-center text-center">
-                    <p className="text-zinc-600 text-sm">
-                        &copy; {new Date().getFullYear()} FORTUNA. All rights reserved.
-                    </p>
-                </div>
-            </div>
-        </footer>
-    );
-}
-
-function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
-    const isExternal = href.startsWith("http");
-    const Component = isExternal ? "a" : Link;
-
-    return (
-        <li>
-            <Component
-                href={href}
-                {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                className="text-zinc-500 hover:text-white transition-colors text-sm font-medium"
-            >
-                {children}
-            </Component>
-        </li>
-    );
-}
-
-function SocialIcon({ href, icon }: { href: string; icon: React.ReactNode }) {
-    return (
-        <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-zinc-500 hover:text-white transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10"
-        >
-            {icon}
-        </a>
-    );
+  return (
+    <footer className="border-t border-line bg-bg">
+      <div className="mx-auto grid max-w-[90rem] grid-cols-2 gap-10 px-6 py-14 md:grid-cols-6">
+        <div className="col-span-2 space-y-3">
+          <p className="font-display text-xl font-bold text-ink">FORTUNA</p>
+          <p className="max-w-xs text-sm leading-relaxed text-muted">
+            A life simulator inside Discord. One wallet across every
+            server. The house appreciates your business.
+          </p>
+        </div>
+        {COLUMNS.map((col) => (
+          <div key={col.title}>
+            <h3 className="mb-3 text-sm font-bold text-ink">{col.title}</h3>
+            <ul className="space-y-2">
+              {col.links.map((l) =>
+                l.external ? (
+                  <li key={l.label}>
+                    <a
+                      href={l.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-muted transition-colors hover:text-ink"
+                    >
+                      {l.label}
+                    </a>
+                  </li>
+                ) : (
+                  <li key={l.label}>
+                    <Link
+                      href={l.href}
+                      className="text-sm text-muted transition-colors hover:text-ink"
+                    >
+                      {l.label}
+                    </Link>
+                  </li>
+                )
+              )}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-line py-6 text-center">
+        <p className="text-sm text-muted">
+          © {new Date().getFullYear()} Fortuna. The Fortunes are fake. The
+          grudges are real.
+        </p>
+      </div>
+    </footer>
+  );
 }

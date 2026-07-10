@@ -1,4 +1,5 @@
 import prisma from "../utils/prisma";
+import { globalCatalogGuildFilter } from "../utils/globalCatalog";
 import { GuildMember, Client, Colors } from "discord.js";
 import { logToChannel } from "../utils/discordLogger";
 import { Mascot } from "../config/branding";
@@ -101,14 +102,14 @@ async function applyEffect(
             await member.roles.add(effect.roleId);
             const expiresAt = new Date(Date.now() + effect.duration * 1000);
 
+            await getUser(userId);
             await prisma.activeEffect.create({
                 data: {
-                    userId: (await getUser(userId, guildId)).id,
-                    guildId,
+                    userId,
                     effectType: "TEMP_ROLE",
                     value: 0,
                     expiresAt,
-                    meta: { roleId: effect.roleId }
+                    meta: { roleId: effect.roleId, guildId }
                 }
             });
 
@@ -133,7 +134,7 @@ async function applyEffect(
             if (!effect.amount) throw new Error("Missing amount");
 
             const targetUser = await prisma.user.findUnique({
-                where: { discordId_guildId: { discordId: userId, guildId } },
+                where: { discordId: userId },
                 include: { wallet: true }
             });
 
@@ -171,10 +172,14 @@ async function applyEffect(
 
             if (!statName) throw new Error("Missing stat name");
 
-            const shopItem = await prisma.shopItem.findFirst({ where: { name: { equals: "Chicken", mode: "insensitive" }, guildId } });
+            const shopItem = await prisma.shopItem.findFirst({
+                where: globalCatalogGuildFilter({
+                    name: { equals: "Chicken", mode: "insensitive" },
+                }),
+            });
             if (!shopItem) throw new Error("Chicken item not configured");
 
-            const chickenInv = await prisma.inventory.findUnique({ where: { userId_shopItemId: { userId: (await getUser(userId, guildId)).id, shopItemId: shopItem.id } } });
+            const chickenInv = await prisma.inventory.findUnique({ where: { userId_shopItemId: { userId, shopItemId: shopItem.id } } });
             if (!chickenInv || chickenInv.amount < 1) throw new Error("You do not own a chicken to boost.");
 
             const meta = (chickenInv.meta as any) || {};
@@ -193,14 +198,13 @@ async function applyEffect(
             };
 
         case "DEATH_SAVE":
-            const dsUser = await getUser(userId, guildId);
+            await getUser(userId);
             const dsDuration = effect.duration || 86400;
             const dsExpires = new Date(Date.now() + dsDuration * 1000);
 
             await prisma.activeEffect.create({
                 data: {
-                    userId: dsUser.id,
-                    guildId,
+                    userId,
                     effectType: "DEATH_SAVE",
                     value: 1,
                     expiresAt: dsExpires
@@ -216,14 +220,13 @@ async function applyEffect(
 
         case "PAY_MULTIPLIER":
         case "COOLDOWN_REDUCTION": {
-            const effectUser = await getUser(userId, guildId);
-            const duration = effect.duration || 86400; // Default 24h
+            await getUser(userId);
+            const duration = effect.duration || 86400;
             const exp = new Date(Date.now() + duration * 1000);
 
             await prisma.activeEffect.create({
                 data: {
-                    userId: effectUser.id,
-                    guildId,
+                    userId,
                     effectType: effect.type,
                     value: effect.value || 0,
                     expiresAt: exp
@@ -242,7 +245,7 @@ async function applyEffect(
         case "STRESS_REDUCE":
             const stressAmount = effect.amount || effect.value || 10;
             const stressUser = await prisma.user.findUnique({
-                where: { discordId_guildId: { discordId: userId, guildId } }
+                where: { discordId: userId }
             });
 
             if (!stressUser || stressUser.jobStress <= 0) {
@@ -256,7 +259,7 @@ async function applyEffect(
             const newStress = Math.max(0, oldStress - stressAmount);
 
             await prisma.user.update({
-                where: { id: stressUser.id },
+                where: { discordId: userId },
                 data: { jobStress: newStress }
             });
 
@@ -268,15 +271,14 @@ async function applyEffect(
             };
 
         case "EXAM_BOOST":
-            const examBoostDuration = effect.duration || 3600; // 1 hour default
+            const examBoostDuration = effect.duration || 3600;
             const examBoostValue = effect.value || 1;
 
-            const ebUser = await getUser(userId, guildId);
+            await getUser(userId);
 
             await prisma.activeEffect.create({
                 data: {
-                    userId: ebUser.id,
-                    guildId,
+                    userId,
                     effectType: "EXAM_BOOST",
                     value: examBoostValue,
                     expiresAt: new Date(Date.now() + examBoostDuration * 1000)
@@ -291,14 +293,13 @@ async function applyEffect(
             };
 
         case "XP_MULTIPLIER": {
-            const xpUser = await getUser(userId, guildId);
+            await getUser(userId);
             const duration = effect.duration || 3600;
             const exp = new Date(Date.now() + duration * 1000);
 
             await prisma.activeEffect.create({
                 data: {
-                    userId: xpUser.id,
-                    guildId,
+                    userId,
                     effectType: "XP_MULTIPLIER",
                     value: effect.multiplier || 1.5,
                     expiresAt: exp
@@ -314,12 +315,11 @@ async function applyEffect(
         }
 
         case "LEVEL_BOOST": {
-            const lbUser = await getUser(userId, guildId);
+            await getUser(userId);
             const levels = effect.levels || 1;
 
-            // Increment level directly
             await prisma.user.update({
-                where: { id: lbUser.id },
+                where: { discordId: userId },
                 data: { level: { increment: levels } }
             });
 
@@ -349,23 +349,21 @@ async function logEffectAction(client: Client, guildId: string, type: string, de
     });
 }
 
-async function getUser(discordId: string, guildId: string) {
+async function getUser(discordId: string) {
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId, guildId } }
+        where: { discordId }
     });
     if (!user) throw new Error("User not found");
     return user;
 }
 
-export async function getActiveEffects(userId: string, guildId: string) {
-    const user = await getUser(userId, guildId);
-
-    await cleanExpiredEffects(user.id);
+export async function getActiveEffects(userId: string, _guildId?: string) {
+    await getUser(userId);
+    await cleanExpiredEffects(userId);
 
     return prisma.activeEffect.findMany({
         where: {
-            userId: user.id,
-            guildId,
+            userId,
             OR: [
                 { expiresAt: { gt: new Date() } },
                 { expiresAt: null }
@@ -401,8 +399,9 @@ export async function removeTemporaryRoles(client: Client) {
     for (const effect of expiredRoleEffects) {
         try {
             const roleId = (effect.meta as any)?.roleId;
-            if (roleId) {
-                const guild = await client.guilds.fetch(effect.guildId).catch(() => null);
+            const guildId = (effect.meta as any)?.guildId;
+            if (roleId && guildId) {
+                const guild = await client.guilds.fetch(guildId).catch(() => null);
                 if (guild) {
                     const member = await guild.members.fetch(effect.user.discordId).catch(() => null);
                     if (member) {

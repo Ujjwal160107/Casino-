@@ -1,5 +1,4 @@
 import { GameConfig, EquipmentSlot } from "../config/gameConfig";
-import { GuildConfig } from "@prisma/client";
 
 export interface StatBonus {
     str: number;
@@ -28,9 +27,18 @@ export function getEquipmentSlot(itemName: string): EquipmentSlot | null {
     return null;
 }
 
+const NAMED_EQUIPMENT_BONUSES: Record<string, StatBonus> = {
+    "iron spurs": { str: 3, agi: 0, def: 0 },
+    "guard vest": { str: 0, agi: 0, def: 4 },
+};
+
 export function getEquipmentBonuses(itemName: string | undefined): StatBonus {
     if (!itemName) return { str: 0, agi: 0, def: 0 };
     const name = itemName.toLowerCase();
+
+    const named = NAMED_EQUIPMENT_BONUSES[name];
+    if (named) return { ...named };
+
     const bonus = { str: 0, agi: 0, def: 0 };
 
     // --- Material Bonuses ---
@@ -120,17 +128,12 @@ export function getWinChance(myScore: number, enemyScore: number): number {
     return (myScore / total) * 100;
 }
 
-export function getGameBetLimits(config: GuildConfig, gameKey: string): { min: number, max: number } {
-    const limits = (config.gameBetLimits as any) || {};
-    const gameLimits = limits[gameKey] || {};
+import { GAME_BET_LIMITS } from "./economyConfig";
 
-    const globalMin = config.minBet || 100;
-    const globalMax = config.maxBet || 100000;
-
-    const min = typeof gameLimits.min === "number" ? gameLimits.min : globalMin;
-    let max = (typeof gameLimits.max === "number" && gameLimits.max !== 0) ? gameLimits.max : globalMax;
-
-    if (max === -1) max = Infinity;
-
-    return { min, max };
+export function getGameBetLimits(gameKey: string): { min: number; max: number } {
+    const perGame = GAME_BET_LIMITS.perGameMax as Record<string, number | undefined>;
+    return {
+        min: GAME_BET_LIMITS.defaultMin,
+        max: perGame[gameKey] ?? GAME_BET_LIMITS.defaultMax,
+    };
 }

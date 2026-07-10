@@ -4,13 +4,13 @@ import { transferAnyFunds } from "../../services/transferService";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { fmtAmount, fmtCurrency, parseSmartAmount } from "../../utils/format";
 import { logToChannel } from "../../utils/discordLogger";
-import { getGuildConfig } from "../../services/guildConfigService";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleTransfer(message: Message, args: string[]) {
   try {
-    const config = await getGuildConfig(message.guildId!);
+    const prefix = await getGuildPrefix(message.guildId!);
     if (args.length < 2) {
-      return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${config.prefix}transfer @user <amount>\``)] });
+      return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}transfer @user <amount>\``)] });
     }
     const targetMention = args[0];
     const amountString = args[1];
@@ -27,16 +27,21 @@ export async function handleTransfer(message: Message, args: string[]) {
       return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please enter a valid positive number for the amount.")] });
     }
     try {
-      await transferAnyFunds(sender.wallet!.id, toId, amount, message.author.id, message.guildId ?? undefined);
+      const taxResult = await transferAnyFunds(sender.wallet!.id, toId, amount, message.author.id, message.guildId ?? undefined);
 
       await logToChannel(message.client, {
         guild: message.guild!,
         type: "ECONOMY",
         title: "Transfer",
-        description: `**From:** <@${sender.discordId}>\n**To:** <@${toId}>\n**Amount:** ${fmtCurrency(amount, config.currencyEmoji)}`,
+        description: `**From:** <@${sender.discordId}>\n**To:** <@${toId}>\n**Amount:** ${fmtCurrency(amount)}\n**Tax:** ${taxResult.shielded ? "🛡️ Shielded" : fmtCurrency(taxResult.taxPaid)}\n**Received:** ${fmtCurrency(taxResult.net)}`,
         color: 0x00FFFF
       });
-      return message.reply({ embeds: [successEmbed(message.author, "Transfer Successful", `Transferred **${fmtAmount(amount)}** to <@${toId}>.`)] });
+
+      const taxLine = taxResult.shielded
+        ? "Tax: 🛡️ Shielded"
+        : `Transfer Tax (5%): -${fmtCurrency(taxResult.taxPaid)} | Recipient receives: ${fmtCurrency(taxResult.net)}`;
+
+      return message.reply({ embeds: [successEmbed(message.author, "Transfer Successful", `Sent **${fmtAmount(amount)}** to <@${toId}>.\n${taxLine}`)] });
     } catch (err) {
       return message.reply({ embeds: [errorEmbed(message.author, "Transfer Failed", (err as Error).message)] });
     }

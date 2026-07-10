@@ -1,62 +1,111 @@
-import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
-import prisma from "../../utils/prisma";
-import { Mascot, getEmoteUrl } from "../../config/branding";
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ContainerBuilder,
+  Message,
+  MessageFlags,
+  SectionBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder
+} from "discord.js";
+import { Mascot } from "../../config/branding";
+import { getRelaxSnapshot, listRelaxOptions } from "../../services/relaxService";
 import { fmtCurrency } from "../../utils/format";
-import { getGuildConfig } from "../../services/guildConfigService";
+import { getGuildPrefix } from "../../utils/guildContext";
 
-export async function handleRelax(message: Message) {
-    if (!message.guild) return;
+const RELAX_ACCENT_COLOR = 0x2ECC71;
 
-    const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: message.author.id, guildId: message.guild.id } }
-    });
+function separator() {
+  return new SeparatorBuilder()
+    .setDivider(true)
+    .setSpacing(SeparatorSpacingSize.Small);
+}
 
-    if (!user) return;
+export function buildRelaxCustomId(ownerId: string, optionId: string) {
+  return `relax:${ownerId}:${optionId}`;
+}
 
-    // Check existing stress
-    if (user.jobStress <= 0) {
-        const embed = new EmbedBuilder()
-            .setTitle(`${Mascot.Emotes.Think} No Stress Detected`)
-            .setDescription("You are totally chill! **0/100 Stress**. No need to relax right now.\nGet back to work!")
-            .setColor("#2ECC71");
-        return message.reply({ embeds: [embed] });
-    }
+export async function buildRelaxDashboard(ownerId: string, guildId: string, username: string) {
+  const prefix = await getGuildPrefix(guildId);
+  const snapshot = await getRelaxSnapshot(ownerId, username);
+  const totalStress = snapshot.jobStress + (snapshot.educationStress ?? 0);
 
-    const config = await getGuildConfig(message.guild.id);
-    // Calculate Dynamic Prices or Use Config
-    const { getJob, getJobPay } = require("../../services/jobService"); // Dynamic import
+  const container = new ContainerBuilder()
+    .setAccentColor(RELAX_ACCENT_COLOR)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Meditation} Relax & Recover`),
+      new TextDisplayBuilder().setContent(
+        `**Wallet:** ${fmtCurrency(snapshot.walletBalance)}\n` +
+        `**Job Stress:** ${snapshot.jobStress}/100\n` +
+        `**Education Stress:** ${snapshot.hasEducation ? `${snapshot.educationStress}/100` : "Not enrolled"}`,
+      ),
+    )
+    .addSeparatorComponents(separator());
 
-    // Parse dashboard config
-    const relaxConfig = (config.jobRelaxControllers as Record<string, number>) || {};
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  let currentRow = new ActionRowBuilder<ButtonBuilder>();
 
-    let basePay = 1000;
-    if (user.jobId) {
-        const job = getJob(user.jobId);
-        if (job) basePay = await getJobPay(job, message.guild.id);
-    }
+  for (const option of listRelaxOptions()) {
+    const canUse = totalStress > 0 && snapshot.walletBalance >= option.cost;
+    const status = totalStress <= 0
+      ? "No stress"
+      : snapshot.walletBalance >= option.cost
+        ? "Available"
+        : "Not enough wallet funds";
 
-    const costs = {
-        gym: relaxConfig.gym || Math.floor(basePay * 0.75),
-        sports: relaxConfig.sports || Math.floor(basePay * 0.50),
-        meditation: relaxConfig.meditation || Math.floor(basePay * 0.25)
-    };
+    container
+      .addSectionComponents(
+        new SectionBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              `### ${option.name}\n` +
+              `**Cost:** ${fmtCurrency(option.cost)}\n` +
+              `**Reduces:** Job -${option.jobStressReduction}, Education -${option.educationStressReduction}\n` +
+              `**Status:** ${status}`,
+            ),
+          )
+          .setButtonAccessory(
+            new ButtonBuilder()
+              .setCustomId(buildRelaxCustomId(ownerId, option.id))
+              .setLabel(canUse ? "Choose" : "Locked")
+              .setStyle(canUse ? ButtonStyle.Success : ButtonStyle.Secondary)
+              .setEmoji(canUse ? Mascot.Emotes.Accept : Mascot.Emotes.Lock)
+              .setDisabled(!canUse),
+          ),
+      )
+      .addSeparatorComponents(separator());
 
-    const embed = new EmbedBuilder()
-        .setTitle(`Relax & Recover`)
-        .setDescription(`Your current stress level is **${user.jobStress}/100**.\nHigh stress increases the chance of **Burnout** during work shifts!\n\nChoose an activity to reduce stress:`)
-        .addFields(
-            { name: `${Mascot.Emotes.Gym} Gym`, value: `**${fmtCurrency(costs.gym, config.currencyEmoji)}**\n-30 Stress`, inline: true },
-            { name: `${Mascot.Emotes.Sports} Sports`, value: `**${fmtCurrency(costs.sports, config.currencyEmoji)}**\n-20 Stress`, inline: true },
-            { name: `${Mascot.Emotes.Meditation} Meditate`, value: `**${fmtCurrency(costs.meditation, config.currencyEmoji)}**\n-15 Stress`, inline: true }
-        )
-        .setColor(Mascot.Colors.Base as any)
-        .setFooter({ text: "Costs are deducted from your wallet." });
-
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId("confirm_stress_gym").setLabel("Gym").setStyle(ButtonStyle.Primary).setEmoji(Mascot.Emotes.Gym),
-        new ButtonBuilder().setCustomId("confirm_stress_sports").setLabel("Sports").setStyle(ButtonStyle.Success).setEmoji(Mascot.Emotes.Sports),
-        new ButtonBuilder().setCustomId("confirm_stress_meditation").setLabel("Meditate").setStyle(ButtonStyle.Secondary).setEmoji(Mascot.Emotes.Meditation)
+    currentRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(buildRelaxCustomId(ownerId, option.id))
+        .setLabel(option.name)
+        .setStyle(canUse ? ButtonStyle.Success : ButtonStyle.Secondary)
+        .setDisabled(!canUse),
     );
 
-    await message.reply({ embeds: [embed], components: [row] });
+    if (currentRow.components.length === 4) {
+      rows.push(currentRow);
+      currentRow = new ActionRowBuilder<ButtonBuilder>();
+    }
+  }
+
+  if (currentRow.components.length > 0) rows.push(currentRow);
+
+  return {
+    container,
+    rows,
+    snapshot
+  };
+}
+
+export async function handleRelax(message: Message) {
+  if (!message.guild) return;
+
+  const dashboard = await buildRelaxDashboard(message.author.id, message.guild.id, message.author.username);
+  await message.reply({
+    components: [dashboard.container],
+    flags: MessageFlags.IsComponentsV2,
+  });
 }

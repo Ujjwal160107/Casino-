@@ -5,9 +5,9 @@ import { ensureBankForUser } from "../../services/bankService";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { fmtCurrency, parseSmartAmount } from "../../utils/format";
 import { logToChannel } from "../../utils/discordLogger";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
 import { Mascot } from "../../config/branding";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleAddMoney(message: Message, args: string[]) {
   if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
@@ -37,8 +37,8 @@ export async function handleAddMoney(message: Message, args: string[]) {
     return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Usage: `!add-money @user <amount> [wallet/bank]`")] });
   }
 
-  const config = await getGuildConfig(message.guildId!);
-  const emoji = config.currencyEmoji;
+  const prefix = await getGuildPrefix(message.guildId!);
+  
 
   // --- ROLE HANDLING ---
   if (mention.startsWith("<@&")) {
@@ -67,7 +67,7 @@ export async function handleAddMoney(message: Message, args: string[]) {
         const target = await ensureUserAndWallet(member.id, message.guildId!, member.user.username);
 
         if (targetType === "bank") {
-          const bank = await ensureBankForUser(target.id);
+          const bank = await ensureBankForUser(target.discordId, member.user.username);
           await prisma.$transaction([
             prisma.transaction.create({
               data: { walletId: target.wallet!.id, amount, type: "admin_add_bank", meta: { by: message.author.id, role: role.name }, isEarned: false }
@@ -95,7 +95,7 @@ export async function handleAddMoney(message: Message, args: string[]) {
 
     return statusMsg.edit({
       content: "",
-      embeds: [successEmbed(message.author, "Role Payment Complete", `Added **${fmtCurrency(amount, emoji)}** to **${count}** users in **${role.name}** (**${targetType === "bank" ? "Bank" : "Wallet"}**).`)]
+      embeds: [successEmbed(message.author, "Role Payment Complete", `Added **${fmtCurrency(amount)}** to **${count}** users in **${role.name}** (**${targetType === "bank" ? "Bank" : "Wallet"}**).`)]
     });
   }
 
@@ -104,7 +104,7 @@ export async function handleAddMoney(message: Message, args: string[]) {
   const target = await ensureUserAndWallet(discordId, message.guildId!, "Unknown");
 
   if (targetType === "bank") {
-    const bank = await ensureBankForUser(target.id);
+    const bank = await ensureBankForUser(target.discordId, "Unknown");
     const [_, updatedBank] = await prisma.$transaction([
       prisma.transaction.create({
         data: {
@@ -122,7 +122,7 @@ export async function handleAddMoney(message: Message, args: string[]) {
       prisma.audit.create({
         data: {
           guildId: message.guildId ?? undefined,
-          userId: target.id,
+          userId: target.discordId,
           type: "admin_add",
           meta: { amount, target: "bank", by: message.author.id }
         }
@@ -132,12 +132,12 @@ export async function handleAddMoney(message: Message, args: string[]) {
       guild: message.guild!,
       type: "ADMIN",
       title: "Money Added (Bank)",
-      description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Amount:** +${fmtCurrency(amount, emoji)}\n**New Bank Balance:** ${fmtCurrency(updatedBank.balance, emoji)}`,
+      description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Amount:** +${fmtCurrency(amount)}\n**New Bank Balance:** ${fmtCurrency(updatedBank.balance)}`,
       color: 0x00FF00
     });
-    const displayAmount = amount === MAX_INT ? "Infinity" : fmtCurrency(amount, emoji);
+    const displayAmount = amount === MAX_INT ? "Infinity" : fmtCurrency(amount);
     return message.reply({
-      embeds: [successEmbed(message.author, "Money Added", `Added **${displayAmount}** to ${mention}'s **Bank**.\nNew Balance: **${fmtCurrency(updatedBank.balance, emoji)}**`)]
+      embeds: [successEmbed(message.author, "Money Added", `Added **${displayAmount}** to ${mention}'s **Bank**.\nNew Balance: **${fmtCurrency(updatedBank.balance)}**`)]
     });
   } else {
     const [_, updatedWallet] = await prisma.$transaction([
@@ -157,7 +157,7 @@ export async function handleAddMoney(message: Message, args: string[]) {
       prisma.audit.create({
         data: {
           guildId: message.guildId ?? undefined,
-          userId: target.id,
+          userId: target.discordId,
           type: "admin_add",
           meta: { amount, target: "wallet", by: message.author.id }
         }
@@ -168,12 +168,12 @@ export async function handleAddMoney(message: Message, args: string[]) {
         guild: message.guild!,
         type: "ADMIN",
         title: "Money Added (Wallet)",
-        description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Amount:** +${fmtCurrency(amount, emoji)}\n**New Wallet Balance:** ${fmtCurrency(updatedWallet.balance, emoji)}`,
+        description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Amount:** +${fmtCurrency(amount)}\n**New Wallet Balance:** ${fmtCurrency(updatedWallet.balance)}`,
         color: 0x00FF00
       });
-      const displayAmount = amount === MAX_INT ? "Infinity" : fmtCurrency(amount, emoji);
+      const displayAmount = amount === MAX_INT ? "Infinity" : fmtCurrency(amount);
       return message.reply({
-        embeds: [successEmbed(message.author, "Money Added", `Added **${displayAmount}** to ${mention}'s **Wallet**.\nNew Balance: **${fmtCurrency(updatedWallet.balance, emoji)}**`)]
+        embeds: [successEmbed(message.author, "Money Added", `Added **${displayAmount}** to ${mention}'s **Wallet**.\nNew Balance: **${fmtCurrency(updatedWallet.balance)}**`)]
       });
     }
   }

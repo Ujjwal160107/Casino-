@@ -7,3 +7,6 @@ dist/
 build/
 coverage/
 .DS_Store
+
+# Superpowers SDD working artifacts (local process scratch)
+.superpowers/

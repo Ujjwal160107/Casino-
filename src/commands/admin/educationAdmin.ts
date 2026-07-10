@@ -1,8 +1,10 @@
 import { Message, EmbedBuilder } from "discord.js";
 import prisma from "../../utils/prisma";
-import { getGuildConfig, updateGuildConfig } from "../../services/guildConfigService";
-import { fmtCurrency, parseDuration, formatDuration } from "../../utils/format";
-import { Mascot, getEmoteUrl } from "../../config/branding";
+import { GLOBAL_CATALOG_GUILD_ID } from "../../utils/globalCatalog";
+import { fmtCurrency } from "../../utils/format";
+import { Mascot } from "../../config/branding";
+import { DEVELOPER_ONLY_COMMAND_MESSAGE, isBotDeveloper } from "../../utils/developerAccess";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 const ADMIN_EMOJI = "<:admin:1451280807535968256>"; // Keep admin specific? Or make generic? User said remove default emojis. This looks custom.
 // Let's use Mascot.Emotes for Success/Fail/Etc.
@@ -11,8 +13,8 @@ const CHECK_EMOJI = Mascot.Emotes.Success;
 
 // Helper to check admin permissions
 async function checkAdmin(message: Message) {
-    if (!message.member?.permissions.has("Administrator")) {
-        message.reply(`${Mascot.Emotes.Fail} You need **Administrator** permissions to use this command.`);
+    if (!isBotDeveloper(message.author.id)) {
+        message.reply(`${Mascot.Emotes.Fail} ${DEVELOPER_ONLY_COMMAND_MESSAGE}`);
         return false;
     }
     return true;
@@ -36,11 +38,9 @@ export async function handleSetInt(message: Message, args: string[]) {
         return message.reply(`${Mascot.Emotes.Fail} Intelligence must be between 0 and 10.`);
     }
 
-    const guildId = message.guild!.id;
-
     // Fetch user with education to update both
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: targetUser.id, guildId } },
+        where: { discordId: targetUser.id },
         include: { currentEducation: true }
     });
 
@@ -50,19 +50,10 @@ export async function handleSetInt(message: Message, args: string[]) {
 
     // Update Transaction
     await prisma.$transaction(async (tx) => {
-        // 1. Update Base Intelligence
         await tx.user.update({
-            where: { id: user.id },
+            where: { discordId: user.discordId },
             data: { intelligence: Math.floor(val) }
         });
-
-        // 2. Update Current GPA (Intelligence Progress) if enrolled
-        if (user.currentEducation) {
-            await tx.userEducation.update({
-                where: { id: user.currentEducation.id },
-                data: { currentGpa: val } // Use exact float value for progress
-            });
-        }
     });
 
     const embed = new EmbedBuilder()
@@ -85,15 +76,14 @@ export async function handleSetDis(message: Message, args: string[]) {
         return message.reply(`${Mascot.Emotes.Fail} Discipline must be between 0 and 100.`);
     }
 
-    const guildId = message.guild!.id;
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: targetUser.id, guildId } }
+        where: { discordId: targetUser.id }
     });
 
     if (!user) return message.reply(`${Mascot.Emotes.Fail} User not found.`);
 
     await prisma.user.update({
-        where: { id: user.id },
+        where: { discordId: user.discordId },
         data: { discipline: Math.floor(val) }
     });
 
@@ -109,19 +99,18 @@ export async function handleResetEdu(message: Message, args: string[]) {
     const targetUser = message.mentions.users.first();
     if (!targetUser) return message.reply(`${Mascot.Emotes.Fail} Usage: \`!resetedu @user\``);
 
-    const guildId = message.guild!.id;
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: targetUser.id, guildId } },
+        where: { discordId: targetUser.id },
         include: { currentEducation: true, degrees: true }
     });
 
     if (!user) return message.reply(`${Mascot.Emotes.Fail} User not found.`);
 
     await prisma.$transaction([
-        prisma.userEducation.deleteMany({ where: { userId: user.id } }),
-        prisma.userDegree.deleteMany({ where: { userId: user.id } }),
+        prisma.userEducation.deleteMany({ where: { userId: user.discordId } }),
+        prisma.userDegree.deleteMany({ where: { userId: user.discordId } }),
         prisma.user.update({
-            where: { id: user.id },
+            where: { discordId: user.discordId },
             data: { intelligence: 0, discipline: 0 }
         })
     ]);
@@ -138,23 +127,34 @@ export async function handleGrantDegree(message: Message, args: string[]) {
     const guildId = message.guild!.id;
 
     const degree = await prisma.degree.findFirst({
-        where: { guildId, name: { contains: degreeNameQuery, mode: 'insensitive' } }
+        where: { guildId: GLOBAL_CATALOG_GUILD_ID, name: { contains: degreeNameQuery, mode: 'insensitive' } }
     });
 
     if (!degree) return message.reply(`${Mascot.Emotes.Fail} Degree not found matching "${degreeNameQuery}".`);
 
     const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: targetUser.id, guildId } }
+        where: { discordId: targetUser.id }
     });
 
     if (!user) return message.reply(`${Mascot.Emotes.Fail} User not found.`);
 
-    // Grant Degree
-    await prisma.userDegree.create({
-        data: {
-            userId: user.id,
+    await prisma.userDegree.upsert({
+        where: {
+            userId_degreeId: {
+                userId: user.discordId,
+                degreeId: degree.id
+            }
+        },
+        update: {
+            finalGpa: 0,
+            finalXp: degree.xpRequired,
+            obtainedAt: new Date()
+        },
+        create: {
+            userId: user.discordId,
             degreeId: degree.id,
-            finalGpa: 10.0,
+            finalGpa: 0,
+            finalXp: degree.xpRequired,
             obtainedAt: new Date()
         }
     });
@@ -173,13 +173,13 @@ export async function handleSetDegreeCost(message: Message, args: string[]) {
 
     const degreeNameQuery = args.slice(0, args.length - 1).join(" "); // Remove cost
     const guildId = message.guild!.id;
-    const config = await getGuildConfig(guildId);
+    const prefix = await getGuildPrefix(guildId);
 
     // Better parsing: join all except last.
     const query = args.slice(0, -1).join(" ");
 
     const degree = await prisma.degree.findFirst({
-        where: { guildId, name: { contains: query, mode: 'insensitive' } }
+        where: { guildId: GLOBAL_CATALOG_GUILD_ID, name: { contains: query, mode: 'insensitive' } }
     });
 
     if (!degree) return message.reply(`${Mascot.Emotes.Fail} Degree not found matching "${query}".`);
@@ -191,28 +191,8 @@ export async function handleSetDegreeCost(message: Message, args: string[]) {
 
     const embed = new EmbedBuilder()
         .setTitle("Degree cost Updated")
-        .setDescription(`${Mascot.Emotes.Accept} Updated **${degree.name}** tuition to **${fmtCurrency(cost, config.currencyEmoji)}**`)
+        .setDescription(`${Mascot.Emotes.Accept} Updated **${degree.name}** tuition to **${fmtCurrency(cost)}**`)
         .setColor("#2ECC71");
 
     message.reply({ embeds: [embed] });
-}
-
-export async function handleSetStudyCooldown(message: Message, args: string[]) {
-    if (!(await checkAdmin(message))) return;
-    const cdStr = args[0]?.toLowerCase();
-
-    let cd = 0;
-    if (cdStr === "off") {
-        cd = 0;
-    } else {
-        const parsed = parseDuration(cdStr);
-        if (parsed === null || parsed < 0) return message.reply(`${Mascot.Emotes.Fail} Usage: \`!setstudycd <30s/5m/1h>\` or \`!setstudycd off\``);
-        cd = parsed;
-    }
-
-    const guildId = message.guild!.id;
-    await updateGuildConfig(guildId, { studyCooldown: cd });
-
-    const valStr = cd === 0 ? "OFF" : `**${formatDuration(cd * 1000)}**`;
-    message.reply(`${Mascot.Emotes.Success} Study cooldown set to ${valStr}.`);
 }

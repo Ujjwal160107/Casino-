@@ -16,8 +16,8 @@ import {
 } from "discord.js";
 import * as path from "path";
 import { Mascot } from "../../config/branding";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { CHERRY, BANANA, GRAPES, MELON, BELL, GEM, SEVEN } from "../games/slots";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 const CASINO_ACCENT_COLOR = 0x9B59B6;
 const CASINO_BANNER_NAME = "casino_banner.png";
@@ -162,8 +162,8 @@ function buildGuidePageNavigationRow(page: number, totalPages: number, disabled 
 export async function handleCasinoGuide(message: Message) {
     const bannerPath = path.join(process.cwd(), "src", "assets", "casino_banner.png");
     const attachment = new AttachmentBuilder(bannerPath, { name: CASINO_BANNER_NAME });
-    const guildConfig = await getGuildConfig(message.guildId!);
-    const prefix = guildConfig.prefix || "!";
+    const prefix = await getGuildPrefix(message.guildId!);
+    
 
     const guideItems: GuideListItem[] = [
         {

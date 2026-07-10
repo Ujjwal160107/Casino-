@@ -13,6 +13,7 @@ import {
 import prisma from "../utils/prisma";
 import { Mascot } from "../config/branding";
 import { ensureUserAndWallet } from "./walletService";
+import { ensureDeferredEphemeralReply, safeEditReply, safeReply } from "../utils/interactionHelpers";
 
 const FEEDBACK_FORM_URL = "https://forms.gle/sWAH2EyWVNhu3eYV7";
 const REMINDER_ACCENT_COLOR = 0x9B59B6;
@@ -97,9 +98,9 @@ export async function maybeSendGlobalEconomyReminder(message: Message, commandCo
 
   const user = await ensureUserAndWallet(message.author.id, message.guildId, message.author.tag);
   const fullUser = await prisma.user.findUnique({
-    where: { discordId_guildId: { discordId: message.author.id, guildId: message.guildId } },
+    where: { discordId: message.author.id },
     select: {
-      id: true,
+      discordId: true,
       globalAnnouncementFormFilled: true,
       globalAnnouncementReminderDate: true,
       globalAnnouncementReminderCount: true,
@@ -116,7 +117,7 @@ export async function maybeSendGlobalEconomyReminder(message: Message, commandCo
   if (reminderCount >= REMINDER_LIMIT_PER_DAY) return;
 
   await prisma.user.update({
-    where: { id: user.id },
+    where: { discordId: user.discordId },
     data: {
       globalAnnouncementReminderDate: today,
       globalAnnouncementReminderCount: reminderCount + 1,
@@ -128,15 +129,18 @@ export async function maybeSendGlobalEconomyReminder(message: Message, commandCo
 
 export async function handleGlobalEconomyReminderInteraction(interaction: ButtonInteraction) {
   if (!interaction.guildId) {
-    return interaction.reply({
+    await safeReply(interaction, {
       content: "This reminder can only be updated inside a server.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
+    return;
   }
+
+  if (!await ensureDeferredEphemeralReply(interaction, MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral)) return;
 
   await ensureUserAndWallet(interaction.user.id, interaction.guildId, interaction.user.tag);
   await prisma.user.update({
-    where: { discordId_guildId: { discordId: interaction.user.id, guildId: interaction.guildId } },
+    where: { discordId: interaction.user.id },
     data: {
       globalAnnouncementFormFilled: true,
       globalAnnouncementReminderDate: getUtcDayStart(),
@@ -144,7 +148,7 @@ export async function handleGlobalEconomyReminderInteraction(interaction: Button
     },
   });
 
-  return interaction.reply({
+  await safeEditReply(interaction, {
     components: [
       new ContainerBuilder()
         .setAccentColor(0x2ECC71)

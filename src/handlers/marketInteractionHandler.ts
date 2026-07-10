@@ -1,408 +1,101 @@
-
-import { Interaction, ButtonInteraction, ModalSubmitInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, ContainerBuilder, TextDisplayBuilder, MessageFlags } from "discord.js";
-import { listItemOnMarket, listPropertyOnMarket, buyItemFromMarket, getMarketListings, getUserListings, cancelListing } from "../services/marketService";
-import { getGuildConfig } from "../services/guildConfigService";
-import prisma from "../utils/prisma";
-import { logToChannel } from "../utils/discordLogger";
-import { fmtCurrency, parseSmartAmount } from "../utils/format";
-import { Mascot } from "../config/branding";
-import { PropertyService } from "../services/propertyService";
 import {
-    buildPropertiesMarketContainer,
-    buildPropertiesNavigationRow,
-    getPropertiesTotalPages,
-    propertyBannerAttachment,
+  AttachmentBuilder,
+  ContainerBuilder,
+  Interaction,
+  MessageFlags,
+  TextDisplayBuilder,
+} from "discord.js";
+import {
+  buildPropertiesMarketContainer,
+  buildPropertiesNavigationRow,
+  buildPropertyBuyRow,
+  getPropertiesTotalPages,
 } from "../commands/economy/properties";
+import { PropertyService, seedGlobalProperties } from "../services/propertyService";
+import { GLOBAL_CURRENCY_EMOJI, Mascot } from "../config/branding";
+import { ensureDeferredEphemeralReply, ensureDeferredUpdate, safeEditReply, safeReply } from "../utils/interactionHelpers";
+import { getGuildPrefix } from "../utils/guildContext";
 
-const EPHEMERAL_COMPONENTS_V2_FLAGS = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
-
-function simplePropertyContainer(title: string, body: string, accentColor = 0x9B59B6) {
-    return new ContainerBuilder()
-        .setAccentColor(accentColor)
-        .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(`**${title}**`),
-            new TextDisplayBuilder().setContent(body),
-        );
+function textContainer(title: string, body: string, color = 0x9B59B6) {
+  return new ContainerBuilder()
+    .setAccentColor(color)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`**${title}**`),
+      new TextDisplayBuilder().setContent(body),
+    );
 }
 
 export async function handleMarketInteraction(interaction: Interaction) {
-    if (interaction.isButton()) {
-        await handleButton(interaction);
-    } else if (interaction.isModalSubmit()) {
-        await handleModal(interaction);
-    } else if (interaction.isStringSelectMenu()) {
-        await handleSelectMenu(interaction);
-    }
-}
+  if (!interaction.isButton()) return;
 
-async function handleButton(interaction: ButtonInteraction) {
-    const { customId, user, guildId } = interaction;
-    if (!guildId) return;
+  const id = interaction.customId;
+  const guildId = interaction.guildId;
+  if (!guildId) {
+    await safeReply(interaction, { content: "This interaction only works inside a server.", flags: MessageFlags.Ephemeral });
+    return;
+  }
 
-    try {
-        if (customId.startsWith("property_page_")) {
-            const customIdParts = customId.split("_");
-            const page = parseInt(customIdParts[customIdParts.length - 1] || "1", 10) || 1;
-            const config = await getGuildConfig(guildId);
-            const properties = await PropertyService.getAllProperties(guildId);
-            const container = buildPropertiesMarketContainer(properties, {
-                currencyEmoji: config.currencyEmoji || Mascot.Emotes.Blackcoin,
-                prefix: config.prefix || "!",
-                page,
-            });
-            const navigationRow = buildPropertiesNavigationRow(getPropertiesTotalPages(properties), page);
+  if (id.startsWith("property_page_")) {
+    await ensureDeferredUpdate(interaction);
+    const parts = id.split("_");
+    const page = parseInt(parts[parts.length - 1], 10) || 1;
 
-            await interaction.update({
-                components: [container, navigationRow],
-                files: properties.length > 0 ? [propertyBannerAttachment()] : [],
-                flags: MessageFlags.IsComponentsV2,
-            });
-        }
-        else if (customId === "cancel_property_buy") {
-            const container = simplePropertyContainer(
-                "Property Purchase Cancelled",
-                "No property purchase was made.",
-                0x9B59B6,
-            );
+    await seedGlobalProperties(guildId);
+    const [properties, prefix] = await Promise.all([
+      PropertyService.getAllProperties(guildId),
+      getGuildPrefix(guildId),
+    ]);
 
-            await interaction.reply({
-                components: [container],
-                flags: EPHEMERAL_COMPONENTS_V2_FLAGS,
-            });
-        }
-        else if (customId.startsWith("buy_property_")) {
-            const key = customId.replace("buy_property_", "").toLowerCase();
-            const result = await PropertyService.buyProperty(user.id, guildId, key);
-            const container = simplePropertyContainer(
-                result.success ? "Purchase Successful" : "Purchase Failed",
-                result.message,
-                result.success ? 0x2ECC71 : 0xE74C3C,
-            );
+    const totalPages = getPropertiesTotalPages(properties);
+    const safePage = Math.min(Math.max(page, 1), totalPages);
+    const files: AttachmentBuilder[] = [];
+    const container = buildPropertiesMarketContainer(properties, {
+      currencyEmoji: GLOBAL_CURRENCY_EMOJI,
+      prefix,
+      page: safePage,
+    }, files);
 
-            await interaction.reply({
-                components: [container],
-                flags: EPHEMERAL_COMPONENTS_V2_FLAGS,
-            });
-        }
-        else if (customId === "market_home") {
-            const config = await getGuildConfig(guildId);
-            const { total } = await getMarketListings(guildId, 1, 1);
+    const components: any[] = [container];
+    if (properties.length > 0) components.push(buildPropertyBuyRow(properties, safePage));
+    if (totalPages > 1) components.push(buildPropertiesNavigationRow(totalPages, safePage));
 
-            const embed = new EmbedBuilder()
-                .setTitle("🏴‍☠️ Black Market")
-                .setDescription(`Welcome to the underground.\n\n**Market Tax:** ${config.marketTax}%\n**Active Listings:** ${total}`)
-                .setColor("#36393F")
-                .setImage("attachment://black_market.png");
+    await safeEditReply(interaction, { components, files });
+    return;
+  }
 
-            const row = new ActionRowBuilder<ButtonBuilder>()
-                .addComponents(
-                    new ButtonBuilder().setCustomId("market_browse_1").setLabel("Browse Market").setStyle(ButtonStyle.Primary).setEmoji("🛒"),
-                    new ButtonBuilder().setCustomId("market_sell_flow").setLabel("Sell Item").setStyle(ButtonStyle.Success).setEmoji("➕"),
-                    new ButtonBuilder().setCustomId("market_sell_prop_flow").setLabel("Sell Property").setStyle(ButtonStyle.Success).setEmoji("🏠"),
-                    new ButtonBuilder().setCustomId("market_buy_flow").setLabel("Buy by ID").setStyle(ButtonStyle.Secondary).setEmoji("🔍"),
-                    new ButtonBuilder().setCustomId("market_mine").setLabel("My Listings").setStyle(ButtonStyle.Danger).setEmoji("📦")
-                );
+  if (id.startsWith("buy_property_")) {
+    const key = id.replace("buy_property_", "");
+    await ensureDeferredEphemeralReply(interaction, MessageFlags.Ephemeral);
+    await seedGlobalProperties(guildId);
 
-            await interaction.update({ embeds: [embed], components: [row], files: ["./assets/black_market.png"] });
-        }
-        else if (customId.startsWith("market_browse_")) {
-            const page = parseInt(customId.split("_")[2]);
-            const { listings, total, totalPages } = await getMarketListings(guildId, page);
-            const config = await getGuildConfig(guildId);
+    const result = await PropertyService.buyProperty(interaction.user.id, guildId, key);
+    await safeEditReply(interaction, {
+      components: [
+        textContainer(
+          result.success ? `${Mascot.Emotes.Accept} Property Purchased` : `${Mascot.Emotes.Decline} Purchase Failed`,
+          result.message,
+          result.success ? 0x2ECC71 : 0xE74C3C,
+        ),
+      ],
+      flags: MessageFlags.IsComponentsV2,
+    });
+    return;
+  }
 
-            const embed = new EmbedBuilder()
-                .setTitle(`🛒 Market Listings (Page ${page}/${totalPages || 1})`)
-                .setColor("#2F3136");
+  if (id.startsWith("sell_property_")) {
+    const key = id.replace("sell_property_", "");
+    await ensureDeferredEphemeralReply(interaction, MessageFlags.Ephemeral);
 
-            if (listings.length === 0) {
-                embed.setDescription("No items for sale right now.");
-            } else {
-                const desc = listings.map(l => {
-                    if (l.shopItem) {
-                        return `**ID:** \`${l.id}\`\n**Item:** ${l.shopItem.name} (x${l.amount})\n**Price:** ${fmtCurrency(l.totalPrice, config.currencyEmoji)}\n**Seller:** <@${l.seller.discordId}>`;
-                    } else if (l.property) {
-                        return `**ID:** \`${l.id}\`\n**Property:** 🏠 ${l.property.name}\n**Price:** ${fmtCurrency(l.totalPrice, config.currencyEmoji)}\n**Seller:** <@${l.seller.discordId}>`;
-                    }
-                    return `Unknown Listing`;
-                }).join("\n\n");
-                embed.setDescription(desc);
-            }
-
-            const row = new ActionRowBuilder<ButtonBuilder>();
-            if (page > 1) {
-                row.addComponents(new ButtonBuilder().setCustomId(`market_browse_${page - 1}`).setLabel("Prev").setStyle(ButtonStyle.Secondary));
-            }
-            row.addComponents(new ButtonBuilder().setCustomId("market_home").setLabel("Home").setStyle(ButtonStyle.Primary));
-            if (page < totalPages) {
-                row.addComponents(new ButtonBuilder().setCustomId(`market_browse_${page + 1}`).setLabel("Next").setStyle(ButtonStyle.Secondary));
-            }
-
-            await interaction.update({ embeds: [embed], components: [row] });
-        }
-        else if (customId === "market_sell_flow") {
-            const userDb = await prisma.user.findUnique({ where: { discordId_guildId: { discordId: user.id, guildId } } });
-            if (!userDb) return;
-
-            const inventory = await prisma.inventory.findMany({
-                where: { userId: userDb.id },
-                include: { shopItem: true },
-                take: 25
-            });
-
-            if (inventory.length === 0) {
-                await interaction.reply({ content: "You have no items to sell.", ephemeral: true });
-                return;
-            }
-
-            const row = new ActionRowBuilder<StringSelectMenuBuilder>()
-                .addComponents(
-                    new StringSelectMenuBuilder()
-                        .setCustomId("market_sell_select")
-                        .setPlaceholder("Select an item to sell")
-                        .addOptions(
-                            inventory.map(inv => new StringSelectMenuOptionBuilder()
-                                .setLabel(`${inv.shopItem.name} (x${inv.amount})`)
-                                .setValue(inv.shopItem.id)
-                                .setDescription(`In Stock: ${inv.amount}`)
-                            )
-                        )
-                );
-
-            await interaction.reply({ content: "Select an item from your inventory to list:", components: [row], ephemeral: true });
-        }
-        else if (customId === "market_sell_prop_flow") {
-            const userDb = await prisma.user.findUnique({ where: { discordId_guildId: { discordId: user.id, guildId } } });
-            if (!userDb) return;
-
-            const ownedProps = await prisma.ownedProperty.findMany({
-                where: { userId: userDb.id },
-                include: { property: true },
-                take: 25
-            });
-
-            if (ownedProps.length === 0) {
-                await interaction.reply({ content: "You have no properties to sell.", ephemeral: true });
-                return;
-            }
-
-            const row = new ActionRowBuilder<StringSelectMenuBuilder>()
-                .addComponents(
-                    new StringSelectMenuBuilder()
-                        .setCustomId("market_sell_prop_select")
-                        .setPlaceholder("Select a property to sell")
-                        .addOptions(
-                            ownedProps.map(op => new StringSelectMenuOptionBuilder()
-                                .setLabel(`${op.property.name}`)
-                                .setValue(op.property.id)
-                                .setDescription(`Valued at ${op.property.price}`)
-                            )
-                        )
-                );
-
-            await interaction.reply({ content: "Select a property to list (Note: It will be removed from your portfolio until cancelled/sold):", components: [row], ephemeral: true });
-        }
-        else if (customId === "market_buy_flow") {
-            const modal = new ModalBuilder()
-                .setCustomId("market_buy_modal")
-                .setTitle("Buy Item");
-
-            const idInput = new TextInputBuilder()
-                .setCustomId("market_listing_id")
-                .setLabel("Listing ID")
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder("Paste the ID from the browse list")
-                .setRequired(true);
-
-            modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(idInput));
-            await interaction.showModal(modal);
-        }
-        else if (customId === "market_mine") {
-            const myListings = await getUserListings(user.id, guildId);
-            const embed = new EmbedBuilder().setTitle("📦 Your Active Listings").setColor("#FFAA00");
-
-            if (myListings.length === 0) {
-                embed.setDescription("You have no active listings.");
-            } else {
-                const desc = myListings.map(l => {
-                    const name = l.shopItem ? l.shopItem.name : (l.property ? `🏠 ${l.property.name}` : 'Unknown');
-                    return `**ID:** \`${l.id}\` | **${name} (x${l.amount})** for ${l.totalPrice}`;
-                }).join("\n");
-                embed.setDescription(desc);
-            }
-
-            const row = new ActionRowBuilder<ButtonBuilder>()
-                .addComponents(
-                    new ButtonBuilder().setCustomId("market_cancel_flow").setLabel("Cancel Listing").setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder().setCustomId("market_home").setLabel("Back").setStyle(ButtonStyle.Secondary)
-                );
-
-            await interaction.update({ embeds: [embed], components: [row] });
-        }
-        else if (customId === "market_cancel_flow") {
-            const modal = new ModalBuilder()
-                .setCustomId("market_cancel_modal")
-                .setTitle("Cancel Listing");
-
-            const idInput = new TextInputBuilder()
-                .setCustomId("market_listing_id")
-                .setLabel("Listing ID")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(idInput));
-            await interaction.showModal(modal);
-        }
-
-    } catch (err: any) {
-        if (
-            customId.startsWith("buy_property_")
-            || customId.startsWith("property_page_")
-            || customId === "cancel_property_buy"
-        ) {
-            const container = simplePropertyContainer(
-                "Property Error",
-                `Error: ${err.message}`,
-                0xE74C3C,
-            );
-
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({
-                    components: [container],
-                    flags: EPHEMERAL_COMPONENTS_V2_FLAGS,
-                });
-            } else {
-                await interaction.followUp({
-                    components: [container],
-                    flags: EPHEMERAL_COMPONENTS_V2_FLAGS,
-                });
-            }
-            return;
-        }
-
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: `${Mascot.Emotes.Fail} Error: ${err.message}`, ephemeral: true });
-        } else {
-            await interaction.followUp({ content: `${Mascot.Emotes.Fail} Error: ${err.message}`, ephemeral: true });
-        }
-    }
-}
-
-async function handleSelectMenu(interaction: StringSelectMenuInteraction) {
-    if (interaction.customId === "market_sell_select") {
-        const shopItemId = interaction.values[0];
-        const modal = new ModalBuilder()
-            .setCustomId(`market_sell_modal_${shopItemId}`)
-            .setTitle("List Item for Sale");
-
-        const qtyInput = new TextInputBuilder()
-            .setCustomId("sell_amount")
-            .setLabel("Quantity")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("1")
-            .setRequired(true);
-
-        const priceInput = new TextInputBuilder()
-            .setCustomId("sell_price")
-            .setLabel("Total Price")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("e.g. 500")
-            .setRequired(true);
-
-        modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(qtyInput), new ActionRowBuilder<TextInputBuilder>().addComponents(priceInput));
-        await interaction.showModal(modal);
-    }
-    else if (interaction.customId === "market_sell_prop_select") {
-        const propId = interaction.values[0];
-        const modal = new ModalBuilder()
-            .setCustomId(`market_sell_prop_modal_${propId}`)
-            .setTitle("List Property for Sale");
-
-        const priceInput = new TextInputBuilder()
-            .setCustomId("sell_price")
-            .setLabel("Total Price")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("e.g. 50000")
-            .setRequired(true);
-
-        modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(priceInput));
-        await interaction.showModal(modal);
-    }
-}
-
-async function handleModal(interaction: ModalSubmitInteraction) {
-    const { customId, fields, user, guildId } = interaction;
-    if (!guildId) return;
-
-    try {
-        if (customId.startsWith("market_sell_modal_")) {
-            const shopItemId = customId.split("_")[3];
-            const amount = parseSmartAmount(fields.getTextInputValue("sell_amount"));
-            const price = parseSmartAmount(fields.getTextInputValue("sell_price"));
-
-            if (isNaN(amount) || isNaN(price)) throw new Error("Invalid numbers.");
-
-            await listItemOnMarket(user.id, guildId, shopItemId, amount, price);
-            const config = await getGuildConfig(guildId);
-
-            await logToChannel(interaction.client, {
-                guild: interaction.guild!,
-                type: "MARKET",
-                title: "Item Listed",
-                description: `**Seller:** ${user.tag}\n**Item:** ${shopItemId} (x${amount})\n**Price:** ${fmtCurrency(price, config.currencyEmoji)}`,
-                color: 0xFFA500
-            });
-
-            await interaction.reply({ content: `${Mascot.Emotes.Accept} Listed item for sale!`, ephemeral: true });
-        }
-        else if (customId.startsWith("market_sell_prop_modal_")) {
-            const propId = customId.split("_")[4];
-            const price = parseSmartAmount(fields.getTextInputValue("sell_price"));
-
-            if (isNaN(price)) throw new Error("Invalid price.");
-
-            await listPropertyOnMarket(user.id, guildId, propId, price);
-            const config = await getGuildConfig(guildId);
-
-            await logToChannel(interaction.client, {
-                guild: interaction.guild!,
-                type: "MARKET",
-                title: "Property Listed",
-                description: `**Seller:** ${user.tag}\n**Property:** ${propId}\n**Price:** ${fmtCurrency(price, config.currencyEmoji)}`,
-                color: 0xFFA500
-            });
-
-            await interaction.reply({ content: `${Mascot.Emotes.Accept} Listed property for sale!`, ephemeral: true });
-        }
-        else if (customId === "market_buy_modal") {
-            const listingId = fields.getTextInputValue("market_listing_id").trim();
-            const res = await buyItemFromMarket(user.id, listingId);
-            const config = await getGuildConfig(guildId);
-
-            await logToChannel(interaction.client, {
-                guild: interaction.guild!,
-                type: "MARKET",
-                title: "Item Bought",
-                description: `**Buyer:** ${user.tag}\n**Listing ID:** \`${listingId}\`\n**Item:** ${res.item} (x${res.amount})\n**Price:** ${fmtCurrency(Math.abs(res.price), config.currencyEmoji)}`,
-                color: 0x00FF00
-            });
-
-            await interaction.reply({ content: `${Mascot.Emotes.Accept} Successfully bought **${res.amount}x ${res.item}** for **${res.price}**! (Tax: ${res.tax})`, ephemeral: true });
-        }
-        else if (customId === "market_cancel_modal") {
-            const listingId = fields.getTextInputValue("market_listing_id").trim();
-            await cancelListing(user.id, listingId);
-
-            await logToChannel(interaction.client, {
-                guild: interaction.guild!,
-                type: "MARKET",
-                title: "Listing Cancelled",
-                description: `**Seller:** ${user.tag}\n**Listing ID:** \`${listingId}\``,
-                color: 0xFF0000
-            });
-
-            await interaction.reply({ content: `${Mascot.Emotes.Accept} Listing cancelled and items returned.`, ephemeral: true });
-        }
-    } catch (err: any) {
-        await interaction.reply({ content: `${Mascot.Emotes.Fail} Error: ${err.message}`, ephemeral: true });
-    }
+    const result = await PropertyService.sellPropertySystem(interaction.user.id, guildId, key);
+    await safeEditReply(interaction, {
+      components: [
+        textContainer(
+          result.success ? `${Mascot.Emotes.Accept} Property Sold` : `${Mascot.Emotes.Decline} Sale Failed`,
+          result.message,
+          result.success ? 0x2ECC71 : 0xE74C3C,
+        ),
+      ],
+      flags: MessageFlags.IsComponentsV2,
+    });
+  }
 }

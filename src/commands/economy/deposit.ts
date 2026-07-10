@@ -1,47 +1,33 @@
 import { Message } from "discord.js";
-import { ensureUserAndWallet } from "../../services/walletService";
-import { depositToBank, getBankByUserId } from "../../services/bankService";
-import { getGuildConfig } from "../../services/guildConfigService";
+import { depositToBank, ensureBankingUser, getBankByUserId } from "../../services/bankService";
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { fmtCurrency, parseSmartAmount } from "../../utils/format";
-import { logToChannel } from "../../utils/discordLogger";
 
 export async function handleDeposit(message: Message, args: string[]) {
-  const user = await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
-  const config = await getGuildConfig(message.guildId!);
-  const emoji = config.currencyEmoji;
+  const user = await ensureBankingUser(message.author.id, message.author.username);
   const wallet = user.wallet!;
   const amountStr = args[0];
 
   if (!amountStr) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", `Usage: \`${config.prefix}dep <amount/all>\``)] });
+    return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Usage: `!dep <amount/all>`")] });
   }
 
-  const amount = parseSmartAmount(amountStr, user.wallet!.balance);
+  const amount = parseSmartAmount(amountStr, wallet.balance);
   if (isNaN(amount) || amount <= 0) {
     return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please enter a valid positive number.")] });
   }
 
   try {
-    const { bank, actualAmount } = await depositToBank(wallet.id, user.id, amount, message.guildId!);
-    const updatedBank = await getBankByUserId(user.id);
-    const isPartial = actualAmount < amount;
-    const partialMsg = isPartial ? ` (Partial Deposit - Bank Limit Reached)` : "";
-
-    await logToChannel(message.client, {
-      guild: message.guild!,
-      type: "ECONOMY",
-      title: "Bank Deposit",
-      description: `**User:** ${message.author.tag}\n**Amount:** ${fmtCurrency(actualAmount, emoji)}${partialMsg}\n**New Balance:** ${fmtCurrency(updatedBank?.balance ?? 0, emoji)}`,
-      color: 0x00AAFF
-    });
+    const { actualAmount, capped } = await depositToBank(wallet.id, user.discordId, amount);
+    const updatedBank = await getBankByUserId(user.discordId);
+    const partialMsg = capped ? " (Wallet cap reached)" : "";
 
     return message.reply({
       embeds: [
         successEmbed(
           message.author,
-          isPartial ? "Partial Deposit" : "Deposit Successful",
-          `Deposited **${fmtCurrency(actualAmount, emoji)}**${partialMsg}.\nBank: **${fmtCurrency(updatedBank?.balance ?? 0, emoji)}**`
+          capped ? "Partial Deposit" : "Deposit Successful",
+          `Deposited **${fmtCurrency(actualAmount)}**${partialMsg}.\nBank balance: **${fmtCurrency(updatedBank?.balance ?? 0)}**`
         )
       ]
     });

@@ -1,40 +1,23 @@
 import { Message, EmbedBuilder, Colors } from "discord.js";
 import prisma from "../../utils/prisma";
 import { errorEmbed } from "../../utils/embed";
-import { getGuildConfig } from "../../services/guildConfigService";
-import { Mascot } from "../../config/branding";
+import { GLOBAL_CURRENCY_EMOJI, Mascot } from "../../config/branding";
+import { ensureUserAndWallet } from "../../services/walletService";
 import fetch from "node-fetch";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 const TOPGG_BOT_ID = "1371816936857669702";
 const VOTE_LINK = `https://top.gg/bot/${TOPGG_BOT_ID}?s=0825a328ae527`;
 const REVIEW_LINK = `https://top.gg/bot/${TOPGG_BOT_ID}#reviews`; // Assuming this is correct based on user request
+const VOTE_REWARD = 5_000;
 
 export async function handleVote(message: Message, args: string[]) {
     if (!message.guild || !message.member) return;
 
-    // Prisma's findUnique expects a non-null string for composite keys if strictly typed, though usually it handles logic.
-    // The previous error "Type 'string | null' is not assignable to type 'string'" likely referred to message.guildId being potentially null.
-    // The check above `!message.guild` ensures message.guild.id is present, but message.guildId property on message itself can be null?
-    // Actually, message.guildId IS string | null. message.guild.id is string. Use message.guild.id.
-
-    const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: message.author.id, guildId: message.guild.id } },
-        include: { wallet: true }
-    });
-
-    if (!user) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Error", "You are not registered in the system.")] });
-    }
-
-    // Ensure wallet exists before accessing logic later
-    if (!user.wallet) {
-        // Create wallet if missing? Or just fail.
-        // For now, fail gracefully or handle it.
-        return message.reply({ embeds: [errorEmbed(message.author, "Error", "You do not have a wallet initialized.")] });
-    }
-
-    const config = await getGuildConfig(message.guild.id);
-    const voteReward = config.voteReward || 5000;
+    const user = await ensureUserAndWallet(message.author.id, message.guild.id, message.author.username);
+    const wallet = user.wallet!;
+    const prefix = await getGuildPrefix(message.guild.id);
+    const voteReward = VOTE_REWARD;
     const now = new Date();
     const cooldown = 12 * 60 * 60 * 1000; // 12 Hours
 
@@ -42,7 +25,7 @@ export async function handleVote(message: Message, args: string[]) {
     if (args[0]?.toLowerCase() === "reminder" || args[0]?.toLowerCase() === "remind") {
         const newState = !user.voteReminder;
         await prisma.user.update({
-            where: { id: user.id },
+            where: { discordId: user.discordId },
             data: { voteReminder: newState }
         });
         return message.reply({
@@ -98,18 +81,18 @@ export async function handleVote(message: Message, args: string[]) {
     if (hasVoted) {
         // Grant Reward
         await prisma.wallet.update({
-            where: { id: user.wallet!.id },
+            where: { id: wallet.id },
             data: { balance: { increment: voteReward } }
         });
 
         await prisma.user.update({
-            where: { id: user.id },
-            data: { lastVote: now, lastChatMoney: now /* Update activity */ } // Store vote time
+            where: { discordId: user.discordId },
+            data: { lastVote: now }
         });
 
         await prisma.transaction.create({
             data: {
-                walletId: user.wallet!.id,
+                walletId: wallet.id,
                 amount: voteReward,
                 type: "vote_reward",
                 isEarned: true,
@@ -119,7 +102,7 @@ export async function handleVote(message: Message, args: string[]) {
 
         const embed = new EmbedBuilder()
             .setTitle(`${Mascot.Emotes.Success} Vote Verified!`)
-            .setDescription(`Thank you for voting for **Fortuna**!\n\nYou have received **${voteReward.toLocaleString()} ${config.currencyEmoji}**.`)
+            .setDescription(`Thank you for voting for **Fortuna**!\n\nYou have received **${voteReward.toLocaleString()} ${GLOBAL_CURRENCY_EMOJI}**.`)
             .setColor(Colors.Green)
             .setFooter({ text: "Vote again in 12 hours!" });
 
@@ -130,13 +113,13 @@ export async function handleVote(message: Message, args: string[]) {
         const embed = new EmbedBuilder()
             .setTitle(`🗳️ Vote for ${message.client.user?.username || "Us"}`)
             .setDescription(
-                `Support the bot and earn **${voteReward.toLocaleString()} ${config.currencyEmoji}** every 12 hours!\n\n` +
+                `Support the bot and earn **${voteReward.toLocaleString()} ${GLOBAL_CURRENCY_EMOJI}** every 12 hours!\n\n` +
                 `**[Click Here to Vote](${VOTE_LINK})**\n` +
                 `If you're enjoying Fortuna, please consider leaving a review!\n` +
                 `**[Leave a Review](${REVIEW_LINK})**\n\n` +
                 `**Instructions:**\n` +
                 `1. Click the link above and vote.\n` +
-                `2. Come back here and run \`${config.prefix}vote\` again to claim your reward!`
+                `2. Come back here and run \`${prefix}vote\` again to claim your reward!`
             )
             .setColor(Colors.Gold)
             .setThumbnail(message.client.user?.displayAvatarURL() || "")

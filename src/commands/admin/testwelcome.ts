@@ -1,10 +1,11 @@
 import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, TextChannel } from "discord.js";
 import { Mascot } from "../../config/branding";
+import { DEVELOPER_ONLY_COMMAND_MESSAGE, isBotDeveloper } from "../../utils/developerAccess";
 
 export async function handleTestWelcome(message: Message) {
     // Basic Admin Check (Optional, but good practice even for debug)
-    if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
-        return message.reply("❌ You need Administrator permissions to run this test.");
+    if (!isBotDeveloper(message.author.id)) {
+        return message.reply(DEVELOPER_ONLY_COMMAND_MESSAGE);
     }
 
     const guild = message.guild!;
@@ -26,7 +27,6 @@ export async function handleTestWelcome(message: Message) {
         .addFields(
             { name: "🚀 Getting Started", value: "Use \`/setup\` to configure your server's economy and settings.", inline: false },
             { name: "📚 Documentation", value: `Read our [Docs](${Mascot.Links.Docs}) for a full command list and guides.`, inline: true },
-            { name: "🌐 Dashboard", value: `Manage everything from our [Web Dashboard](${Mascot.Links.Dashboard}).`, inline: true },
             { name: "🆘 Support", value: `Need help? Join our [Support Server](${Mascot.Links.Support}).`, inline: true }
         )
         .setColor(Mascot.Colors.Base as any)
@@ -36,10 +36,6 @@ export async function handleTestWelcome(message: Message) {
 
     // 2. Prepare Buttons
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-            .setLabel("Open Dashboard")
-            .setStyle(ButtonStyle.Link)
-            .setURL(Mascot.Links.Dashboard),
         new ButtonBuilder()
             .setLabel("Documentation")
             .setStyle(ButtonStyle.Link)

@@ -1,46 +1,46 @@
-import type { Metadata } from "next";
-import { Inter, Poppins, Orbitron } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Bricolage_Grotesque, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Toaster } from "sonner";
-import { CursorSpotlight } from "@/components/CursorSpotlight";
-import { AmbientBackground } from "@/components/AmbientBackground";
 
-
-const inter = Inter({
-  variable: "--font-inter",
+const display = Bricolage_Grotesque({
   subsets: ["latin"],
+  variable: "--font-bricolage",
 });
-
-const poppins = Poppins({
-  variable: "--font-poppins",
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const orbitron = Orbitron({
-  variable: "--font-orbitron",
-  subsets: ["latin"],
+  variable: "--font-jetbrains",
 });
 
 export const metadata: Metadata = {
-  title: "Fortuna Admin",
-  description: "Admin Dashboard for Fortuna Bot",
+  title: {
+    default: "Fortuna — The Discord life simulator",
+    template: "%s · Fortuna",
+  },
+  description:
+    "Fortuna is a life simulator inside Discord — careers, degrees, credit cards, marriage, stocks, hunting, and a casino. One wallet across every server.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0e0f13",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={`${display.variable} ${inter.variable} ${jetbrains.variable}`}
+    >
       <body
-        className={`${inter.variable} ${poppins.variable} ${orbitron.variable} antialiased font-sans`}
+        className="bg-bg font-body text-ink antialiased"
+        suppressHydrationWarning
       >
         <Providers>
-          <AmbientBackground />
-          <CursorSpotlight />
           {children}
           <Toaster position="top-right" theme="dark" richColors />
         </Providers>

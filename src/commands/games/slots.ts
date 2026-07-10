@@ -1,14 +1,14 @@
-import { Message, EmbedBuilder, Colors } from "discord.js";
-import { Mascot, getEmoteUrl } from "../../config/branding";
+import { ContainerBuilder, Message, MessageFlags, TextDisplayBuilder } from "discord.js";
+import { Mascot } from "../../config/branding";
 import { ensureUserAndWallet } from "../../services/walletService";
-import { placeBetWithTransaction, placeBetFallback } from "../../services/gameService";
-import { getGuildConfig } from "../../services/guildConfigService";
+import { placeBetWithTransaction } from "../../services/gameService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
-import { successEmbed, errorEmbed } from "../../utils/embed";
-import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
-import { formatDuration } from "../../utils/format";
+import { errorEmbed } from "../../utils/embed";
+import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage } from "../../services/casinoCooldownService";
 import { getGameBetLimits } from "../../utils/gameUtils";
-import { updateQuestProgress } from "../../services/questService";
+import { questBus } from "../../services/questEvents";
+import { checkLuckyCoin, checkCrownOfGreed, recordPotentialSoulLedgerLoss, getCurrentLuck } from "../../services/shopBuffs";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export const CHERRY = "<:cherri:1446428169786622053>";
 export const BANANA = "<:banano:1446428190837968989>";
@@ -20,10 +20,7 @@ export const SEVEN = "<:sevenn:1446428916867661846>";
 
 const SYMBOLS = [CHERRY, BANANA, GRAPES, MELON, BELL, GEM, SEVEN];
 
-// Probabilities for each tier (cumulative check)
-// 2x: 15%, 3x: 7%, 5x: 4%, 10x: 1.5%, 20x: 0.5%
-// Total Win Chance: ~28%
-const PROBABILITIES = [
+export const SLOTS_PAYOUT_TABLE = [
   { chance: 0.005, multiplier: 20, symbols: [SEVEN] },
   { chance: 0.015, multiplier: 10, symbols: [GEM] },
   { chance: 0.040, multiplier: 5, symbols: [BELL] },
@@ -31,26 +28,38 @@ const PROBABILITIES = [
   { chance: 0.150, multiplier: 2, symbols: [CHERRY, BANANA] }
 ];
 
-export function getSpinResult(): { reels: string[], win: boolean, multiplier: number, payout: number } {
-  const roll = Math.random();
-  let cumulative = 0;
+function buildSlotsContainer(title: string, body: string, accent: number) {
+  return new ContainerBuilder()
+    .setAccentColor(accent)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`## ${title}`),
+      new TextDisplayBuilder().setContent(body),
+    );
+}
 
-  for (const tier of PROBABILITIES) {
+export function getSpinResult(): { reels: string[], win: boolean, multiplier: number, payout: number } {
+  return getSpinResultWithLuck(50);
+}
+
+export function getSpinResultWithLuck(luck: number): { reels: string[], win: boolean, multiplier: number, payout: number } {
+  const roll = Math.random();
+  const bias = ((luck - 50) / 100) * 0.05;
+  const adjustedRoll = Math.max(0, Math.min(1, roll - bias));
+
+  let cumulative = 0;
+  for (const tier of SLOTS_PAYOUT_TABLE) {
     cumulative += tier.chance;
-    if (roll < cumulative) {
-      // WINNER
+    if (adjustedRoll < cumulative) {
       const symbol = tier.symbols[Math.floor(Math.random() * tier.symbols.length)];
       return {
         reels: [symbol, symbol, symbol],
         win: true,
         multiplier: tier.multiplier,
-        payout: 0 // Calculated later based on bet
+        payout: 0
       };
     }
   }
 
-  // LOSER - Generate 3 reels that NOT all match
-  // We pick random symbols until we get a non-win state
   let r1, r2, r3;
   do {
     r1 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
@@ -67,97 +76,97 @@ export function getSpinResult(): { reels: string[], win: boolean, multiplier: nu
 }
 
 export async function handleSlots(message: Message, args: string[]) {
-  const config = await getGuildConfig(message.guildId!);
+  const prefix = await getGuildPrefix(message.guildId!);
   const user = await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
-  const bet = parseBetAmount(args[0], user.wallet!.balance);
+  const amount = parseBetAmount(args[0], user.wallet!.balance);
+  
 
-  if (isNaN(bet) || bet <= 0) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Invalid Bet", `Usage: \`${config.prefix}slots <amount>\``)] });
+  if (!Number.isInteger(amount) || amount <= 0) {
+    return message.reply({ embeds: [errorEmbed(message.author, "Invalid Bet", `Usage: \`${prefix}slots <amount>\``)] });
   }
-  const amount = bet;
-  const emoji = config.currencyEmoji;
-  const { min, max } = getGameBetLimits(config, "slots");
+
+  const { min, max } = getGameBetLimits("slots");
   if (amount < min) {
-    return message.reply({
-      embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Slots is **${fmtCurrency(min, emoji)}**.`)]
-    });
+    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Slots is **${fmtCurrency(min)}**.`)] });
   }
   if (amount > max) {
-    return message.reply({
-      embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Slots is **${fmtCurrency(max, emoji)}**.`)]
-    });
-  }
-  const cooldowns = (config.gameCooldowns as Record<string, number>) || {};
-  const cdSeconds = cooldowns["slots"] || 0;
-  if (cdSeconds > 0) {
-    const key = `game:slots:${message.guildId}:${message.author.id}`;
-    const remaining = checkCooldown(key, cdSeconds);
-    if (remaining > 0) {
-      const expire = getCooldownExpiry(key);
-      const ts = expire ? Math.floor(expire / 1000) : Math.floor(Date.now() / 1000 + remaining);
-      return message.reply({
-        embeds: [errorEmbed(message.author, "Cooldown Active", `${Mascot.Emotes.Angry} Please wait <t:${ts}:R> before playing Slots again.`)]
-      });
-    }
-  }
-  if (user.wallet!.balance < amount) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You don't have enough money.")] });
+    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Slots is **${fmtCurrency(max)}**.`)] });
   }
 
-  // Use new Probability Logic
-  const result = getSpinResult();
-  const reel1 = result.reels[0];
-  const reel2 = result.reels[1];
-  const reel3 = result.reels[2];
-
-  let win = result.win;
-  let multiplier = result.multiplier;
-  let payout = amount * multiplier;
-
-  let actualPayout = payout;
-  try {
-    actualPayout = await placeBetWithTransaction(user.id, user.wallet!.id, "slots", amount, "spin", win, payout, message.guildId!);
-  } catch (e) {
-    actualPayout = await placeBetFallback(user.wallet!.id, user.id, "slots", amount, "spin", win, payout, message.guildId!);
+  const cd = await checkCasinoCooldown("slots", message.author.id);
+  if (cd.active) {
+    const msg = cd.unavailable
+      ? "Casino cooldown service is temporarily unavailable. Try again soon."
+      : formatCasinoCooldownMessage("slots", cd.availableAtUnix!);
+    const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Cooldown Active", msg)] });
+    setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
+    return;
   }
-  payout = actualPayout;
 
-  await updateQuestProgress(user.id, "GAMBLE").catch(console.error);
-  if (win) await updateQuestProgress(user.id, "WIN_SLOTS").catch(console.error);
+  if (!user.wallet || user.wallet.balance < amount) {
+    return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You don't have enough money in your wallet.")] });
+  }
 
-  // LOGGING
-  const logColor = win ? 0x00FF00 : 0xFF0000;
+  const luckyCoinMult = await checkLuckyCoin(message.author.id);
+  const crownMult = await checkCrownOfGreed(message.author.id);
+  const luck = await getCurrentLuck(message.author.id);
+  const result = getSpinResultWithLuck(luck);
+  const [reel1, reel2, reel3] = result.reels;
+  const win = result.win;
+
+  // Crown of Greed: adjust net profit on win, increase effective stake on loss
+  const baseGross = win ? Math.floor(amount * result.multiplier * luckyCoinMult) : 0;
+  let adjustedGross: number;
+  let effectiveStake = amount;
+  if (win) {
+    const netProfit = baseGross - amount;
+    adjustedGross = amount + Math.floor(netProfit * crownMult);
+  } else {
+    effectiveStake = Math.min(Math.floor(amount * crownMult), user.wallet.balance);
+    adjustedGross = 0;
+  }
+
+  if (!win && amount > 300_000) {
+    await recordPotentialSoulLedgerLoss(user.discordId, effectiveStake);
+  }
+
+  const payout = await placeBetWithTransaction(
+    user.discordId,
+    user.wallet.id,
+    "slots",
+    effectiveStake,
+    "spin",
+    win,
+    adjustedGross,
+    message.guildId!
+  );
+
+  await setCasinoCooldown("slots", user.discordId, message.guildId!);
+  questBus.emit("casino:play", { discordId: user.discordId, bet: amount });
+  if (win) questBus.emit("casino:win", { discordId: user.discordId, game: "slots" });
+
   await import("../../utils/discordLogger").then(({ logToChannel }) => {
     logToChannel(message.client, {
       guild: message.guild!,
       type: "ECONOMY",
       title: "Slots Game",
-      description: `**User:** ${message.author.toString()}\n**Reels:** [ ${reel1} | ${reel2} | ${reel3} ]\n**Bet:** ${fmtCurrency(amount, emoji)}\n**Payout:** ${fmtCurrency(payout, emoji)}`,
-      color: logColor,
+      description: `**User:** ${message.author.toString()}\n**Reels:** [ ${reel1} | ${reel2} | ${reel3} ]\n**Bet:** ${fmtCurrency(amount)}\n**Payout:** ${fmtCurrency(payout)}`,
+      color: win ? 0x00FF00 : 0xFF0000,
       thumbnail: message.author.displayAvatarURL()
     }).catch(() => { });
   });
 
+  const wallet = user.wallet.balance - amount + payout;
+  const body = [
+    `### [ ${reel1} | ${reel2} | ${reel3} ]`,
+    win
+      ? `Jackpot: **${fmtCurrency(payout)}** (x${result.multiplier})`
+      : `Lost: **${fmtCurrency(amount)}**`,
+    `Wallet: **${fmtCurrency(wallet)}**`
+  ].join("\n");
 
-  const eTitle = "<a:casino:1445732641545654383>";
-  const embed = new EmbedBuilder()
-    .setTitle(`${eTitle} Slots`)
-    .setColor(win ? Colors.Green : Colors.Red)
-    .setDescription(
-      `**[ ${reel1} | ${reel2} | ${reel3} ]**\n\n` +
-      (win
-        ? `**JACKPOT!** You won **${fmtCurrency(payout, emoji)}**! (x${multiplier})`
-        : `Better luck next time... You lost **${fmtCurrency(amount, emoji)}**.`)
-    )
-    .setFooter({ text: `${Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet!.balance - amount + payout).toLocaleString('en-US')}` });
-
-  if (win) {
-    const url = getEmoteUrl(Mascot.Emotes.Money);
-    if (url) embed.setThumbnail(url);
-  } else {
-    const url = getEmoteUrl(Mascot.Emotes.Fail);
-    if (url) embed.setThumbnail(url);
-  }
-
-  return message.reply({ embeds: [embed] });
+  return message.reply({
+    components: [buildSlotsContainer(win ? "Slots Won" : "Slots Lost", body, win ? 0x2ECC71 : 0xE74C3C)],
+    flags: MessageFlags.IsComponentsV2
+  });
 }

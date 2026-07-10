@@ -1,11 +1,40 @@
-import { Interaction, ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Message, TextChannel } from "discord.js";
-import { enroll, claimScholarship, reduceStress, getStressCost, dropout } from "../services/educationService";
-import { getGuildConfig } from "../services/guildConfigService";
+import { Interaction, ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Message, TextChannel, MessageFlags, ContainerBuilder, TextDisplayBuilder } from "discord.js";
+import { enroll, claimScholarship, dropout } from "../services/educationService";
 import { fmtCurrency, formatDuration } from "../utils/format";
 import { Mascot, getEmoteUrl } from "../config/branding";
 import prisma from "../utils/prisma";
 import { logToChannel } from "../utils/discordLogger";
-import { updateQuestProgress } from "../services/questService";
+import { questBus } from "../services/questEvents";
+import { applyRelaxOption, getRelaxSnapshot } from "../services/relaxService";
+import { buildRelaxDashboard } from "../commands/life/relax";
+import { checkCounterfeitKit, checkCrownOfGreed, checkDevilContract } from "../services/shopBuffs";
+import { redisService } from "../services/redisService";
+import { getRequiredGearKey } from "../services/jobService";
+import { JOB_SHOP_CATALOG } from "../utils/shopCatalog";
+import { seedJobShop } from "../services/shopService";
+import { getGuildPrefix } from "../utils/guildContext";
+import { globalCatalogGuildFilter } from "../utils/globalCatalog";
+import { MAX_SAFE_BALANCE } from "../utils/economyConfig";
+import {
+    ensureDeferredEphemeralReply,
+    ensureDeferredUpdate,
+    safeDeferReply,
+    safeEditReply,
+    safeFollowUp,
+    safeReply,
+    safeUpdate,
+} from "../utils/interactionHelpers";
+
+function textContainer(title: string, body: string, color = 0x2ECC71) {
+    return new ContainerBuilder()
+        .setAccentColor(color)
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**${title}**`),
+            new TextDisplayBuilder().setContent(body),
+        );
+}
+
+const activeRelaxSelections = new Set<string>();
 
 export async function handleLifeInteraction(interaction: Interaction) {
     if (interaction.isButton()) {
@@ -25,184 +54,144 @@ async function handleButton(interaction: ButtonInteraction) {
         // Backwards compatibility handling or robust parsing
         const degreeId = parts[2];
         const targetUserId = parts[3];
+        const paymentMethod = parts[4] === "card" ? "card" : "wallet";
 
         if (targetUserId && targetUserId !== user.id) {
-            return interaction.reply({ content: `${Mascot.Emotes.Fail} This interaction is not for you.`, ephemeral: true });
+            await safeReply(interaction, {
+                content: `${Mascot.Emotes.Fail} This interaction is not for you.`,
+                flags: MessageFlags.Ephemeral,
+            });
+            return;
         }
 
-        await interaction.deferReply({ ephemeral: false });
+        if (!await ensureDeferredEphemeralReply(interaction)) return;
 
         try {
-            const result = await enroll(user.id, guild.id, degreeId);
-            const config = await getGuildConfig(guild.id);
+            const result = await enroll(user.id, guild.id, degreeId, paymentMethod);
 
             const embed = new EmbedBuilder()
                 .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
                 .setTitle(`${Mascot.Emotes.Accept} Enrollment Successful`)
                 .setDescription(`You have successfully enrolled in **${result.degree.name}**!`)
-                .addFields({ name: "Tuition Paid", value: fmtCurrency(result.degree.tuitionPerSem, config.currencyEmoji) })
+                .addFields(
+                    { name: "Tuition Paid", value: fmtCurrency(result.degree.tuitionPerSem) },
+                    { name: "Payment Method", value: paymentMethod === "card" ? "Fortuna Card" : "Wallet" }
+                )
                 .setColor("#2ECC71");
 
-            await interaction.editReply({ embeds: [embed] });
+            await safeEditReply(interaction, { embeds: [embed] });
 
         } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Enrollment Failed**: ${err.message}` });
+            await safeEditReply(interaction, { content: `${Mascot.Emotes.Fail} **Enrollment Failed**: ${err.message}` });
+        }
+    }
+    else if (customId.startsWith("relax:")) {
+        const [, ownerId, optionId] = customId.split(":");
+        if (ownerId !== user.id) {
+            return safeReply(interaction, {
+                components: [textContainer("Relax Session", "This relax dashboard belongs to someone else.", 0xE74C3C)],
+                flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+            });
+        }
+
+        if (!await ensureDeferredUpdate(interaction)) return;
+
+        const lockKey = `${user.id}:${optionId}`;
+        if (activeRelaxSelections.has(lockKey)) {
+            return safeEditReply(interaction, {
+                components: [textContainer("Relax In Progress", "Your relax activity is already being processed.", 0xF1C40F)],
+                flags: MessageFlags.IsComponentsV2,
+            });
+        }
+
+        try {
+            activeRelaxSelections.add(lockKey);
+            const result = await applyRelaxOption(user.id, user.username, optionId);
+            const prefix = await getGuildPrefix(guild.id);
+            const dashboard = await buildRelaxDashboard(user.id, guild.id, user.username);
+
+            dashboard.container.addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(
+                    `**${Mascot.Emotes.Accept} ${result.option.name} complete.**\n` +
+                    `Paid ${fmtCurrency(result.cost)}.\n` +
+                    `Wallet: ${fmtCurrency(result.previousWalletBalance)} -> ${fmtCurrency(result.walletBalance)}\n` +
+                    `Job Stress: ${result.previousJobStress}/100 -> ${result.jobStress}/100\n` +
+                    `Education Stress: ${result.previousEducationStress === null ? "Not enrolled" : `${result.previousEducationStress}/100 -> ${result.educationStress}/100`}`,
+                ),
+            );
+
+            await safeEditReply(interaction, {
+                components: [dashboard.container],
+                flags: MessageFlags.IsComponentsV2,
+            });
+        } catch (err: any) {
+            const snapshot = await getRelaxSnapshot(user.id, user.username);
+            await safeEditReply(interaction, {
+                components: [
+                    textContainer(
+                        "Relax Failed",
+                        `${Mascot.Emotes.Fail} ${err.message}\n\nWallet: ${fmtCurrency(snapshot.walletBalance)}\nJob Stress: ${snapshot.jobStress}/100\nEducation Stress: ${snapshot.hasEducation ? `${snapshot.educationStress}/100` : "Not enrolled"}`,
+                        0xE74C3C,
+                    ),
+                ],
+                flags: MessageFlags.IsComponentsV2,
+            });
+        } finally {
+            activeRelaxSelections.delete(lockKey);
         }
     }
     else if (customId.startsWith("claim_scholarship_")) {
         const milestone = parseInt(customId.replace("claim_scholarship_", ""));
 
-        await interaction.deferReply({ ephemeral: true });
+        if (!await ensureDeferredEphemeralReply(interaction)) return;
 
         try {
             const amount = await claimScholarship(user.id, guild.id, milestone);
-            const config = await getGuildConfig(guild.id);
 
             const embed = new EmbedBuilder()
                 .setTitle(`${Mascot.Emotes.MoneyBag} Scholarship Claimed!`)
-                .setDescription(`You have successfully claimed your scholarship of **${fmtCurrency(amount, config.currencyEmoji)}** for reaching Meritfull Performance **${milestone}.0**!`)
+                .setDescription(`You claimed **${fmtCurrency(amount)}** for reaching **${milestone}% Education XP**!`)
                 .setColor("#F1C40F");
 
-            await interaction.editReply({ embeds: [embed] });
+            await safeEditReply(interaction, { embeds: [embed] });
         } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Claim Failed**: ${err.message}` });
+            await safeEditReply(interaction, { content: `${Mascot.Emotes.Fail} **Claim Failed**: ${err.message}` });
         }
     }
-    else if (customId.startsWith("edu_stress_")) {
-        const activity = customId.replace("edu_stress_", "") as "sports" | "gym" | "meditation";
+    else if (customId.startsWith("edu_stress_") || customId.startsWith("stress_") || customId.startsWith("confirm_edu_stress_") || customId.startsWith("confirm_stress_")) {
+        const activity = customId.split("_").pop() || "gym";
+        const optionByLegacyActivity: Record<string, string> = {
+            sports: "quick_break",
+            gym: "gym_session",
+            meditation: "meditation_retreat",
+        };
+        const optionId = optionByLegacyActivity[activity] ?? "gym_session";
 
-        // Check if stress is already 0
-        const userData = await prisma.user.findUnique({
-            where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
-            include: { currentEducation: true }
-        });
+        if (!await ensureDeferredUpdate(interaction)) {
+            if (!await ensureDeferredEphemeralReply(interaction)) return;
+        }
 
-        if (userData?.currentEducation && userData.currentEducation.stress <= 0) {
-            return interaction.reply({
-                content: `${Mascot.Emotes.Think} You are currently stress free! Why not try studying instead?`,
-                ephemeral: true
+        try {
+            await applyRelaxOption(user.id, user.username, optionId);
+            const dashboard = await buildRelaxDashboard(user.id, guild.id, user.username);
+            await safeEditReply(interaction, {
+                components: [dashboard.container],
+                embeds: [],
+                flags: MessageFlags.IsComponentsV2,
             });
-        }
-
-        await interaction.deferReply({ ephemeral: true });
-
-        try {
-            const cost = await getStressCost(user.id, guild.id, activity);
-            const config = await getGuildConfig(guild.id);
-
-            const embed = new EmbedBuilder()
-                .setTitle(`Confirm ${activity.charAt(0).toUpperCase() + activity.slice(1)} (Education)`)
-                .setDescription(`Do you want to spend **${fmtCurrency(cost, config.currencyEmoji)}** to reduce your **Education Stress**?`)
-                .setColor("#3498DB");
-
-            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder().setCustomId(`confirm_edu_stress_${activity}`).setLabel("Confirm").setStyle(ButtonStyle.Success).setEmoji(Mascot.Emotes.Accept),
-                new ButtonBuilder().setCustomId("cancel_stress").setLabel("Cancel").setStyle(ButtonStyle.Danger).setEmoji(Mascot.Emotes.Decline)
-            );
-
-            await interaction.editReply({ embeds: [embed], components: [row] });
         } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Error**: ${err.message}` });
-        }
-    }
-    else if (customId.startsWith("confirm_edu_stress_")) {
-        const activity = customId.replace("confirm_edu_stress_", "") as "sports" | "gym" | "meditation";
-        await interaction.deferUpdate();
-
-        try {
-            const config = await getGuildConfig(guild.id);
-            const res = await reduceStress(user.id, guild.id, activity);
-
-            const embed = new EmbedBuilder()
-                .setTitle("Stress Relieved (Education)")
-                .setDescription(`**${activity.charAt(0).toUpperCase() + activity.slice(1)}** relieved your stress!\nStress: **${res.newStress}/100** (-${res.newStress < 0 ? 0 : 15})\nPaid: **${fmtCurrency(res.cost, config.currencyEmoji)}**`) // Note: generic calc for display, real val used logic
-                // Actually the service returns the new stress and msg.
-                .setDescription(res.msg)
-                .setColor("#2ECC71");
-
-            await interaction.editReply({ embeds: [embed], components: [] });
-        } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Activity Failed**: ${err.message}`, components: [] });
-        }
-    }
-    else if (customId.startsWith("stress_")) {
-        const activity = customId.replace("stress_", "") as "sports" | "gym" | "meditation";
-
-        // Check if stress is already 0
-        const userData = await prisma.user.findUnique({
-            where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
-            include: { currentEducation: true }
-        });
-
-        if (userData?.currentEducation && userData.currentEducation.stress <= 0) {
-            const embed = new EmbedBuilder()
-                .setTitle(`${Mascot.Emotes.Think} No Stress Detected`)
-                .setDescription("You are currently stress free! Why not try studying instead?")
-                .setColor("#2ECC71");
-
-            const thumbUrl = getEmoteUrl(Mascot.Emotes.Think);
-            if (thumbUrl) embed.setThumbnail(thumbUrl);
-
-            return interaction.reply({ embeds: [embed], ephemeral: true });
-        }
-
-        await interaction.deferReply({ ephemeral: true });
-
-        try {
-            const cost = await getStressCost(user.id, guild.id, activity);
-            const config = await getGuildConfig(guild.id);
-
-            const embed = new EmbedBuilder()
-                .setTitle(`Confirm ${activity.charAt(0).toUpperCase() + activity.slice(1)}`)
-                .setDescription(`Do you want to spend **${fmtCurrency(cost, config.currencyEmoji)}** to reduce stress?`)
-                .setColor("#3498DB");
-
-            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder().setCustomId(`confirm_stress_${activity}`).setLabel("Confirm").setStyle(ButtonStyle.Success).setEmoji(Mascot.Emotes.Accept),
-                new ButtonBuilder().setCustomId("cancel_stress").setLabel("Cancel").setStyle(ButtonStyle.Danger).setEmoji(Mascot.Emotes.Decline)
-            );
-
-            await interaction.editReply({ embeds: [embed], components: [row] });
-        } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Error**: ${err.message}` });
-        }
-    }
-    else if (customId.startsWith("confirm_stress_")) {
-        const activity = customId.replace("confirm_stress_", "") as "sports" | "gym" | "meditation";
-
-        // Defer update to replace the confirmation message
-        await interaction.deferUpdate();
-
-        try {
-            const { reduceJobStress } = require("../services/jobService");
-            const config = await getGuildConfig(guild.id); // Fetch config for currency
-            const res = await reduceJobStress(user.id, guild.id, activity);
-
-            let thumb = "";
-            switch (activity) {
-                case "sports": thumb = Mascot.Emotes.Sports; break;
-                case "gym": thumb = Mascot.Emotes.Gym; break;
-                case "meditation": thumb = Mascot.Emotes.Meditation; break;
-            }
-
-            const embed = new EmbedBuilder()
-                .setTitle("Stress Relieved")
-                .setDescription(`**${activity.charAt(0).toUpperCase() + activity.slice(1)}** relieved your stress!\nStress: **${res.newStress}/100** (-${res.reduction})\nPaid: **${fmtCurrency(res.cost, config.currencyEmoji)}**`)
-                .setColor("#2ECC71");
-
-            const thumbUrl = getEmoteUrl(thumb);
-            if (thumbUrl) embed.setThumbnail(thumbUrl);
-
-            await interaction.editReply({ embeds: [embed], components: [] });
-        } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Activity Failed**: ${err.message}`, components: [] });
+            await safeEditReply(interaction, {
+                components: [textContainer("Relax Failed", `${Mascot.Emotes.Fail} ${err.message}`, 0xE74C3C)],
+                embeds: [],
+                flags: MessageFlags.IsComponentsV2,
+            });
         }
     }
     else if (customId === "cancel_stress") {
-        await interaction.update({ content: `${Mascot.Emotes.Decline} Activity cancelled.`, embeds: [], components: [] });
+        await safeUpdate(interaction, { content: `${Mascot.Emotes.Decline} Activity cancelled.`, embeds: [], components: [] });
     }
     else if (customId === "dropout_confirm") {
-        await interaction.deferUpdate();
+        if (!await ensureDeferredUpdate(interaction)) return;
         try {
             const res = await dropout(user.id, guild.id);
 
@@ -212,18 +201,18 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setColor("#E74C3C")
                 .setThumbnail(getEmoteUrl(Mascot.Emotes.Shocked));
 
-            await interaction.editReply({ embeds: [embed], components: [] });
+            await safeEditReply(interaction, { embeds: [embed], components: [] });
 
         } catch (err: any) {
-            await interaction.editReply({ content: `${Mascot.Emotes.Fail} **Dropout Failed**: ${err.message}`, components: [] });
+            await safeEditReply(interaction, { content: `${Mascot.Emotes.Fail} **Dropout Failed**: ${err.message}`, components: [] });
         }
     }
     else if (customId === "dropout_cancel") {
-        await interaction.update({ content: `${Mascot.Emotes.Decline} Dropout cancelled. Phew!`, embeds: [], components: [] });
+        await safeUpdate(interaction, { content: `${Mascot.Emotes.Decline} Dropout cancelled. Phew!`, embeds: [], components: [] });
     }
     // JOB HANDLERS
     else if (customId === "work_resign") {
-        await interaction.deferReply({ ephemeral: true });
+        if (!await ensureDeferredEphemeralReply(interaction)) return;
 
         const shockedUrl = getEmoteUrl(Mascot.Emotes.Shocked);
         const embed = new EmbedBuilder()
@@ -239,13 +228,73 @@ async function handleButton(interaction: ButtonInteraction) {
             new ButtonBuilder().setCustomId("work_resign_cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
         );
 
-        await interaction.editReply({ embeds: [embed], components: [row] });
+        await safeEditReply(interaction, { embeds: [embed], components: [row] });
+    }
+    else if (customId.startsWith("work_promote_")) {
+        if (!await ensureDeferredEphemeralReply(interaction)) return;
+
+        const requestedNextJobId = customId.replace("work_promote_", "");
+        const freshUser = await prisma.user.findUnique({ where: { discordId: user.id } });
+        if (!freshUser || !freshUser.jobId) {
+            return safeEditReply(interaction, { content: "You don't have a job to promote from." });
+        }
+
+        const { checkPromotion: _checkPromo, getJob: _getJob } = require("../services/jobService");
+        const promoCheck = await _checkPromo(freshUser, guild.id);
+
+        if (!promoCheck.eligible || !promoCheck.nextJob) {
+            const parts: string[] = [];
+            if (promoCheck.missingXp > 0) parts.push(`**${promoCheck.missingXp} more XP**`);
+            if (promoCheck.missingShifts > 0) parts.push(`**${promoCheck.missingShifts} more shifts**`);
+            const missing = parts.length > 0 ? parts.join(" and ") : "requirements not met";
+            return safeEditReply(interaction, { content: `You need ${missing} before you can be promoted.` });
+        }
+
+        if (promoCheck.nextJob.id !== requestedNextJobId) {
+            return safeEditReply(interaction, { content: "This promotion button is outdated. Run `!work` again." });
+        }
+
+        const prevJob = _getJob(freshUser.jobId);
+        const nextJob = promoCheck.nextJob;
+
+        await prisma.user.update({
+            where: { discordId: user.id },
+            data: {
+                jobId: nextJob.id,
+                jobFailStreak: 0,
+                // keep jobXp, shiftsWorked, jobStress
+            }
+        });
+
+                
+        const promoEmbed = new EmbedBuilder()
+            .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
+            .setTitle(`${Mascot.Emotes.JobPromotion} Promoted!`)
+            .setDescription(
+                `**${prevJob?.title ?? "Previous Role"}** → **${nextJob.title}**\n\n` +
+                `**New Pay:** ${fmtCurrency(nextJob.pay)}/shift\n` +
+                `**Sector:** ${nextJob.sector.charAt(0).toUpperCase() + nextJob.sector.slice(1)}\n` +
+                `**Level:** ${nextJob.level}`
+            )
+            .setColor("#F1C40F")
+            .setFooter({ text: "Use !work to start your next shift in your new role." });
+
+        logToChannel(interaction.client, {
+            guild,
+            type: "ECONOMY",
+            title: "Job Promotion",
+            description: `**${user.username}** promoted from **${prevJob?.title}** to **${nextJob.title}**`,
+            color: 0xF1C40F,
+            thumbnail: user.displayAvatarURL(),
+        }).catch(() => {});
+
+        return safeEditReply(interaction, { embeds: [promoEmbed] });
     }
     else if (customId === "work_resign_confirm") {
-        await interaction.deferUpdate();
+        if (!await ensureDeferredUpdate(interaction)) return;
         try {
             await prisma.user.update({
-                where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
+                where: { discordId: user.id },
                 data: { jobId: null, jobXp: 0, shiftsWorked: 0, lastShift: null }
             });
 
@@ -254,7 +303,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setDescription("**You have resigned.**\n\nYou are now unemployed. Your career progress has been reset.")
                 .setColor("#95A5A6");
 
-            await interaction.editReply({ embeds: [embed], components: [] });
+            await safeEditReply(interaction, { embeds: [embed], components: [] });
 
             // Log resignation
             logToChannel(interaction.client, {
@@ -269,11 +318,11 @@ async function handleButton(interaction: ButtonInteraction) {
                 color: 0xE74C3C
             });
         } catch (e: any) {
-            await interaction.editReply({ content: `Error: ${e.message}`, components: [] });
+            await safeEditReply(interaction, { content: `Error: ${e.message}`, components: [] });
         }
     }
     else if (customId === "work_resign_cancel") {
-        await interaction.update({ content: `${Mascot.Emotes.Success} Cancelled resignation. Get back to work!`, embeds: [], components: [] });
+        await safeUpdate(interaction, { content: `${Mascot.Emotes.Success} Cancelled resignation. Get back to work!`, embeds: [], components: [] });
     }
     else if (customId.startsWith("work_event_choice_")) {
         const parts = customId.split("_"); // work_event_choice_eventId_choiceIdx
@@ -292,29 +341,43 @@ async function handleButton(interaction: ButtonInteraction) {
         const event = WORK_EVENTS.find((e: any) => e.id === targetEventId);
 
         if (!event) {
-            return interaction.update({ content: "Event expired or invalid.", embeds: [], components: [] });
+            return safeUpdate(interaction, { content: "Event expired or invalid.", embeds: [], components: [] });
         }
 
         const choice = event.choices[choiceIdx];
-        const success = Math.random() * 100 < choice.successChance;
 
-        await interaction.deferUpdate();
+        // Lucky Tie: +10% success chance on event choices
+        const tieData = await redisService.get<{ active: boolean }>(`lucky_tie:${user.id}`);
+        const tieBoost = tieData?.active ? 10 : 0;
+        let success = Math.random() * 100 < (choice.successChance + tieBoost);
 
-        const config = await getGuildConfig(guild.id);
+        if (!await ensureDeferredUpdate(interaction)) return;
+
+        const prefix = await getGuildPrefix(guild.id);
         const userData = await prisma.user.findUnique({
-            where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
+            where: { discordId: user.id },
             include: { wallet: true }
         });
 
         if (!userData || !userData.jobId) return;
 
-        // Import job here
         const { getJob, getJobPay, checkPromotion, checkDemotion } = require("../services/jobService");
         const job = getJob(userData.jobId);
         const basePay = await getJobPay(job, guild.id);
 
+        // Emergency Pager: convert critical failure to partial success
+        let pagerSaved = false;
+        if (!success && choice.critical) {
+            const pagerData = await redisService.get<{ active: boolean }>(`emergency_pager:${user.id}`);
+            if (pagerData?.active) {
+                await redisService.del(`emergency_pager:${user.id}`);
+                pagerSaved = true;
+            }
+        }
+
         let msg = success ? choice.successMsg : choice.failMsg;
-        let color = success ? "#2ECC71" : "#E74C3C";
+        if (pagerSaved) msg = `Emergency Pager activated! Disaster averted.\n${msg}`;
+        let color = success ? "#2ECC71" : pagerSaved ? "#F1C40F" : "#E74C3C";
 
         // Outcome
         const { xp = 0, money = 0, stress = 0 } = choice.outcome;
@@ -324,62 +387,123 @@ async function handleButton(interaction: ButtonInteraction) {
         let xpGain = 0;
         let stressGain = 0;
 
+        const eventNotes: string[] = [];
+        if (tieBoost > 0) eventNotes.push("Lucky Tie: +10% success boost");
+        if (pagerSaved) eventNotes.push("Emergency Pager: saved from critical failure");
+
+        const overtimeEventData = await redisService.get<{ gearRisk: boolean }>(`overtime_active:${user.id}`);
+        if (overtimeEventData?.gearRisk) {
+            await redisService.del(`overtime_active:${user.id}`);
+            eventNotes.push("Overtime Contract: high-pressure event triggered extra gear risk");
+        }
+
+        // Fetch current sector rep BEFORE applying bonuses (current tier applies to this event)
+        const { getSectorReputation: _getEventRep, addSectorReputation: _addEventRep } = require("../services/jobReputationService");
+        const eventRepData = await _getEventRep(userData.discordId, job.sector);
+
         if (success) {
             earnings = Math.floor(basePay * (money || 0));
-
-            // Check Wallet Limit for Event
-            if (config.walletLimit && userData.wallet && userData.wallet.balance + earnings > config.walletLimit) {
+            earnings = Math.floor(earnings * eventRepData.tier.payBonus); // Apply rep pay bonus
+            if (MAX_SAFE_BALANCE && userData.wallet && userData.wallet.balance + earnings > MAX_SAFE_BALANCE) {
                 earnings = 0;
-                msg += `\n(⚠️ Wallet Limit Reached! Earned 0 coins.)`;
+                eventNotes.push("⚠️ Wallet Limit Reached! Earned 0 coins.");
             }
 
-            xpGain = xp || 0;
-            stressGain = stress || 0;
+            // Focus Headphones XP boost on event success
+            let baseXp = xp || 0;
+            const focusData = await redisService.get<{ shiftsLeft: number; xpMult: number }>(`focus_headphones:${user.id}`);
+            if (focusData && focusData.shiftsLeft > 0 && baseXp > 0) {
+                baseXp = Math.floor(baseXp * focusData.xpMult);
+                const remaining = focusData.shiftsLeft - 1;
+                if (remaining <= 0) {
+                    await redisService.del(`focus_headphones:${user.id}`);
+                } else {
+                    const ttl = await redisService.getInstance().ttl(`focus_headphones:${user.id}`);
+                    if (ttl > 0) await redisService.set(`focus_headphones:${user.id}`, { ...focusData, shiftsLeft: remaining }, ttl);
+                }
+                eventNotes.push(`Focus Headphones: +${baseXp} XP (${remaining} shifts left)`);
+            }
+            xpGain = baseXp;
+            stressGain = pagerSaved ? 2 : (stress || 0);
         } else {
-            // Fail usually gives stress, maybe small money? Check definitions.
-            // My definitions only have one outcome object. I should maybe have successOutcome and failOutcome?
-            // For now, let's assume the defined outcome is for SUCCESS, and FAIL applies penalties.
-            // OR the defined outcome is applied differently?
-            // "outcome: { xp: 50, money: 2.0, stress: 20 }" logic:
-            // "Success chance 40%". If success -> Get outcome. If allow fail?
+            earnings = 0;
+            xpGain = pagerSaved ? 2 : -5;
+            stressGain = pagerSaved ? 2 : ((stress || 10) + 15);
+            if (pagerSaved) eventNotes.push("Critical failure softened: no pay, +2 XP, +2 Stress");
+            else eventNotes.push(`Penalty: No Pay, -5 XP, +${stressGain} Stress`);
+        }
 
-            // Let's refine the logic:
-            // IF SUCCESS: Apply outcome as positive benefit (XP+, Money+, Stress+ (if high stress event)).
-            // IF FAIL: Apply outcome as PENALTY?
-
-            // Checking the definitions:
-            // { label: "Hotfix", successChance: 40, outcome: { xp: 50, money: 2.0, stress: 20 } }
-            // Logic: Success = You get +50 XP, 2.0x Pay, +20 Stress.
-            // Fail = You fail. What happens? Standard fail penalty?
-
-            // Let's standardize:
-            // SUCCESS: Gain `money` * JobPay, Gain `xp`, Gain `stress`.
-            // FAIL: Gain 0 Money, Lose `xp` (or 0), Gain `stress` * 2?
-
-            if (success) {
-                earnings = Math.floor(basePay * (money || 0));
-                xpGain = xp || 10;
-                stressGain = stress || 5;
-            } else {
-                earnings = 0;
-                xpGain = -5;
-                stressGain = (stress || 10) + 15; // Extra stress (Total 25+)
-                msg += `\n(Penalty: No Pay, -5 XP, +${stressGain} Stress)`;
+        // Gear damage on event failure (3-8 base wear) and overtime-risk events.
+        const { getRequiredGearKey: getGearKeyForEvent } = require("../services/jobService");
+        const eventGearKey = getGearKeyForEvent(job.sector);
+        if (eventGearKey && ((!success && !pagerSaved) || overtimeEventData?.gearRisk)) {
+            const { JOB_SHOP_CATALOG: JOB_CAT } = require("../utils/shopCatalog");
+            const { seedJobShop: seedJob } = require("../services/shopService");
+            await seedJob(guild.id);
+            const gearItem = JOB_CAT.find((i: any) => i.key === eventGearKey);
+            if (gearItem) {
+                const gearInDb = await prisma.shopItem.findFirst({
+                    where: globalCatalogGuildFilter({
+                        name: { equals: gearItem.name, mode: "insensitive" },
+                    }),
+                });
+                const invRow = gearInDb ? await prisma.inventory.findUnique({ where: { userId_shopItemId: { userId: userData.discordId, shopItemId: gearInDb.id } } }) : null;
+                if (invRow) {
+                    let wear = !success && !pagerSaved ? 3 + Math.floor(Math.random() * 6) : 0;
+                    if (overtimeEventData?.gearRisk) wear += 15 + Math.floor(Math.random() * 16);
+                    const oilData = await redisService.get<{ shiftsLeft: number }>(`tools_oil:${user.id}`);
+                    if (oilData && oilData.shiftsLeft > 0 && wear > 0) {
+                        wear = Math.ceil(wear / 2);
+                        const oilRemaining = oilData.shiftsLeft - 1;
+                        if (oilRemaining <= 0) {
+                            await redisService.del(`tools_oil:${user.id}`);
+                        } else {
+                            const oilTtl = await redisService.getInstance().ttl(`tools_oil:${user.id}`);
+                            if (oilTtl > 0) await redisService.set(`tools_oil:${user.id}`, { shiftsLeft: oilRemaining }, oilTtl);
+                        }
+                        eventNotes.push(`Premium Tools Oil: reduced gear wear (${oilRemaining} shifts left)`);
+                    }
+                    const currentDurability = (invRow.meta as any)?.durability ?? 100;
+                    const newDurability = Math.max(0, currentDurability - wear);
+                    const warrantyData = await redisService.get<{ active: boolean }>(`warranty_card:${user.id}`);
+                    if (newDurability <= 0 && warrantyData?.active) {
+                        await redisService.del(`warranty_card:${user.id}`);
+                        eventNotes.push(`Warranty Card protected your **${gearItem.name}**`);
+                    } else if (wear > 0) {
+                        await prisma.inventory.update({ where: { id: invRow.id }, data: { meta: { ...((invRow.meta as any) ?? {}), durability: newDurability } } });
+                        if (newDurability <= 0) eventNotes.push(`**Gear Broken:** ${gearItem.name} — use Repair Coupon`);
+                        else eventNotes.push(`Gear Wear: ${gearItem.name} -${wear} (${newDurability}/100)`);
+                    }
+                }
             }
         }
 
         // Apply to DB
         await prisma.user.update({
-            where: { id: userData.id },
+            where: { discordId: userData.discordId },
             data: {
                 wallet: { update: { balance: { increment: earnings } } },
                 jobXp: { increment: xpGain },
                 jobStress: Math.min(100, (userData.jobStress || 0) + stressGain), // Cap at 100
                 shiftsWorked: { increment: 1 },
                 lastShift: new Date(),
-                jobFailStreak: success ? 0 : undefined // Reset fail streak on success
+                jobFailStreak: success || pagerSaved ? 0 : undefined // Reset fail streak on success or pager save
             }
         });
+
+        // Grant reputation AFTER DB write — only on success/pager
+        if (success || pagerSaved) {
+            const eventRepResult = await _addEventRep(userData.discordId, job.sector, 8, "event_success");
+            if (eventRepResult.tierChanged) {
+                eventNotes.push(`Reputation: **${eventRepResult.tier.name}** tier reached! (${eventRepResult.after} rep)`);
+            } else {
+                eventNotes.push(`Reputation: +8 (${eventRepResult.after} — ${eventRepResult.tier.name})`);
+            }
+        }
+
+        if (eventNotes.length > 0) {
+            msg += `\n${eventNotes.map(n => `- ${n}`).join("\n")}`;
+        }
 
         // XP/Stress Checks
         let footerText = "";
@@ -397,18 +521,23 @@ async function handleButton(interaction: ButtonInteraction) {
         }
 
         // Demotion (check on failure — uses 3-strike system)
+        let eventDemoField: { name: string; value: string } | null = null;
         if (xpGain < 0) {
+            const prevJobTitle = getJob ? getJob(userData.jobId)?.title ?? "Previous Role" : "Previous Role";
             const demoCheck = await checkDemotion(userData);
             if (demoCheck.demoted) {
-                msg += `\n\n🚨 **DEMOTED** to ${demoCheck.prevJob?.title}`;
+                eventDemoField = {
+                    name: "🚨 Demoted",
+                    value: `**${prevJobTitle}** → **${demoCheck.prevJob?.title ?? "previous role"}**\n${demoCheck.msg}`,
+                };
             } else if (demoCheck.msg) {
-                msg += `\n\n${demoCheck.msg}`;
+                eventDemoField = { name: "⚠️ Warning", value: demoCheck.msg };
             }
         }
 
         const resEmbed = new EmbedBuilder()
-            .setTitle(success ? `${Mascot.Emotes.Success} Event Resolved` : `${Mascot.Emotes.Fail} Event Failed`)
-            .setDescription(`**${choice.label}**\n${msg}\n\n**Result:**\n${Mascot.Emotes.MoneyBag} ${fmtCurrency(earnings, config.currencyEmoji)}\nXP: ${xpGain > 0 ? '+' : ''}${xpGain}\n${Mascot.Emotes.Alert} +${stressGain} Stress`)
+            .setTitle(success ? `${Mascot.Emotes.Success} Event Resolved` : pagerSaved ? `${Mascot.Emotes.Alert} Event Saved` : `${Mascot.Emotes.Fail} Event Failed`)
+            .setDescription(`**${choice.label}**\n${msg}\n\n**Result:**\n${Mascot.Emotes.MoneyBag} ${fmtCurrency(earnings)}\nXP: ${xpGain > 0 ? '+' : ''}${xpGain}\n${Mascot.Emotes.Alert} +${stressGain} Stress`)
             .setColor(color as any);
 
         const eventRows: ActionRowBuilder<ButtonBuilder>[] = [];
@@ -417,24 +546,30 @@ async function handleButton(interaction: ButtonInteraction) {
             // Re-check promotion to get the object
             const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
             if (promoCheck.eligible && promoCheck.nextJob) {
-                resEmbed.addFields({ name: `${Mascot.Emotes.JobPromotion} Promotion Available!`, value: `You have qualified for **${promoCheck.nextJob.title}**!` });
+                resEmbed.addFields({ name: `${Mascot.Emotes.JobPromotion} Promotion Available!`, value: `You are ready for **${promoCheck.nextJob.title}**! Use \`!work\` and click **Promote**.` });
                 resEmbed.setColor("#F1C40F");
 
                 eventRows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder()
-                        .setCustomId(`promote_confirm_${promoCheck.nextJob.id}`)
-                        .setLabel(`Check Eligibility: ${promoCheck.nextJob.title}`)
-                        .setStyle(ButtonStyle.Success)
+                        .setCustomId(`work_promote_${promoCheck.nextJob.id}`)
+                        .setLabel(`Promote → ${promoCheck.nextJob.title}`)
+                        .setStyle(ButtonStyle.Primary)
                         .setEmoji(Mascot.Emotes.JobPromotion)
                 ));
             } else if (promoCheck.nextJob) {
-                resEmbed.setFooter({ text: `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingXp} xp, ${promoCheck.missingShifts} shifts to go)` });
+                const promoParts: string[] = [];
+                if (promoCheck.missingXp > 0) promoParts.push(`${promoCheck.missingXp} XP`);
+                if (promoCheck.missingShifts > 0) promoParts.push(`${promoCheck.missingShifts} shifts`);
+                resEmbed.setFooter({ text: `Progress to ${promoCheck.nextJob.title}: need ${promoParts.join(", ")}` });
             }
         } else if (footerText) {
             resEmbed.setFooter({ text: footerText });
         }
 
-        await interaction.editReply({ embeds: [resEmbed], components: eventRows });
+        if (eventDemoField) resEmbed.addFields(eventDemoField);
+        if (eventDemoField?.name.startsWith("🚨")) resEmbed.setColor("#E74C3C");
+
+        await safeEditReply(interaction, { embeds: [resEmbed], components: eventRows });
 
         // Log it
         logToChannel(interaction.client, {
@@ -444,7 +579,7 @@ async function handleButton(interaction: ButtonInteraction) {
             description: `**${user.username}** encountered: ${event.title}`,
             fields: [
                 { name: "Choice", value: choice.label, inline: true },
-                { name: "Earnings", value: fmtCurrency(earnings, config.currencyEmoji), inline: true }
+                { name: "Earnings", value: fmtCurrency(earnings), inline: true }
             ],
             thumbnail: user.displayAvatarURL(),
             color: success ? 0x2ECC71 : 0xE74C3C
@@ -457,9 +592,9 @@ async function handleButton(interaction: ButtonInteraction) {
 
 
     else if (customId.startsWith("promote_confirm_")) {
-        try {
-            await interaction.deferReply({ ephemeral: true });
+        if (!await ensureDeferredEphemeralReply(interaction)) return;
 
+        try {
             const nextJobId = customId.replace("promote_confirm_", "");
             // Import Job Service Safely
             let jobService;
@@ -467,20 +602,19 @@ async function handleButton(interaction: ButtonInteraction) {
                 jobService = require("../services/jobService");
             } catch (err) {
                 console.error("Failed to require jobService:", err);
-                return interaction.editReply({ content: "System Error: Job Service unavailable." });
+                return safeEditReply(interaction, { content: "System Error: Job Service unavailable." });
             }
 
             const { getJob, getJobAction } = jobService;
             const nextJob = getJob(nextJobId);
 
             if (!nextJob) {
-                return interaction.editReply({ content: `Error: Job definition for '${nextJobId}' not found.` });
+                return safeEditReply(interaction, { content: `Error: Job definition for '${nextJobId}' not found.` });
             }
 
             // Fetch config if not already available in this scope
-            const { getGuildConfig } = require("../services/guildConfigService");
-            const config = await getGuildConfig(guild.id);
-            const prefix = config?.prefix || "!";
+                        const prefix = await getGuildPrefix(guild.id);
+            
 
             // DO NOT AUTO PROMOTE. Tell user to apply.
             const embed = new EmbedBuilder()
@@ -493,55 +627,93 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setColor("#F1C40F") // Gold
                 .setThumbnail(getEmoteUrl(Mascot.Emotes.Success));
 
-            await interaction.editReply({ embeds: [embed] });
+            await safeEditReply(interaction, { embeds: [embed] });
 
         } catch (err: any) {
             console.error("Promotion Error:", err);
-            // If already deferred, use editReply
-            try { await interaction.editReply({ content: `Error: ${err.message}` }); } catch (e) { }
+            await safeEditReply(interaction, { content: `Error: ${err.message}` });
         }
     }
     else if (customId === "work_shift") {
         // Defer immediately to prevent timeout (Unknown Interaction)
         // We use ephemeral: false because the game is intended to be public.
         // This means validation errors will also be public, which is a necessary trade-off to prevent crashes.
-        await interaction.deferReply({ ephemeral: false });
+        if (!await safeDeferReply(interaction)) return;
 
         // Import here to avoid circular dependencies if any
         const { getJob, getJobPay, checkPromotion, checkDemotion, getWorkEvent } = require("../services/jobService");
-        const { getWorkGame } = require("../services/minigameService");
+        const { getWorkGame, getWorkGameForUser } = require("../services/minigameService");
+        const { getRecentIds, recordRecentId } = require("../services/jobAntiRepeat");
 
         const userData = await prisma.user.findUnique({
-            where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
+            where: { discordId: user.id },
             include: { wallet: true }
         });
         if (!userData || !userData.jobId) {
             await interaction.deleteReply().catch(() => { });
-            return interaction.followUp({ content: "You don't have a job!", ephemeral: true });
+            return safeFollowUp(interaction, { content: "You don't have a job!", flags: MessageFlags.Ephemeral });
         }
 
         const job = getJob(userData.jobId);
         if (!job) {
             await interaction.deleteReply().catch(() => { });
-            return interaction.followUp({ content: "Invalid job.", ephemeral: true });
+            return safeFollowUp(interaction, { content: "Invalid job.", flags: MessageFlags.Ephemeral });
+        }
+
+        // Gear check — required equipment must be owned and not broken before shift proceeds
+        const gearKey = getRequiredGearKey(job.sector);
+        let gearInvRow: { id: string; amount: number; meta: any } | null = null;
+        let gearCatalogName = "";
+        if (gearKey) {
+            await seedJobShop(guild.id);
+            const gearCatalogItem = JOB_SHOP_CATALOG.find(i => i.key === gearKey);
+            if (gearCatalogItem) {
+                gearCatalogName = gearCatalogItem.name;
+                const gearInDb = await prisma.shopItem.findFirst({
+                    where: globalCatalogGuildFilter({
+                        name: { equals: gearCatalogItem.name, mode: "insensitive" },
+                    }),
+                });
+                const invRow = gearInDb
+                    ? await prisma.inventory.findUnique({
+                        where: { userId_shopItemId: { userId: userData.discordId, shopItemId: gearInDb.id } }
+                    })
+                    : null;
+                if (!invRow || invRow.amount < 1) {
+                    const sectorDisplay = job.sector.charAt(0).toUpperCase() + job.sector.slice(1);
+                    await interaction.deleteReply().catch(() => { });
+                    return safeFollowUp(interaction, {
+                        content: `You need a **${gearCatalogItem.name}** to work ${sectorDisplay} jobs. Buy it from the Job Store (\`!shop job\`).`,
+                        flags: MessageFlags.Ephemeral,
+                    });
+                }
+                const durability = (invRow.meta as any)?.durability ?? 100;
+                if (durability <= 0) {
+                    await interaction.deleteReply().catch(() => { });
+                    return safeFollowUp(interaction, {
+                        content: `Your **${gearCatalogItem.name}** is broken (0/100). Use a **Repair Coupon** before working.`,
+                        flags: MessageFlags.Ephemeral,
+                    });
+                }
+                gearInvRow = { id: invRow.id, amount: invRow.amount, meta: invRow.meta };
+            }
         }
 
         // Cooldown check
-        const config = await getGuildConfig(guild.id);
+        const prefix = await getGuildPrefix(guild.id);
 
         // Check Wallet Limit Check BEFORE shift starts
-        if (config.walletLimit && userData.wallet && userData.wallet.balance >= config.walletLimit) {
+        if (MAX_SAFE_BALANCE && userData.wallet && userData.wallet.balance >= MAX_SAFE_BALANCE) {
             await interaction.deleteReply().catch(() => { });
-            return interaction.followUp({ content: `${Mascot.Emotes.Fail} Your wallet is full! Deposit money to the bank before working.`, ephemeral: true });
+            return safeFollowUp(interaction, { content: `${Mascot.Emotes.Fail} Your wallet is full! Deposit money to the bank before working.`, flags: MessageFlags.Ephemeral });
         }
 
-        const cooldownSeconds = config.jobCooldown ?? 3600;
+        const cooldownSeconds = 3600;
 
         // Check Active Effects (Permanent Buffs)
         const activeEffects = await prisma.activeEffect.findMany({
             where: {
-                userId: userData.id,
-                guildId: guild.id,
+                userId: userData.discordId,
                 effectType: { in: ["COOLDOWN_REDUCTION", "PAY_MULTIPLIER"] },
                 OR: [
                     { expiresAt: { gt: new Date() } },
@@ -565,10 +737,11 @@ async function handleButton(interaction: ButtonInteraction) {
         const finalCooldown = Math.max(0, cooldownSeconds - cooldownRed);
         const cooldownMs = finalCooldown * 1000;
 
-        if (now - lastShift < cooldownMs) {
+        const { isTester: _isTesterWork } = require("../utils/developerAccess");
+        if (now - lastShift < cooldownMs && !_isTesterWork(user.id, interaction.member)) {
             const canWorkAt = Math.floor((lastShift + cooldownMs) / 1000);
             await interaction.deleteReply().catch(() => { });
-            return interaction.followUp({ content: `${Mascot.Emotes.Angry} You are tired! You can work again <t:${canWorkAt}:R>.`, ephemeral: true });
+            return safeFollowUp(interaction, { content: `${Mascot.Emotes.Angry} You are tired! You can work again <t:${canWorkAt}:R>.`, flags: MessageFlags.Ephemeral });
         }
 
         // --- STRESS CHECK ---
@@ -578,14 +751,14 @@ async function handleButton(interaction: ButtonInteraction) {
             if (Math.random() < 0.5) {
                 // BURNOUT!
                 await prisma.user.update({
-                    where: { id: userData.id },
+                    where: { discordId: userData.discordId },
                     data: {
                         lastShift: new Date(),
                         jobStress: { increment: 5 } // Even more stress
                     }
                 });
 
-                const prefix = config?.prefix || "!";
+                
 
                 const burnoutEmbed = new EmbedBuilder()
                     .setTitle(`${Mascot.Emotes.Alert} BURNOUT!`)
@@ -594,17 +767,20 @@ async function handleButton(interaction: ButtonInteraction) {
                     .setThumbnail(getEmoteUrl(Mascot.Emotes.Fail));
 
                 await interaction.deleteReply().catch(() => { });
-                return interaction.followUp({ embeds: [burnoutEmbed], ephemeral: true });
+                return safeFollowUp(interaction, { embeds: [burnoutEmbed], flags: MessageFlags.Ephemeral });
             }
         }
 
         // --- WORK EVENT CHECK ---
-        // getWorkEvent imported at block start
+        // Overtime Contract increases event chance to 60%
+        const overtimeFlagData = await redisService.get<{ gearRisk: boolean }>(`overtime_active:${user.id}`);
+        const { getSectorReputation: _getRepForEvent } = require("../services/jobReputationService");
+        const _repForEvent = await _getRepForEvent(user.id, job.sector);
+        const eventChance = (overtimeFlagData?.gearRisk ? 0.60 : 0.30) + _repForEvent.tier.eventChanceBonus;
 
-
-        // 20% Chance for Event (if not high stress burnout)
-        if (Math.random() < 0.20) {
-            const event = getWorkEvent(job.sector);
+        const recentEventIds = await getRecentIds(user.id, "event");
+        if (Math.random() < eventChance) {
+            const event = getWorkEvent(job.sector, recentEventIds);
             if (event) {
                 const evEmbed = new EmbedBuilder()
                     .setTitle(event.title)
@@ -623,11 +799,12 @@ async function handleButton(interaction: ButtonInteraction) {
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(rows);
 
-                return interaction.editReply({ embeds: [evEmbed], components: [row] });
+                await recordRecentId(user.id, "event", event.id);
+                return safeEditReply(interaction, { embeds: [evEmbed], components: [row] });
             }
         }
 
-        const game = getWorkGame();
+        const game = await getWorkGameForUser(job.sector, user.id);
 
         // --- PREVIEW LOGIC ---
         let reply: any;
@@ -647,13 +824,13 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setColor("#3498DB")
                 .setFooter({ text: `Memorize this for ${game.previewTime} seconds!` });
 
-            reply = await interaction.editReply({ embeds: [previewEmbed] }); // Removed fetchReply as editReply returns Message or boolean/APIMessage
+            reply = await safeEditReply(interaction, { embeds: [previewEmbed] });
 
             // Wait
             await new Promise(resolve => setTimeout(resolve, game.previewTime! * 1000));
 
             // Update to Question
-            await interaction.editReply({ embeds: [embed] });
+            await safeEditReply(interaction, { embeds: [embed] });
         }
 
         // --- BUTTON GAME ---
@@ -670,13 +847,10 @@ async function handleButton(interaction: ButtonInteraction) {
             // Since we already deferred, we always use editReply
             // If reply was set by preview logic, we edit.
             // If not set, we still edit the deferred message.
-            reply = await interaction.editReply({ embeds: [embed], components: [row] });
+            await safeEditReply(interaction, { embeds: [embed], components: [row] });
 
             try {
-                // If reply is not a message (failed edit?), fallback to fetchReply?
-                // editReply returns Message if successful in d.js v14?
-                // Actually editReply resolves to Message.
-                if (!reply) reply = await interaction.fetchReply();
+                reply = await interaction.fetchReply();
 
                 const i = await reply.awaitMessageComponent({
                     componentType: ComponentType.Button,
@@ -695,7 +869,7 @@ async function handleButton(interaction: ButtonInteraction) {
         else {
             // TYPING GAME
             // We just edit the embed to show the question
-            reply = await interaction.editReply({ embeds: [embed], components: [] });
+            reply = await safeEditReply(interaction, { embeds: [embed], components: [] });
 
             if (interaction.channel) {
                 try {
@@ -715,6 +889,15 @@ async function handleButton(interaction: ButtonInteraction) {
                 } catch (e) {
                     isWin = false;
                 }
+            }
+        }
+
+        // --- Emergency Pager: redirect one shift failure ---
+        if (!isWin) {
+            const pagerData = await redisService.get<{ active: boolean }>(`emergency_pager:${user.id}`);
+            if (pagerData?.active) {
+                await redisService.del(`emergency_pager:${user.id}`);
+                isWin = true;
             }
         }
 
@@ -746,45 +929,186 @@ async function handleButton(interaction: ButtonInteraction) {
             const streakBonus = Math.floor(amount * (streakBonusPct / 100));
             amount += streakBonus;
 
+            // Apply Counterfeit Kit buff if active
+            const counterfeitMult = await checkCounterfeitKit(user.id);
+            if (counterfeitMult > 1) amount = Math.floor(amount * counterfeitMult);
+
+            // Apply Crown of Greed and Devil Contract income modifiers
+            const crownMult = await checkCrownOfGreed(user.id);
+            const devilReduction = await checkDevilContract(user.id);
+            if (crownMult !== 1) amount = Math.floor(amount * crownMult);
+            if (devilReduction !== 1) amount = Math.floor(amount * devilReduction);
+
+            // Fetch current sector reputation (BEFORE granting +5 so current tier applies to this shift)
+            const { getSectorReputation: _getShiftRep, addSectorReputation: _addShiftRep } = require("../services/jobReputationService");
+            const shiftRepData = await _getShiftRep(user.id, job.sector);
+            amount = Math.floor(amount * shiftRepData.tier.payBonus);
+            const repStressReduction = shiftRepData.tier.stressReduction;
+            const repGearWearReduction = shiftRepData.tier.gearWearReduction;
+
+            // --- Job Store item effects ---
+            const jobEffectNotes: string[] = [];
+
+            // Focus Headphones: 2x XP for next N shifts
+            const focusData = await redisService.get<{ shiftsLeft: number; xpMult: number }>(`focus_headphones:${user.id}`);
+            let xpGain = 10;
+            if (focusData && focusData.shiftsLeft > 0) {
+                xpGain = Math.floor(10 * focusData.xpMult);
+                const remaining = focusData.shiftsLeft - 1;
+                if (remaining <= 0) {
+                    await redisService.del(`focus_headphones:${user.id}`);
+                } else {
+                    const ttl = await redisService.getInstance().ttl(`focus_headphones:${user.id}`);
+                    if (ttl > 0) await redisService.set(`focus_headphones:${user.id}`, { ...focusData, shiftsLeft: remaining }, ttl);
+                }
+                jobEffectNotes.push(`Focus Headphones: +${xpGain} XP (${remaining} shifts left)`);
+            }
+
+            // Premium Tools Oil flag — consumed only when gear wear is calculated below
+            const oilData = await redisService.get<{ shiftsLeft: number }>(`tools_oil:${user.id}`);
+
+            // Lucky Tie: +10% payout bonus on this shift
+            const tieData = await redisService.get<{ active: boolean }>(`lucky_tie:${user.id}`);
+            if (tieData?.active) {
+                const tieBonus = Math.floor(amount * 0.10);
+                amount += tieBonus;
+                jobEffectNotes.push(`Lucky Tie: +${fmtCurrency(tieBonus)} bonus`);
+            }
+
+            // Corporate Blessing: 40% chance of 2-3x payout; on fail +25 stress and extra gear wear
+            let corporateBlessingFailed = false;
+            const blessingData = await redisService.get<{ active: boolean }>(`corporate_blessing:${user.id}`);
+            if (blessingData?.active) {
+                await redisService.del(`corporate_blessing:${user.id}`);
+                if (Math.random() < 0.40) {
+                    const mult = 2 + Math.random();
+                    amount = Math.floor(amount * mult);
+                    jobEffectNotes.push(`Corporate Blessing: Massive payout! (${mult.toFixed(1)}x)`);
+                } else {
+                    // Failure: +25 stress, amount unchanged, plus durability damage below
+                    corporateBlessingFailed = true;
+                    await prisma.user.update({ where: { discordId: user.id }, data: { jobStress: { increment: 25 } } });
+                    jobEffectNotes.push(`Corporate Blessing: Failed — +25 stress and extra gear wear`);
+                }
+            }
+
+            // Overtime Contract flag — consumed in gear wear block below
+            const overtimeData = await redisService.get<{ gearRisk: boolean }>(`overtime_active:${user.id}`);
+
             // Check Wallet Limit (Double check before payout)
             let walletFull = false;
             // userData.wallet is available from the earlier fetch (if we passed it down, but we are in the same scope?
             // Yes, userData is defined at line 501 in the `work_shift` block.
             // Wait, loop back: `userData` at line 501 includes wallet now due to my previous edit?
             // YES.
-            if (config.walletLimit && userData.wallet && userData.wallet.balance + amount > config.walletLimit) {
+            if (MAX_SAFE_BALANCE && userData.wallet && userData.wallet.balance + amount > MAX_SAFE_BALANCE) {
                 amount = 0;
                 walletFull = true;
             }
 
             // Update User
             await prisma.user.update({
-                where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
+                where: { discordId: user.id },
                 data: {
                     wallet: { update: { balance: { increment: amount } } },
                     shiftsWorked: { increment: 1 },
-                    jobXp: { increment: 10 },
-                    jobStress: { increment: 5 }, // +5 Stress on success
+                    jobXp: { increment: xpGain },
+                    jobStress: { increment: Math.max(0, 5 - repStressReduction) }, // +5 base, reduced by rep tier
                     jobStreak: newStreak,
                     lastShift: new Date(),
                     jobFailStreak: 0 // Reset fail streak on success
                 }
             });
 
-            // Check Promotion
-            // We use the UPDATED jobXp (add 10 to current)
-            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + 10, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
+            // Grant reputation AFTER DB write — takes effect on the NEXT shift
+            const shiftRepResult = await _addShiftRep(user.id, job.sector, 5, "shift_success");
+            if (shiftRepResult.tierChanged) {
+                jobEffectNotes.push(`Reputation: **${shiftRepResult.tier.name}** tier reached! (${shiftRepResult.after} rep)`);
+            } else {
+                jobEffectNotes.push(`Reputation: +5 (${shiftRepResult.after} — ${shiftRepResult.tier.name})`);
+            }
 
-            let earningsText = `${fmtCurrency(amount, config?.currencyEmoji)}\n(Base Pay + ${streakBonusPct}% Streak Bonus)`;
+            // Check Promotion using actual xpGain (may be boosted by Focus Headphones)
+            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
+
+            // Apply income tax on work shift payout
+            const { applyIncomeTax } = await import("../services/taxService");
+            const workTax = walletFull ? { net: 0, taxPaid: 0, shielded: false } : await applyIncomeTax(user.id, amount);
+
+            let earningsText = `${fmtCurrency(amount)}\n(Base Pay + ${streakBonusPct}% Streak Bonus)`;
             if (walletFull) {
-                earningsText = `~~${fmtCurrency(amount, config?.currencyEmoji)}~~ 0\n(⚠️ Wallet Limit Reached)`;
+                earningsText = `~~${fmtCurrency(amount)}~~ 0\n(⚠️ Wallet Limit Reached)`;
+            }
+            // --- Gear durability wear ---
+            if (gearInvRow && gearCatalogName) {
+                const currentDurability = (gearInvRow.meta as any)?.durability ?? 100;
+
+                // Base wear: 5-12 per successful shift, reduced by rep tier
+                let totalWear = Math.max(0, (5 + Math.floor(Math.random() * 8)) - repGearWearReduction);
+
+                // Overtime Contract: extra 15-30 wear
+                if (overtimeData?.gearRisk) {
+                    await redisService.del(`overtime_active:${user.id}`);
+                    totalWear += 15 + Math.floor(Math.random() * 16);
+                }
+
+                // Corporate Blessing failure: extra 20-35 wear
+                if (corporateBlessingFailed) {
+                    totalWear += 20 + Math.floor(Math.random() * 16);
+                }
+
+                // Premium Tools Oil: halve wear, consume a shift
+                if (oilData && oilData.shiftsLeft > 0) {
+                    totalWear = Math.ceil(totalWear / 2);
+                    const oilRemaining = oilData.shiftsLeft - 1;
+                    if (oilRemaining <= 0) {
+                        await redisService.del(`tools_oil:${user.id}`);
+                    } else {
+                        const oilTtl = await redisService.getInstance().ttl(`tools_oil:${user.id}`);
+                        if (oilTtl > 0) await redisService.set(`tools_oil:${user.id}`, { shiftsLeft: oilRemaining }, oilTtl);
+                    }
+                    jobEffectNotes.push(`Premium Tools Oil: reduced gear wear (${oilRemaining} shifts left)`);
+                }
+
+                // Warranty Card: if wear would bring durability to 0, block all wear
+                const projectedDurability = currentDurability - totalWear;
+                const warrantyData = await redisService.get<{ active: boolean }>(`warranty_card:${user.id}`);
+                if (projectedDurability <= 0 && warrantyData?.active) {
+                    await redisService.del(`warranty_card:${user.id}`);
+                    jobEffectNotes.push(`Warranty Card protected your **${gearCatalogName}** from breaking`);
+                    totalWear = 0;
+                }
+
+                if (totalWear > 0) {
+                    const newDurability = Math.max(0, currentDurability - totalWear);
+                    await prisma.inventory.update({
+                        where: { id: gearInvRow.id },
+                        data: { meta: { ...((gearInvRow.meta as any) ?? {}), durability: newDurability } },
+                    });
+                    if (newDurability <= 0) {
+                        jobEffectNotes.push(`**Gear Broken:** ${gearCatalogName} hit 0/100 — use a Repair Coupon before next shift`);
+                    } else {
+                        jobEffectNotes.push(`Gear Wear: ${gearCatalogName} -${totalWear} durability (${newDurability}/100)`);
+                    }
+                }
+            }
+
+            if (jobEffectNotes.length > 0) {
+                earningsText += `\n${jobEffectNotes.map(n => `- ${n}`).join("\n")}`;
             }
 
             const winEmbed = new EmbedBuilder()
                 .setAuthor({ name: `${user.username}`, iconURL: user.displayAvatarURL() })
                 .setTitle(`${Mascot.Emotes.JobWorking} Shift Complete`)
-                .setDescription(`Great work! You finished your shift as a **${job.title}**.\n\n**Earnings:** ${earningsText}\n\n**XP Gained:** +10\n**Stress:** +5`)
+                .setDescription(`Great work! You finished your shift as a **${job.title}**.\n\n**Earnings:** ${earningsText}\n\n**XP Gained:** +${xpGain}\n**Stress:** +5`)
                 .setColor("#2ECC71");
+
+            if (!walletFull) {
+                winEmbed.addFields(workTax.shielded
+                    ? { name: "Tax", value: "🛡️ Shielded", inline: true }
+                    : { name: "Tax (8%)", value: `-${fmtCurrency(workTax.taxPaid)}`, inline: true }
+                );
+            }
 
             if (newStreak > 1) {
                 winEmbed.addFields({ name: "Job Streak", value: `${newStreak} Days`, inline: true });
@@ -793,28 +1117,30 @@ async function handleButton(interaction: ButtonInteraction) {
             const rows: ActionRowBuilder<ButtonBuilder>[] = [];
 
             if (promoCheck.eligible && promoCheck.nextJob) {
-                winEmbed.addFields({ name: `${Mascot.Emotes.JobPromotion} Promotion Available!`, value: `You have qualified for **${promoCheck.nextJob.title}**!` });
-                winEmbed.setColor("#F1C40F"); // Gold
+                winEmbed.addFields({ name: `${Mascot.Emotes.JobPromotion} Promotion Available!`, value: `You are ready for **${promoCheck.nextJob.title}**! Click **Promote** below.` });
+                winEmbed.setColor("#F1C40F");
 
                 rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder()
-                        .setCustomId(`promote_confirm_${promoCheck.nextJob.id}`)
-                        .setLabel(`Check Eligibility: ${promoCheck.nextJob.title}`)
-                        .setStyle(ButtonStyle.Success)
+                        .setCustomId(`work_promote_${promoCheck.nextJob.id}`)
+                        .setLabel(`Promote → ${promoCheck.nextJob.title}`)
+                        .setStyle(ButtonStyle.Primary)
                         .setEmoji(Mascot.Emotes.JobPromotion)
                 ));
             } else if (promoCheck.nextJob) {
-                winEmbed.setFooter({ text: `Next Job: ${promoCheck.nextJob.title} (Need ${promoCheck.missingXp} xp, ${promoCheck.missingShifts} shifts)` });
+                const shiftParts: string[] = [];
+                if (promoCheck.missingXp > 0) shiftParts.push(`${promoCheck.missingXp} XP`);
+                if (promoCheck.missingShifts > 0) shiftParts.push(`${promoCheck.missingShifts} shifts`);
+                winEmbed.setFooter({ text: `Progress to ${promoCheck.nextJob.title}: need ${shiftParts.join(", ")}` });
             }
 
             // Disable buttons on the original game embed
-            await interaction.editReply({ components: [] });
+            await safeEditReply(interaction, { components: [] });
 
             // Create Work Log
             await prisma.workLog.create({
                 data: {
-                    guildId: guild.id,
-                    userId: userData.id, // Use internal DB ID
+                    userId: userData.discordId,
                     jobId: userData.jobId!,
                     shiftType: game.type,
                     success: true,
@@ -830,7 +1156,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 description: `**${user.username}** finished a shift as **${job.title}**.`,
                 fields: [
                     { name: "User", value: `<@${user.id}>`, inline: true },
-                    { name: "Earnings", value: fmtCurrency(amount, config?.currencyEmoji), inline: true },
+                    { name: "Earnings", value: fmtCurrency(amount), inline: true },
                     { name: "Job", value: job.title, inline: true },
                     { name: "Streak", value: `${newStreak}`, inline: true }
                 ],
@@ -839,18 +1165,18 @@ async function handleButton(interaction: ButtonInteraction) {
             });
 
             // Update Quest Progress
-            await updateQuestProgress(userData.id, "WORK").catch(console.error);
+            questBus.emit("work:complete", { discordId: userData.discordId });
 
             if (userMessage) {
                 await (userMessage as Message).reply({ embeds: [winEmbed], components: rows });
             } else {
-                await interaction.followUp({ embeds: [winEmbed], components: rows });
+                await safeFollowUp(interaction, { embeds: [winEmbed], components: rows });
             }
 
         } else {
             // FAILED
             await prisma.user.update({
-                where: { discordId_guildId: { discordId: user.id, guildId: guild.id } },
+                where: { discordId: user.id },
                 data: {
                     lastShift: new Date(), // Trigger cooldown
                     jobXp: { decrement: 5 }, // -5 XP
@@ -859,15 +1185,10 @@ async function handleButton(interaction: ButtonInteraction) {
             });
 
             // Check Demotion (uses 3-strike consecutive failure system)
+            const prevJobTitleFail = getJob(userData.jobId)?.title ?? "Previous Role";
             const demoCheck = await checkDemotion(userData);
 
-            let desc = `You messed up the task!\n\n**Correct Answer:** ${game.answer}\n\n**Penalty:**\n- No Pay\n- **-5 Job XP**\n- **+10 Stress**\n\nCome back in **${cooldownSeconds > 0 ? formatDuration(cooldownMs) : "a moment"}**.`;
-
-            if (demoCheck.demoted) {
-                desc += `\n\n${Mascot.Emotes.Alert} **DEMOTED!**\n${demoCheck.msg}`;
-            } else if (demoCheck.msg) {
-                desc += `\n\n${demoCheck.msg}`;
-            }
+            const desc = `You messed up the task!\n\n**Correct Answer:** ${game.answer}\n\n**Penalty:**\n- No Pay\n- **-5 Job XP**\n- **+10 Stress**\n\nCome back in **${cooldownSeconds > 0 ? formatDuration(cooldownMs) : "a moment"}**.`;
 
             const failEmbed = new EmbedBuilder()
                 .setAuthor({ name: `${user.username}`, iconURL: user.displayAvatarURL() })
@@ -875,14 +1196,22 @@ async function handleButton(interaction: ButtonInteraction) {
                 .setDescription(desc)
                 .setColor("#E74C3C");
 
+            if (demoCheck.demoted) {
+                failEmbed.addFields({
+                    name: "🚨 Demoted",
+                    value: `**${prevJobTitleFail}** → **${demoCheck.prevJob?.title ?? "previous role"}**\n${demoCheck.msg}`,
+                });
+            } else if (demoCheck.msg) {
+                failEmbed.addFields({ name: "⚠️ Warning", value: demoCheck.msg });
+            }
+
             // Disable buttons on the original game embed
-            await interaction.editReply({ components: [] });
+            await safeEditReply(interaction, { components: [] });
 
             // Create Work Log
             await prisma.workLog.create({
                 data: {
-                    guildId: guild.id,
-                    userId: userData.id,
+                    userId: userData.discordId,
                     jobId: userData.jobId!,
                     shiftType: game.type,
                     success: false,
@@ -908,7 +1237,7 @@ async function handleButton(interaction: ButtonInteraction) {
             if (userMessage) {
                 await (userMessage as Message).reply({ embeds: [failEmbed] });
             } else {
-                await interaction.followUp({ embeds: [failEmbed] });
+                await safeFollowUp(interaction, { embeds: [failEmbed] });
             }
         }
     }

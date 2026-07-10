@@ -1,9 +1,9 @@
 import { Message, EmbedBuilder, Colors } from "discord.js";
 import { getShopItemByName, getShopItems } from "../../services/shopService";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { fmtCurrency, formatDuration } from "../../utils/format";
 import { errorEmbed } from "../../utils/embed";
 import { ItemEffect } from "../../services/effectService";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 function formatEffectDescription(effect: ItemEffect): string {
     switch (effect.type) {
@@ -26,11 +26,11 @@ function formatEffectDescription(effect: ItemEffect): string {
 
 export async function handleItemInfo(message: Message, args: string[]) {
     try {
-        const config = await getGuildConfig(message.guildId!);
-        const emoji = config.currencyEmoji;
+        const prefix = await getGuildPrefix(message.guildId!);
+        
 
         if (args.length === 0) {
-            return message.reply(`Usage: \`${config.prefix}iteminfo <item name>\``);
+            return message.reply(`Usage: \`${prefix}iteminfo <item name>\``);
         }
 
         const itemName = args.join(" ");
@@ -48,7 +48,7 @@ export async function handleItemInfo(message: Message, args: string[]) {
             .setColor(Colors.Blue)
             .setDescription(item.description || "*No description provided*")
             .addFields(
-                { name: "<:pricee:1449707707442528387> Price", value: fmtCurrency(item.price, emoji), inline: true },
+                { name: "<:pricee:1449707707442528387> Price", value: fmtCurrency(item.price), inline: true },
                 { name: "<a:BoxBox:1449707866079494154> Stock", value: stockText, inline: true }
             );
 
@@ -59,7 +59,7 @@ export async function handleItemInfo(message: Message, args: string[]) {
             embed.addFields({ name: "<:sparks:1449708086099968031> Effects", value: "*No special effects*", inline: false });
         }
 
-        embed.setFooter({ text: `Use ${config.prefix}shop buy ${item.name} to purchase` });
+        embed.setFooter({ text: `Use ${prefix}shop buy ${item.name} to purchase` });
 
         return message.reply({ embeds: [embed] });
 

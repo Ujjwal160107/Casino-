@@ -14,10 +14,10 @@ import {
 } from "discord.js";
 import { getDegrees } from "../../services/educationService";
 import { fmtCurrency } from "../../utils/format";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { errorEmbed } from "../../utils/embed";
-import { Mascot, getEmoteUrl } from "../../config/branding";
+import { Mascot } from "../../config/branding";
 import { getUser } from "../../services/userService";
+import { getGuildPrefix } from "../../utils/guildContext";
 
 const EDUCATION_ACCENT_COLOR = 0xF1C40F;
 const ITEMS_PER_PAGE = 5;
@@ -42,8 +42,8 @@ export async function handleEducation(message: Message, args: string[]) {
         if (!message.guild) return;
         const guildId = message.guild.id;
         const userId = message.author.id;
-        const config = await getGuildConfig(guildId);
-        const prefix = config?.prefix || "!";
+        const prefix = await getGuildPrefix(guildId);
+        
 
         const user = await getUser(userId, guildId);
 
@@ -55,65 +55,77 @@ export async function handleEducation(message: Message, args: string[]) {
             const edu = user.currentEducation;
             const deg = edu.degree;
 
-            const progress = Math.min(100, Math.round((edu.currentGpa / 6.0) * 100));
-            const progressBar = "▓".repeat(Math.floor(progress / 10)) + "░".repeat(10 - Math.floor(progress / 10));
+            const xpProgress = Math.min(100, Math.round((edu.educationXp / deg.xpRequired) * 100));
+            const progressBar = "▓".repeat(Math.floor(xpProgress / 10)) + "░".repeat(10 - Math.floor(xpProgress / 10));
 
             const EMOJI_XP = "<:xpfull:1451636569982111765>";
             const EMOJI_XP_EMPTY = "<:xpempty:1451642829427314822>";
-            const filledBars = Math.min(10, Math.floor(edu.currentGpa));
+            const filledBars = Math.min(10, Math.floor((edu.educationXp / deg.xpRequired) * 10));
             const emptyBars = 10 - filledBars;
             const intProgress = `${EMOJI_XP.repeat(filledBars)}${EMOJI_XP_EMPTY.repeat(Math.max(0, emptyBars))}`;
 
             const scholarshipMilestones = [
-                { level: 9, desc: "1.5x Refund" },
-                { level: 10, desc: "2x Refund" },
+                { level: 75, desc: "1.5x Refund" },
+                { level: 100, desc: "2x Refund" },
             ];
 
+            const pct = edu.educationXp / deg.xpRequired;
             const scholarshipGuide = scholarshipMilestones.map((m) => {
                 const isClaimed = edu.scholarshipsClaimed.includes(m.level);
-                const isEligible = edu.currentGpa >= m.level;
+                const isEligible = pct >= m.level / 100;
 
-                let status = `${Mascot.Emotes.Lcok} Locked`;
+                let status = `${Mascot.Emotes.Lock} Locked`;
                 if (isClaimed) status = `${Mascot.Emotes.Accept} Claimed`;
                 else if (isEligible) status = `${Mascot.Emotes.MoneyBag} Available`;
 
-                return `${status} **${m.level}.0 Int** (${m.desc})`;
+                return `${status} **${m.level}% XP** (${m.desc})`;
             }).join("\n");
 
-            const embed = new EmbedBuilder()
-                .setTitle(`Student Dashboard: ${deg.name}`)
-                .setDescription(`**Degree Fee Paid**: ${fmtCurrency(deg.tuitionPerSem, config.currencyEmoji)}\n${progressBar} ${progress}% to Graduation`)
-                .setColor(edu.stress > 80 ? "#FF0000" : "#3498DB")
-                .addFields(
-                    { name: "Intelligence", value: `${intProgress} **${edu.currentGpa.toFixed(1)} / 10**\nRequired: 6.0`, inline: true },
-                    { name: "Stress", value: `${edu.stress}/100`, inline: true },
-                    { name: "Actions", value: `\`${prefix}study\` - Gain Intelligence (+0.5)\n\`${prefix}exam\` - Take Final Exam (Req: 6 Intelligence)` },
-                    { name: `${Mascot.Emotes.MoneyBag} Scholarship Guide`, value: scholarshipGuide },
+            const container = new ContainerBuilder()
+                .setAccentColor(edu.stress > 80 ? 0xFF0000 : 0x3498DB)
+                .addSectionComponents(
+                    new SectionBuilder()
+                        .addTextDisplayComponents(
+                            new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Graduate} Student Dashboard`),
+                            new TextDisplayBuilder().setContent(
+                                `**Degree:** ${deg.name}\n` +
+                                `**Fee Paid:** ${fmtCurrency(deg.tuitionPerSem)}\n` +
+                                `**Graduation:** ${progressBar} ${xpProgress}%`
+                            ),
+                        )
+                        .setThumbnailAccessory((thumbnail) =>
+                            thumbnail
+                                .setURL(message.author.displayAvatarURL({ size: 256 }))
+                                .setDescription(`${message.author.username}'s avatar`),
+                        ),
+                )
+                .addSeparatorComponents(separator())
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(
+                        `### Education XP\n${intProgress} **${edu.educationXp} / ${deg.xpRequired}**`,
+                    ),
+                    new TextDisplayBuilder().setContent(
+                        `### Stress\n**${edu.stress}/100**${edu.stress > 70 ? `\n${Mascot.Emotes.Alert} Use \`${prefix}relax\` to recover.` : ""}`,
+                    ),
+                    new TextDisplayBuilder().setContent(
+                        `### Actions\n\`${prefix}study\` - Gain XP (+50 base)\n\`${prefix}exam\` - Take Final Exam`,
+                    ),
+                    new TextDisplayBuilder().setContent(
+                        `### ${Mascot.Emotes.MoneyBag} Scholarship Guide\n${scholarshipGuide}`,
+                    ),
                 );
 
-            const thumbUrl = getEmoteUrl(Mascot.Emotes.Teacher);
-            if (thumbUrl) embed.setThumbnail(thumbUrl);
+            const row = new ActionRowBuilder<ButtonBuilder>();
 
-            if (edu.stress > 70) {
-                embed.setDescription(`${embed.data.description}\n\n${Mascot.Emotes.Alert} **High Stress!** You should visit the Gym, meditate, or play sports to relax!`);
-            }
-
-            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder().setCustomId("edu_stress_sports").setLabel("Sports").setStyle(ButtonStyle.Success).setEmoji(Mascot.Emotes.Sports),
-                new ButtonBuilder().setCustomId("edu_stress_gym").setLabel("Gym").setStyle(ButtonStyle.Primary).setEmoji(Mascot.Emotes.Gym),
-                new ButtonBuilder().setCustomId("edu_stress_meditation").setLabel("Meditation").setStyle(ButtonStyle.Secondary).setEmoji(Mascot.Emotes.Meditation),
-            );
-
-            const milestones = [9, 10];
-            const currentInt = Math.floor(edu.currentGpa);
+            const milestones = [75, 100];
             const claimed = edu.scholarshipsClaimed;
 
             for (const m of milestones) {
-                if (currentInt >= m && !claimed.includes(m)) {
+                if (pct >= m / 100 && !claimed.includes(m)) {
                     row.addComponents(
                         new ButtonBuilder()
                             .setCustomId(`claim_scholarship_${m}`)
-                            .setLabel(`Claim ${m}.0 Int Scholarship`)
+                            .setLabel(`Claim ${m}% XP Scholarship`)
                             .setStyle(ButtonStyle.Success)
                             .setEmoji(Mascot.Emotes.MoneyBag),
                     );
@@ -121,7 +133,10 @@ export async function handleEducation(message: Message, args: string[]) {
                 }
             }
 
-            return message.reply({ embeds: [embed], components: [row] });
+            return message.reply({
+                components: row.components.length > 0 ? [container, row] : [container],
+                flags: MessageFlags.IsComponentsV2,
+            });
         }
 
         const degrees = await getDegrees(guildId);
@@ -180,7 +195,8 @@ export async function handleEducation(message: Message, args: string[]) {
                             new TextDisplayBuilder().setContent(`### ${statusIcon} ${displayName}`),
                             new TextDisplayBuilder().setContent(
                                 `**Status:** ${statusText}\n` +
-                                `**Degree Fee:** ${fmtCurrency(degree.tuitionPerSem, config.currencyEmoji)}\n` +
+                                `**Degree Fee:** ${fmtCurrency(degree.tuitionPerSem)}\n` +
+                                `**XP Required:** ${degree.xpRequired}\n` +
                                 `**Reqs:** ${reqText}`,
                             ),
                         )
@@ -189,7 +205,7 @@ export async function handleEducation(message: Message, args: string[]) {
                                 .setCustomId(`enroll_confirm_${degree.id}_${userId}`)
                                 .setLabel(buttonLabel)
                                 .setStyle(buttonStyle)
-                                .setEmoji(disabled ? Mascot.Emotes.Lcok : Mascot.Emotes.Graduate)
+                                .setEmoji(disabled ? Mascot.Emotes.Lock : Mascot.Emotes.Graduate)
                                 .setDisabled(disabled),
                         ),
                 );
@@ -274,8 +290,8 @@ export async function handleListDegrees(message: Message) {
     const userId = message.author.id;
     const guildId = message.guild.id;
 
-    const config = await getGuildConfig(guildId);
-    const prefix = config?.prefix || "!";
+    const prefix = await getGuildPrefix(guildId);
+    
 
     const user = await getUser(userId, guildId);
 
@@ -283,21 +299,13 @@ export async function handleListDegrees(message: Message) {
         return message.reply({ embeds: [errorEmbed(message.author, "No Degrees", `You haven't earned any degrees yet. Use \`${prefix}education\` to find a program!`)] });
     }
 
-    const embed = new EmbedBuilder()
-        .setDescription(`# ${Mascot.Emotes.Graduate} ${message.author.username}'s Earned Degrees`)
-        .setColor("#F1C40F")
-        .setThumbnail(message.author.displayAvatarURL());
-
-    const fields = user.degrees.map((ud) => {
-        return {
-            name: `${Mascot.Emotes.Graduate} ${ud.degree.name}`,
-            value: `**GPA:** ${ud.finalGpa.toFixed(1)} | **Obtained:** <t:${Math.floor(ud.obtainedAt.getTime() / 1000)}:D>`,
-            inline: false,
-        };
+    const lines = user.degrees.map((ud) => {
+        const finalXp = ud.finalXp ?? (ud.finalGpa > 0 ? Math.round((ud.finalGpa / 10) * ud.degree.xpRequired) : 0);
+        return `${Mascot.Emotes.Graduate} **${ud.degree.name}** — Final XP **${finalXp}/${ud.degree.xpRequired}** · <t:${Math.floor(ud.obtainedAt.getTime() / 1000)}:D>`;
     });
 
-    embed.addFields(fields);
-    embed.setFooter({ text: `Total Degrees: ${user.degrees.length}` });
-
-    message.reply({ embeds: [embed] });
+    return message.reply({
+        components: [buildTextOnlyContainer("Earned Degrees", lines.join("\n"), 0xF1C40F)],
+        flags: MessageFlags.IsComponentsV2,
+    });
 }

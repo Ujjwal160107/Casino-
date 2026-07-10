@@ -1,4 +1,5 @@
 import { Mascot } from "../config/branding";
+import { DEFAULT_JOB_PAYS } from "../utils/economyConfig";
 
 import prisma from "../utils/prisma";
 
@@ -12,6 +13,7 @@ export interface JobDefinition {
     reqJobId?: string; // ID of prerequisite job (e.g., must be Resident before Surgeon)
     reqXp?: number; // Min jobXp required to hold/promote to this job
     level: "Intern" | "Junior" | "Senior" | "Lead" | "Executive" | "Freelance";
+    careerTier: number;
 }
 
 export interface WorkEvent {
@@ -30,6 +32,7 @@ export interface WorkEvent {
             money?: number; // Multiplier of base pay
             stress: number;
         };
+        critical?: boolean; // Emergency Pager can intercept failure on critical choices
     }[];
 }
 
@@ -42,39 +45,8 @@ export interface JobAction {
     cooldown: number; // Seconds
 }
 
-export const WORK_EVENTS: WorkEvent[] = [
-    // TECH
-    {
-        id: "tech_crash", sector: "tech", title: "Server Crash!", description: "Production database is down! What do you do?",
-        choices: [
-            { label: "Hotfix in Prod", style: "danger", successChance: 40, successMsg: "You saved the day! Bonus!", failMsg: "You made it worse. Much worse.", outcome: { xp: 50, money: 2.0, stress: 20 } },
-            { label: "Follow Protocol", style: "primary", successChance: 90, successMsg: "Service restored safely.", failMsg: "It took too long.", outcome: { xp: 10, money: 1.0, stress: 5 } }
-        ]
-    },
-    {
-        id: "tech_bug", sector: "tech", title: "Critical Bug", description: "A user found a critical bug in your code.",
-        choices: [
-            { label: "Blame the User", style: "secondary", successChance: 10, successMsg: "They believed you!", failMsg: "HR wants a word.", outcome: { xp: 0, money: 0.5, stress: 30 } },
-            { label: "Fix it now", style: "success", successChance: 80, successMsg: "Bug squashed.", failMsg: "You introduced 3 new bugs.", outcome: { xp: 20, money: 1.1, stress: 10 } }
-        ]
-    },
-    // MEDICAL
-    {
-        id: "med_emergency", sector: "medical", title: "Emergency!", description: "A patient is crashing in the ER!",
-        choices: [
-            { label: "CPR", style: "danger", successChance: 60, successMsg: "Patient stabilized!", failMsg: "It was too late...", outcome: { xp: 100, money: 1.5, stress: 25 } },
-            { label: "Call Attending", style: "primary", successChance: 100, successMsg: "The senior doctor took over.", failMsg: "N/A", outcome: { xp: 5, money: 0.8, stress: 0 } }
-        ]
-    },
-    // BUSINESS
-    {
-        id: "biz_deal", sector: "business", title: "The Big Deal", description: "A client wants to close a risky deal.",
-        choices: [
-            { label: "Sign it!", style: "success", successChance: 50, successMsg: "Huge commission!", failMsg: "The company lost millions.", outcome: { xp: 50, money: 3.0, stress: 40 } },
-            { label: "Review first", style: "secondary", successChance: 90, successMsg: "Smart move. Safe deal.", failMsg: "Client walked away.", outcome: { xp: 15, money: 1.0, stress: 5 } }
-        ]
-    }
-];
+export { WORK_EVENTS } from "../data/workEvents";
+import { WORK_EVENTS as _WORK_EVENTS } from "../data/workEvents";
 
 export const JOB_ACTIONS: JobAction[] = [
     { id: "tech_hack", sector: "tech", label: "Hack Server", description: "Attempt to steal small crypto.", emoji: "💻", cooldown: 86400 },
@@ -83,10 +55,12 @@ export const JOB_ACTIONS: JobAction[] = [
     { id: "law_consult", sector: "legal", label: "Legal Consult", description: "Quick cash job.", emoji: "⚖️", cooldown: 21600 }
 ];
 
-export function getWorkEvent(sector: string): WorkEvent | null {
-    const events = WORK_EVENTS.filter(e => e.sector === sector || e.sector === "all");
-    if (events.length === 0) return null;
-    return events[Math.floor(Math.random() * events.length)];
+export function getWorkEvent(sector: string, recentIds: string[] = []): WorkEvent | null {
+    const matching = _WORK_EVENTS.filter(e => e.sector === sector || e.sector === "all");
+    if (matching.length === 0) return null;
+    const fresh = matching.filter((e: WorkEvent) => !recentIds.includes(e.id));
+    const pool = fresh.length > 0 ? fresh : matching;
+    return pool[Math.floor(Math.random() * pool.length)];
 }
 
 export function getJobAction(sector: string): JobAction | null {
@@ -96,39 +70,39 @@ export function getJobAction(sector: string): JobAction | null {
 // Grouped by Sector for easiest display
 export const JOBS: JobDefinition[] = [
     // --- TECH (Computer Science) ---
-    { id: "tech_intern", title: "IT Intern", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: 1500, reqDegrees: ["High School Diploma"], level: "Intern", reqXp: 0 },
-    { id: "tech_junior", title: "Junior Developer", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: 3000, reqDegrees: ["BS Computer Science"], level: "Junior", reqXp: 50 },
-    { id: "tech_senior", title: "Senior Developer", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: 5500, reqDegrees: ["BS Computer Science"], reqJobId: "tech_junior", level: "Senior", reqXp: 150 },
-    { id: "tech_lead", title: "Lead Engineer", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: 8000, reqDegrees: ["BS Computer Science"], reqJobId: "tech_senior", level: "Lead", reqXp: 300 },
+    { id: "tech_intern", title: "IT Intern", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: DEFAULT_JOB_PAYS.itIntern, reqDegrees: ["High School Diploma"], level: "Intern", reqXp: 0, careerTier: 1 },
+    { id: "tech_junior", title: "Junior Developer", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: DEFAULT_JOB_PAYS.juniorDeveloper, reqDegrees: ["BS Computer Science"], level: "Junior", reqXp: 50, careerTier: 2 },
+    { id: "tech_senior", title: "Senior Developer", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: DEFAULT_JOB_PAYS.seniorDeveloper, reqDegrees: ["BS Computer Science"], reqJobId: "tech_junior", level: "Senior", reqXp: 150, careerTier: 3 },
+    { id: "tech_lead", title: "Lead Engineer", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: DEFAULT_JOB_PAYS.leadEngineer, reqDegrees: ["BS Computer Science"], reqJobId: "tech_senior", level: "Lead", reqXp: 300, careerTier: 4 },
 
     // --- MEDICAL (Medicine) ---
-    { id: "med_resident", title: "Medical Resident", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: 2000, reqDegrees: ["MBBS"], level: "Intern", reqXp: 0 },
-    { id: "med_general", title: "General Practitioner", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: 4500, reqDegrees: ["MBBS"], reqJobId: "med_resident", level: "Junior", reqXp: 50 },
-    { id: "med_surgeon", title: "Surgeon", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: 7500, reqDegrees: ["MBBS", "Doctor of Medicine (MD)"], reqJobId: "med_general", level: "Senior", reqXp: 150 },
-    { id: "med_chief", title: "Chief of Medicine", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: 12000, reqDegrees: ["MBBS", "Doctor of Medicine (MD)"], reqJobId: "med_surgeon", level: "Executive", reqXp: 500 },
+    { id: "med_resident", title: "Medical Resident", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: DEFAULT_JOB_PAYS.medicalResident, reqDegrees: ["MBBS"], level: "Intern", reqXp: 0, careerTier: 2 },
+    { id: "med_general", title: "General Practitioner", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: DEFAULT_JOB_PAYS.generalPractitioner, reqDegrees: ["MBBS"], reqJobId: "med_resident", level: "Junior", reqXp: 50, careerTier: 3 },
+    { id: "med_surgeon", title: "Surgeon", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: DEFAULT_JOB_PAYS.surgeon, reqDegrees: ["MBBS", "Doctor of Medicine (MD) / Ph.D."], reqJobId: "med_general", level: "Senior", reqXp: 150, careerTier: 3 },
+    { id: "med_chief", title: "Chief of Medicine", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: DEFAULT_JOB_PAYS.chiefOfMedicine, reqDegrees: ["MBBS", "Doctor of Medicine (MD) / Ph.D."], reqJobId: "med_surgeon", level: "Executive", reqXp: 500, careerTier: 4 },
 
     // --- BUSINESS (Business/Finance) ---
-    { id: "biz_intern", title: "Sales Intern", sector: "business", emoji: Mascot.Emotes.JobBusiness, pay: 1200, reqDegrees: ["High School Diploma"], level: "Intern", reqXp: 0 },
-    { id: "biz_analyst", title: "Financial Analyst", sector: "business", emoji: Mascot.Emotes.JobBusiness, pay: 3500, reqDegrees: ["BA Fine Arts"], level: "Junior", reqXp: 50 }, // Placeholder degree
-    { id: "biz_manager", title: "Sales Manager", sector: "business", emoji: Mascot.Emotes.JobBusiness, pay: 6000, reqDegrees: ["BA Fine Arts"], reqJobId: "biz_analyst", level: "Senior", reqXp: 150 },
+    { id: "biz_intern", title: "Sales Intern", sector: "business", emoji: Mascot.Emotes.JobBusiness, pay: DEFAULT_JOB_PAYS.salesIntern, reqDegrees: ["High School Diploma"], level: "Intern", reqXp: 0, careerTier: 1 },
+    { id: "biz_analyst", title: "Financial Analyst", sector: "business", emoji: Mascot.Emotes.JobBusiness, pay: DEFAULT_JOB_PAYS.financialAnalyst, reqDegrees: ["BA Fine Arts"], level: "Junior", reqXp: 50, careerTier: 2 },
+    { id: "biz_manager", title: "Sales Manager", sector: "business", emoji: Mascot.Emotes.JobBusiness, pay: DEFAULT_JOB_PAYS.salesManager, reqDegrees: ["BA Fine Arts"], reqJobId: "biz_analyst", level: "Senior", reqXp: 150, careerTier: 3 },
 
     // --- LEGAL (Law) ---
-    { id: "law_paralegal", title: "Paralegal", sector: "legal", emoji: Mascot.Emotes.JobLegal, pay: 2500, reqDegrees: ["High School Diploma"], level: "Junior", reqXp: 20 },
-    { id: "law_associate", title: "Associate Attorney", sector: "legal", emoji: Mascot.Emotes.JobLegal, pay: 5000, reqDegrees: ["Bachelor of Laws (LLB)"], reqJobId: "law_paralegal", level: "Senior", reqXp: 150 },
-    { id: "law_partner", title: "Partner", sector: "legal", emoji: Mascot.Emotes.JobLegal, pay: 10000, reqDegrees: ["Master of Laws (LLM)"], reqJobId: "law_associate", level: "Executive", reqXp: 500 },
+    { id: "law_paralegal", title: "Paralegal", sector: "legal", emoji: Mascot.Emotes.JobLegal, pay: DEFAULT_JOB_PAYS.paralegal, reqDegrees: ["Bachelor of Laws (LLB)"], level: "Junior", reqXp: 20, careerTier: 2 },
+    { id: "law_associate", title: "Associate Attorney", sector: "legal", emoji: Mascot.Emotes.JobLegal, pay: DEFAULT_JOB_PAYS.associateAttorney, reqDegrees: ["Bachelor of Laws (LLB)"], reqJobId: "law_paralegal", level: "Senior", reqXp: 150, careerTier: 3 },
+    { id: "law_partner", title: "Partner", sector: "legal", emoji: Mascot.Emotes.JobLegal, pay: DEFAULT_JOB_PAYS.partner, reqDegrees: ["Master of Laws (LLM)"], reqJobId: "law_associate", level: "Executive", reqXp: 500, careerTier: 4 },
 
     // --- SERVICE (No Degree / Hospitality) ---
-    { id: "srv_waiter", title: "Waiter", sector: "service", emoji: Mascot.Emotes.JobService, pay: 1000, reqDegrees: [], level: "Junior", reqXp: 0 },
-    { id: "srv_chef", title: "Sous Chef", sector: "service", emoji: Mascot.Emotes.JobService, pay: 2800, reqDegrees: ["High School Diploma"], reqJobId: "srv_waiter", level: "Senior", reqXp: 100 },
+    { id: "srv_waiter", title: "Waiter", sector: "service", emoji: Mascot.Emotes.JobService, pay: DEFAULT_JOB_PAYS.waiter, reqDegrees: [], level: "Junior", reqXp: 0, careerTier: 0 },
+    { id: "srv_chef", title: "Sous Chef", sector: "service", emoji: Mascot.Emotes.JobService, pay: DEFAULT_JOB_PAYS.sousChef, reqDegrees: [], reqJobId: "srv_waiter", level: "Senior", reqXp: 100, careerTier: 0 },
 
     // --- TRADE (Trade School) ---
-    { id: "trd_apprentice", title: "Apprentice Mechanic", sector: "trade", emoji: Mascot.Emotes.JobTrade, pay: 1800, reqDegrees: ["High School Diploma"], level: "Intern", reqXp: 0 },
-    { id: "trd_mechanic", title: "Master Mechanic", sector: "trade", emoji: Mascot.Emotes.JobTrade, pay: 4000, reqDegrees: ["Trade License (Plumbing)"], reqJobId: "trd_apprentice", level: "Senior", reqXp: 150 },
+    { id: "trd_apprentice", title: "Apprentice Mechanic", sector: "trade", emoji: Mascot.Emotes.JobTrade, pay: DEFAULT_JOB_PAYS.apprenticeMechanic, reqDegrees: ["Trade License (Plumbing)"], level: "Intern", reqXp: 0, careerTier: 1 },
+    { id: "trd_mechanic", title: "Master Mechanic", sector: "trade", emoji: Mascot.Emotes.JobTrade, pay: DEFAULT_JOB_PAYS.masterMechanic, reqDegrees: ["Trade License (Plumbing)"], reqJobId: "trd_apprentice", level: "Senior", reqXp: 150, careerTier: 2 },
 
     // --- FREELANCE (No Degree) ---
-    { id: "freelance_writer", title: "Freelance Writer", sector: "freelance", emoji: Mascot.Emotes.JobWorking, pay: 800, reqDegrees: [], level: "Freelance", reqXp: 0 },
-    { id: "freelance_uber", title: "Delivery Driver", sector: "freelance", emoji: Mascot.Emotes.JobWorking, pay: 900, reqDegrees: [], level: "Freelance", reqXp: 0 },
-    { id: "freelance_streamer", title: "Streamer", sector: "freelance", emoji: Mascot.Emotes.JobWorking, pay: 1200, reqDegrees: [], level: "Freelance", reqXp: 0 }
+    { id: "freelance_writer", title: "Freelance Writer", sector: "freelance", emoji: Mascot.Emotes.JobWorking, pay: DEFAULT_JOB_PAYS.freelanceWriter, reqDegrees: [], level: "Freelance", reqXp: 0, careerTier: 0 },
+    { id: "freelance_uber", title: "Delivery Driver", sector: "freelance", emoji: Mascot.Emotes.JobWorking, pay: DEFAULT_JOB_PAYS.deliveryDriver, reqDegrees: [], level: "Freelance", reqXp: 0, careerTier: 0 },
+    { id: "freelance_streamer", title: "Streamer", sector: "freelance", emoji: Mascot.Emotes.JobWorking, pay: DEFAULT_JOB_PAYS.streamer, reqDegrees: [], level: "Freelance", reqXp: 0, careerTier: 0 }
 ];
 
 export function getJobsBySector(sector: JobDefinition['sector']) {
@@ -137,6 +111,73 @@ export function getJobsBySector(sector: JobDefinition['sector']) {
 
 export function getJob(id: string) {
     return JOBS.find(j => j.id === id);
+}
+
+export const JOB_GEAR_REQUIREMENTS: Record<string, string> = {
+    tech:      "work_laptop",
+    medical:   "medical_kit",
+    business:  "business_briefcase",
+    legal:     "legal_case_file",
+    service:   "service_uniform",
+    trade:     "mechanic_toolkit",
+    freelance: "freelance_starter_pack",
+};
+
+export function getRequiredGearKey(sector: string): string | null {
+    return JOB_GEAR_REQUIREMENTS[sector] ?? null;
+}
+
+function normalizeJobLookup(value: string) {
+    return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+export function getJobByName(query: string) {
+    const normalized = normalizeJobLookup(query);
+    if (!normalized) return undefined;
+
+    return JOBS.find((job) => normalizeJobLookup(job.title) === normalized)
+        ?? JOBS.find((job) => normalizeJobLookup(job.title).includes(normalized));
+}
+
+export function getJobApplicationStatus(
+    user: { jobId?: string | null; jobXp?: number; degrees?: { degree: { name: string } }[] },
+    job: JobDefinition
+) {
+    const missing: string[] = [];
+    const ownedDegrees = new Set((user.degrees ?? []).map((item) => item.degree.name));
+
+    if (user.jobId === job.id) {
+        return { canApply: false, label: "Current Job", missing: ["Already employed here"] };
+    }
+
+    if (user.jobId && !job.reqJobId) {
+        return { canApply: false, label: "Locked", missing: ["Resign before changing fields"] };
+    }
+
+    for (const degree of job.reqDegrees) {
+        if (!ownedDegrees.has(degree)) missing.push(`Need ${degree}`);
+    }
+
+    if (job.reqJobId && user.jobId !== job.reqJobId) {
+        const previousJob = getJob(job.reqJobId);
+        missing.push(`Need job: ${previousJob?.title ?? job.reqJobId}`);
+    }
+
+    const requiredXp = job.reqXp ?? 0;
+    if (requiredXp > 0 && (user.jobXp ?? 0) < requiredXp) {
+        missing.push(`Need ${requiredXp} XP`);
+    }
+
+    return {
+        canApply: missing.length === 0,
+        label: missing.length === 0 ? "Apply" : "Locked",
+        missing
+    };
+}
+
+export function getUserCareerTier(user: { jobId?: string | null }, currentJob?: JobDefinition | null): number {
+    const job = currentJob ?? (user.jobId ? getJob(user.jobId) : null);
+    return job?.careerTier ?? 0;
 }
 // Default Multipliers to use when a Sectore Base Pay is set
 export const DEFAULT_LEVEL_MULTIPLIERS: Record<string, number> = {
@@ -148,88 +189,30 @@ export const DEFAULT_LEVEL_MULTIPLIERS: Record<string, number> = {
     "Executive": 8.0 // Approx 12000/1500 = 8
 };
 
-// --- Dynamic Pay Implementation ---
-
-import { getGuildConfig } from "./guildConfigService";
-import { GuildConfig } from "@prisma/client";
-
-/**
- * Calculates the dynamic pay for a job based on guild configuration.
- * Uses:
- * 1. Sector Base Pay (overrides job.pay if set)
- * 2. Level Multiplier (scales the base)
- */
-export function getJobPaySync(job: JobDefinition, config: GuildConfig | null): number {
-    if (!config) return job.pay;
-
-    // 1. Determine Base Pay (Sector Config > Default Job Pay)
-    let basePay = job.pay;
-    if (config.jobSectorBasePay) {
-        const sectorPay = (config.jobSectorBasePay as Record<string, number>)[job.sector];
-        if (sectorPay && sectorPay > 0) {
-            basePay = sectorPay;
-        }
-    }
-
-    // 2. Determine Level Multiplier
-    // Logic: 
-    // - If config has an override for this specific level (e.g. Intern = 1.2), use it.
-    // - ELSE if we are using a Custom Sector Base Pay, use the DEFAULT multiplier (e.g. Senior = 3.6x), 
-    //   otherwise everyone gets the base pay which is wrong.
-    // - ELSE (Using default job.pay, no sector override), use 1.0 because job.pay is already scaled.
-
-    let levelMult = 1.0;
-    const levelMultipliers = (config.jobLevelMultipliers as Record<string, number>) || {};
-
-    if (levelMultipliers[job.level]) {
-        // Explicit config override found
-        levelMult = levelMultipliers[job.level];
-    } else if (config.jobSectorBasePay && (config.jobSectorBasePay as Record<string, number>)[job.sector]) {
-        // We are using a custom base pay, so we MUST apply a default multiplier if no explicit one is set
-        levelMult = DEFAULT_LEVEL_MULTIPLIERS[job.level] || 1.0;
-    }
-
-    // Final Calculation
-    const finalPay = Math.round(basePay * levelMult);
-    return finalPay;
+import { applyRelaxOption } from "./relaxService";
+export function getJobPaySync(job: JobDefinition): number {
+    return job.pay;
 }
 
 /**
- * Async wrapper to fetch config and calculate pay.
- * Use this when you don't already have the guild config.
+ * Async wrapper kept for call-site compatibility.
  */
-export async function getJobPay(job: JobDefinition, guildId: string): Promise<number> {
-    const config = await getGuildConfig(guildId);
-    return getJobPaySync(job, config);
+export async function getJobPay(job: JobDefinition, _guildId: string): Promise<number> {
+    return getJobPaySync(job);
 }
 
 /**
  * Checks if a user is eligible for a promotion based on XP.
  */
-export async function checkPromotion(user: any, guildId?: string): Promise<{ eligible: boolean; nextJob: JobDefinition | null; missingXp: number; missingShifts: number }> {
+export async function checkPromotion(user: any, _guildId?: string): Promise<{ eligible: boolean; nextJob: JobDefinition | null; missingXp: number; missingShifts: number }> {
     if (!user.jobId) return { eligible: false, nextJob: null, missingXp: 0, missingShifts: 0 };
 
     // Find a job that requires this current job as a prereq
     const nextJob = JOBS.find(j => j.reqJobId === user.jobId);
     if (!nextJob) return { eligible: false, nextJob: null, missingXp: 0, missingShifts: 0 };
 
-    let reqXp = nextJob.reqXp || 0;
-    let reqShifts = 0; // Default 0
-
-    // Dynamic Requirements
-    if (guildId) {
-        const config = await getGuildConfig(guildId);
-        if (config) {
-
-            // Check Shifts Req
-            if (config.jobShiftReqs) {
-                const shiftReqs = config.jobShiftReqs as Record<string, number>;
-                if (shiftReqs[nextJob.id] !== undefined) {
-                    reqShifts = shiftReqs[nextJob.id];
-                }
-            }
-        }
-    }
+    const reqXp = nextJob.reqXp || 0;
+    const reqShifts = 0;
 
     const missingXp = Math.max(0, reqXp - user.jobXp);
     const missingShifts = Math.max(0, reqShifts - (user.shiftsWorked || 0));
@@ -239,6 +222,37 @@ export async function checkPromotion(user: any, guildId?: string): Promise<{ eli
     }
 
     return { eligible: false, nextJob, missingXp, missingShifts };
+}
+
+/**
+ * Returns the next job in the progression chain for a given jobId, or null if at the top.
+ */
+export function getNextJob(currentJobId: string): JobDefinition | null {
+    return JOBS.find(j => j.reqJobId === currentJobId) ?? null;
+}
+
+/**
+ * Returns checkPromotion result plus a human-readable progressText string.
+ */
+export async function getPromotionProgress(
+    user: { jobId?: string | null; jobXp: number; shiftsWorked: number },
+    guildId?: string
+): Promise<{ eligible: boolean; nextJob: JobDefinition | null; missingXp: number; missingShifts: number; progressText: string }> {
+    const result = await checkPromotion(user, guildId);
+    let progressText = "";
+    if (!result.nextJob) {
+        progressText = "At the top of your career path.";
+    } else if (result.eligible) {
+        progressText = `Ready for **${result.nextJob.title}**!`;
+    } else {
+        const parts: string[] = [];
+        if (result.missingXp > 0) parts.push(`${result.missingXp} XP`);
+        if (result.missingShifts > 0) parts.push(`${result.missingShifts} shifts`);
+        progressText = parts.length > 0
+            ? `Need: ${parts.join(", ")} → ${result.nextJob.title}`
+            : "Almost there.";
+    }
+    return { ...result, progressText };
 }
 
 /**
@@ -257,7 +271,7 @@ export async function checkDemotion(user: any): Promise<{ demoted: boolean; prev
 
     // Update fail streak in DB
     await prisma.user.update({
-        where: { id: user.id },
+        where: { discordId: user.discordId },
         data: { jobFailStreak: newFailStreak }
     });
 
@@ -273,7 +287,7 @@ export async function checkDemotion(user: any): Promise<{ demoted: boolean; prev
         if (prevJob) {
             // Perform Demotion & reset fail streak
             await prisma.user.update({
-                where: { id: user.id },
+                where: { discordId: user.discordId },
                 data: { jobId: prevJob.id, jobFailStreak: 0 }
             });
             return { demoted: true, prevJob, msg: `You have been **demoted** to **${prevJob.title}** after **3 consecutive failures**.`, failStreak: 0 };
@@ -284,71 +298,19 @@ export async function checkDemotion(user: any): Promise<{ demoted: boolean; prev
 }
 
 export async function reduceJobStress(userId: string, guildId: string, activity: "gym" | "sports" | "meditation") {
-    const user = await prisma.user.findUnique({
-        where: { discordId_guildId: { discordId: userId, guildId } },
-        include: { wallet: true }
-    });
-
+    const user = await prisma.user.findUnique({ where: { discordId: userId } });
     if (!user) throw new Error("User not found.");
 
-    // Dynamic Cost Calculation
-    let cost = 0;
-    const config = await getGuildConfig(guildId);
+    const optionByLegacyActivity = {
+        gym: "gym_session",
+        sports: "quick_break",
+        meditation: "meditation_retreat",
+    } as const;
+    const result = await applyRelaxOption(userId, user.username, optionByLegacyActivity[activity]);
 
-    // Check Config first
-    if (config && config.jobRelaxControllers) {
-        const prices = config.jobRelaxControllers as Record<string, number>;
-        if (prices[activity]) {
-            cost = prices[activity];
-        }
-    }
-
-    // Fallback if not configured
-    if (cost === 0) {
-        // Calculate Dynamic Cost based on Pay
-        let basePay = 1000; // Default if unemployed
-        if (user.jobId) {
-            const job = getJob(user.jobId);
-            if (job) {
-                basePay = await getJobPay(job, guildId);
-            }
-        }
-
-        let multiplier = 0.5;
-
-        if (activity === "gym") {
-            multiplier = 0.75;
-        } else if (activity === "sports") {
-            multiplier = 0.5;
-        } else if (activity === "meditation") {
-            multiplier = 0.25;
-        }
-
-        cost = Math.floor(basePay * multiplier);
-    }
-
-    // Define stress reduction amount based on activity
-    let reduction = 15;
-    if (activity === "gym") reduction = 30;
-    else if (activity === "sports") reduction = 20;
-    else if (activity === "meditation") reduction = 15;
-
-    if (user.wallet!.balance < cost) {
-        throw new Error(`You need **${cost}** coins to go to the ${activity}.`);
-    }
-
-    const newStress = Math.max(0, user.jobStress - reduction);
-
-    await prisma.$transaction([
-        prisma.wallet.update({
-            where: { id: user.wallet!.id },
-            data: { balance: { decrement: cost } }
-        }),
-        prisma.user.update({
-            where: { id: user.id },
-            data: { jobStress: newStress }
-        })
-    ]);
-
-    return { newStress, cost, reduction };
+    return {
+        newStress: result.jobStress,
+        cost: result.cost,
+        reduction: result.previousJobStress - result.jobStress
+    };
 }

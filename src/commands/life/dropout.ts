@@ -1,18 +1,18 @@
 import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { dropout } from "../../services/educationService";
 import { errorEmbed, successEmbed } from "../../utils/embed";
-import { getGuildConfig } from "../../services/guildConfigService";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 import prisma from "../../utils/prisma"; // Added prisma import
+import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleDropout(message: Message) {
     if (!message.guild) return;
-    const config = await getGuildConfig(message.guild.id);
-    const prefix = config?.prefix || "!";
+    const prefix = await getGuildPrefix(message.guild.id);
+    
 
     try {
         const user = await prisma.user.findUnique({
-            where: { discordId_guildId: { discordId: message.author.id, guildId: message.guild.id } },
+            where: { discordId: message.author.id },
             include: { currentEducation: { include: { degree: true } } }
         });
 

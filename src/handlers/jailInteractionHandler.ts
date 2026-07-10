@@ -1,32 +1,33 @@
-import { ButtonInteraction, Interaction } from "discord.js";
+import { Interaction } from "discord.js";
 import { payBail, checkJailStatus } from "../services/jailService";
 import { ensureUserAndWallet } from "../services/walletService";
 import { errorEmbed, successEmbed } from "../utils/embed";
+import { ensureDeferredEphemeralReply, safeEditReply } from "../utils/interactionHelpers";
 
 export async function handleJailInteraction(interaction: Interaction) {
-    if (!interaction.isButton()) return;
-    if (interaction.customId !== "pay_bail") return;
+  if (!interaction.isButton()) return;
+  if (interaction.customId !== "pay_bail") return;
 
-    await interaction.deferReply({ ephemeral: true });
+  if (!await ensureDeferredEphemeralReply(interaction)) return;
 
-    const user = await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
-    const status = await checkJailStatus(user.id);
+  const user = await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.tag);
+  const status = await checkJailStatus(user.discordId);
 
-    if (!status.isJailed) {
-        return interaction.editReply({
-            embeds: [errorEmbed(interaction.user, "Not Jailed", "You are not in jail!")]
-        });
-    }
+  if (!status.isJailed) {
+    return safeEditReply(interaction, {
+      embeds: [errorEmbed(interaction.user, "Not Jailed", "You are not in jail!")],
+    });
+  }
 
-    const result = await payBail(user.id, interaction.guildId!);
+  const result = await payBail(user.discordId, interaction.guildId!);
 
-    if (result.success) {
-        return interaction.editReply({
-            embeds: [successEmbed(interaction.user, "Bail Paid", result.message)]
-        });
-    } else {
-        return interaction.editReply({
-            embeds: [errorEmbed(interaction.user, "Bail Failed", result.message)]
-        });
-    }
+  if (result.success) {
+    return safeEditReply(interaction, {
+      embeds: [successEmbed(interaction.user, "Bail Paid", result.message)],
+    });
+  }
+
+  return safeEditReply(interaction, {
+    embeds: [errorEmbed(interaction.user, "Bail Failed", result.message)],
+  });
 }

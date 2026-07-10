@@ -1,179 +1,76 @@
 "use client";
 
-import { motion } from "framer-motion";
 import Link from "next/link";
-import { signIn, signOut } from "next-auth/react";
-import { LayoutDashboard, Menu, X, LogOut, User } from "lucide-react";
-import { useState, useEffect } from "react";
-import { GlassCard } from "./ui/GlassCard";
-import Image from "next/image";
+import { useState } from "react";
+import { Menu } from "lucide-react";
 import { MobileSidebar } from "./MobileSidebar";
+import { INVITE_URL } from "@/lib/links";
 
+const LINKS = [
+  { href: "/commands", label: "Commands" },
+  { href: "/docs", label: "Docs" },
+  { href: "/changelog", label: "Changelog" },
+];
+
+// `user`/`hideLogin` are accepted so existing pages keep compiling; login is
+// intentionally disabled for now, so they go unused.
 interface LandingNavbarProps {
-    user?: {
-        name?: string | null;
-        image?: string | null;
-    };
-    hideLogin?: boolean;
+  user?: { name?: string | null; image?: string | null };
+  hideLogin?: boolean;
 }
 
-export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
-    const [isScrolled, setIsScrolled] = useState(false);
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+export function LandingNavbar(_props: LandingNavbarProps) {
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-    useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 50);
-        };
-        window.addEventListener("scroll", handleScroll);
-        return () => window.removeEventListener("scroll", handleScroll);
-    }, []);
-
-    return (
-        <motion.nav
-            initial={{ y: -100 }}
-            animate={{ y: 0 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? "py-4" : "py-6"
-                }`}
-        >
-            <div className="max-w-7xl mx-auto px-6">
-                <GlassCard
-                    className="px-6 py-3 bg-black/10 backdrop-blur-md border-white/5 shadow-none transition-all duration-300 rounded-full"
-                >
-                    <div className="flex items-center justify-between w-full">
-                        {/* Logo */}
-                        <Link href="/" className="flex items-center gap-3 group cursor-pointer">
-                            <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-white/10 shadow-[0_0_15px_rgba(168,85,247,0.4)] group-hover:shadow-[0_0_25px_rgba(168,85,247,0.6)] transition-all">
-                                <img
-                                    src="/fortuna_icon.png"
-                                    alt="Fortuna"
-                                    className="w-full h-full object-cover"
-                                />
-                            </div>
-                            <span className="text-xl font-bold tracking-wider text-white group-hover:text-primary transition-colors">FORTUNA</span>
-                        </Link>
-
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-6">
-                            <div className="hidden md:flex items-center gap-6">
-                                <Link href="/docs" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">Documentation</Link>
-                                <Link href="/changelog" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">Changelog</Link>
-                                <Link href="/team" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">Team</Link>
-                            </div>
-                            <div className="h-4 w-[1px] bg-white/10 hidden md:block"></div>
-
-                            {user ? (
-                                <div className="relative">
-                                    <button
-                                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                        className="flex items-center gap-3 focus:outline-none group pl-2"
-                                    >
-                                        <div className="text-right hidden sm:block">
-                                            <p className="text-sm font-bold text-zinc-200 group-hover:text-white transition-colors">{user.name}</p>
-                                        </div>
-                                        <div className="relative w-9 h-9 rounded-full p-0.5 bg-zinc-800 border border-zinc-600 group-hover:border-violet-500 transition-colors">
-                                            {user.image ? (
-                                                <Image
-                                                    src={user.image}
-                                                    width={36}
-                                                    height={36}
-                                                    alt="Profile"
-                                                    className="rounded-full w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full rounded-full bg-zinc-700 flex items-center justify-center">
-                                                    <span className="text-xs font-bold text-zinc-300">
-                                                        {user.name?.charAt(0) || "?"}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </button>
-
-                                    {/* Dropdown Menu */}
-                                    {isDropdownOpen && (
-                                        <>
-                                            <div className="absolute right-0 top-full mt-4 w-56 bg-[#0f0f11] border border-white/10 rounded-xl shadow-2xl overflow-hidden backdrop-blur-xl z-50">
-                                                <div className="p-4 border-b border-white/5">
-                                                    <p className="text-sm font-bold text-white truncate">{user.name}</p>
-                                                    <p className="text-xs text-zinc-400">Logged in via Discord</p>
-                                                </div>
-                                                <div className="p-2 space-y-1">
-                                                    <Link
-                                                        href="/dashboard"
-                                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 hover:text-white rounded-lg transition-colors"
-                                                    >
-                                                        <LayoutDashboard size={16} />
-                                                        Dashboard
-                                                    </Link>
-                                                    <button
-                                                        onClick={() => signOut({ callbackUrl: "/" })}
-                                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-colors text-left"
-                                                    >
-                                                        <LogOut size={16} />
-                                                        Sign Out
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            {/* Backdrop */}
-                                            <div
-                                                className="fixed inset-0 z-40"
-                                                onClick={() => setIsDropdownOpen(false)}
-                                            />
-                                        </>
-                                    )}
-                                </div>
-                            ) : (
-                                !hideLogin && (
-                                    <button
-                                        onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
-                                        className="px-6 py-2 rounded-full border border-white/10 text-zinc-300 font-medium text-sm hover:bg-white/5 hover:text-white hover:border-white/20 transition-all cursor-pointer"
-                                    >
-                                        Login
-                                    </button>
-                                )
-                            )}
-                            <button
-                                className="px-6 py-2 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold text-sm hover:brightness-110 transition-all shadow-lg hover:shadow-indigo-500/25 cursor-pointer hidden md:block"
-                            >
-                                Premium
-                            </button>
-
-                            {/* Mobile Menu Toggle */}
-                            <button
-                                onClick={() => setMobileMenuOpen(true)}
-                                className="md:hidden p-2 text-zinc-300 hover:text-white transition-colors"
-                            >
-                                <Menu size={24} />
-                            </button>
-                        </div>
-                    </div>
-                </GlassCard>
-
-                <MobileSidebar
-                    isOpen={mobileMenuOpen}
-                    onClose={() => setMobileMenuOpen(false)}
-                    user={user}
-                />
-            </div >
-        </motion.nav >
-    );
-}
-
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
-    return (
-        <Link href={href} className="text-sm font-medium text-zinc-400 hover:text-primary transition-colors hover:drop-shadow-[0_0_8px_rgba(0,240,255,0.5)]">
-            {children}
+  return (
+    <header className="sticky top-0 z-50 border-b border-line bg-bg">
+      <nav className="mx-auto flex h-16 max-w-[90rem] items-center justify-between px-6">
+        <Link href="/" className="flex items-center gap-2.5">
+          <img
+            src="/fortuna_icon.png"
+            alt=""
+            className="h-8 w-8 rounded-lg border border-line"
+          />
+          <span className="font-display text-lg font-bold tracking-wide text-ink">
+            FORTUNA
+          </span>
         </Link>
-    );
-}
 
-function MobileNavLink({ href, children }: { href: string; children: React.ReactNode }) {
-    return (
-        <Link href={href} className="text-lg font-medium text-zinc-200 hover:text-primary transition-colors block py-2">
-            {children}
-        </Link>
-    );
+        <div className="hidden items-center gap-7 md:flex">
+          {LINKS.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              className="text-sm font-medium text-muted transition-colors hover:text-ink"
+            >
+              {l.label}
+            </Link>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <a
+            href={INVITE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden min-h-11 items-center rounded-lg bg-gold px-4 text-sm font-bold text-bg transition-colors hover:bg-gold-deep md:flex"
+          >
+            Add to Discord
+          </a>
+
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="flex h-11 w-11 cursor-pointer items-center justify-center text-muted transition-colors hover:text-ink md:hidden"
+            aria-label="Open menu"
+            aria-haspopup="dialog"
+            aria-expanded={mobileOpen}
+          >
+            <Menu size={22} aria-hidden="true" />
+          </button>
+        </div>
+      </nav>
+
+      <MobileSidebar isOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+    </header>
+  );
 }

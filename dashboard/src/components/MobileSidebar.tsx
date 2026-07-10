@@ -1,130 +1,116 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
-import { X, Home, Book, Terminal, FileText, Shield, Users, LifeBuoy, LayoutDashboard, LogOut } from "lucide-react";
-import { signIn, signOut } from "next-auth/react";
+import { useEffect, useRef } from "react";
+import { X } from "lucide-react";
+import { INVITE_URL } from "@/lib/links";
 
 interface MobileSidebarProps {
-    isOpen: boolean;
-    onClose: () => void;
-    user?: {
-        name?: string | null;
-        image?: string | null;
-    };
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-const NAV_ITEMS = [
-    { label: "Home", href: "/", icon: Home },
-    { label: "Documents", href: "/docs", icon: Book },
-    { label: "Commands", href: "/docs/commands", icon: Terminal },
-    { label: "Terms of Service", href: "/terms", icon: FileText },
-    { label: "Privacy Policy", href: "/policy", icon: Shield },
-    { label: "Team", href: "/team", icon: Users },
-    { label: "Changelog", href: "/changelog", icon: LifeBuoy },
-    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+const LINKS = [
+  { href: "/commands", label: "Commands" },
+  { href: "/docs", label: "Docs" },
+  { href: "/changelog", label: "Changelog" },
 ];
 
-export function MobileSidebar({ isOpen, onClose, user }: MobileSidebarProps) {
-    const pathname = usePathname();
+export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
-    return (
-        <AnimatePresence>
-            {isOpen && (
-                <>
-                    {/* Backdrop */}
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={onClose}
-                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998] lg:hidden"
-                    />
+  useEffect(() => {
+    if (!isOpen) return;
 
-                    {/* Sidebar Drawer */}
-                    <motion.div
-                        initial={{ x: "100%" }}
-                        animate={{ x: 0 }}
-                        exit={{ x: "100%" }}
-                        transition={{ type: "spring", damping: 20, stiffness: 300 }}
-                        className="fixed top-0 right-0 bottom-0 w-[80%] max-w-sm bg-[#0a0a0a] border-l border-white/10 z-[9999] lg:hidden flex flex-col shadow-2xl"
-                    >
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-white/10">
-                            <span className="text-xl font-bold text-white tracking-wider">MENU</span>
-                            <button
-                                onClick={onClose}
-                                className="p-2 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
-                            >
-                                <X size={24} />
-                            </button>
-                        </div>
+    // Move focus into the dialog, remembering where it came from.
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    closeButtonRef.current?.focus();
 
-                        {/* Navigation Links */}
-                        <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
-                            {NAV_ITEMS.map((item) => {
-                                const isActive = pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href));
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
 
-                                return (
-                                    <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        onClick={onClose}
-                                        className={cn(
-                                            "flex items-center gap-4 px-4 py-3.5 rounded-xl text-base font-medium transition-all duration-200",
-                                            isActive
-                                                ? "bg-violet-500/10 text-white border border-violet-500/20"
-                                                : "text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent"
-                                        )}
-                                    >
-                                        <item.icon size={20} className={isActive ? "text-violet-400" : "text-zinc-500"} />
-                                        {item.label}
-                                    </Link>
-                                );
-                            })}
-                        </div>
+      // Trap Tab / Shift+Tab inside the dialog.
+      const container = containerRef.current;
+      if (!container) return;
+      const focusables = container.querySelectorAll<HTMLElement>(
+        "a[href], button:not([disabled])"
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      const inside = active instanceof HTMLElement && container.contains(active);
 
-                        {/* Footer / User Section */}
-                        <div className="p-6 border-t border-white/10 bg-black/20">
-                            {user ? (
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-zinc-800 border border-white/10 overflow-hidden">
-                                            {user.image ? (
-                                                <img src={user.image} alt={user.name || "User"} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-zinc-400 font-bold">
-                                                    {user.name?.[0]}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-white font-medium truncate">{user.name}</p>
-                                            <p className="text-xs text-zinc-500">Logged in via Discord</p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => signOut({ callbackUrl: "/" })}
-                                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors font-medium text-sm"
-                                    >
-                                        <LogOut size={16} />
-                                        Sign Out
-                                    </button>
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
-                                    className="w-full py-3.5 rounded-xl bg-white text-black font-bold hover:bg-zinc-200 transition-colors"
-                                >
-                                    Login with Discord
-                                </button>
-                            )}
-                        </div>
-                    </motion.div>
-                </>
-            )}
-        </AnimatePresence>
-    );
+      if (e.shiftKey) {
+        if (!inside || active === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (!inside || active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      // Restore focus to the element that opened the dialog.
+      previousFocusRef.current?.focus();
+      previousFocusRef.current = null;
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      ref={containerRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mobile navigation"
+      className="fixed inset-0 z-[60] overscroll-contain bg-bg md:hidden"
+    >
+      <div className="flex h-16 items-center justify-between border-b border-line px-6">
+        <span className="font-display text-lg font-bold text-ink">FORTUNA</span>
+        <button
+          ref={closeButtonRef}
+          onClick={onClose}
+          className="flex h-11 w-11 cursor-pointer items-center justify-center text-muted"
+          aria-label="Close menu"
+        >
+          <X size={22} aria-hidden="true" />
+        </button>
+      </div>
+      <div className="flex flex-col gap-1 p-6">
+        {LINKS.map((l) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            onClick={onClose}
+            className="rounded-lg px-3 py-3 text-lg font-medium text-ink hover:bg-panel"
+          >
+            {l.label}
+          </Link>
+        ))}
+        <a
+          href={INVITE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 rounded-lg bg-gold px-4 py-3 text-center font-bold text-bg"
+        >
+          Add to Discord
+        </a>
+      </div>
+    </div>
+  );
 }
