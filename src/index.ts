@@ -64,7 +64,7 @@ const client = new Client({
 
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user?.tag}`);
-  client.user?.setActivity("V2 massive update incoming, stay tuned", { type: ActivityType.Playing });
+  client.user?.setActivity("V2 is finally out! Check what's new in changelog", { type: ActivityType.Playing });
 
   try {
     await prisma.$connect();
