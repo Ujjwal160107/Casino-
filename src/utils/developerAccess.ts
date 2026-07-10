@@ -4,11 +4,7 @@ export const BOT_DEVELOPER_ID = "1288340046449086567";
 
 // Testing role: these users bypass cooldowns, can buy anything regardless of balance,
 // and have access to all admin commands.
-export const TESTER_IDS = new Set<string>([
-  "711955153196155011",
-  "761118244198285313",
-  "849330483313115168",
-]);
+export const TESTER_IDS = new Set<string>([]);
 
 export const TESTER_ROLE_IDS = new Set<string>([
   // Add tester role IDs here. Users with any of these roles bypass cooldowns and shop costs.
