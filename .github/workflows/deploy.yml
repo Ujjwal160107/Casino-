@@ -33,6 +33,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npx prisma db push --skip-generate
+      - name: Seed global catalogs (shop, properties, degrees, stocks)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run seed
 
   deploy:
     needs: [build, sync-schema]

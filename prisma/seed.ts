@@ -16,6 +16,7 @@ import {
 } from "../src/services/shopService";
 import { seedGlobalProperties } from "../src/services/propertyService";
 import { checkAndSeedDegrees } from "../src/services/educationService";
+import { initGlobalMarket } from "../src/services/stockService";
 
 const prisma = new PrismaClient();
 
@@ -31,17 +32,20 @@ async function main() {
     seedCosmeticsShop(),
     seedGlobalProperties(),
     checkAndSeedDegrees(),
+    initGlobalMarket(),
   ]);
 
-  const [shopCount, propertyCount, degreeCount] = await Promise.all([
+  const [shopCount, propertyCount, degreeCount, stockCount] = await Promise.all([
     prisma.shopItem.count({ where: { guildId: "global" } }),
     prisma.property.count({ where: { guildId: "global" } }),
     prisma.degree.count({ where: { guildId: "global" } }),
+    prisma.stock.count(),
   ]);
 
   console.log(`Shop items (global): ${shopCount}`);
   console.log(`Properties (global): ${propertyCount}`);
   console.log(`Degrees (global): ${degreeCount}`);
+  console.log(`Stocks: ${stockCount}`);
   console.log("Seed complete.");
 }
 
