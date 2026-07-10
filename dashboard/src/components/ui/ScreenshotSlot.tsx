@@ -8,40 +8,34 @@ export function ScreenshotSlot({
   alt,
   caption,
   className,
+  aspect = "aspect-video",
+  maxWidth,
 }: {
-  /** public path, e.g. "/screenshots/bank.png" */
+  /** public path, e.g. "/art/stock-market.jpg" */
   src: string;
   alt: string;
   caption?: string;
   className?: string;
+  /** tailwind aspect class matching the image's native ratio so nothing is cropped */
+  aspect?: string;
+  /** tailwind max-width class for tall/portrait art, e.g. "max-w-xs" (centered) */
+  maxWidth?: string;
 }) {
+  // Render nothing when the file isn't there — no placeholder boxes.
   const exists = fs.existsSync(path.join(process.cwd(), "public", src));
-
-  if (!exists) {
-    return (
-      <figure className={className}>
-        <div className="flex aspect-video items-center justify-center rounded-2xl border border-dashed border-line bg-panel px-6 text-center">
-          <div>
-            <p className="font-mono text-sm text-muted">bot screenshot slot</p>
-            <p className="mt-1 text-xs text-muted">
-              drop <span className="font-mono text-ink">{src}</span> into
-              public/ and it appears here
-            </p>
-          </div>
-        </div>
-        {caption && (
-          <figcaption className="mt-2 text-center text-sm text-muted">
-            {caption}
-          </figcaption>
-        )}
-      </figure>
-    );
-  }
+  if (!exists) return null;
 
   return (
     <figure className={className}>
-      <div className={cn("relative aspect-video overflow-hidden rounded-2xl border border-line bg-panel")}>
-        <Image src={src} alt={alt} fill className="object-cover" />
+      <div
+        className={cn(
+          "relative mx-auto overflow-hidden rounded-2xl border border-line bg-panel",
+          aspect,
+          maxWidth
+        )}
+      >
+        {/* object-contain guarantees the whole image is visible — never cropped */}
+        <Image src={src} alt={alt} fill sizes="768px" className="object-contain" />
       </div>
       {caption && (
         <figcaption className="mt-2 text-center text-sm text-muted">

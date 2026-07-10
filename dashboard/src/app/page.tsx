@@ -6,7 +6,6 @@ import { Hero } from "@/components/landing/Hero";
 import { ModuleShowcase } from "@/components/landing/ModuleShowcase";
 import { LandingFeatures } from "@/components/landing/LandingFeatures";
 import { BeginnerPath } from "@/components/landing/BeginnerPath";
-import { ScreenshotGallery } from "@/components/landing/ScreenshotGallery";
 import { TopGGReviews } from "@/components/landing/TopGGReviews";
 import { FinalCTA } from "@/components/landing/FinalCTA";
 
@@ -20,7 +19,6 @@ export default async function Home() {
       <ModuleShowcase />
       <LandingFeatures />
       <BeginnerPath />
-      <ScreenshotGallery />
       <TopGGReviews />
       <FinalCTA />
       <Footer />

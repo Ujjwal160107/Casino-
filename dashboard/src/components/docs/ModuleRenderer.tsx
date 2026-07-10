@@ -41,13 +41,15 @@ export function ModuleRenderer({ doc }: { doc: ModuleDoc }) {
         </p>
       </Panel>
 
-      {/* Bot screenshot (placeholder until the owner drops the file) */}
+      {/* Module artwork (renders nothing if the file is missing) */}
       {doc.screenshot && (
         <ScreenshotSlot
           className="mt-8"
           src={doc.screenshot.src}
           alt={doc.screenshot.alt}
           caption={doc.screenshot.caption}
+          aspect={doc.screenshot.aspect}
+          maxWidth={doc.screenshot.maxWidth}
         />
       )}
 

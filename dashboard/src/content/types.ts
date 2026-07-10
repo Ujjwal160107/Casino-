@@ -50,11 +50,18 @@ export interface ModuleDoc {
     tip: string;
   };
   /**
-   * Real bot screenshot for this module. Rendered by ScreenshotSlot:
-   * shows the image if the file exists under public/, otherwise a labeled
-   * flat placeholder the owner can fill later.
+   * Module artwork rendered by ScreenshotSlot. Shows the image if the file
+   * exists under public/, otherwise renders nothing (no placeholder).
+   * `aspect` is a tailwind aspect class matching the image's native ratio so
+   * it is never cropped; `maxWidth` centers and caps portrait/square art.
    */
-  screenshot?: { src: string; alt: string; caption?: string };
+  screenshot?: {
+    src: string;
+    alt: string;
+    caption?: string;
+    aspect?: string;
+    maxWidth?: string;
+  };
   sections: DocSection[];
   /** Command ids (from commands.ts) listed on this page */
   commandIds: string[];
