@@ -36,7 +36,10 @@ export default function RootLayout({
       lang="en"
       className={`${display.variable} ${inter.variable} ${jetbrains.variable}`}
     >
-      <body className="bg-bg font-body text-ink antialiased">
+      <body
+        className="bg-bg font-body text-ink antialiased"
+        suppressHydrationWarning
+      >
         <Providers>
           {children}
           <Toaster position="top-right" theme="dark" richColors />

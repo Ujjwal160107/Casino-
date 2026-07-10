@@ -1,10 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { useEffect, useState } from "react";
-import { signIn, signOut } from "next-auth/react";
-import { LogOut, Menu } from "lucide-react";
+import { useState } from "react";
+import { Menu } from "lucide-react";
 import { MobileSidebar } from "./MobileSidebar";
 import { INVITE_URL } from "@/lib/links";
 
@@ -14,23 +12,15 @@ const LINKS = [
   { href: "/changelog", label: "Changelog" },
 ];
 
+// `user`/`hideLogin` are accepted so existing pages keep compiling; login is
+// intentionally disabled for now, so they go unused.
 interface LandingNavbarProps {
   user?: { name?: string | null; image?: string | null };
   hideLogin?: boolean;
 }
 
-export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
+export function LandingNavbar(_props: LandingNavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenuOpen(false);
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [menuOpen]);
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-bg">
@@ -59,60 +49,6 @@ export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          {user ? (
-            <div className="relative hidden md:block">
-              <button
-                onClick={() => setMenuOpen((v) => !v)}
-                aria-haspopup="true"
-                aria-expanded={menuOpen}
-                className="flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-panel px-2 py-1.5 transition-colors hover:border-gold/40"
-              >
-                {user.image ? (
-                  <Image
-                    src={user.image}
-                    width={24}
-                    height={24}
-                    alt=""
-                    className="rounded-full"
-                  />
-                ) : (
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-panel-2 text-xs font-bold text-muted">
-                    {user.name?.charAt(0) ?? "?"}
-                  </span>
-                )}
-                <span className="max-w-[10rem] truncate text-sm font-medium text-ink">
-                  {user.name}
-                </span>
-              </button>
-              {menuOpen && (
-                <>
-                  <div className="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-xl border border-line bg-panel">
-                    <button
-                      onClick={() => signOut({ callbackUrl: "/" })}
-                      className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left text-sm text-chip transition-colors hover:bg-panel-2"
-                    >
-                      <LogOut size={15} aria-hidden="true" />
-                      Cash out (sign out)
-                    </button>
-                  </div>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setMenuOpen(false)}
-                  />
-                </>
-              )}
-            </div>
-          ) : (
-            !hideLogin && (
-              <button
-                onClick={() => signIn("discord", { callbackUrl: "/" })}
-                className="hidden min-h-11 cursor-pointer items-center rounded-lg border border-line px-4 text-sm font-medium text-muted transition-colors hover:border-gold/40 hover:text-ink md:flex"
-              >
-                Log in
-              </button>
-            )
-          )}
-
           <a
             href={INVITE_URL}
             target="_blank"
@@ -134,11 +70,7 @@ export function LandingNavbar({ user, hideLogin }: LandingNavbarProps) {
         </div>
       </nav>
 
-      <MobileSidebar
-        isOpen={mobileOpen}
-        onClose={() => setMobileOpen(false)}
-        user={user}
-      />
+      <MobileSidebar isOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
     </header>
   );
 }

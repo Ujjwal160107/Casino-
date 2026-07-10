@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
-import { signIn, signOut } from "next-auth/react";
 import { X } from "lucide-react";
 import { INVITE_URL } from "@/lib/links";
 
 interface MobileSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  user?: { name?: string | null; image?: string | null };
 }
 
 const LINKS = [
@@ -18,7 +16,7 @@ const LINKS = [
   { href: "/changelog", label: "Changelog" },
 ];
 
-export function MobileSidebar({ isOpen, onClose, user }: MobileSidebarProps) {
+export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -112,21 +110,6 @@ export function MobileSidebar({ isOpen, onClose, user }: MobileSidebarProps) {
         >
           Add to Discord
         </a>
-        {user ? (
-          <button
-            onClick={() => signOut({ callbackUrl: "/" })}
-            className="mt-2 cursor-pointer rounded-lg border border-line px-4 py-3 text-sm font-medium text-chip"
-          >
-            Sign out
-          </button>
-        ) : (
-          <button
-            onClick={() => signIn("discord", { callbackUrl: "/" })}
-            className="mt-2 cursor-pointer rounded-lg border border-line px-4 py-3 text-sm font-medium text-muted"
-          >
-            Log in with Discord
-          </button>
-        )}
       </div>
     </div>
   );
