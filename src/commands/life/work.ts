@@ -36,8 +36,8 @@ function capitalize(s: string) {
 
 function getStressColor(stress: number) {
     if (stress < 30) return "<:n_check:1451281806279311435>";
-    if (stress < 70) return "<:alert_sign:1451625691664875610>";
-    return "<:rip:1451287136132403303>";
+    if (stress < 70) return "<:alert_sign:1455458789934235738>";
+    return "<:rip:1456569015639212032>";
 }
 
 export async function handleWork(message: Message) {

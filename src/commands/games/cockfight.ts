@@ -945,7 +945,7 @@ async function runCockFight(
         } else if (usedDeathSave) {
             deathMessage = [
                 `🛡️ **SAVED!** ${loser.displayName}'s chicken was saved from critical by a **Death Save** effect!`,
-                `<:clinic:1453972244610154507> Injured for **${recoveryHours.toFixed(1)}h**. Coin heal: **${fmtCurrency(coinHealCost)}**`,
+                `<:clinic:1456568728883040287> Injured for **${recoveryHours.toFixed(1)}h**. Coin heal: **${fmtCurrency(coinHealCost)}**`,
                 `-# Or use \`${prefix}use feather bandage\` for instant heal`,
             ].join("\n");
         } else {
@@ -953,7 +953,7 @@ async function runCockFight(
                 ? "\n🛡️ **Guard Vest protected equipment!**"
                 : "\n💥 Equipment broken!";
             deathMessage = [
-                `<:clinic:1453972244610154507> **INJURED!** ${loser.displayName}'s chicken is hospitalized for **${recoveryHours.toFixed(1)}h**.${vestNote}`,
+                `<:clinic:1456568728883040287> **INJURED!** ${loser.displayName}'s chicken is hospitalized for **${recoveryHours.toFixed(1)}h**.${vestNote}`,
                 `-# Coin heal: **${fmtCurrency(coinHealCost)}** | \`${prefix}use feather bandage\` | \`${prefix}use phoenix serum\``,
             ].join("\n");
         }

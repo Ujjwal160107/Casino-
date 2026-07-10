@@ -26,11 +26,11 @@ import { GAME_UI_TIMINGS } from "../../utils/economyConfig";
 
 export async function handleRouletteMenu(message: Message) {
   const prefix = await getGuildPrefix(message.guildId!);
-  const eCasino = "<a:casino:1445732641545654383>";
-  const eScroll = "<:scroll:1446218234171887760>";
-  const eDicesBtn = "<:dices:1446220119733702767>";
+  const eCasino = "<a:casino:1456568719374553138>";
+  const eScroll = "<:scroll:1456569017530716254>";
+  const eDicesBtn = "<a:dices:1456568817621925991>";
   const eBlackCoin = "<:BlackCoin:1446217613632999565>";
-  const eRedCoin = "<:redcoin:1446217599439343772>";
+  const eRedCoin = "<:redcoin:1456569008273883176>";
   const eDiceSpecific = "<a:dice:1446217848551899300>";
   const parseEmojiId = (str: string) => str.match(/:(\d+)>/)?.[1] ?? (str.match(/^\d+$/) ? str : str);
 
@@ -140,7 +140,7 @@ export async function handleBet(message: Message, args: string[]) {
 
   // SPIN ANIMATION
   const spinTime = GAME_UI_TIMINGS.rouletteSpinSeconds;
-  const eCasino = "<a:casino:1445732641545654383>";
+  const eCasino = "<a:casino:1456568719374553138>";
   const spinningEmbed = new EmbedBuilder()
     .setTitle(`${eCasino} The wheel is spinning...`)
     .setDescription(`Rolling the ball... Good luck!`)
@@ -233,7 +233,7 @@ export async function handleBet(message: Message, args: string[]) {
     }).catch(() => { });
   });
 
-  const eRedCoin = "<:redcoin:1446217599439343772>";
+  const eRedCoin = "<:redcoin:1456569008273883176>";
   const eBlackCoin = "<:BlackCoin:1446217613632999565>";
   const displayColor = spin === 0 ? "🟢" : (isRed ? eRedCoin : eBlackCoin);
   const resultEmbed = new EmbedBuilder()
