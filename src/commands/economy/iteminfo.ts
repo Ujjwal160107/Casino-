@@ -54,9 +54,9 @@ export async function handleItemInfo(message: Message, args: string[]) {
 
         if (effects.length > 0) {
             const effectsText = effects.map((e, i) => `${i + 1}. ${formatEffectDescription(e)}`).join("\n");
-            embed.addFields({ name: "<:sparks:1449708086099968031> Effects", value: effectsText, inline: false });
+            embed.addFields({ name: "<:sparks:1456569026292744303> Effects", value: effectsText, inline: false });
         } else {
-            embed.addFields({ name: "<:sparks:1449708086099968031> Effects", value: "*No special effects*", inline: false });
+            embed.addFields({ name: "<:sparks:1456569026292744303> Effects", value: "*No special effects*", inline: false });
         }
 
         embed.setFooter({ text: `Use ${prefix}shop buy ${item.name} to purchase` });

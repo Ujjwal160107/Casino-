@@ -426,10 +426,10 @@ async function handleView(message: Message, args: string[]) {
 
                 const embed = new EmbedBuilder()
                     .setColor("#E74C3C")
-                    .setTitle("<:clinic:1453972244610154507> Veterinary Clinic")
+                    .setTitle("<:clinic:1456568728883040287> Veterinary Clinic")
                     .setDescription(
                         `Your chicken is **Injured** and cannot fight or train.\n\n` +
-                        `<a:bandaid:1453972442300154018> Recovers <t:${endTimeUnix}:R> (${recoveryHours.toFixed(1)}h total)`
+                        `<a:bandaid:1456568701737500753> Recovers <t:${endTimeUnix}:R> (${recoveryHours.toFixed(1)}h total)`
                     )
                     .addFields(
                         { name: "💰 Coin Heal", value: `Pay **${healCost.toLocaleString()}** coins to heal instantly.`, inline: true },
@@ -437,7 +437,7 @@ async function handleView(message: Message, args: string[]) {
                     );
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                    new ButtonBuilder().setCustomId("chicken_heal").setLabel(`Heal (${healCost.toLocaleString()})`).setStyle(ButtonStyle.Success).setEmoji("<:medicine:1453973645675200727>")
+                    new ButtonBuilder().setCustomId("chicken_heal").setLabel(`Heal (${healCost.toLocaleString()})`).setStyle(ButtonStyle.Success).setEmoji("<:medicine:1456568989340930138>")
                 );
 
                 const reply = await message.reply({ embeds: [embed], components: [row] });

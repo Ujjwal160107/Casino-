@@ -2,12 +2,12 @@ export const GameConfig = {
     Emojis: {
         Chicken: "<:cock:1451281426329768172>",
         Win: "<:MoneyBag:1446970451606896781>",
-        Rip: "<:rip:1451287136132403303>",
+        Rip: "<:rip:1456569015639212032>",
         Tick: "<:tick:1455105986120515656>",
-        Cooldown: "<:cooldown:1454025354631970826>",
-        Clinic: "<:clinic:1453972244610154507>",
-        Medicine: "<:medicine:1453973645675200727>",
-        Bandaid: "<a:bandaid:1453972442300154018>",
+        Cooldown: "<:cooldown:1456568806741774449>",
+        Clinic: "<:clinic:1456568728883040287>",
+        Medicine: "<:medicine:1456568989340930138>",
+        Bandaid: "<a:bandaid:1456568701737500753>",
         XpFull: "<:xpfull:1451636569982111765>",
         XpEmpty: "<:xpempty:1451642829427314822>",
         RedBar: "<:Red_Bar:1454017024346034176>",
@@ -17,7 +17,7 @@ export const GameConfig = {
         Rank3: "🥉",
         MenuSpear: "<a:Spear:1454552210569691239>",
         MenuShield: "<:shieldd:1454552308720341155>",
-        MenuBoots: "<a:boots:1454552355512258622>"
+        MenuBoots: "<a:boots:1456568714592780290>"
     },
     BaseStats: {
         LevelMultiplier: 10,  // Score = 100 + (Level * 10)

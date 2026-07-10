@@ -141,7 +141,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
     const prefix = await getGuildPrefix(message.guildId!);
     const { min, max } = getGameBetLimits("blackjack");
 
-    const eCasino = "<a:casino:1445732641545654383>";
+    const eCasino = "<a:casino:1456568719374553138>";
 
     if (amount < min) {
         return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Blackjack is **${fmtCurrency(min)}**.`)] });
