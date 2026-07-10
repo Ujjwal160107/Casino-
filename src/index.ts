@@ -24,8 +24,7 @@ import { handleShopBuyInteraction, handleShopUseInteraction, handleShopBuyCardIn
 import { guildCreateListener } from "./listeners/guildCreateListener";
 import { Mascot } from "./config/branding";
 import {
-  handleGlobalEconomyReminderInteraction,
-  maybeSendGlobalEconomyReminder
+  handleGlobalEconomyReminderInteraction
 } from "./services/globalEconomyReminderService";
 import { initScheduler } from "./scheduler";
 
@@ -65,7 +64,7 @@ const client = new Client({
 
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user?.tag}`);
-  client.user?.setActivity("Did you check out the recent alert?", { type: ActivityType.Playing });
+  client.user?.setActivity("V2 massive update incoming, stay tuned", { type: ActivityType.Playing });
 
   try {
     await prisma.$connect();
@@ -291,9 +290,6 @@ client.on("messageCreate", async (message) => {
     try {
       (message as any).content = "!" + contentToProcess;
       await routeMessage(client, message, prefix);
-      await maybeSendGlobalEconomyReminder(message, contentToProcess).catch((err) => {
-        console.error("Global economy reminder error:", err);
-      });
     } finally {
       (message as any).content = originalContent;
     }
