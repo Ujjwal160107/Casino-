@@ -110,12 +110,15 @@ export const GRINDING_COMMANDS = {
 } as const;
 
 export const ROB_CONFIG = {
-  cooldownSeconds: 300,
-  successRate: 0.45,
+  cooldownSeconds: 3600,       // 1 hour
+  successRate: 0.40,           // 40% base success / 60% failure
   stealPctMin: 0.08,
   stealPctMax: 0.20,
-  failPenaltyMin: 60_000,
-  failPenaltyMax: 120_000
+  // Fine on failure is always a multiple of what this specific attempt would
+  // have stolen, so getting caught costs strictly more than succeeding would
+  // have earned. failFineMinimum floors it when the target is nearly broke.
+  failFineMultiplier: 1.5,
+  failFineMinimum: 60_000,
 } as const;
 
 export const RELAX_OPTIONS = {
