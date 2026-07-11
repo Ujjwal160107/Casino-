@@ -113,25 +113,24 @@ handle_request() {
         return
     fi
 
-    # Serialize deploys and wait for the real result: a flock around
-    # do_deploy means overlapping webhook calls (e.g. several pushes in
-    # quick succession) queue up and run one at a time instead of racing
-    # git pull / npm install / pm2 restart against each other on the same
-    # directory. Waiting for it to finish (instead of backgrounding) means
-    # the HTTP response — and therefore the GitHub Actions job — actually
-    # reflects whether the deploy succeeded, instead of always saying 200
-    # the instant the secret checks out.
-    (
-        flock -w 600 200 || { log "❌ Timed out waiting for deploy lock"; exit 1; }
-        do_deploy
-    ) >>"$LOG_FILE" 2>&1 200>"$LOCK_FILE"
-    local status=$?
+    # Acknowledge immediately, then deploy in the background. The full build
+    # (npm install + tsc + prisma + a memory-heavy Next.js build + pm2
+    # restart) takes several minutes on a small VPS, and the GitHub Actions
+    # curl holds the connection open until we respond — so we must NOT block
+    # on the build, or a slow/stalled build hangs the CI run indefinitely.
+    #
+    # The two properties that actually matter are still preserved:
+    #   - flock serializes deploys so overlapping webhook calls (several
+    #     pushes in quick succession) queue and run one at a time instead of
+    #     racing git pull / npm install / pm2 restart on the same directory.
+    #   - all build output goes to $LOG_FILE only (never the socket), so the
+    #     real success/failure of each step is inspectable there.
+    echo -ne "HTTP/1.1 200 OK\r\nContent-Length: 14\r\n\r\nDeploy queued!"
 
-    if [ "$status" -eq 0 ]; then
-        echo -ne "HTTP/1.1 200 OK\r\nContent-Length: 15\r\n\r\nDeploy started!"
-    else
-        echo -ne "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 14\r\n\r\nDeploy failed!"
-    fi
+    (
+        flock -w 900 200 || { log "❌ Timed out waiting for deploy lock — another deploy is still running"; exit 1; }
+        do_deploy
+    ) >>"$LOG_FILE" 2>&1 200>"$LOCK_FILE" &
 }
 
 # --- Entrypoint ---

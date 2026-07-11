@@ -53,7 +53,12 @@ jobs:
             --arg sha "$COMMIT_SHA" \
             --arg message "$COMMIT_MESSAGE" \
             '{ref: $ref, sha: $sha, message: $message}')
-          curl -s -o /dev/null -w "%{http_code}" \
+          # --max-time bounds the request: the webhook acknowledges within a
+          # second (the real build runs on the VPS afterward), so anything
+          # longer means a network/listener problem — fail fast instead of
+          # letting the CI run hang. --fail-with-body makes a non-2xx response
+          # (e.g. 403 bad secret) fail the step instead of silently passing.
+          curl -sS --max-time 30 --fail-with-body -o /dev/null -w "%{http_code}\n" \
             -X POST "${{ secrets.DEPLOY_WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
             -H "X-Deploy-Secret: ${{ secrets.DEPLOY_SECRET }}" \
