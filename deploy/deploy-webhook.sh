@@ -21,6 +21,7 @@ SCRIPT_PATH="$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")"
 PORT="${DEPLOY_PORT:-9000}"
 APP_DIR="${APP_DIR:-/root/app}"
 LOG_FILE="${LOG_FILE:-/var/log/casino-deploy.log}"
+LOCK_FILE="${LOCK_FILE:-/tmp/casino-deploy.lock}"
 DEPLOY_SECRET="${DEPLOY_SECRET:?DEPLOY_SECRET environment variable is required}"
 
 log() {
@@ -36,35 +37,34 @@ do_deploy() {
 
     # Pull latest code
     log "📥 Pulling latest code..."
-    git pull origin main 2>&1 | tee -a "$LOG_FILE"
+    git pull origin main 2>&1 | tee -a "$LOG_FILE" || { log "❌ git pull failed"; return 1; }
 
     # --- Bot build ---
     log "📦 Installing bot dependencies..."
-    npm install 2>&1 | tee -a "$LOG_FILE"
+    npm install 2>&1 | tee -a "$LOG_FILE" || { log "❌ npm install (bot) failed"; return 1; }
 
     log "🔨 Building bot..."
-    npm run build 2>&1 | tee -a "$LOG_FILE"
+    npm run build 2>&1 | tee -a "$LOG_FILE" || { log "❌ npm run build (bot) failed"; return 1; }
 
     # --- Prisma ---
     log "🗄️  Running Prisma db push..."
-    npx prisma db push --accept-data-loss 2>&1 | tee -a "$LOG_FILE"
+    npx prisma db push --accept-data-loss 2>&1 | tee -a "$LOG_FILE" || { log "❌ prisma db push failed"; return 1; }
 
     # --- Dashboard build ---
     log "📦 Installing dashboard dependencies..."
-    cd dashboard
-    npm install 2>&1 | tee -a "$LOG_FILE"
+    (cd dashboard && npm install) 2>&1 | tee -a "$LOG_FILE" || { log "❌ npm install (dashboard) failed"; return 1; }
 
     log "🔨 Building dashboard..."
-    npm run build 2>&1 | tee -a "$LOG_FILE"
-    cd ..
+    (cd dashboard && npm run build) 2>&1 | tee -a "$LOG_FILE" || { log "❌ npm run build (dashboard) failed"; return 1; }
 
     # --- Restart PM2 ---
     log "♻️  Restarting PM2 processes..."
-    pm2 restart ecosystem.config.js 2>&1 | tee -a "$LOG_FILE"
+    pm2 restart ecosystem.config.js 2>&1 | tee -a "$LOG_FILE" || { log "❌ pm2 restart failed"; return 1; }
     pm2 save 2>&1 | tee -a "$LOG_FILE"
 
     log "✅ Deploy complete!"
     log "========================================="
+    return 0
 }
 
 handle_request() {
@@ -105,11 +105,25 @@ handle_request() {
         return
     fi
 
-    # Respond immediately, then deploy in background
-    echo -ne "HTTP/1.1 200 OK\r\nContent-Length: 15\r\n\r\nDeploy started!"
+    # Serialize deploys and wait for the real result: a flock around
+    # do_deploy means overlapping webhook calls (e.g. several pushes in
+    # quick succession) queue up and run one at a time instead of racing
+    # git pull / npm install / pm2 restart against each other on the same
+    # directory. Waiting for it to finish (instead of backgrounding) means
+    # the HTTP response — and therefore the GitHub Actions job — actually
+    # reflects whether the deploy succeeded, instead of always saying 200
+    # the instant the secret checks out.
+    (
+        flock -w 600 200 || { log "❌ Timed out waiting for deploy lock"; exit 1; }
+        do_deploy
+    ) 200>"$LOCK_FILE"
+    local status=$?
 
-    # Run deploy in background so the HTTP response is sent immediately
-    do_deploy &
+    if [ "$status" -eq 0 ]; then
+        echo -ne "HTTP/1.1 200 OK\r\nContent-Length: 15\r\n\r\nDeploy started!"
+    else
+        echo -ne "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 14\r\n\r\nDeploy failed!"
+    fi
 }
 
 # --- Entrypoint ---
