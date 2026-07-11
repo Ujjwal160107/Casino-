@@ -1,6 +1,7 @@
 import prisma from "../utils/prisma";
 import { MAX_SAFE_BALANCE, STARTING_WALLET_BALANCE } from "../utils/economyConfig";
 import { questBus } from "./questEvents";
+import { invalidateUserCache } from "./userService";
 
 function isTransientWriteConflict(error: any) {
   const message = `${error?.message ?? ""} ${error?.code ?? ""}`.toLowerCase();
@@ -40,6 +41,7 @@ export async function ensureUserAndWallet(discordId: string, _guildId: string, u
         },
         include: { wallet: true }
       });
+      await invalidateUserCache(discordId, "");
     }
     return user;
   }
@@ -77,6 +79,8 @@ export async function depositToWallet(walletId: string, amount: number, meta: an
     prisma.transaction.create({ data: { walletId, amount, type: "deposit", meta, isEarned: earned } }),
     prisma.wallet.update({ where: { id: walletId }, data: { balance: { increment: amount } } })
   ]);
+  const owner = await prisma.wallet.findUnique({ where: { id: walletId }, select: { userId: true } });
+  if (owner) await invalidateUserCache(owner.userId, "");
 }
 
 export async function removeMoneyFromWallet(walletId: string, amount: number) {
@@ -97,6 +101,7 @@ export async function removeMoneyFromWallet(walletId: string, amount: number) {
       data: { balance: { decrement: amount } }
     })
   ]);
+  await invalidateUserCache(wallet.userId, "");
   return wallet.balance - amount;
 }
 
@@ -123,6 +128,10 @@ export async function transferMoney(fromDiscordId: string, toDiscordId: string, 
     prisma.transaction.create({ data: { walletId: fromUser.wallet.id, amount: -amount, type: "transfer_sent", meta: { to: toDiscordId } } }),
     prisma.wallet.update({ where: { id: toUser.wallet!.id }, data: { balance: { increment: amount } } }),
     prisma.transaction.create({ data: { walletId: toUser.wallet!.id, amount: amount, type: "transfer_recv", meta: { from: fromDiscordId } } })
+  ]);
+  await Promise.all([
+    invalidateUserCache(fromDiscordId, ""),
+    invalidateUserCache(toDiscordId, ""),
   ]);
 }
 
@@ -205,13 +214,15 @@ export async function addBalance(discordId: string, username: string, amount: nu
     questBus.emit("economy:earn", { discordId, amount: result.appliedAmount });
   }
 
+  if (result.appliedAmount > 0) await invalidateUserCache(discordId, "");
+
   return result;
 }
 
 export async function removeBalance(discordId: string, amount: number, type = "remove", meta: any = {}) {
   if (amount <= 0) throw new Error("Amount must be positive.");
 
-  return withTransactionRetry(() => prisma.$transaction(async (tx) => {
+  const result = await withTransactionRetry(() => prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({
       where: { discordId },
       include: { wallet: true }
@@ -254,4 +265,8 @@ export async function removeBalance(discordId: string, amount: number, type = "r
       removedAmount
     };
   }));
+
+  if (result.removedAmount > 0) await invalidateUserCache(discordId, "");
+
+  return result;
 }

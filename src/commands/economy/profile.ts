@@ -26,6 +26,7 @@ import { getLuckBreakdown } from "../../services/shopBuffs";
 import { COSMETICS_SHOP_CATALOG } from "../../utils/shopCatalog";
 import { getAffectionTier, getMarriage, MAX_AFFECTION } from "../../services/life/marriageService";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { redisService } from "../../services/redisService";
 
 const PROFILE_ACCENT_COLOR = 0x9B59B6;
 
@@ -235,7 +236,24 @@ function rankUsers<T>(items: T[], valueOf: (item: T) => number, idOf: (item: T) 
   return index >= 0 ? index + 1 : null;
 }
 
-async function getGlobalLeaderboardRanks(discordId: string) {
+const LEADERBOARD_DATASET_CACHE_KEY = "profile:leaderboard_dataset";
+// Rank precision doesn't need to be real-time, and this dataset is read on
+// every !profile view but only changes via the huge number of wallet/bank
+// mutation call sites — a short TTL is the practical way to cache it rather
+// than wiring invalidation into every earning/spending command.
+const LEADERBOARD_DATASET_CACHE_TTL = 20;
+
+type LeaderboardUser = {
+  discordId: string;
+  shiftsWorked: number;
+  wallet: { balance: number } | null;
+  bank: { balance: number } | null;
+};
+
+async function getLeaderboardDataset(): Promise<LeaderboardUser[]> {
+  const cached = await redisService.get<LeaderboardUser[]>(LEADERBOARD_DATASET_CACHE_KEY);
+  if (cached) return cached;
+
   const users = await prisma.user.findMany({
     select: {
       discordId: true,
@@ -244,6 +262,12 @@ async function getGlobalLeaderboardRanks(discordId: string) {
       bank: { select: { balance: true } },
     },
   });
+  await redisService.set(LEADERBOARD_DATASET_CACHE_KEY, users, LEADERBOARD_DATASET_CACHE_TTL);
+  return users;
+}
+
+async function getGlobalLeaderboardRanks(discordId: string) {
+  const users = await getLeaderboardDataset();
 
   const total = users.length;
   const netRank = rankUsers(

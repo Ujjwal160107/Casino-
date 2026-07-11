@@ -7,6 +7,22 @@ import {
   baselineNoisePct, pickEvent, rollEventMagnitude, resolveForecast,
   applyPct, computeFill,
 } from "./stockEngine";
+import { redisService } from "./redisService";
+
+const STOCKS_CACHE_KEY = "stocks:all_active";
+const FORECASTS_CACHE_KEY = "stocks:active_forecasts";
+const RECENT_EVENTS_CACHE_KEY = "stocks:recent_events";
+// Short TTL as a safety net between ticks; explicitly invalidated whenever
+// marketTick() actually moves a price so views never lag behind a real tick.
+const MARKET_CACHE_TTL = 30;
+
+function invalidateMarketCache() {
+  return Promise.all([
+    redisService.del(STOCKS_CACHE_KEY),
+    redisService.del(FORECASTS_CACHE_KEY),
+    redisService.del(RECENT_EVENTS_CACHE_KEY),
+  ]);
+}
 
 type StockRow = Awaited<ReturnType<typeof prisma.stock.findFirst>>;
 
@@ -35,10 +51,15 @@ export async function initGlobalMarket(): Promise<void> {
 }
 
 export async function getAllStocks() {
-  return prisma.stock.findMany({
+  const cached = await redisService.get<Awaited<ReturnType<typeof prisma.stock.findMany>>>(STOCKS_CACHE_KEY);
+  if (cached) return cached;
+
+  const stocks = await prisma.stock.findMany({
     where: { status: { not: "DELISTED" } },
     orderBy: { currentPrice: "desc" },
   });
+  await redisService.set(STOCKS_CACHE_KEY, stocks, MARKET_CACHE_TTL);
+  return stocks;
 }
 
 export async function getStock(symbol: string) {
@@ -50,18 +71,31 @@ export async function getStockById(stockId: string) {
 }
 
 export async function getActiveForecasts() {
-  return prisma.stockEvent.findMany({
+  const cached = await redisService.get<Awaited<ReturnType<typeof prisma.stockEvent.findMany>>>(FORECASTS_CACHE_KEY);
+  if (cached) return cached;
+
+  const forecasts = await prisma.stockEvent.findMany({
     where: { status: "FORECAST" },
     orderBy: { resolveTick: "asc" },
   });
+  await redisService.set(FORECASTS_CACHE_KEY, forecasts, MARKET_CACHE_TTL);
+  return forecasts;
 }
 
 export async function getRecentEvents(limit = 10) {
-  return prisma.stockEvent.findMany({
+  // Cached under a single key regardless of limit — the only caller uses a
+  // fixed limit, and a slightly-off count for a differently-limited caller
+  // within the 30s TTL is an acceptable tradeoff for a "recent news" list.
+  const cached = await redisService.get<Awaited<ReturnType<typeof prisma.stockEvent.findMany>>>(RECENT_EVENTS_CACHE_KEY);
+  if (cached) return cached;
+
+  const events = await prisma.stockEvent.findMany({
     where: { status: { in: ["RESOLVED", "FORECAST"] } },
     orderBy: { createdAt: "desc" },
     take: limit,
   });
+  await redisService.set(RECENT_EVENTS_CACHE_KEY, events, MARKET_CACHE_TTL);
+  return events;
 }
 
 export async function getPortfolio(discordId: string) {
@@ -169,6 +203,7 @@ export async function marketTick(): Promise<void> {
       console.error(`Stock tick failed for ${stock.symbol}:`, err);
     }
   }
+  await invalidateMarketCache();
 }
 
 async function processStockTick(stock: NonNullable<StockRow>, tick: number): Promise<void> {

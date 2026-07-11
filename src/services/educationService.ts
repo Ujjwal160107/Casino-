@@ -19,7 +19,11 @@ function resolveEventOutcome(event: StudyEvent): boolean {
     return Math.random() * 100 < (event.successChance ?? 50);
 }
 
+let degreesSeeded = false;
+
 export async function checkAndSeedDegrees(_guildId?: string) {
+    if (degreesSeeded) return;
+
     const upsertDegree = async (
         catalogKey: string,
         name: string,
@@ -143,6 +147,8 @@ export async function checkAndSeedDegrees(_guildId?: string) {
         xpRequired: 5_000,
         requiredDegreeId: mbbs.id
     }, ["MD / PhD", "Doctor of Medicine (MD)"]);
+
+    degreesSeeded = true;
 }
 
 export async function getDegrees(_guildId?: string) {
