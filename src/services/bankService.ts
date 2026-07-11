@@ -1,6 +1,7 @@
 import prisma, { runWithRetry } from "../utils/prisma";
 import { PrismaClient } from "@prisma/client";
 import { MAX_SAFE_BALANCE } from "../utils/economyConfig";
+import { invalidateUserCache } from "./userService";
 
 export async function ensureBankForUser(userIdOrDiscordId: string, username = "UnknownUser") {
   const discordId = userIdOrDiscordId;
@@ -79,7 +80,7 @@ export async function ensureBankingUser(discordId: string, username = "UnknownUs
 export async function depositToBank(walletId: string, userId: string, amount: number) {
   if (amount <= 0) throw new Error("Amount must be greater than 0.");
 
-  return runWithRetry(async (tx: PrismaClient) => {
+  const result = await runWithRetry(async (tx: PrismaClient) => {
     return tx.$transaction(async (trx) => {
       const wallet = await trx.wallet.findUnique({ where: { id: walletId } });
       if (!wallet) throw new Error("Wallet not found.");
@@ -124,12 +125,15 @@ export async function depositToBank(walletId: string, userId: string, amount: nu
       return { bank: updatedBank, wallet: updatedWallet, actualAmount, capped: actualAmount < amount };
     });
   });
+
+  await invalidateUserCache(userId, "");
+  return result;
 }
 
 export async function withdrawFromBank(walletId: string, userId: string, amount: number) {
   if (amount <= 0) throw new Error("Amount must be greater than 0.");
 
-  return runWithRetry(async (tx: PrismaClient) => {
+  const result = await runWithRetry(async (tx: PrismaClient) => {
     return tx.$transaction(async (trx) => {
       const wallet = await trx.wallet.findUnique({ where: { id: walletId } });
       if (!wallet) throw new Error("Wallet not found.");
@@ -171,6 +175,9 @@ export async function withdrawFromBank(walletId: string, userId: string, amount:
       return { bank: updatedBank, wallet: updatedWallet, actualAmount, capped: actualAmount < amount };
     });
   });
+
+  await invalidateUserCache(userId, "");
+  return result;
 }
 
 export async function getBankByUserId(userId: string) {
@@ -208,5 +215,6 @@ export async function removeMoneyFromBank(userId: string, amount: number) {
     });
   });
 
+  await invalidateUserCache(userId, "");
   return result.balance;
 }

@@ -3,6 +3,14 @@ import { Property, OwnedProperty } from "@prisma/client";
 import { ZOO_PROPERTY_DEFS, ZOO_CAPACITY, RARITY_INCOME, getAnimal } from "../utils/animalCatalog";
 import { isTester } from "../utils/developerAccess";
 import { GLOBAL_CATALOG_GUILD_ID } from "../utils/globalCatalog";
+import { redisService } from "./redisService";
+
+const ALL_PROPERTIES_CACHE_KEY = "properties:all_public";
+const ALL_PROPERTIES_CACHE_TTL = 20; // seconds — price only moves on buy/sell, which invalidate explicitly
+
+function invalidatePropertiesCache() {
+  return redisService.del(ALL_PROPERTIES_CACHE_KEY);
+}
 
 // --- Regular property catalog ---
 export const REGULAR_PROPERTY_CATALOG: {
@@ -21,10 +29,15 @@ export const ZOO_KEYS = new Set(Object.keys(ZOO_CAPACITY));
 export class PropertyService {
 
   static async getAllProperties(_guildId?: string): Promise<Property[]> {
-    return prisma.property.findMany({
+    const cached = await redisService.get<Property[]>(ALL_PROPERTIES_CACHE_KEY);
+    if (cached) return cached;
+
+    const properties = await prisma.property.findMany({
       where: { isPublic: true },
       orderBy: { price: "asc" },
     });
+    await redisService.set(ALL_PROPERTIES_CACHE_KEY, properties, ALL_PROPERTIES_CACHE_TTL);
+    return properties;
   }
 
   static async getPropertyByKey(_guildId: string, key: string): Promise<Property | null> {
@@ -58,7 +71,7 @@ export class PropertyService {
       return { success: false, message: `Insufficient funds. You need ${property.price.toLocaleString()} coins.` };
     }
 
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       await tx.wallet.update({ where: { userId: discordId }, data: { balance: { decrement: property.price } } });
       await tx.ownedProperty.create({
         data: { userId: discordId, propertyId: property.id, purchasedPrice: property.price, lastCollected: new Date() },
@@ -68,6 +81,8 @@ export class PropertyService {
       await tx.property.update({ where: { id: property.id }, data: { price: newPrice } });
       return { success: true, message: `Successfully purchased **${property.name}** for ${property.price.toLocaleString()} coins!` };
     });
+    await invalidatePropertiesCache();
+    return result;
   }
 
   static async sellPropertySystem(discordId: string, guildId: string, key: string): Promise<{ success: boolean; message: string }> {
@@ -81,7 +96,7 @@ export class PropertyService {
 
     const sellPrice = Math.floor(property.price * 0.75);
 
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       await tx.ownedProperty.delete({ where: { id: owned.id } });
       await tx.wallet.update({ where: { userId: discordId }, data: { balance: { increment: sellPrice } } });
       const updated = await tx.property.update({ where: { id: property.id }, data: { totalSold: { decrement: 1 } } });
@@ -89,13 +104,15 @@ export class PropertyService {
       await tx.property.update({ where: { id: property.id }, data: { price: newPrice } });
       return { success: true, message: `Sold **${property.name}** for ${sellPrice.toLocaleString()} coins.` };
     });
+    await invalidatePropertiesCache();
+    return result;
   }
 
   // Admin (legacy — catalog is code-owned in V2)
   static async createProperty(_guildId: string, key: string, name: string, price: number, income: number): Promise<Property> {
     const existing = await this.getPropertyByKey(_guildId, key);
     if (existing) throw new Error(`Property with key '${key}' already exists.`);
-    return prisma.property.create({
+    const created = await prisma.property.create({
       data: {
         guildId: GLOBAL_CATALOG_GUILD_ID,
         key: key.toLowerCase(),
@@ -107,14 +124,20 @@ export class PropertyService {
         totalSold: 0,
       },
     });
+    await invalidatePropertiesCache();
+    return created;
   }
 
   static async deleteProperty(_guildId: string, key: string) {
-    return prisma.property.delete({ where: { key } });
+    const deleted = await prisma.property.delete({ where: { key } });
+    await invalidatePropertiesCache();
+    return deleted;
   }
 
   static async editProperty(_guildId: string, key: string, data: Partial<Property>) {
-    return prisma.property.update({ where: { key }, data });
+    const updated = await prisma.property.update({ where: { key }, data });
+    await invalidatePropertiesCache();
+    return updated;
   }
 }
 
