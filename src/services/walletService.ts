@@ -12,7 +12,7 @@ function isTransientWriteConflict(error: any) {
     || message.includes("p2034");
 }
 
-async function withTransactionRetry<T>(operation: () => Promise<T>, retries = 4): Promise<T> {
+export async function withTransactionRetry<T>(operation: () => Promise<T>, retries = 4): Promise<T> {
   let lastError: any;
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
