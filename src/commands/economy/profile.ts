@@ -432,7 +432,7 @@ export async function getProfilePayload(
       body:
         `**Job:** ${jobDisplay}\n` +
         `**Salary:** ${salaryDisplay}/shift\n` +
-        `**Shifts:** ${userDb.shiftsWorked}\n` +
+        `**Lifetime Shifts:** ${userDb.shiftsWorked}\n` +
         `**Job Stress:** ${userDb.jobStress}/100\n` +
         `**Rifle:** ${rifleDisplay}\n` +
         `**Properties:** ${propertyCount} (${propertyDisplay})\n` +

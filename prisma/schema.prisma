@@ -68,15 +68,11 @@ model User {
   degrees          UserDegree[]
   
   // Employment
-  // Employment
   jobId       String?   // Static ID from jobService (e.g., "tech_intern")
-  jobXp       Int       @default(0)
   jobStress   Int       @default(0)
   jobStreak   Int       @default(0)
   jobFailStreak Int     @default(0) // Consecutive shift failures — demote after 3
-  lastJobShift      DateTime?
-  lastJobPromotion  DateTime?
-  shiftsWorked Int      @default(0)
+  shiftsWorked Int      @default(0) // Lifetime successful shifts — never reset, gates job requirements
 
   lastShift   DateTime?
 
