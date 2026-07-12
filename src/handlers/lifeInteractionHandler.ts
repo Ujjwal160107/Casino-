@@ -476,7 +476,21 @@ async function handleButton(interaction: ButtonInteraction) {
 
         // Grant reputation AFTER DB write — only on success/pager
         if (success || pagerSaved) {
-            const eventRepResult = await _addEventRep(userData.discordId, job.sector, 8, "event_success");
+            // Focus Headphones: doubles rep gain for the next 3 successful shifts
+            let eventRepGain = 8;
+            const focusEventData = await redisService.get<{ shiftsLeft: number; repMult: number }>(`focus_headphones:${user.id}`);
+            if (focusEventData && focusEventData.shiftsLeft > 0 && focusEventData.repMult) {
+                eventRepGain = 8 * focusEventData.repMult;
+                const focusRemaining = focusEventData.shiftsLeft - 1;
+                if (focusRemaining <= 0) {
+                    await redisService.del(`focus_headphones:${user.id}`);
+                } else {
+                    const focusTtl = await redisService.getInstance().ttl(`focus_headphones:${user.id}`);
+                    if (focusTtl > 0) await redisService.set(`focus_headphones:${user.id}`, { ...focusEventData, shiftsLeft: focusRemaining }, focusTtl);
+                }
+                eventNotes.push(`Focus Headphones: doubled rep gain (${focusRemaining} shifts left)`);
+            }
+            const eventRepResult = await _addEventRep(userData.discordId, job.sector, eventRepGain, "event_success");
             if (eventRepResult.tierChanged) {
                 eventNotes.push(`Reputation: **${eventRepResult.tier.name}** tier reached! (${eventRepResult.after} rep)`);
             } else {
@@ -987,7 +1001,21 @@ async function handleButton(interaction: ButtonInteraction) {
             void enqueueWorkReminder(user.id);
 
             // Grant reputation AFTER DB write — takes effect on the NEXT shift
-            const shiftRepResult = await _addShiftRep(user.id, job.sector, 5, "shift_success");
+            // Focus Headphones: doubles rep gain for the next 3 successful shifts
+            let shiftRepGain = 5;
+            const focusRepData = await redisService.get<{ shiftsLeft: number; repMult: number }>(`focus_headphones:${user.id}`);
+            if (focusRepData && focusRepData.shiftsLeft > 0 && focusRepData.repMult) {
+                shiftRepGain = 5 * focusRepData.repMult;
+                const focusRemaining = focusRepData.shiftsLeft - 1;
+                if (focusRemaining <= 0) {
+                    await redisService.del(`focus_headphones:${user.id}`);
+                } else {
+                    const focusTtl = await redisService.getInstance().ttl(`focus_headphones:${user.id}`);
+                    if (focusTtl > 0) await redisService.set(`focus_headphones:${user.id}`, { ...focusRepData, shiftsLeft: focusRemaining }, focusTtl);
+                }
+                jobEffectNotes.push(`Focus Headphones: doubled rep gain (${focusRemaining} shifts left)`);
+            }
+            const shiftRepResult = await _addShiftRep(user.id, job.sector, shiftRepGain, "shift_success");
             if (shiftRepResult.tierChanged) {
                 jobEffectNotes.push(`Reputation: **${shiftRepResult.tier.name}** tier reached! (${shiftRepResult.after} rep)`);
             } else {
