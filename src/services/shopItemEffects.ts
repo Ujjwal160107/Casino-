@@ -4,7 +4,7 @@ import { redisService } from "./redisService";
 import { JOB_SHOP_CATALOG } from "../utils/shopCatalog";
 import { clearCooldown, getCooldownExpiry } from "../utils/cooldown";
 import { clearLastCasinoCooldown, GAME_DISPLAY_NAMES } from "./casinoCooldownService";
-import { addBalance, removeBalance } from "./walletService";
+import { addBalance } from "./walletService";
 import { invalidateUserCache } from "./userService";
 import { Mascot } from "../config/branding";
 import {
@@ -595,6 +595,9 @@ async function handleDemonicHarp(
 }
 
 async function handlePandoraBox(discordId: string, guildId: string): Promise<ShopItemUseResult> {
+  const onCooldown = await checkItemCooldown("pandora_box", discordId);
+  if (onCooldown) return onCooldown;
+
   const roll = Math.random();
   const user = await prisma.user.findUnique({ where: { discordId }, include: { wallet: true } }) as any;
 
@@ -604,6 +607,7 @@ async function handlePandoraBox(discordId: string, guildId: string): Promise<Sho
     // Money reward
     const reward = randomInt(300_000, 1_500_000);
     const result = await addBalance(discordId, discordId, reward, "pandora_box", { outcome: "reward" }, true);
+    await setItemCooldown("pandora_box", discordId);
     return {
       success: true,
       message: `**Pandora Box — Fortune!**\n\nA cascade of coins spills out!\n${Mascot.Emotes.Currency} **+${result.appliedAmount.toLocaleString("en-US")}** added to your wallet!`,
@@ -612,6 +616,7 @@ async function handlePandoraBox(discordId: string, guildId: string): Promise<Sho
     // Luck boost
     await upsertLuckModifier(discordId, 15, "pandora_box", 2 * 3600 * 1000);
     const luck = await getCurrentLuck(discordId);
+    await setItemCooldown("pandora_box", discordId);
     return {
       success: true,
       message: `**Pandora Box — Blessing!**\n\nA golden light washes over you.\nYour Luck is now **${luck}/100** (+15 for 2 hours).`,
@@ -632,6 +637,7 @@ async function handlePandoraBox(discordId: string, guildId: string): Promise<Sho
         create: { userId: discordId, shopItemId: shopItem.id, amount: 1 },
         update: { amount: { increment: 1 } },
       });
+      await setItemCooldown("pandora_box", discordId);
       return {
         success: true,
         message: `**Pandora Box — Rare Find!**\n\nSomething useful tumbled out of the box.\nYou received: **${shopItem.name}**!`,
@@ -640,6 +646,7 @@ async function handlePandoraBox(discordId: string, guildId: string): Promise<Sho
     // Fallback if item not found in DB
     const reward = 150_000;
     await addBalance(discordId, discordId, reward, "pandora_box", { outcome: "rare_fallback" }, true);
+    await setItemCooldown("pandora_box", discordId);
     return {
       success: true,
       message: `**Pandora Box — Rare Find!**\n\nSomething shiny fell out.\n${Mascot.Emotes.Currency} **+${reward.toLocaleString("en-US")}** added to your wallet!`,
@@ -648,6 +655,7 @@ async function handlePandoraBox(discordId: string, guildId: string): Promise<Sho
     // Luck curse
     await upsertLuckModifier(discordId, -15, "pandora_box", 2 * 3600 * 1000);
     const luck = await getCurrentLuck(discordId);
+    await setItemCooldown("pandora_box", discordId);
     return {
       success: true,
       message: `**Pandora Box — Curse!**\n\nA dark shadow creeps over you.\nYour Luck is now **${luck}/100** (-15 for 2 hours).`,
@@ -657,14 +665,15 @@ async function handlePandoraBox(discordId: string, guildId: string): Promise<Sho
     const baseDamage = randomInt(200_000, 900_000);
     const crownMult = await checkCrownOfGreed(discordId);
     const damage = Math.floor(baseDamage * crownMult);
-    const result = await removeBalance(discordId, damage, "pandora_box", { outcome: "curse_damage" });
+    const collected = await applyItemFine(discordId, damage, "pandora_box");
 
     const { recordPotentialSoulLedgerLoss } = await import("./shopBuffs");
-    await recordPotentialSoulLedgerLoss(discordId, result.removedAmount);
+    await recordPotentialSoulLedgerLoss(discordId, collected);
 
+    await setItemCooldown("pandora_box", discordId);
     return {
       success: true,
-      message: `**Pandora Box — Disaster!**\n\nSomething terrible was released.\n${Mascot.Emotes.Currency} **-${result.removedAmount.toLocaleString("en-US")}** drained from your wallet.`,
+      message: `**Pandora Box — Disaster!**\n\nSomething terrible was released.\n${Mascot.Emotes.Currency} **-${collected.toLocaleString("en-US")}** drained (from your wallet, then bank).`,
     };
   }
 }
