@@ -5,6 +5,7 @@ import { processWeeklyCardSettlement } from "./services/creditCardService";
 import { removeTemporaryRoles } from "./services/effectService";
 import { marketTick, initGlobalMarket } from "./services/stockService";
 import { decayAllHeat, runRaidScan } from "./services/taxService";
+import { processDueReminders } from "./services/cooldownReminderService";
 import prisma from "./utils/prisma";
 
 export function initScheduler(client: Client) {
@@ -27,7 +28,7 @@ export function initScheduler(client: Client) {
       console.log(`Processed ${processedCount} matured investments.`);
 
       await removeTemporaryRoles(client);
-      await processVoteReminders(client).catch((err) => console.error("Vote Reminder error:", err));
+      await processDueReminders(client).catch((err) => console.error("Cooldown reminder error:", err));
     } catch (err) {
       console.error("Scheduler error:", err);
     }
@@ -69,36 +70,3 @@ export function initScheduler(client: Client) {
   console.log("Banking scheduler initialized.");
 }
 
-async function processVoteReminders(client: Client) {
-  const threshold = new Date(Date.now() - 12 * 60 * 60 * 1000);
-
-  const potentialReminders = await prisma.user.findMany({
-    where: {
-      lastVote: { lte: threshold },
-      voteReminder: true
-    },
-    take: 100
-  });
-
-  for (const user of potentialReminders) {
-    if (user.lastVoteReminder && user.lastVote && user.lastVoteReminder > user.lastVote) {
-      continue;
-    }
-
-    try {
-      const discordUser = await client.users.fetch(user.discordId).catch(() => null);
-      if (!discordUser) continue;
-
-      await discordUser.send({
-        content: `Vote Reminder!\nIt's been 12 hours since your last vote for Fortuna. You can now vote again to earn rewards!\n\nUse \`!vote\` in the server.`
-      }).catch(() => null);
-
-      await prisma.user.update({
-        where: { discordId: user.discordId },
-        data: { lastVoteReminder: new Date() }
-      });
-    } catch (err) {
-      console.error(`Failed to verify/remind user ${user.discordId}`, err);
-    }
-  }
-}

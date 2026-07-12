@@ -5,6 +5,7 @@ import { GLOBAL_CURRENCY_EMOJI, Mascot } from "../../config/branding";
 import { ensureUserAndWallet } from "../../services/walletService";
 import fetch from "node-fetch";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { enqueueReminder, setReminderTypeEnabled, getReminderPrefs } from "../../services/cooldownReminderService";
 
 const TOPGG_BOT_ID = "1371816936857669702";
 const VOTE_LINK = `https://top.gg/bot/${TOPGG_BOT_ID}?s=0825a328ae527`;
@@ -23,13 +24,11 @@ export async function handleVote(message: Message, args: string[]) {
 
     // Handle Reminder Toggle
     if (args[0]?.toLowerCase() === "reminder" || args[0]?.toLowerCase() === "remind") {
-        const newState = !user.voteReminder;
-        await prisma.user.update({
-            where: { discordId: user.discordId },
-            data: { voteReminder: newState }
-        });
+        const prefs = await getReminderPrefs(user.discordId);
+        const currentlyOn = prefs.remindersEnabled && !prefs.disabledReminders.includes("vote");
+        const newState = await setReminderTypeEnabled(user.discordId, "vote", !currentlyOn);
         return message.reply({
-            embeds: [errorEmbed(message.author, "Reminder Settings", `Vote reminders are now **${newState ? "ENABLED" : "DISABLED"}**.`)]
+            embeds: [errorEmbed(message.author, "Reminder Settings", `Vote reminders are now **${newState ? "ENABLED" : "DISABLED"}**. Manage all reminders with \`${prefix}settings\`.`)]
         });
     }
 
@@ -89,6 +88,7 @@ export async function handleVote(message: Message, args: string[]) {
             where: { discordId: user.discordId },
             data: { lastVote: now }
         });
+        void enqueueReminder(user.discordId, "vote", new Date(now.getTime() + cooldown));
 
         await prisma.transaction.create({
             data: {
