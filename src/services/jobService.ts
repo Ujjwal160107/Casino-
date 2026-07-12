@@ -28,7 +28,6 @@ export interface WorkEvent {
         successMsg: string;
         failMsg: string;
         outcome: {
-            xp?: number;
             money?: number; // Multiplier of base pay
             stress: number;
         };
