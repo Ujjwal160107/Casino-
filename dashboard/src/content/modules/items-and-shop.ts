@@ -8,7 +8,7 @@ const itemsAndShop: ModuleDoc = {
   forBeginners: {
     what: "The shop sells tools that change the rules: buffs that fatten payouts, shields that block robbers and taxes, gear your job literally requires, and chaos items that gamble on themselves. One catalog is shared across every server, stock is unlimited, and everything here lists the real effect — not the flavor text.",
     firstCommands: ["!shop", "!inventory", "!use lucky coin"],
-    tip: "!shop buy card <item> charges your Fortuna Card instead of your wallet — but Mystery Box, Treasure Map, and Pandora Box are cash-only by design.",
+    tip: "!shop buy card <item> charges your Fortuna Card instead of your wallet — but Mystery Box, Treasure Map, Pandora Box, Loaded Dice of Ruin, and Devil Contract are cash-only by design.",
   },
   sections: [
     {
@@ -36,10 +36,10 @@ const itemsAndShop: ModuleDoc = {
           ["Energy Drink", "125,000", "Work cooldown reduced by 1 hour"],
           ["Padlock", "175,000", "Blocks one robbery against you (24h shelf life, breaks on use)"],
           ["Mystery Box", "250,000", "Instant roll: 30% → 75,000 · 50% → 100,000 · 20% → 500,000 (avg ~172k)"],
-          ["Treasure Map", "400,000", "Instant roll: 30% → 150k · 30% → 400k · 22% → 750k · 13% → 1.2M · 5% → 2M (avg ~586k)"],
+          ["Treasure Map", "400,000", "Daily gamble: 25% treasure (60% → 1.5M · 30% → 2.2M · 10% → 4M) / 75% dead end: 150k–300k fine (wallet, then bank) + 25% chance of −15 Luck for 1h"],
         ],
       },
-      note: "Do the math before you gamble on crates: Treasure Map averages ~586k on a 400k buy (net positive); Mystery Box averages ~172k on a 250k buy (net negative). Both are blocked from credit-card purchase.",
+      note: "Do the math before you gamble on crates: every crate is net-negative on average — the house always keeps an edge. All gamble crates are cash-only and limited to one use per 24 hours.",
     },
     {
       heading: "General store, page 2: the dark shelf",
@@ -50,14 +50,14 @@ const itemsAndShop: ModuleDoc = {
         title: "General store — power items",
         columns: ["Item", "Price", "Real effect"],
         rows: [
-          ["Loaded Dice of Ruin", "350,000", "45% win 500k–1.2M / 55% lose 150k–600k"],
+          ["Loaded Dice of Ruin", "350,000", "Daily: 45% win 700k–1.6M / 55% lose 150k–600k (collected from wallet, then bank)"],
           ["Celestial Harp", "450,000", "+25 Luck for 6 hours"],
           ["Demonic Harp", "600,000", "Target: −25 Luck for 6h + easier to rob (+5% success, +5% loot against them)"],
-          ["Pandora Box", "750,000", "Random chaos: blessing (+15 Luck 2h) or curse (−15 Luck 2h), among other rolls"],
+          ["Pandora Box", "750,000", "Daily chaos roll: 25% money 300k–1.5M · 20% +15 Luck 2h · 20% rare item · 20% −15 Luck 2h · 15% lose 200k–900k (wallet, then bank)"],
           ["Eclipse Mask", "850,000", "Next rob: +12% success, +15% loot — but a failed rob adds a 300k–900k backlash"],
           ["Mirror of Fate", "900,000", "Reflects the next targeted curse back at its caster (24h, one trigger)"],
           ["Crown of Greed", "1,000,000", "For 1 hour: all income +25% AND all losses +25% (win profits up, losing stakes up)"],
-          ["Devil Contract", "1,250,000", "Instant 1.8M–3M payout; your next 3 income claims pay −20%"],
+          ["Devil Contract", "1,250,000", "Daily: 30% jackpot 2.5M–3.5M / 70% short-changed 300k–700k; your next 3 income claims pay −20% either way"],
           ["Soul Ledger", "1,500,000", "Watches your next loss ≥ 300,000; 24h later, resolve it: 50% refund of 1.5× the loss, 50% nothing"],
         ],
       },
@@ -134,14 +134,14 @@ const itemsAndShop: ModuleDoc = {
       body: [
         "Buy timing, not inventory. Almost every buff is a short window — Lucky Coin lasts 5 minutes, Counterfeit Kit 2 hours, Crown of Greed 1 hour. Buy immediately before the action they boost, never in advance.",
         "Learn the stacking rule: income multipliers compound. Counterfeit Kit (×1.25) + Crown of Greed (×1.25) on a !monthly claim turns 4,000,000 into ~6,250,000 before tax — the two cost 1,050,000 combined. That's the single best item play in the game, once per month.",
-        "Respect the two-way items. Crown of Greed inflates your casino losses and crime fines by the same 25% it adds to wins. Eclipse Mask's backlash can cost more than three successful robs earn. Devil Contract's 3-claim income penalty stings hardest right before a weekly/monthly claim.",
+        "Respect the two-way items. Crown of Greed inflates your casino losses and crime fines by the same 25% it adds to wins. Eclipse Mask's backlash can cost more than three successful robs earn. Devil Contract's 3-claim income penalty applies even when the devil short-changes you — never sign right before a weekly/monthly claim.",
         "Padlock is the cheapest peace of mind in Fortuna — 175,000 to void a robbery that could take 250,000. Re-buy it whenever it breaks and your wallet is worth robbing.",
       ],
     },
   ],
   commandIds: ["shop", "inventory", "use", "equip", "iteminfo", "market"],
   proTips: [
-    "Treasure Map averages ~586,000 on a 400,000 buy — the only crate that's net-positive on average. Skip Mystery Box; it averages under its own price.",
+    "No crate is net-positive anymore — Treasure Map is a 25% shot at 1.5M+ with a real fine on the other 75%. Gamble for the thrill, not the math.",
     "Items are never consumed on a failed or pointless use — you can't waste a Bandage with no cooldown or a Repair Coupon with nothing broken.",
     "Soul Ledger turns one catastrophic casino loss into a coin flip for a 1.5× refund. Activate it before a max-bet blackjack session, not after.",
     "Quick Sell pays 50% at best — anything valuable deserves a Black Market listing at 90%+ of shop price instead.",
