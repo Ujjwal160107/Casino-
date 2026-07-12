@@ -179,7 +179,7 @@ async function runInterview(reply: Message, source: Message | ButtonInteraction,
     if (passed) {
         await prisma.user.update({
             where: { discordId },
-            data: { jobId: job.id, jobXp: 0, shiftsWorked: 0, lastShift: null }
+            data: { jobId: job.id, lastShift: null }
         });
     }
 
