@@ -18,6 +18,7 @@ import {
 } from "../utils/animalCatalog";
 import { isTester } from "../utils/developerAccess";
 import { getCraftEffect, unlockCommonRecipesForAnimal } from "./huntCraftService";
+import { enqueueReminder } from "./cooldownReminderService";
 
 export interface CaughtAnimalWithDef {
   id: string;
@@ -185,6 +186,7 @@ export async function hunt(
 
   if (!isTester(discordId)) {
     await redis.set(huntKey, "1", "EX", tier.cooldownSeconds);
+    void enqueueReminder(discordId, "hunt", new Date(Date.now() + tier.cooldownSeconds * 1000));
   }
   if (rareBoostRow) {
     await redisService.del(`crafted_hunt_rare_boost:${discordId}`);

@@ -70,6 +70,28 @@ export async function enqueueReminder(discordId: string, type: ReminderType, due
   }
 }
 
+// Mirrors the shift gate in lifeInteractionHandler: flat base minus
+// COOLDOWN_REDUCTION active effects, floored at zero.
+const WORK_BASE_COOLDOWN_SECONDS = 3600;
+
+/** Enqueue a work reminder using the same cooldown math as the shift gate. */
+export async function enqueueWorkReminder(discordId: string): Promise<void> {
+  try {
+    const effects = await prisma.activeEffect.findMany({
+      where: {
+        userId: discordId,
+        effectType: "COOLDOWN_REDUCTION",
+        OR: [{ expiresAt: { gt: new Date() } }, { expiresAt: null }],
+      },
+    });
+    const reduction = effects.reduce((sum, eff) => sum + (eff.value || 0), 0);
+    const seconds = Math.max(0, WORK_BASE_COOLDOWN_SECONDS - reduction);
+    await enqueueReminder(discordId, "work", new Date(Date.now() + seconds * 1000));
+  } catch (err) {
+    console.error(`enqueueWorkReminder failed for ${discordId}:`, err);
+  }
+}
+
 export async function cancelReminder(discordId: string, type: ReminderType): Promise<void> {
   await prisma.cooldownReminder.deleteMany({ where: { discordId, type } }).catch(() => {});
 }
