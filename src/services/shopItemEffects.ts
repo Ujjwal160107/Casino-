@@ -258,6 +258,9 @@ async function handleKomodoVenomFlask(discordId: string, targetId?: string, memb
 }
 
 async function handleMysteryBox(discordId: string, guildId: string): Promise<ShopItemUseResult> {
+  const onCooldown = await checkItemCooldown("mystery_box", discordId);
+  if (onCooldown) return onCooldown;
+
   const roll = Math.random();
   let reward: number;
   let tier: string;
@@ -296,6 +299,8 @@ async function handleMysteryBox(discordId: string, guildId: string): Promise<Sho
       isEarned: true,
     },
   });
+
+  await setItemCooldown("mystery_box", discordId);
 
   return {
     success: true,
