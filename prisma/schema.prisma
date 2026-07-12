@@ -40,6 +40,9 @@ model User {
     lastVote    DateTime?
     lastVoteReminder DateTime?
     voteReminder Boolean @default(true)
+    remindersEnabled    Boolean  @default(true)
+    disabledReminders   String[] @default([])
+    reminderDmFailCount Int      @default(0)
     globalAnnouncementFormFilled Boolean? @default(false)
     globalAnnouncementReminderDate DateTime?
     globalAnnouncementReminderCount Int? @default(0)
@@ -711,3 +714,14 @@ model AskBlock {
   @@index([blockedId])
 }
 
+
+model CooldownReminder {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  discordId String
+  type      String
+  dueAt     DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([discordId, type])
+  @@index([dueAt])
+}
