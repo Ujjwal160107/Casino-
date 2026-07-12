@@ -218,7 +218,7 @@ async function handleButton(interaction: ButtonInteraction) {
         const shockedUrl = getEmoteUrl(Mascot.Emotes.Shocked);
         const embed = new EmbedBuilder()
             .setTitle(`${Mascot.Emotes.Alert} Confirm Resignation`)
-            .setDescription("Are you sure you want to resign from your job?\n\n**You will lose:**\n- Your current job title\n- Job XP progress\n- Current shift streak")
+            .setDescription("Are you sure you want to resign from your job?\n\n**You will lose:**\n- Your current job title\n- Current shift streak\n\nYour **lifetime shift count is preserved** and still counts toward future job requirements.")
             .setColor("#E74C3C")
             .setFooter({ text: "This action cannot be undone." });
 
@@ -262,7 +262,7 @@ async function handleButton(interaction: ButtonInteraction) {
             data: {
                 jobId: nextJob.id,
                 jobFailStreak: 0,
-                // keep jobXp, shiftsWorked, jobStress
+                // keep shiftsWorked, jobStress
             }
         });
 
@@ -295,12 +295,12 @@ async function handleButton(interaction: ButtonInteraction) {
         try {
             await prisma.user.update({
                 where: { discordId: user.id },
-                data: { jobId: null, jobXp: 0, shiftsWorked: 0, lastShift: null }
+                data: { jobId: null, lastShift: null }
             });
 
             const embed = new EmbedBuilder()
                 .setTitle(`${Mascot.Emotes.Shocked} Resignation Processed`)
-                .setDescription("**You have resigned.**\n\nYou are now unemployed. Your career progress has been reset.")
+                .setDescription("**You have resigned.**\n\nYou are now unemployed. Your lifetime shift count is preserved — it still counts toward future job requirements.")
                 .setColor("#95A5A6");
 
             await safeEditReply(interaction, { embeds: [embed], components: [] });
@@ -380,11 +380,10 @@ async function handleButton(interaction: ButtonInteraction) {
         let color = success ? "#2ECC71" : pagerSaved ? "#F1C40F" : "#E74C3C";
 
         // Outcome
-        const { xp = 0, money = 0, stress = 0 } = choice.outcome;
+        const { money = 0, stress = 0 } = choice.outcome;
 
         // Apply Outcome
         let earnings = 0;
-        let xpGain = 0;
         let stressGain = 0;
 
         const eventNotes: string[] = [];
@@ -409,28 +408,12 @@ async function handleButton(interaction: ButtonInteraction) {
                 eventNotes.push("⚠️ Wallet Limit Reached! Earned 0 coins.");
             }
 
-            // Focus Headphones XP boost on event success
-            let baseXp = xp || 0;
-            const focusData = await redisService.get<{ shiftsLeft: number; xpMult: number }>(`focus_headphones:${user.id}`);
-            if (focusData && focusData.shiftsLeft > 0 && baseXp > 0) {
-                baseXp = Math.floor(baseXp * focusData.xpMult);
-                const remaining = focusData.shiftsLeft - 1;
-                if (remaining <= 0) {
-                    await redisService.del(`focus_headphones:${user.id}`);
-                } else {
-                    const ttl = await redisService.getInstance().ttl(`focus_headphones:${user.id}`);
-                    if (ttl > 0) await redisService.set(`focus_headphones:${user.id}`, { ...focusData, shiftsLeft: remaining }, ttl);
-                }
-                eventNotes.push(`Focus Headphones: +${baseXp} XP (${remaining} shifts left)`);
-            }
-            xpGain = baseXp;
             stressGain = pagerSaved ? 2 : (stress || 0);
         } else {
             earnings = 0;
-            xpGain = pagerSaved ? 2 : -5;
             stressGain = pagerSaved ? 2 : ((stress || 10) + 15);
-            if (pagerSaved) eventNotes.push("Critical failure softened: no pay, +2 XP, +2 Stress");
-            else eventNotes.push(`Penalty: No Pay, -5 XP, +${stressGain} Stress`);
+            if (pagerSaved) eventNotes.push("Critical failure softened: no pay, +2 Stress");
+            else eventNotes.push(`Penalty: No Pay, +${stressGain} Stress`);
         }
 
         // Gear damage on event failure (3-8 base wear) and overtime-risk events.
@@ -478,14 +461,13 @@ async function handleButton(interaction: ButtonInteraction) {
             }
         }
 
-        // Apply to DB
+        // Apply to DB — lifetime shift counter only moves on success/pager save
         await prisma.user.update({
             where: { discordId: userData.discordId },
             data: {
                 wallet: { update: { balance: { increment: earnings } } },
-                jobXp: { increment: xpGain },
                 jobStress: Math.min(100, (userData.jobStress || 0) + stressGain), // Cap at 100
-                shiftsWorked: { increment: 1 },
+                shiftsWorked: success || pagerSaved ? { increment: 1 } : undefined,
                 lastShift: new Date(),
                 jobFailStreak: success || pagerSaved ? 0 : undefined // Reset fail streak on success or pager save
             }
@@ -506,12 +488,12 @@ async function handleButton(interaction: ButtonInteraction) {
             msg += `\n${eventNotes.map(n => `- ${n}`).join("\n")}`;
         }
 
-        // XP/Stress Checks
+        // Promotion/Demotion Checks
         let footerText = "";
 
         // Promotion
-        if (xpGain > 0) {
-            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
+        if (success || pagerSaved) {
+            const promoCheck = await checkPromotion({ ...userData, shiftsWorked: (userData.shiftsWorked ?? 0) + 1 }, guild.id);
             if (promoCheck.eligible && promoCheck.nextJob) {
                 // Determine if we show celebration or just footer
                 // Let's just note it for now, implementation plan says Celebration later
@@ -523,7 +505,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
         // Demotion (check on failure — uses 3-strike system)
         let eventDemoField: { name: string; value: string } | null = null;
-        if (xpGain < 0) {
+        if (!success && !pagerSaved) {
             const prevJobTitle = getJob ? getJob(userData.jobId)?.title ?? "Previous Role" : "Previous Role";
             const demoCheck = await checkDemotion(userData);
             if (demoCheck.demoted) {
@@ -538,14 +520,14 @@ async function handleButton(interaction: ButtonInteraction) {
 
         const resEmbed = new EmbedBuilder()
             .setTitle(success ? `${Mascot.Emotes.Success} Event Resolved` : pagerSaved ? `${Mascot.Emotes.Alert} Event Saved` : `${Mascot.Emotes.Fail} Event Failed`)
-            .setDescription(`**${choice.label}**\n${msg}\n\n**Result:**\n${Mascot.Emotes.MoneyBag} ${fmtCurrency(earnings)}\nXP: ${xpGain > 0 ? '+' : ''}${xpGain}\n${Mascot.Emotes.Alert} +${stressGain} Stress`)
+            .setDescription(`**${choice.label}**\n${msg}\n\n**Result:**\n${Mascot.Emotes.MoneyBag} ${fmtCurrency(earnings)}\n${Mascot.Emotes.Alert} +${stressGain} Stress`)
             .setColor(color as any);
 
         const eventRows: ActionRowBuilder<ButtonBuilder>[] = [];
 
-        if (xpGain > 0) {
+        if (success || pagerSaved) {
             // Re-check promotion to get the object
-            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
+            const promoCheck = await checkPromotion({ ...userData, shiftsWorked: (userData.shiftsWorked ?? 0) + 1 }, guild.id);
             if (promoCheck.eligible && promoCheck.nextJob) {
                 resEmbed.addFields({ name: `${Mascot.Emotes.JobPromotion} Promotion Available!`, value: `You are ready for **${promoCheck.nextJob.title}**! Use \`!work\` and click **Promote**.` });
                 resEmbed.setColor("#F1C40F");
@@ -948,21 +930,6 @@ async function handleButton(interaction: ButtonInteraction) {
             // --- Job Store item effects ---
             const jobEffectNotes: string[] = [];
 
-            // Focus Headphones: 2x XP for next N shifts
-            const focusData = await redisService.get<{ shiftsLeft: number; xpMult: number }>(`focus_headphones:${user.id}`);
-            let xpGain = 10;
-            if (focusData && focusData.shiftsLeft > 0) {
-                xpGain = Math.floor(10 * focusData.xpMult);
-                const remaining = focusData.shiftsLeft - 1;
-                if (remaining <= 0) {
-                    await redisService.del(`focus_headphones:${user.id}`);
-                } else {
-                    const ttl = await redisService.getInstance().ttl(`focus_headphones:${user.id}`);
-                    if (ttl > 0) await redisService.set(`focus_headphones:${user.id}`, { ...focusData, shiftsLeft: remaining }, ttl);
-                }
-                jobEffectNotes.push(`Focus Headphones: +${xpGain} XP (${remaining} shifts left)`);
-            }
-
             // Premium Tools Oil flag — consumed only when gear wear is calculated below
             const oilData = await redisService.get<{ shiftsLeft: number }>(`tools_oil:${user.id}`);
 
@@ -1011,7 +978,6 @@ async function handleButton(interaction: ButtonInteraction) {
                 data: {
                     wallet: { update: { balance: { increment: amount } } },
                     shiftsWorked: { increment: 1 },
-                    jobXp: { increment: xpGain },
                     jobStress: { increment: Math.max(0, 5 - repStressReduction) }, // +5 base, reduced by rep tier
                     jobStreak: newStreak,
                     lastShift: new Date(),
@@ -1028,8 +994,8 @@ async function handleButton(interaction: ButtonInteraction) {
                 jobEffectNotes.push(`Reputation: +5 (${shiftRepResult.after} — ${shiftRepResult.tier.name})`);
             }
 
-            // Check Promotion using actual xpGain (may be boosted by Focus Headphones)
-            const promoCheck = await checkPromotion({ ...userData, jobXp: userData.jobXp + xpGain, shiftsWorked: userData.shiftsWorked + 1 }, guild.id);
+            // Check Promotion with the shift just worked counted
+            const promoCheck = await checkPromotion({ ...userData, shiftsWorked: (userData.shiftsWorked ?? 0) + 1 }, guild.id);
 
             // Apply income tax on work shift payout
             const { applyIncomeTax } = await import("../services/taxService");
@@ -1100,7 +1066,7 @@ async function handleButton(interaction: ButtonInteraction) {
             const winEmbed = new EmbedBuilder()
                 .setAuthor({ name: `${user.username}`, iconURL: user.displayAvatarURL() })
                 .setTitle(`${Mascot.Emotes.JobWorking} Shift Complete`)
-                .setDescription(`Great work! You finished your shift as a **${job.title}**.\n\n**Earnings:** ${earningsText}\n\n**XP Gained:** +${xpGain}\n**Stress:** +5`)
+                .setDescription(`Great work! You finished your shift as a **${job.title}**.\n\n**Earnings:** ${earningsText}\n\n**Lifetime Shifts:** ${(userData.shiftsWorked ?? 0) + 1}\n**Stress:** +5`)
                 .setColor("#2ECC71");
 
             if (!walletFull) {
@@ -1171,12 +1137,11 @@ async function handleButton(interaction: ButtonInteraction) {
             }
 
         } else {
-            // FAILED
+            // FAILED — no lifetime shift credit, no XP anymore, just cooldown + stress
             await prisma.user.update({
                 where: { discordId: user.id },
                 data: {
                     lastShift: new Date(), // Trigger cooldown
-                    jobXp: { decrement: 5 }, // -5 XP
                     jobStress: Math.min(100, (userData.jobStress || 0) + 10) // +10 Stress, capped at 100
                 }
             });
@@ -1186,7 +1151,7 @@ async function handleButton(interaction: ButtonInteraction) {
             const prevJobTitleFail = getJob(userData.jobId)?.title ?? "Previous Role";
             const demoCheck = await checkDemotion(userData);
 
-            const desc = `You messed up the task!\n\n**Correct Answer:** ${game.answer}\n\n**Penalty:**\n- No Pay\n- **-5 Job XP**\n- **+10 Stress**\n\nCome back in **${cooldownSeconds > 0 ? formatDuration(cooldownMs) : "a moment"}**.`;
+            const desc = `You messed up the task!\n\n**Correct Answer:** ${game.answer}\n\n**Penalty:**\n- No Pay\n- **+10 Stress**\n- No lifetime shift credit\n\nCome back in **${cooldownSeconds > 0 ? formatDuration(cooldownMs) : "a moment"}**.`;
 
             const failEmbed = new EmbedBuilder()
                 .setAuthor({ name: `${user.username}`, iconURL: user.displayAvatarURL() })

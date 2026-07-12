@@ -150,7 +150,7 @@ export async function handleWork(message: Message) {
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
                 `### Shift Status\n` +
-                `**XP:** ${user.jobXp}  |  **Shifts:** ${user.shiftsWorked}  |  **Streak:** ${user.jobStreak ?? 0}\n` +
+                `**Lifetime Shifts:** ${user.shiftsWorked}  |  **Streak:** ${user.jobStreak ?? 0}\n` +
                 `**Stress:** ${getStressColor(user.jobStress ?? 0)} ${user.jobStress ?? 0}/100` +
                 gearStatusLine +
                 repLine
