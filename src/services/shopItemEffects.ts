@@ -687,8 +687,15 @@ async function handleCrownOfGreed(discordId: string): Promise<ShopItemUseResult>
 }
 
 async function handleDevilContract(discordId: string, guildId: string): Promise<ShopItemUseResult> {
-  const payout = randomInt(1_800_000, 3_000_000);
-  const result = await addBalance(discordId, discordId, payout, "devil_contract", { item: "devil_contract" }, true);
+  const onCooldown = await checkItemCooldown("devil_contract", discordId);
+  if (onCooldown) return onCooldown;
+
+  // 30% jackpot 2.5M-3.5M, 70% the devil collects: 300k-700k (below the
+  // 1.25M price). The -20% next-3-incomes curse applies either way — the
+  // fine print always applies. Pre-curse EV ~= break-even.
+  const jackpot = Math.random() < 0.30;
+  const payout = jackpot ? randomInt(2_500_000, 3_500_000) : randomInt(300_000, 700_000);
+  const result = await addBalance(discordId, discordId, payout, "devil_contract", { item: "devil_contract", jackpot }, true);
 
   // Merge with existing debt instead of stacking duplicates
   const existing = await prisma.activeEffect.findFirst({
@@ -713,9 +720,15 @@ async function handleDevilContract(discordId: string, guildId: string): Promise<
     });
   }
 
+  await setItemCooldown("devil_contract", discordId);
+
+  const flavor = jackpot
+    ? "The devil pays generously... this time."
+    : "The devil smiles. You signed without reading.";
+
   return {
     success: true,
-    message: `**Devil Contract signed!**\n\nAn instant payout of ${Mascot.Emotes.Currency} **${result.appliedAmount.toLocaleString("en-US")}** has been added to your wallet.\n\nThe fine print: your next **3 income events** are reduced by **20%**.`,
+    message: `**Devil Contract signed!**\n\n${flavor}\n${Mascot.Emotes.Currency} **+${result.appliedAmount.toLocaleString("en-US")}** added to your wallet.\n\nThe fine print: your next **3 income events** are reduced by **20%**.`,
   };
 }
 
