@@ -5,6 +5,7 @@ import { JOB_SHOP_CATALOG } from "../utils/shopCatalog";
 import { clearCooldown, getCooldownExpiry } from "../utils/cooldown";
 import { clearLastCasinoCooldown, GAME_DISPLAY_NAMES } from "./casinoCooldownService";
 import { addBalance, removeBalance } from "./walletService";
+import { invalidateUserCache } from "./userService";
 import { Mascot } from "../config/branding";
 import {
   upsertLuckModifier,
@@ -431,6 +432,75 @@ async function handleTreasureMap(discordId: string, _guildId: string): Promise<S
 
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// ---------------------------------------------------------------------------
+// Shared gamble-item helpers
+// ---------------------------------------------------------------------------
+
+const ITEM_COOLDOWN_SECONDS = 86_400; // 24h — one roll of each gamble item per day
+
+/**
+ * Collects a fine from the user: wallet first, overflowing into the bank.
+ * Unlike removeBalance (wallet-capped), this cannot be dodged by banking
+ * cash before using an item. Never drives balances negative — if wallet and
+ * bank combined can't cover it, takes everything available.
+ * Returns the amount actually collected.
+ */
+async function applyItemFine(discordId: string, amount: number, source: string): Promise<number> {
+  if (amount <= 0) return 0;
+
+  const collected = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.findUnique({
+      where: { discordId },
+      include: { wallet: true, bank: true },
+    });
+    if (!user?.wallet) return 0;
+
+    const fromWallet = Math.min(amount, Math.max(0, user.wallet.balance));
+    const fromBank = Math.min(amount - fromWallet, Math.max(0, user.bank?.balance ?? 0));
+    const total = fromWallet + fromBank;
+    if (total <= 0) return 0;
+
+    if (fromWallet > 0) {
+      await tx.wallet.update({ where: { id: user.wallet.id }, data: { balance: { decrement: fromWallet } } });
+    }
+    if (fromBank > 0 && user.bank) {
+      await tx.bank.update({ where: { id: user.bank.id }, data: { balance: { decrement: fromBank } } });
+    }
+    await tx.transaction.create({
+      data: {
+        walletId: user.wallet.id,
+        amount: -total,
+        type: "item_fine",
+        meta: { source, requestedAmount: amount, fromWallet, fromBank },
+        isEarned: false,
+      },
+    });
+    return total;
+  });
+
+  if (collected > 0) await invalidateUserCache(discordId, "");
+  return collected;
+}
+
+/** Returns a blocking result if the item is on cooldown for this user, else null. Testers bypass. */
+async function checkItemCooldown(itemKey: string, discordId: string): Promise<ShopItemUseResult | null> {
+  if (isTester(discordId)) return null;
+  const data = await redisService.get<{ until: number }>(`item_cd:${itemKey}:${discordId}`);
+  if (!data) return null;
+  const expiresAt = Math.floor(data.until / 1000);
+  return {
+    success: false,
+    shouldConsume: false,
+    message: `This item is still recharging! Available <t:${expiresAt}:R>.`,
+  };
+}
+
+/** Starts the per-item cooldown. Call ONLY after the item actually resolved (win or lose). Testers bypass. */
+async function setItemCooldown(itemKey: string, discordId: string, seconds: number = ITEM_COOLDOWN_SECONDS): Promise<void> {
+  if (isTester(discordId)) return;
+  await redisService.set(`item_cd:${itemKey}:${discordId}`, { until: Date.now() + seconds * 1000 }, seconds);
 }
 
 async function handleLoadedDice(discordId: string): Promise<ShopItemUseResult> {
