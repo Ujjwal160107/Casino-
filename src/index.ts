@@ -198,6 +198,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
       return await handleTutorialInteraction(interaction);
     }
 
+    if (id.startsWith("settings:")) {
+      const { handleSettingsInteraction } = require("./commands/general/settings");
+      return await handleSettingsInteraction(interaction);
+    }
+
     if (id.startsWith("ask_")) {
       const { handleAskInteraction } = require("./handlers/askInteractionHandler");
       return await handleAskInteraction(interaction);
