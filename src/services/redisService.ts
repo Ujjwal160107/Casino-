@@ -70,6 +70,21 @@ class RedisService {
             console.error(`Redis del error for key ${key}:`, error);
         }
     }
+
+    /**
+     * Atomically set a key only if it doesn't exist (SET NX EX).
+     * Returns true if the key was set (claim acquired), false if it already existed.
+     * Fails open (returns true) on Redis errors, consistent with get/set above.
+     */
+    public async setIfNotExists(key: string, value: any, ttlSeconds: number): Promise<boolean> {
+        try {
+            const res = await this.getInstance().set(key, JSON.stringify(value), "EX", ttlSeconds, "NX");
+            return res === "OK";
+        } catch (error) {
+            console.error(`Redis setnx error for key ${key}:`, error);
+            return true;
+        }
+    }
 }
 
 export const redisService = new RedisService();

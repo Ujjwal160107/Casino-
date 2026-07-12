@@ -87,7 +87,7 @@ const bankAndCredit: ModuleDoc = {
     {
       heading: "Spending & cash advances",
       body: [
-        "Charge purchases anywhere the shop sells: !shop buy card <item>, tuition on enrollment, and more — all against your limit and the weekly spend cap. Three items are cash-only by design: Mystery Box, Treasure Map, and Pandora Box.",
+        "Charge purchases anywhere the shop sells: !shop buy card <item>, tuition on enrollment, and more — all against your limit and the weekly spend cap. Five items are cash-only by design: Mystery Box, Treasure Map, Pandora Box, Loaded Dice of Ruin, and Devil Contract.",
         "!card withdraw <amount> is a cash advance straight to your wallet, against the same limit but under the (much smaller) weekly withdraw cap. And the iron rule: card money never gambles. Every casino bet comes from your wallet — no card, no bank balance, no exceptions.",
         "Done with a card? !card close requires a zero balance. Closing and reissuing later starts the paperwork fresh.",
       ],

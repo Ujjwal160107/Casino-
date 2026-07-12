@@ -4,7 +4,7 @@ import { redisService } from "./redisService";
 import { JOB_SHOP_CATALOG } from "../utils/shopCatalog";
 import { clearCooldown, getCooldownExpiry } from "../utils/cooldown";
 import { clearLastCasinoCooldown, GAME_DISPLAY_NAMES } from "./casinoCooldownService";
-import { addBalance } from "./walletService";
+import { addBalance, withTransactionRetry } from "./walletService";
 import { invalidateUserCache } from "./userService";
 import { Mascot } from "../config/branding";
 import {
@@ -258,54 +258,29 @@ async function handleKomodoVenomFlask(discordId: string, targetId?: string, memb
 }
 
 async function handleMysteryBox(discordId: string, guildId: string): Promise<ShopItemUseResult> {
-  const onCooldown = await checkItemCooldown("mystery_box", discordId);
-  if (onCooldown) return onCooldown;
+  return withClaimedCooldown("mystery_box", discordId, async () => {
+    const roll = Math.random();
+    let reward: number;
+    let tier: string;
 
-  const roll = Math.random();
-  let reward: number;
-  let tier: string;
+    if (roll < 0.3) {
+      reward = 75_000;
+      tier = "Common";
+    } else if (roll < 0.8) {
+      reward = 100_000;
+      tier = "Uncommon";
+    } else {
+      reward = 500_000;
+      tier = "Rare";
+    }
 
-  if (roll < 0.3) {
-    reward = 75_000;
-    tier = "Common";
-  } else if (roll < 0.8) {
-    reward = 100_000;
-    tier = "Uncommon";
-  } else {
-    reward = 500_000;
-    tier = "Rare";
-  }
+    const result = await addBalance(discordId, discordId, reward, "mystery_box", { tier }, true);
 
-  const user = await prisma.user.findUnique({
-    where: { discordId },
-    include: { wallet: true },
-  }) as any;
-
-  if (!user?.wallet) {
-    return { success: false, message: "Could not find your wallet." };
-  }
-
-  await prisma.wallet.update({
-    where: { id: user.wallet.id },
-    data: { balance: { increment: reward } },
+    return {
+      success: true,
+      message: `**Mystery Box Opened!**\n\nYou found a **${tier}** prize!\n${Mascot.Emotes.Currency} **+${result.appliedAmount.toLocaleString("en-US")}** added to your wallet!`,
+    };
   });
-
-  await prisma.transaction.create({
-    data: {
-      walletId: user.wallet.id,
-      amount: reward,
-      type: "mystery_box",
-      meta: { tier },
-      isEarned: true,
-    },
-  });
-
-  await setItemCooldown("mystery_box", discordId);
-
-  return {
-    success: true,
-    message: `**Mystery Box Opened!**\n\nYou found a **${tier}** prize!\n${Mascot.Emotes.Currency} **+${reward.toLocaleString("en-US")}** added to your wallet!`,
-  };
 }
 
 async function handleBandage(discordId: string, guildId: string): Promise<ShopItemUseResult> {
@@ -380,53 +355,54 @@ async function handleTaxShield(discordId: string, guildId: string): Promise<Shop
 }
 
 async function handleTreasureMap(discordId: string, _guildId: string): Promise<ShopItemUseResult> {
-  const onCooldown = await checkItemCooldown("treasure_map", discordId);
-  if (onCooldown) return onCooldown;
+  return withClaimedCooldown("treasure_map", discordId, async () => {
+    // 25% success / 75% failure. Failure fines 150k-300k (wallet then bank)
+    // and has a 25% chance of -15 Luck for 1h. Net EV ~= -79k per use.
+    const success = Math.random() < 0.25;
 
-  // 25% success / 75% failure. Failure fines 150k-300k (wallet then bank)
-  // and has a 25% chance of -15 Luck for 1h. Net EV ~= -79k per use.
-  const success = Math.random() < 0.25;
+    if (success) {
+      const tierRoll = Math.random();
+      let reward: number;
+      let description: string;
+      if (tierRoll < 0.60) {
+        reward = 1_500_000;
+        description = "a pirate's hidden chest packed with jewels";
+      } else if (tierRoll < 0.90) {
+        reward = 2_200_000;
+        description = "an ancient vault sealed with arcane locks";
+      } else {
+        reward = 4_000_000;
+        description = "a legendary dragon's hoard beyond imagination";
+      }
 
-  if (success) {
-    const tierRoll = Math.random();
-    let reward: number;
-    let description: string;
-    if (tierRoll < 0.60) {
-      reward = 1_500_000;
-      description = "a pirate's hidden chest packed with jewels";
-    } else if (tierRoll < 0.90) {
-      reward = 2_200_000;
-      description = "an ancient vault sealed with arcane locks";
-    } else {
-      reward = 4_000_000;
-      description = "a legendary dragon's hoard beyond imagination";
+      const result = await addBalance(discordId, discordId, reward, "treasure_map", { description }, true);
+
+      return {
+        success: true,
+        message: `**Treasure Found!**\n\nYou followed the map and discovered ${description}!\n${Mascot.Emotes.Currency} **+${result.appliedAmount.toLocaleString("en-US")}** added to your wallet!\n\nThe map crumbles to dust. Another can be followed <t:${Math.floor((Date.now() + 86_400_000) / 1000)}:R>.`,
+      };
     }
 
-    const result = await addBalance(discordId, discordId, reward, "treasure_map", { description }, true);
-    await setItemCooldown("treasure_map", discordId);
+    // Failure: fine 150k-300k, 25% chance of a -15 Luck debuff for 1h
+    const baseFine = randomInt(150_000, 300_000);
+    const crownMult = await checkCrownOfGreed(discordId);
+    const fine = Math.floor(baseFine * crownMult);
+    const collected = await applyItemFine(discordId, fine, "treasure_map");
+
+    const { recordPotentialSoulLedgerLoss } = await import("./shopBuffs");
+    await recordPotentialSoulLedgerLoss(discordId, collected);
+
+    let debuffNote = "";
+    if (Math.random() < 0.25) {
+      await upsertLuckModifier(discordId, -15, "treasure_map", 3600 * 1000);
+      debuffNote = "\nThe curse of the false map clings to you: **-15 Luck for 1 hour**.";
+    }
 
     return {
       success: true,
-      message: `**Treasure Found!**\n\nYou followed the map and discovered ${description}!\n${Mascot.Emotes.Currency} **+${result.appliedAmount.toLocaleString("en-US")}** added to your wallet!\n\nThe map crumbles to dust. Another can be followed <t:${Math.floor((Date.now() + 86_400_000) / 1000)}:R>.`,
+      message: `**Dead End!**\n\nThe map led you into an ambush of booby traps.\n${Mascot.Emotes.Currency} **-${collected.toLocaleString("en-US")}** lost covering your escape.${debuffNote}`,
     };
-  }
-
-  // Failure: fine 150k-300k, 25% chance of a -15 Luck debuff for 1h
-  const fine = randomInt(150_000, 300_000);
-  const collected = await applyItemFine(discordId, fine, "treasure_map");
-
-  let debuffNote = "";
-  if (Math.random() < 0.25) {
-    await upsertLuckModifier(discordId, -15, "treasure_map", 3600 * 1000);
-    debuffNote = "\nThe curse of the false map clings to you: **-15 Luck for 1 hour**.";
-  }
-
-  await setItemCooldown("treasure_map", discordId);
-
-  return {
-    success: true,
-    message: `**Dead End!**\n\nThe map led you into an ambush of booby traps.\n${Mascot.Emotes.Currency} **-${collected.toLocaleString("en-US")}** lost covering your escape.${debuffNote}`,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -453,7 +429,7 @@ const ITEM_COOLDOWN_SECONDS = 86_400; // 24h — one roll of each gamble item pe
 async function applyItemFine(discordId: string, amount: number, source: string): Promise<number> {
   if (amount <= 0) return 0;
 
-  const collected = await prisma.$transaction(async (tx) => {
+  const collected = await withTransactionRetry(() => prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({
       where: { discordId },
       include: { wallet: true, bank: true },
@@ -481,18 +457,24 @@ async function applyItemFine(discordId: string, amount: number, source: string):
       },
     });
     return total;
-  });
+  }));
 
   if (collected > 0) await invalidateUserCache(discordId, "");
   return collected;
 }
 
-/** Returns a blocking result if the item is on cooldown for this user, else null. Testers bypass. */
-async function checkItemCooldown(itemKey: string, discordId: string): Promise<ShopItemUseResult | null> {
+/**
+ * Atomically claim the per-item cooldown BEFORE resolving (SET NX), so two
+ * concurrent uses of the same item can never both resolve. Returns a blocking
+ * result if the cooldown is already held. Testers bypass.
+ */
+async function claimItemCooldown(itemKey: string, discordId: string, seconds: number = ITEM_COOLDOWN_SECONDS): Promise<ShopItemUseResult | null> {
   if (isTester(discordId)) return null;
-  const data = await redisService.get<{ until: number }>(`item_cd:${itemKey}:${discordId}`);
-  if (!data) return null;
-  const expiresAt = Math.floor(data.until / 1000);
+  const key = `item_cd:${itemKey}:${discordId}`;
+  const claimed = await redisService.setIfNotExists(key, { until: Date.now() + seconds * 1000 }, seconds);
+  if (claimed) return null;
+  const data = await redisService.get<{ until: number }>(key);
+  const expiresAt = Math.floor((data?.until ?? Date.now() + seconds * 1000) / 1000);
   return {
     success: false,
     shouldConsume: false,
@@ -500,45 +482,60 @@ async function checkItemCooldown(itemKey: string, discordId: string): Promise<Sh
   };
 }
 
-/** Starts the per-item cooldown. Call ONLY after the item actually resolved (win or lose). Testers bypass. */
-async function setItemCooldown(itemKey: string, discordId: string, seconds: number = ITEM_COOLDOWN_SECONDS): Promise<void> {
+async function releaseItemCooldown(itemKey: string, discordId: string): Promise<void> {
   if (isTester(discordId)) return;
-  await redisService.set(`item_cd:${itemKey}:${discordId}`, { until: Date.now() + seconds * 1000 }, seconds);
+  await redisService.del(`item_cd:${itemKey}:${discordId}`);
+}
+
+/**
+ * Claims the cooldown, runs the item's resolution, and releases the claim if
+ * the item did NOT actually resolve (validation failure returns success:false,
+ * or the handler throws). A resolved use — success:true, win OR lose — keeps
+ * the cooldown. This preserves the design rule "a blocked attempt or early
+ * error never costs the player their daily use" while making the claim atomic.
+ */
+async function withClaimedCooldown(itemKey: string, discordId: string, fn: () => Promise<ShopItemUseResult>): Promise<ShopItemUseResult> {
+  const blocked = await claimItemCooldown(itemKey, discordId);
+  if (blocked) return blocked;
+  try {
+    const result = await fn();
+    if (!result.success) await releaseItemCooldown(itemKey, discordId);
+    return result;
+  } catch (err) {
+    await releaseItemCooldown(itemKey, discordId);
+    throw err;
+  }
 }
 
 async function handleLoadedDice(discordId: string): Promise<ShopItemUseResult> {
-  const onCooldown = await checkItemCooldown("loaded_dice_of_ruin", discordId);
-  if (onCooldown) return onCooldown;
+  return withClaimedCooldown("loaded_dice_of_ruin", discordId, async () => {
+    // 45% win 700k-1.6M / 55% lose 150k-600k (wallet then bank). EV ~= -39k.
+    const win = Math.random() < 0.45;
 
-  // 45% win 700k-1.6M / 55% lose 150k-600k (wallet then bank). EV ~= -39k.
-  const win = Math.random() < 0.45;
+    if (win) {
+      const reward = randomInt(700_000, 1_600_000);
+      const result = await addBalance(discordId, discordId, reward, "loaded_dice_win", { item: "loaded_dice_of_ruin" }, true);
+      return {
+        success: true,
+        message: `**Loaded Dice — Win!**\n\nThe dice rolled in your favor.\n${Mascot.Emotes.Currency} **+${result.appliedAmount.toLocaleString("en-US")}** added to your wallet!`,
+      };
+    }
 
-  if (win) {
-    const reward = randomInt(700_000, 1_600_000);
-    const result = await addBalance(discordId, discordId, reward, "loaded_dice_win", { item: "loaded_dice_of_ruin" }, true);
-    await setItemCooldown("loaded_dice_of_ruin", discordId);
+    const baseLoss = randomInt(150_000, 600_000);
+    const crownMult = await checkCrownOfGreed(discordId);
+    const lossAmount = Math.floor(baseLoss * crownMult);
+
+    const collected = await applyItemFine(discordId, lossAmount, "loaded_dice_of_ruin");
+
+    // Record potential soul ledger loss
+    const { recordPotentialSoulLedgerLoss } = await import("./shopBuffs");
+    await recordPotentialSoulLedgerLoss(discordId, collected);
+
     return {
       success: true,
-      message: `**Loaded Dice — Win!**\n\nThe dice rolled in your favor.\n${Mascot.Emotes.Currency} **+${result.appliedAmount.toLocaleString("en-US")}** added to your wallet!`,
+      message: `**Loaded Dice — Loss!**\n\nThe dice betrayed you.\n${Mascot.Emotes.Currency} **-${collected.toLocaleString("en-US")}** lost (collected from your wallet, then bank).`,
     };
-  }
-
-  const baseLoss = randomInt(150_000, 600_000);
-  const crownMult = await checkCrownOfGreed(discordId);
-  const lossAmount = Math.floor(baseLoss * crownMult);
-
-  const collected = await applyItemFine(discordId, lossAmount, "loaded_dice_of_ruin");
-
-  // Record potential soul ledger loss
-  const { recordPotentialSoulLedgerLoss } = await import("./shopBuffs");
-  await recordPotentialSoulLedgerLoss(discordId, collected);
-
-  await setItemCooldown("loaded_dice_of_ruin", discordId);
-
-  return {
-    success: true,
-    message: `**Loaded Dice — Loss!**\n\nThe dice betrayed you.\n${Mascot.Emotes.Currency} **-${collected.toLocaleString("en-US")}** lost (collected from your wallet, then bank).`,
-  };
+  });
 }
 
 async function handleCelestialHarp(discordId: string): Promise<ShopItemUseResult> {
@@ -600,87 +597,80 @@ async function handleDemonicHarp(
 }
 
 async function handlePandoraBox(discordId: string, guildId: string): Promise<ShopItemUseResult> {
-  const onCooldown = await checkItemCooldown("pandora_box", discordId);
-  if (onCooldown) return onCooldown;
+  return withClaimedCooldown("pandora_box", discordId, async () => {
+    const roll = Math.random();
+    const user = await prisma.user.findUnique({ where: { discordId }, include: { wallet: true } }) as any;
 
-  const roll = Math.random();
-  const user = await prisma.user.findUnique({ where: { discordId }, include: { wallet: true } }) as any;
+    if (!user?.wallet) return { success: false, message: "Could not find your wallet." };
 
-  if (!user?.wallet) return { success: false, message: "Could not find your wallet." };
-
-  if (roll < 0.25) {
-    // Money reward
-    const reward = randomInt(300_000, 1_500_000);
-    const result = await addBalance(discordId, discordId, reward, "pandora_box", { outcome: "reward" }, true);
-    await setItemCooldown("pandora_box", discordId);
-    return {
-      success: true,
-      message: `**Pandora Box — Fortune!**\n\nA cascade of coins spills out!\n${Mascot.Emotes.Currency} **+${result.appliedAmount.toLocaleString("en-US")}** added to your wallet!`,
-    };
-  } else if (roll < 0.45) {
-    // Luck boost
-    await upsertLuckModifier(discordId, 15, "pandora_box", 2 * 3600 * 1000);
-    const luck = await getCurrentLuck(discordId);
-    await setItemCooldown("pandora_box", discordId);
-    return {
-      success: true,
-      message: `**Pandora Box — Blessing!**\n\nA golden light washes over you.\nYour Luck is now **${luck}/100** (+15 for 2 hours).`,
-    };
-  } else if (roll < 0.65) {
-    // Rare item grant
-    const grantableItems = ["tax_shield", "bandage", "counterfeit_kit", "lucky_coin", "padlock"];
-    const itemKey = grantableItems[Math.floor(Math.random() * grantableItems.length)];
-    const shopItem = await prisma.shopItem.findFirst({
-      where: globalCatalogGuildFilter({
-        name: { equals: itemKey.replace(/_/g, " "), mode: "insensitive" },
-      }),
-    });
-
-    if (shopItem) {
-      await prisma.inventory.upsert({
-        where: { userId_shopItemId: { userId: discordId, shopItemId: shopItem.id } },
-        create: { userId: discordId, shopItemId: shopItem.id, amount: 1 },
-        update: { amount: { increment: 1 } },
-      });
-      await setItemCooldown("pandora_box", discordId);
+    if (roll < 0.25) {
+      // Money reward
+      const reward = randomInt(300_000, 1_500_000);
+      const result = await addBalance(discordId, discordId, reward, "pandora_box", { outcome: "reward" }, true);
       return {
         success: true,
-        message: `**Pandora Box — Rare Find!**\n\nSomething useful tumbled out of the box.\nYou received: **${shopItem.name}**!`,
+        message: `**Pandora Box — Fortune!**\n\nA cascade of coins spills out!\n${Mascot.Emotes.Currency} **+${result.appliedAmount.toLocaleString("en-US")}** added to your wallet!`,
+      };
+    } else if (roll < 0.45) {
+      // Luck boost
+      await upsertLuckModifier(discordId, 15, "pandora_box", 2 * 3600 * 1000);
+      const luck = await getCurrentLuck(discordId);
+      return {
+        success: true,
+        message: `**Pandora Box — Blessing!**\n\nA golden light washes over you.\nYour Luck is now **${luck}/100** (+15 for 2 hours).`,
+      };
+    } else if (roll < 0.65) {
+      // Rare item grant
+      const grantableItems = ["tax_shield", "bandage", "counterfeit_kit", "lucky_coin", "padlock"];
+      const itemKey = grantableItems[Math.floor(Math.random() * grantableItems.length)];
+      const shopItem = await prisma.shopItem.findFirst({
+        where: globalCatalogGuildFilter({
+          name: { equals: itemKey.replace(/_/g, " "), mode: "insensitive" },
+        }),
+      });
+
+      if (shopItem) {
+        await prisma.inventory.upsert({
+          where: { userId_shopItemId: { userId: discordId, shopItemId: shopItem.id } },
+          create: { userId: discordId, shopItemId: shopItem.id, amount: 1 },
+          update: { amount: { increment: 1 } },
+        });
+        return {
+          success: true,
+          message: `**Pandora Box — Rare Find!**\n\nSomething useful tumbled out of the box.\nYou received: **${shopItem.name}**!`,
+        };
+      }
+      // Fallback if item not found in DB
+      const reward = 150_000;
+      await addBalance(discordId, discordId, reward, "pandora_box", { outcome: "rare_fallback" }, true);
+      return {
+        success: true,
+        message: `**Pandora Box — Rare Find!**\n\nSomething shiny fell out.\n${Mascot.Emotes.Currency} **+${reward.toLocaleString("en-US")}** added to your wallet!`,
+      };
+    } else if (roll < 0.85) {
+      // Luck curse
+      await upsertLuckModifier(discordId, -15, "pandora_box", 2 * 3600 * 1000);
+      const luck = await getCurrentLuck(discordId);
+      return {
+        success: true,
+        message: `**Pandora Box — Curse!**\n\nA dark shadow creeps over you.\nYour Luck is now **${luck}/100** (-15 for 2 hours).`,
+      };
+    } else {
+      // Wallet damage
+      const baseDamage = randomInt(200_000, 900_000);
+      const crownMult = await checkCrownOfGreed(discordId);
+      const damage = Math.floor(baseDamage * crownMult);
+      const collected = await applyItemFine(discordId, damage, "pandora_box");
+
+      const { recordPotentialSoulLedgerLoss } = await import("./shopBuffs");
+      await recordPotentialSoulLedgerLoss(discordId, collected);
+
+      return {
+        success: true,
+        message: `**Pandora Box — Disaster!**\n\nSomething terrible was released.\n${Mascot.Emotes.Currency} **-${collected.toLocaleString("en-US")}** drained (from your wallet, then bank).`,
       };
     }
-    // Fallback if item not found in DB
-    const reward = 150_000;
-    await addBalance(discordId, discordId, reward, "pandora_box", { outcome: "rare_fallback" }, true);
-    await setItemCooldown("pandora_box", discordId);
-    return {
-      success: true,
-      message: `**Pandora Box — Rare Find!**\n\nSomething shiny fell out.\n${Mascot.Emotes.Currency} **+${reward.toLocaleString("en-US")}** added to your wallet!`,
-    };
-  } else if (roll < 0.85) {
-    // Luck curse
-    await upsertLuckModifier(discordId, -15, "pandora_box", 2 * 3600 * 1000);
-    const luck = await getCurrentLuck(discordId);
-    await setItemCooldown("pandora_box", discordId);
-    return {
-      success: true,
-      message: `**Pandora Box — Curse!**\n\nA dark shadow creeps over you.\nYour Luck is now **${luck}/100** (-15 for 2 hours).`,
-    };
-  } else {
-    // Wallet damage
-    const baseDamage = randomInt(200_000, 900_000);
-    const crownMult = await checkCrownOfGreed(discordId);
-    const damage = Math.floor(baseDamage * crownMult);
-    const collected = await applyItemFine(discordId, damage, "pandora_box");
-
-    const { recordPotentialSoulLedgerLoss } = await import("./shopBuffs");
-    await recordPotentialSoulLedgerLoss(discordId, collected);
-
-    await setItemCooldown("pandora_box", discordId);
-    return {
-      success: true,
-      message: `**Pandora Box — Disaster!**\n\nSomething terrible was released.\n${Mascot.Emotes.Currency} **-${collected.toLocaleString("en-US")}** drained (from your wallet, then bank).`,
-    };
-  }
+  });
 }
 
 async function handleEclipseMask(discordId: string): Promise<ShopItemUseResult> {
@@ -708,49 +698,46 @@ async function handleCrownOfGreed(discordId: string): Promise<ShopItemUseResult>
 }
 
 async function handleDevilContract(discordId: string, guildId: string): Promise<ShopItemUseResult> {
-  const onCooldown = await checkItemCooldown("devil_contract", discordId);
-  if (onCooldown) return onCooldown;
+  return withClaimedCooldown("devil_contract", discordId, async () => {
+    // 30% jackpot 2.5M-3.5M, 70% the devil collects: 300k-700k (below the
+    // 1.25M price). The -20% next-3-incomes curse applies either way — the
+    // fine print always applies. Pre-curse EV ~= break-even.
+    const jackpot = Math.random() < 0.30;
+    const payout = jackpot ? randomInt(2_500_000, 3_500_000) : randomInt(300_000, 700_000);
+    const result = await addBalance(discordId, discordId, payout, "devil_contract", { item: "devil_contract", jackpot }, true);
 
-  // 30% jackpot 2.5M-3.5M, 70% the devil collects: 300k-700k (below the
-  // 1.25M price). The -20% next-3-incomes curse applies either way — the
-  // fine print always applies. Pre-curse EV ~= break-even.
-  const jackpot = Math.random() < 0.30;
-  const payout = jackpot ? randomInt(2_500_000, 3_500_000) : randomInt(300_000, 700_000);
-  const result = await addBalance(discordId, discordId, payout, "devil_contract", { item: "devil_contract", jackpot }, true);
+    // Merge with existing debt instead of stacking duplicates
+    const existing = await prisma.activeEffect.findFirst({
+      where: { userId: discordId, effectType: "devil_contract_debt" },
+    });
 
-  // Merge with existing debt instead of stacking duplicates
-  const existing = await prisma.activeEffect.findFirst({
-    where: { userId: discordId, effectType: "devil_contract_debt" },
+    if (existing) {
+      const currentUses = ((existing.meta as any)?.usesLeft ?? 0) as number;
+      await prisma.activeEffect.update({
+        where: { id: existing.id },
+        data: { meta: { usesLeft: currentUses + 3 } },
+      });
+    } else {
+      await prisma.activeEffect.create({
+        data: {
+          userId: discordId,
+          effectType: "devil_contract_debt",
+          value: 0.8,
+          meta: { usesLeft: 3 },
+          expiresAt: null,
+        },
+      });
+    }
+
+    const flavor = jackpot
+      ? "The devil pays generously... this time."
+      : "The devil smiles. You signed without reading.";
+
+    return {
+      success: true,
+      message: `**Devil Contract signed!**\n\n${flavor}\n${Mascot.Emotes.Currency} **+${result.appliedAmount.toLocaleString("en-US")}** added to your wallet.\n\nThe fine print: your next **3 income events** are reduced by **20%**.`,
+    };
   });
-
-  if (existing) {
-    const currentUses = ((existing.meta as any)?.usesLeft ?? 0) as number;
-    await prisma.activeEffect.update({
-      where: { id: existing.id },
-      data: { meta: { usesLeft: currentUses + 3 } },
-    });
-  } else {
-    await prisma.activeEffect.create({
-      data: {
-        userId: discordId,
-        effectType: "devil_contract_debt",
-        value: 0.8,
-        meta: { usesLeft: 3 },
-        expiresAt: null,
-      },
-    });
-  }
-
-  await setItemCooldown("devil_contract", discordId);
-
-  const flavor = jackpot
-    ? "The devil pays generously... this time."
-    : "The devil smiles. You signed without reading.";
-
-  return {
-    success: true,
-    message: `**Devil Contract signed!**\n\n${flavor}\n${Mascot.Emotes.Currency} **+${result.appliedAmount.toLocaleString("en-US")}** added to your wallet.\n\nThe fine print: your next **3 income events** are reduced by **20%**.`,
-  };
 }
 
 async function handleSoulLedger(discordId: string, guildId: string): Promise<ShopItemUseResult> {
