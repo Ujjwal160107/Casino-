@@ -13,6 +13,7 @@ import { getRequiredGearKey } from "../services/jobService";
 import { JOB_SHOP_CATALOG } from "../utils/shopCatalog";
 import { seedJobShop } from "../services/shopService";
 import { getGuildPrefix } from "../utils/guildContext";
+import { enqueueWorkReminder } from "../services/cooldownReminderService";
 import { globalCatalogGuildFilter } from "../utils/globalCatalog";
 import { MAX_SAFE_BALANCE } from "../utils/economyConfig";
 import {
@@ -243,10 +244,9 @@ async function handleButton(interaction: ButtonInteraction) {
         const promoCheck = await _checkPromo(freshUser, guild.id);
 
         if (!promoCheck.eligible || !promoCheck.nextJob) {
-            const parts: string[] = [];
-            if (promoCheck.missingXp > 0) parts.push(`**${promoCheck.missingXp} more XP**`);
-            if (promoCheck.missingShifts > 0) parts.push(`**${promoCheck.missingShifts} more shifts**`);
-            const missing = parts.length > 0 ? parts.join(" and ") : "requirements not met";
+            const missing = promoCheck.missingShifts > 0
+                ? `**${promoCheck.missingShifts} more lifetime shifts**`
+                : "requirements not met";
             return safeEditReply(interaction, { content: `You need ${missing} before you can be promoted.` });
         }
 
@@ -490,6 +490,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 jobFailStreak: success || pagerSaved ? 0 : undefined // Reset fail streak on success or pager save
             }
         });
+        void enqueueWorkReminder(userData.discordId);
 
         // Grant reputation AFTER DB write — only on success/pager
         if (success || pagerSaved) {
@@ -516,7 +517,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 // Let's just note it for now, implementation plan says Celebration later
                 footerText = `🎉 Promotion Available: ${promoCheck.nextJob.title}`;
             } else if (promoCheck.nextJob) {
-                footerText = `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingXp} xp, ${promoCheck.missingShifts} shifts to go)`;
+                footerText = `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingShifts} shifts to go)`;
             }
         }
 
@@ -557,10 +558,7 @@ async function handleButton(interaction: ButtonInteraction) {
                         .setEmoji(Mascot.Emotes.JobPromotion)
                 ));
             } else if (promoCheck.nextJob) {
-                const promoParts: string[] = [];
-                if (promoCheck.missingXp > 0) promoParts.push(`${promoCheck.missingXp} XP`);
-                if (promoCheck.missingShifts > 0) promoParts.push(`${promoCheck.missingShifts} shifts`);
-                resEmbed.setFooter({ text: `Progress to ${promoCheck.nextJob.title}: need ${promoParts.join(", ")}` });
+                resEmbed.setFooter({ text: `Progress to ${promoCheck.nextJob.title}: need ${promoCheck.missingShifts} more shifts` });
             }
         } else if (footerText) {
             resEmbed.setFooter({ text: footerText });
@@ -757,6 +755,7 @@ async function handleButton(interaction: ButtonInteraction) {
                         jobStress: { increment: 5 } // Even more stress
                     }
                 });
+                void enqueueWorkReminder(userData.discordId);
 
                 
 
@@ -1019,6 +1018,7 @@ async function handleButton(interaction: ButtonInteraction) {
                     jobFailStreak: 0 // Reset fail streak on success
                 }
             });
+            void enqueueWorkReminder(user.id);
 
             // Grant reputation AFTER DB write — takes effect on the NEXT shift
             const shiftRepResult = await _addShiftRep(user.id, job.sector, 5, "shift_success");
@@ -1128,10 +1128,7 @@ async function handleButton(interaction: ButtonInteraction) {
                         .setEmoji(Mascot.Emotes.JobPromotion)
                 ));
             } else if (promoCheck.nextJob) {
-                const shiftParts: string[] = [];
-                if (promoCheck.missingXp > 0) shiftParts.push(`${promoCheck.missingXp} XP`);
-                if (promoCheck.missingShifts > 0) shiftParts.push(`${promoCheck.missingShifts} shifts`);
-                winEmbed.setFooter({ text: `Progress to ${promoCheck.nextJob.title}: need ${shiftParts.join(", ")}` });
+                winEmbed.setFooter({ text: `Progress to ${promoCheck.nextJob.title}: need ${promoCheck.missingShifts} more shifts` });
             }
 
             // Disable buttons on the original game embed
@@ -1183,6 +1180,7 @@ async function handleButton(interaction: ButtonInteraction) {
                     jobStress: Math.min(100, (userData.jobStress || 0) + 10) // +10 Stress, capped at 100
                 }
             });
+            void enqueueWorkReminder(user.id);
 
             // Check Demotion (uses 3-strike consecutive failure system)
             const prevJobTitleFail = getJob(userData.jobId)?.title ?? "Previous Role";

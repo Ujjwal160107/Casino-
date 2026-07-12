@@ -11,7 +11,7 @@ export interface JobDefinition {
     pay: number;
     reqDegrees: string[]; // List of degree names required
     reqJobId?: string; // ID of prerequisite job (e.g., must be Resident before Surgeon)
-    reqXp?: number; // Min jobXp required to hold/promote to this job
+    reqShifts?: number; // Min lifetime shiftsWorked required to hold/promote to this job
     level: "Intern" | "Junior" | "Senior" | "Lead" | "Executive" | "Freelance";
     careerTier: number;
 }
@@ -70,39 +70,39 @@ export function getJobAction(sector: string): JobAction | null {
 // Grouped by Sector for easiest display
 export const JOBS: JobDefinition[] = [
     // --- TECH (Computer Science) ---
-    { id: "tech_intern", title: "IT Intern", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: DEFAULT_JOB_PAYS.itIntern, reqDegrees: ["High School Diploma"], level: "Intern", reqXp: 0, careerTier: 1 },
-    { id: "tech_junior", title: "Junior Developer", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: DEFAULT_JOB_PAYS.juniorDeveloper, reqDegrees: ["BS Computer Science"], level: "Junior", reqXp: 50, careerTier: 2 },
-    { id: "tech_senior", title: "Senior Developer", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: DEFAULT_JOB_PAYS.seniorDeveloper, reqDegrees: ["BS Computer Science"], reqJobId: "tech_junior", level: "Senior", reqXp: 150, careerTier: 3 },
-    { id: "tech_lead", title: "Lead Engineer", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: DEFAULT_JOB_PAYS.leadEngineer, reqDegrees: ["BS Computer Science"], reqJobId: "tech_senior", level: "Lead", reqXp: 300, careerTier: 4 },
+    { id: "tech_intern", title: "IT Intern", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: DEFAULT_JOB_PAYS.itIntern, reqDegrees: ["High School Diploma"], level: "Intern", reqShifts: 0, careerTier: 1 },
+    { id: "tech_junior", title: "Junior Developer", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: DEFAULT_JOB_PAYS.juniorDeveloper, reqDegrees: ["BS Computer Science"], level: "Junior", reqShifts: 10, careerTier: 2 },
+    { id: "tech_senior", title: "Senior Developer", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: DEFAULT_JOB_PAYS.seniorDeveloper, reqDegrees: ["BS Computer Science"], reqJobId: "tech_junior", level: "Senior", reqShifts: 30, careerTier: 3 },
+    { id: "tech_lead", title: "Lead Engineer", sector: "tech", emoji: Mascot.Emotes.JobTech, pay: DEFAULT_JOB_PAYS.leadEngineer, reqDegrees: ["BS Computer Science"], reqJobId: "tech_senior", level: "Lead", reqShifts: 60, careerTier: 4 },
 
     // --- MEDICAL (Medicine) ---
-    { id: "med_resident", title: "Medical Resident", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: DEFAULT_JOB_PAYS.medicalResident, reqDegrees: ["MBBS"], level: "Intern", reqXp: 0, careerTier: 2 },
-    { id: "med_general", title: "General Practitioner", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: DEFAULT_JOB_PAYS.generalPractitioner, reqDegrees: ["MBBS"], reqJobId: "med_resident", level: "Junior", reqXp: 50, careerTier: 3 },
-    { id: "med_surgeon", title: "Surgeon", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: DEFAULT_JOB_PAYS.surgeon, reqDegrees: ["MBBS", "Doctor of Medicine (MD) / Ph.D."], reqJobId: "med_general", level: "Senior", reqXp: 150, careerTier: 3 },
-    { id: "med_chief", title: "Chief of Medicine", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: DEFAULT_JOB_PAYS.chiefOfMedicine, reqDegrees: ["MBBS", "Doctor of Medicine (MD) / Ph.D."], reqJobId: "med_surgeon", level: "Executive", reqXp: 500, careerTier: 4 },
+    { id: "med_resident", title: "Medical Resident", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: DEFAULT_JOB_PAYS.medicalResident, reqDegrees: ["MBBS"], level: "Intern", reqShifts: 0, careerTier: 2 },
+    { id: "med_general", title: "General Practitioner", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: DEFAULT_JOB_PAYS.generalPractitioner, reqDegrees: ["MBBS"], reqJobId: "med_resident", level: "Junior", reqShifts: 10, careerTier: 3 },
+    { id: "med_surgeon", title: "Surgeon", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: DEFAULT_JOB_PAYS.surgeon, reqDegrees: ["MBBS", "Doctor of Medicine (MD) / Ph.D."], reqJobId: "med_general", level: "Senior", reqShifts: 30, careerTier: 3 },
+    { id: "med_chief", title: "Chief of Medicine", sector: "medical", emoji: Mascot.Emotes.JobMedical, pay: DEFAULT_JOB_PAYS.chiefOfMedicine, reqDegrees: ["MBBS", "Doctor of Medicine (MD) / Ph.D."], reqJobId: "med_surgeon", level: "Executive", reqShifts: 100, careerTier: 4 },
 
     // --- BUSINESS (Business/Finance) ---
-    { id: "biz_intern", title: "Sales Intern", sector: "business", emoji: Mascot.Emotes.JobBusiness, pay: DEFAULT_JOB_PAYS.salesIntern, reqDegrees: ["High School Diploma"], level: "Intern", reqXp: 0, careerTier: 1 },
-    { id: "biz_analyst", title: "Financial Analyst", sector: "business", emoji: Mascot.Emotes.JobBusiness, pay: DEFAULT_JOB_PAYS.financialAnalyst, reqDegrees: ["BA Fine Arts"], level: "Junior", reqXp: 50, careerTier: 2 },
-    { id: "biz_manager", title: "Sales Manager", sector: "business", emoji: Mascot.Emotes.JobBusiness, pay: DEFAULT_JOB_PAYS.salesManager, reqDegrees: ["BA Fine Arts"], reqJobId: "biz_analyst", level: "Senior", reqXp: 150, careerTier: 3 },
+    { id: "biz_intern", title: "Sales Intern", sector: "business", emoji: Mascot.Emotes.JobBusiness, pay: DEFAULT_JOB_PAYS.salesIntern, reqDegrees: ["High School Diploma"], level: "Intern", reqShifts: 0, careerTier: 1 },
+    { id: "biz_analyst", title: "Financial Analyst", sector: "business", emoji: Mascot.Emotes.JobBusiness, pay: DEFAULT_JOB_PAYS.financialAnalyst, reqDegrees: ["BA Fine Arts"], level: "Junior", reqShifts: 10, careerTier: 2 },
+    { id: "biz_manager", title: "Sales Manager", sector: "business", emoji: Mascot.Emotes.JobBusiness, pay: DEFAULT_JOB_PAYS.salesManager, reqDegrees: ["BA Fine Arts"], reqJobId: "biz_analyst", level: "Senior", reqShifts: 30, careerTier: 3 },
 
     // --- LEGAL (Law) ---
-    { id: "law_paralegal", title: "Paralegal", sector: "legal", emoji: Mascot.Emotes.JobLegal, pay: DEFAULT_JOB_PAYS.paralegal, reqDegrees: ["Bachelor of Laws (LLB)"], level: "Junior", reqXp: 20, careerTier: 2 },
-    { id: "law_associate", title: "Associate Attorney", sector: "legal", emoji: Mascot.Emotes.JobLegal, pay: DEFAULT_JOB_PAYS.associateAttorney, reqDegrees: ["Bachelor of Laws (LLB)"], reqJobId: "law_paralegal", level: "Senior", reqXp: 150, careerTier: 3 },
-    { id: "law_partner", title: "Partner", sector: "legal", emoji: Mascot.Emotes.JobLegal, pay: DEFAULT_JOB_PAYS.partner, reqDegrees: ["Master of Laws (LLM)"], reqJobId: "law_associate", level: "Executive", reqXp: 500, careerTier: 4 },
+    { id: "law_paralegal", title: "Paralegal", sector: "legal", emoji: Mascot.Emotes.JobLegal, pay: DEFAULT_JOB_PAYS.paralegal, reqDegrees: ["Bachelor of Laws (LLB)"], level: "Junior", reqShifts: 5, careerTier: 2 },
+    { id: "law_associate", title: "Associate Attorney", sector: "legal", emoji: Mascot.Emotes.JobLegal, pay: DEFAULT_JOB_PAYS.associateAttorney, reqDegrees: ["Bachelor of Laws (LLB)"], reqJobId: "law_paralegal", level: "Senior", reqShifts: 30, careerTier: 3 },
+    { id: "law_partner", title: "Partner", sector: "legal", emoji: Mascot.Emotes.JobLegal, pay: DEFAULT_JOB_PAYS.partner, reqDegrees: ["Master of Laws (LLM)"], reqJobId: "law_associate", level: "Executive", reqShifts: 100, careerTier: 4 },
 
     // --- SERVICE (No Degree / Hospitality) ---
-    { id: "srv_waiter", title: "Waiter", sector: "service", emoji: Mascot.Emotes.JobService, pay: DEFAULT_JOB_PAYS.waiter, reqDegrees: [], level: "Junior", reqXp: 0, careerTier: 0 },
-    { id: "srv_chef", title: "Sous Chef", sector: "service", emoji: Mascot.Emotes.JobService, pay: DEFAULT_JOB_PAYS.sousChef, reqDegrees: [], reqJobId: "srv_waiter", level: "Senior", reqXp: 100, careerTier: 0 },
+    { id: "srv_waiter", title: "Waiter", sector: "service", emoji: Mascot.Emotes.JobService, pay: DEFAULT_JOB_PAYS.waiter, reqDegrees: [], level: "Junior", reqShifts: 0, careerTier: 0 },
+    { id: "srv_chef", title: "Sous Chef", sector: "service", emoji: Mascot.Emotes.JobService, pay: DEFAULT_JOB_PAYS.sousChef, reqDegrees: [], reqJobId: "srv_waiter", level: "Senior", reqShifts: 20, careerTier: 0 },
 
     // --- TRADE (Trade School) ---
-    { id: "trd_apprentice", title: "Apprentice Mechanic", sector: "trade", emoji: Mascot.Emotes.JobTrade, pay: DEFAULT_JOB_PAYS.apprenticeMechanic, reqDegrees: ["Trade License (Plumbing)"], level: "Intern", reqXp: 0, careerTier: 1 },
-    { id: "trd_mechanic", title: "Master Mechanic", sector: "trade", emoji: Mascot.Emotes.JobTrade, pay: DEFAULT_JOB_PAYS.masterMechanic, reqDegrees: ["Trade License (Plumbing)"], reqJobId: "trd_apprentice", level: "Senior", reqXp: 150, careerTier: 2 },
+    { id: "trd_apprentice", title: "Apprentice Mechanic", sector: "trade", emoji: Mascot.Emotes.JobTrade, pay: DEFAULT_JOB_PAYS.apprenticeMechanic, reqDegrees: ["Trade License (Plumbing)"], level: "Intern", reqShifts: 0, careerTier: 1 },
+    { id: "trd_mechanic", title: "Master Mechanic", sector: "trade", emoji: Mascot.Emotes.JobTrade, pay: DEFAULT_JOB_PAYS.masterMechanic, reqDegrees: ["Trade License (Plumbing)"], reqJobId: "trd_apprentice", level: "Senior", reqShifts: 30, careerTier: 2 },
 
     // --- FREELANCE (No Degree) ---
-    { id: "freelance_writer", title: "Freelance Writer", sector: "freelance", emoji: Mascot.Emotes.JobWorking, pay: DEFAULT_JOB_PAYS.freelanceWriter, reqDegrees: [], level: "Freelance", reqXp: 0, careerTier: 0 },
-    { id: "freelance_uber", title: "Delivery Driver", sector: "freelance", emoji: Mascot.Emotes.JobWorking, pay: DEFAULT_JOB_PAYS.deliveryDriver, reqDegrees: [], level: "Freelance", reqXp: 0, careerTier: 0 },
-    { id: "freelance_streamer", title: "Streamer", sector: "freelance", emoji: Mascot.Emotes.JobWorking, pay: DEFAULT_JOB_PAYS.streamer, reqDegrees: [], level: "Freelance", reqXp: 0, careerTier: 0 }
+    { id: "freelance_writer", title: "Freelance Writer", sector: "freelance", emoji: Mascot.Emotes.JobWorking, pay: DEFAULT_JOB_PAYS.freelanceWriter, reqDegrees: [], level: "Freelance", reqShifts: 0, careerTier: 0 },
+    { id: "freelance_uber", title: "Delivery Driver", sector: "freelance", emoji: Mascot.Emotes.JobWorking, pay: DEFAULT_JOB_PAYS.deliveryDriver, reqDegrees: [], level: "Freelance", reqShifts: 0, careerTier: 0 },
+    { id: "freelance_streamer", title: "Streamer", sector: "freelance", emoji: Mascot.Emotes.JobWorking, pay: DEFAULT_JOB_PAYS.streamer, reqDegrees: [], level: "Freelance", reqShifts: 0, careerTier: 0 }
 ];
 
 export function getJobsBySector(sector: JobDefinition['sector']) {
@@ -140,7 +140,7 @@ export function getJobByName(query: string) {
 }
 
 export function getJobApplicationStatus(
-    user: { jobId?: string | null; jobXp?: number; degrees?: { degree: { name: string } }[] },
+    user: { jobId?: string | null; shiftsWorked?: number; degrees?: { degree: { name: string } }[] },
     job: JobDefinition
 ) {
     const missing: string[] = [];
@@ -163,9 +163,9 @@ export function getJobApplicationStatus(
         missing.push(`Need job: ${previousJob?.title ?? job.reqJobId}`);
     }
 
-    const requiredXp = job.reqXp ?? 0;
-    if (requiredXp > 0 && (user.jobXp ?? 0) < requiredXp) {
-        missing.push(`Need ${requiredXp} XP`);
+    const requiredShifts = job.reqShifts ?? 0;
+    if (requiredShifts > 0 && (user.shiftsWorked ?? 0) < requiredShifts) {
+        missing.push(`Need ${requiredShifts} lifetime shifts (you have ${user.shiftsWorked ?? 0})`);
     }
 
     return {
@@ -202,26 +202,19 @@ export async function getJobPay(job: JobDefinition, _guildId: string): Promise<n
 }
 
 /**
- * Checks if a user is eligible for a promotion based on XP.
+ * Checks if a user is eligible for a promotion based on lifetime shifts worked.
  */
-export async function checkPromotion(user: any, _guildId?: string): Promise<{ eligible: boolean; nextJob: JobDefinition | null; missingXp: number; missingShifts: number }> {
-    if (!user.jobId) return { eligible: false, nextJob: null, missingXp: 0, missingShifts: 0 };
+export async function checkPromotion(user: any, _guildId?: string): Promise<{ eligible: boolean; nextJob: JobDefinition | null; missingShifts: number }> {
+    if (!user.jobId) return { eligible: false, nextJob: null, missingShifts: 0 };
 
     // Find a job that requires this current job as a prereq
     const nextJob = JOBS.find(j => j.reqJobId === user.jobId);
-    if (!nextJob) return { eligible: false, nextJob: null, missingXp: 0, missingShifts: 0 };
+    if (!nextJob) return { eligible: false, nextJob: null, missingShifts: 0 };
 
-    const reqXp = nextJob.reqXp || 0;
-    const reqShifts = 0;
-
-    const missingXp = Math.max(0, reqXp - user.jobXp);
+    const reqShifts = nextJob.reqShifts ?? 0;
     const missingShifts = Math.max(0, reqShifts - (user.shiftsWorked || 0));
 
-    if (missingXp === 0 && missingShifts === 0) {
-        return { eligible: true, nextJob, missingXp: 0, missingShifts: 0 };
-    }
-
-    return { eligible: false, nextJob, missingXp, missingShifts };
+    return { eligible: missingShifts === 0, nextJob, missingShifts };
 }
 
 /**
@@ -235,9 +228,9 @@ export function getNextJob(currentJobId: string): JobDefinition | null {
  * Returns checkPromotion result plus a human-readable progressText string.
  */
 export async function getPromotionProgress(
-    user: { jobId?: string | null; jobXp: number; shiftsWorked: number },
+    user: { jobId?: string | null; shiftsWorked: number },
     guildId?: string
-): Promise<{ eligible: boolean; nextJob: JobDefinition | null; missingXp: number; missingShifts: number; progressText: string }> {
+): Promise<{ eligible: boolean; nextJob: JobDefinition | null; missingShifts: number; progressText: string }> {
     const result = await checkPromotion(user, guildId);
     let progressText = "";
     if (!result.nextJob) {
@@ -245,12 +238,7 @@ export async function getPromotionProgress(
     } else if (result.eligible) {
         progressText = `Ready for **${result.nextJob.title}**!`;
     } else {
-        const parts: string[] = [];
-        if (result.missingXp > 0) parts.push(`${result.missingXp} XP`);
-        if (result.missingShifts > 0) parts.push(`${result.missingShifts} shifts`);
-        progressText = parts.length > 0
-            ? `Need: ${parts.join(", ")} → ${result.nextJob.title}`
-            : "Almost there.";
+        progressText = `Need: ${result.missingShifts} more shifts → ${result.nextJob.title}`;
     }
     return { ...result, progressText };
 }
