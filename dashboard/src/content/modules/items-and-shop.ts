@@ -35,7 +35,7 @@ const itemsAndShop: ModuleDoc = {
           ["Thieves Gloves", "100,000", "Rob loot +25% for 6 robberies or 6 hours"],
           ["Energy Drink", "125,000", "Work cooldown reduced by 1 hour"],
           ["Padlock", "175,000", "Blocks one robbery against you (24h shelf life, breaks on use)"],
-          ["Mystery Box", "250,000", "Instant roll: 30% → 75,000 · 50% → 100,000 · 20% → 500,000 (avg ~172k)"],
+          ["Mystery Box", "250,000", "Daily: Instant roll: 30% → 75,000 · 50% → 100,000 · 20% → 500,000 (avg ~172k)"],
           ["Treasure Map", "400,000", "Daily gamble: 25% treasure (60% → 1.5M · 30% → 2.2M · 10% → 4M) / 75% dead end: 150k–300k fine (wallet, then bank) + 25% chance of −15 Luck for 1h"],
         ],
       },
