@@ -888,8 +888,8 @@ async function handleEnergyFlask(discordId: string): Promise<ShopItemUseResult> 
 }
 
 async function handleFocusHeadphones(discordId: string): Promise<ShopItemUseResult> {
-  await redisService.set(`focus_headphones:${discordId}`, { shiftsLeft: 3, xpMult: 2 }, 86400 * 3); // 3 days max
-  return { success: true, message: `**Focus Headphones on!**\n\nJob XP is doubled for your next **3 shifts**.` };
+  await redisService.set(`focus_headphones:${discordId}`, { shiftsLeft: 3, repMult: 2 }, 86400 * 3); // 3 days max
+  return { success: true, message: `**Focus Headphones on!**\n\nSector reputation gain is **doubled (+10 instead of +5)** for your next **3 successful shifts** (expires in 3 days).` };
 }
 
 async function handleLuckyTie(discordId: string): Promise<ShopItemUseResult> {
@@ -925,23 +925,19 @@ async function handleOvertimeContract(discordId: string, guildId: string): Promi
 async function handleBlackMarketResume(discordId: string, guildId: string): Promise<ShopItemUseResult> {
   const roll = Math.random();
   if (roll < 0.65) {
-    // Success: boost job XP significantly
-    const xpBoost = randomInt(50, 150);
-    await prisma.user.update({ where: { discordId }, data: { jobXp: { increment: xpBoost } } });
-    return { success: true, message: `**Black Market Resume — Success!**\n\nThe résumé passed all checks. Job XP boosted by **+${xpBoost}**.` };
+    // Success: credit lifetime shifts toward job requirements
+    const shiftBoost = randomInt(3, 8);
+    await prisma.user.update({ where: { discordId }, data: { shiftsWorked: { increment: shiftBoost } } });
+    return { success: true, message: `**Black Market Resume — Success!**\n\nThe résumé passed all checks. **+${shiftBoost} lifetime shifts** credited to your career record.` };
   } else {
-    // Backfire: lose XP and gain stress
-    const xpLoss = randomInt(20, 60);
+    // Backfire: stress only — the lifetime shift counter never decreases
     const stressPenalty = randomInt(10, 25);
     const user = await prisma.user.findUnique({ where: { discordId } });
     await prisma.user.update({
       where: { discordId },
-      data: {
-        jobXp: Math.max(0, (user?.jobXp ?? 0) - xpLoss),
-        jobStress: Math.min(100, (user?.jobStress ?? 0) + stressPenalty),
-      },
+      data: { jobStress: Math.min(100, (user?.jobStress ?? 0) + stressPenalty) },
     });
-    return { success: true, message: `**Black Market Resume — Exposed!**\n\nHR caught the forgery. Job XP **-${xpLoss}**, Stress **+${stressPenalty}**. You're lucky you still have a job.` };
+    return { success: true, message: `**Black Market Resume — Exposed!**\n\nHR caught the forgery. Stress **+${stressPenalty}**. You're lucky you still have a job.` };
   }
 }
 
