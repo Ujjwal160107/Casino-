@@ -271,6 +271,12 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "guide":
     case "tutorial":
       return handleTutorial(message);
+    case "settings":
+    case "notifications":
+    case "reminders": {
+      const { handleSettings } = require("./commands/general/settings");
+      return handleSettings(message);
+    }
     case "setprefix":
     case "set-prefix":
       return handleSetPrefix(message, args);
