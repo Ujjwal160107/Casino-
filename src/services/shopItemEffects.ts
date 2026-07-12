@@ -375,54 +375,52 @@ async function handleTaxShield(discordId: string, guildId: string): Promise<Shop
 }
 
 async function handleTreasureMap(discordId: string, _guildId: string): Promise<ShopItemUseResult> {
-  const roll = Math.random();
-  let reward: number;
-  let description: string;
+  const onCooldown = await checkItemCooldown("treasure_map", discordId);
+  if (onCooldown) return onCooldown;
 
-  if (roll < 0.30) {
-    reward = 150_000;
-    description = "a rusty lockbox with a handful of old coins";
-  } else if (roll < 0.60) {
-    reward = 400_000;
-    description = "a buried sack stuffed with gold coins";
-  } else if (roll < 0.82) {
-    reward = 750_000;
-    description = "a pirate's hidden chest packed with jewels";
-  } else if (roll < 0.95) {
-    reward = 1_200_000;
-    description = "an ancient vault sealed with arcane locks";
-  } else {
-    reward = 2_000_000;
-    description = "a legendary dragon's hoard beyond imagination";
+  // 25% success / 75% failure. Failure fines 150k-300k (wallet then bank)
+  // and has a 25% chance of -15 Luck for 1h. Net EV ~= -79k per use.
+  const success = Math.random() < 0.25;
+
+  if (success) {
+    const tierRoll = Math.random();
+    let reward: number;
+    let description: string;
+    if (tierRoll < 0.60) {
+      reward = 1_500_000;
+      description = "a pirate's hidden chest packed with jewels";
+    } else if (tierRoll < 0.90) {
+      reward = 2_200_000;
+      description = "an ancient vault sealed with arcane locks";
+    } else {
+      reward = 4_000_000;
+      description = "a legendary dragon's hoard beyond imagination";
+    }
+
+    const result = await addBalance(discordId, discordId, reward, "treasure_map", { description }, true);
+    await setItemCooldown("treasure_map", discordId);
+
+    return {
+      success: true,
+      message: `**Treasure Found!**\n\nYou followed the map and discovered ${description}!\n${Mascot.Emotes.Currency} **+${result.appliedAmount.toLocaleString("en-US")}** added to your wallet!\n\nThe map crumbles to dust. Another can be followed <t:${Math.floor((Date.now() + 86_400_000) / 1000)}:R>.`,
+    };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { discordId },
-    include: { wallet: true },
-  }) as any;
+  // Failure: fine 150k-300k, 25% chance of a -15 Luck debuff for 1h
+  const fine = randomInt(150_000, 300_000);
+  const collected = await applyItemFine(discordId, fine, "treasure_map");
 
-  if (!user?.wallet) {
-    return { success: false, message: "Could not find your wallet." };
+  let debuffNote = "";
+  if (Math.random() < 0.25) {
+    await upsertLuckModifier(discordId, -15, "treasure_map", 3600 * 1000);
+    debuffNote = "\nThe curse of the false map clings to you: **-15 Luck for 1 hour**.";
   }
 
-  await prisma.wallet.update({
-    where: { id: user.wallet.id },
-    data: { balance: { increment: reward } },
-  });
-
-  await prisma.transaction.create({
-    data: {
-      walletId: user.wallet.id,
-      amount: reward,
-      type: "treasure_map",
-      meta: { description },
-      isEarned: true,
-    },
-  });
+  await setItemCooldown("treasure_map", discordId);
 
   return {
     success: true,
-    message: `**Treasure Found!**\n\nYou followed the map and discovered ${description}!\n${Mascot.Emotes.Currency} **+${reward.toLocaleString("en-US")}** added to your wallet!`,
+    message: `**Dead End!**\n\nThe map led you into an ambush of booby traps.\n${Mascot.Emotes.Currency} **-${collected.toLocaleString("en-US")}** lost covering your escape.${debuffNote}`,
   };
 }
 
