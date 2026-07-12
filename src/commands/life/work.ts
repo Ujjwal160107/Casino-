@@ -65,9 +65,9 @@ export async function handleWork(message: Message) {
         return message.reply("Error: Your job ID is invalid. Please contact admin.");
     }
 
-    // Promotion progress (XP-based, correct)
+    // Promotion progress (lifetime-shift-based)
     const promo = await getPromotionProgress(
-        { jobId: user.jobId, jobXp: user.jobXp, shiftsWorked: user.shiftsWorked },
+        { jobId: user.jobId, shiftsWorked: user.shiftsWorked },
         message.guildId!
     );
 
@@ -114,13 +114,14 @@ export async function handleWork(message: Message) {
             `**${promo.nextJob.title}** is waiting for you.\n` +
             `Click **Promote** to advance your career now.`;
     } else if (promo.nextJob) {
-        const xpPct = Math.min(100, Math.floor(((promo.nextJob.reqXp ?? 0) - promo.missingXp) / Math.max(1, promo.nextJob.reqXp ?? 1) * 100));
-        const filled = Math.round(xpPct / 10);
+        const reqShifts = promo.nextJob.reqShifts ?? 0;
+        const shiftPct = Math.min(100, Math.floor((reqShifts - promo.missingShifts) / Math.max(1, reqShifts) * 100));
+        const filled = Math.round(shiftPct / 10);
         const bar = "`[" + "█".repeat(filled) + "░".repeat(10 - filled) + "]`";
         careerProgressContent =
             `### Career Progress\n` +
             `Next: **${promo.nextJob.title}**\n` +
-            `${bar} ${xpPct}%\n` +
+            `${bar} ${shiftPct}%\n` +
             promo.progressText;
     } else {
         careerProgressContent = `### Career Progress\n${promo.progressText}`;

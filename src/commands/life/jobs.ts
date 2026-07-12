@@ -57,7 +57,7 @@ function formatRequirement(job: JobDefinition) {
         const previousJob = JOBS.find((item) => item.id === job.reqJobId);
         requirements.push(`Requires job: ${previousJob?.title ?? job.reqJobId}`);
     }
-    if (job.reqXp) requirements.push(`XP: ${job.reqXp}`);
+    if (job.reqShifts) requirements.push(`Shifts: ${job.reqShifts}`);
     return requirements.length ? requirements.join("\n") : "No degree required";
 }
 
