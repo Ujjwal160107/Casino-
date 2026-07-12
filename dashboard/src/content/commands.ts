@@ -63,6 +63,20 @@ export const COMMANDS: Command[] = [
     usage: "!ping",
     examples: ["!ping"],
   },
+  {
+    id: "settings",
+    name: "!settings",
+    aliases: ["notifications", "reminders"],
+    module: "general",
+    short: "Choose which cooldown alarms Fortuna DMs you — or silence the lot.",
+    usage: "!settings",
+    examples: ["!settings"],
+    keyNumbers: [
+      { label: "Alarm types", value: "daily, weekly, monthly, crime, hunt, work, vote" },
+      { label: "Default", value: "all ON" },
+    ],
+    interactive: true,
+  },
 
   // ── economy ────────────────────────────────────────────────
   {
@@ -261,7 +275,7 @@ export const COMMANDS: Command[] = [
     short: "Vote for the bot on Top.gg, get paid for the click.",
     usage: "!vote [reminder]",
     args: [
-      { name: "reminder", desc: "Toggle a reminder ping for your next vote." },
+      { name: "reminder", desc: "Toggle vote reminder DMs — same switch as !settings." },
     ],
     examples: ["!vote", "!vote reminder"],
     cooldown: "12 h",

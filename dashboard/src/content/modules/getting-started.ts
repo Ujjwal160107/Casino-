@@ -91,6 +91,7 @@ const gettingStarted: ModuleDoc = {
     "Claim !daily, !weekly, and !monthly on cooldown even when you're broke. Especially when you're broke.",
     "Open !quests before you play, not after — most of the board completes itself while you work and gamble anyway.",
     "Read a game's real odds in the Casino docs before you bet. Coinflip is fair; slots keeps 4%. Knowing that is worth more than any starter grind.",
+    "Fortuna DMs you when your daily, work, crime, and other long cooldowns lift. Too chatty? !settings lets you pick exactly which alarms you get.",
   ],
 };
 
