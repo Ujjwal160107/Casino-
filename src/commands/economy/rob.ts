@@ -16,6 +16,7 @@ import {
 import { successEmbed, errorEmbed } from "../../utils/embed";
 import { fmtCurrency } from "../../utils/format";
 import { redisService } from "../../services/redisService";
+import { notifyRobbed, notifyPadlockUsed } from "../../services/victimNotifyService";
 
 function randomInt(min: number, max: number) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -57,6 +58,12 @@ export async function handleRob(message: Message, args: string[]) {
 
     const victimPadlocked = await checkPadlock(targetUser.id);
     if (victimPadlocked) {
+        void notifyPadlockUsed(
+            message.client,
+            targetUser.id,
+            message.member?.displayName ?? message.author.username,
+            message.guild?.name ?? null,
+        );
         return message.reply({
             embeds: [errorEmbed(message.author, "Robbery Blocked!", `**${targetUser.displayName}** has a **Padlock** active — their wallet is protected. Your attempt was foiled.`)]
         });
@@ -123,6 +130,14 @@ export async function handleRob(message: Message, args: string[]) {
 
             return { robAmount, updatedWallet, percent };
         });
+
+        void notifyRobbed(
+            message.client,
+            targetUser.id,
+            message.member?.displayName ?? message.author.username,
+            result.robAmount,
+            message.guild?.name ?? null,
+        );
 
         return message.reply({
             embeds: [successEmbed(message.author, "Robbery Successful!", `Stole **${fmtCurrency(result.robAmount)}** from **${targetUser.displayName}**!\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**${craftedRobBoost ? "\n\nWolf Fang Dagger boosted the loot." : ""}`)]

@@ -49,6 +49,12 @@ function buildSettingsPayload(
         );
     }
 
+    container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+            "-# Security alerts (robbery, padlock) are always on.",
+        ),
+    );
+
     const masterRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
             .setCustomId(`settings:master:${ownerId}`)
