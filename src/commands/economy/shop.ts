@@ -1088,6 +1088,28 @@ async function sendEffectMessages(message: Message, results: ItemEffectResult[])
 // Buy logic — shared by both text command and button interactions
 // ---------------------------------------------------------------------------
 
+function titleCase(name: string): string {
+  return name.split(" ").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
+}
+
+function buildRifleHint(
+  itemName: string,
+  rifleInfo: { isNewBest: boolean; cooldownCleared: boolean; activeRifleName: string },
+): string {
+  if (!rifleInfo.isNewBest) {
+    return `-# You already own a better rifle — your hunts will keep using your **${titleCase(rifleInfo.activeRifleName)}** automatically.`;
+  }
+  const lines = [
+    `-# **${itemName}** is now your active rifle — it will automatically be used from your next hunt expedition onwards.`,
+  ];
+  lines.push(
+    rifleInfo.cooldownCleared
+      ? `-# Your hunt cooldown has been reset — \`!hunt\` is ready right now!`
+      : `-# No hunt cooldown is active — \`!hunt\` whenever you're ready!`,
+  );
+  return lines.join("\n");
+}
+
 async function executeBuy(
   userId: string,
   guildId: string,
@@ -1136,11 +1158,14 @@ async function executeBuy(
   const safeName = assetFile ? assetFile.replace(/\s+/g, "_") : null;
 
   const effectLines = results?.length ? results.map((r: any) => r.message).join("\n") : null;
-  const usageHint = catalogItem.usable
-    ? `-# To use: \`use ${catalogItem.name.toLowerCase()}\``
-    : catalogItem.itemType === "EQUIPMENT"
-      ? `-# This is equipment — it activates automatically when you work or use your job.`
-      : `-# This item activates automatically.`;
+  const rifleInfo = purchase.rifle as { isNewBest: boolean; cooldownCleared: boolean; activeRifleName: string } | null;
+  const usageHint = rifleInfo
+    ? buildRifleHint(item.name, rifleInfo)
+    : catalogItem.usable
+      ? `-# To use: \`use ${catalogItem.name.toLowerCase()}\``
+      : catalogItem.itemType === "EQUIPMENT"
+        ? `-# This is equipment — it activates automatically when you work or use your job.`
+        : `-# This item activates automatically.`;
 
   const container = new ContainerBuilder().setAccentColor(0x2ECC71);
 
@@ -1295,7 +1320,8 @@ export async function handleShop(message: Message, args: string[]) {
         }
         await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
         if (!message.member) return;
-        const { item, results, cardInfo } = await buyItem(message.guildId!, message.author.id, itemName, message.member, false, paymentSource) as any;
+        const purchase = await buyItem(message.guildId!, message.author.id, itemName, message.member, false, paymentSource) as any;
+        const { item, results, cardInfo } = purchase;
         if (item.roleId && message.guild) {
           const role = message.guild.roles.cache.get(item.roleId);
           if (role) try { await message.member?.roles.add(role); } catch { }
@@ -1308,6 +1334,9 @@ export async function handleShop(message: Message, args: string[]) {
           color: 0x00FF00,
         });
         let confirmMsg = `You bought **${item.name}** for **${fmtCurrency(item.price)}**!`;
+        if (purchase.rifle) {
+          confirmMsg += `\n\n${buildRifleHint(item.name, purchase.rifle)}`;
+        }
         if (paymentSource === "card" && cardInfo) {
           confirmMsg += `\n\n${Mascot.Emotes.Credit} **Charged to Credit Card**\nBalance: **${formatAmount(cardInfo.currentBalance)}** / ${formatAmount(cardInfo.creditLimit)} limit\nWeekly spend cap: **${formatAmount(cardInfo.spentThisCycle)}** / ${formatAmount(cardInfo.weeklySpendCap)}`;
         }

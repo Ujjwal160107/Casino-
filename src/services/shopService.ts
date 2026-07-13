@@ -259,33 +259,47 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
   questBus.emit("economy:shop_buy", { discordId: userId, paymentSource: res.paymentSource });
 
   // If user just bought a rifle upgrade, clear the hunt cooldown so the new tier takes effect immediately
+  let rifle: { isNewBest: boolean; cooldownCleared: boolean; activeRifleName: string } | null = null;
   const purchasedRifleName = res.item.name.toLowerCase();
   const purchasedRifleIndex = RIFLE_PRIORITY.indexOf(purchasedRifleName as any);
   if (purchasedRifleIndex !== -1) {
     try {
-      const redis = redisService.getInstance();
-      const huntKey = `hunt:${userId}`;
-      const existing = await redis.ttl(huntKey);
-      if (existing > 0) {
-        // Only clear if user already owns a worse rifle (lower priority = higher index in RIFLE_PRIORITY)
-        const inventory = await prisma.inventory.findMany({
-          where: { userId },
-          include: { shopItem: true },
+      // Inventory already contains the just-bought rifle (upserted in the
+      // transaction above), so exclude that one copy to compare against what
+      // the player owned BEFORE this purchase.
+      const inventory = await prisma.inventory.findMany({
+        where: { userId },
+        include: { shopItem: true },
+      });
+      const ownedBeforeIndices = inventory
+        .filter((i) => i.shopItem.category === "HUNT" && i.shopItem.itemType === "EQUIPMENT")
+        .flatMap((i) => {
+          const idx = RIFLE_PRIORITY.indexOf(i.shopItem.name.toLowerCase() as any);
+          if (idx === -1) return [];
+          const countBefore = i.shopItemId === res.item.id ? i.amount - 1 : i.amount;
+          return countBefore > 0 ? [idx] : [];
         });
-        const ownedRifleNames = inventory
-          .filter((i) => i.shopItem.category === "HUNT" && i.shopItem.itemType === "EQUIPMENT")
-          .map((i) => i.shopItem.name.toLowerCase());
-        const bestOwnedIndex = Math.min(...ownedRifleNames.map((n) => {
-          const idx = RIFLE_PRIORITY.indexOf(n as any);
-          return idx === -1 ? 999 : idx;
-        }));
-        // purchased rifle is better (lower index) than whatever set the cooldown → reset
-        if (purchasedRifleIndex < bestOwnedIndex) {
+      const bestBeforeIndex = ownedBeforeIndices.length > 0 ? Math.min(...ownedBeforeIndices) : Infinity;
+      // Lower index = better rifle; hunts always auto-use the best owned rifle.
+      const isNewBest = purchasedRifleIndex < bestBeforeIndex;
+      const activeRifleName = RIFLE_PRIORITY[Math.min(purchasedRifleIndex, bestBeforeIndex)];
+
+      let cooldownCleared = false;
+      if (isNewBest) {
+        const redis = redisService.getInstance();
+        const huntKey = `hunt:${userId}`;
+        if ((await redis.ttl(huntKey)) > 0) {
           await redis.del(huntKey);
+          cooldownCleared = true;
+          // The queued "hunt ready" DM is now stale — the cooldown no longer exists.
+          const { cancelReminder } = await import("./cooldownReminderService");
+          await cancelReminder(userId, "hunt");
         }
       }
-    } catch {
-      // Non-critical
+      rifle = { isNewBest, cooldownCleared, activeRifleName };
+    } catch (err) {
+      // Non-critical — the purchase itself succeeded.
+      console.error("Rifle purchase hunt-cooldown reset failed:", err);
     }
   }
 
@@ -310,6 +324,7 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
     results,
     cardInfo: res.cardInfo ?? null,
     paymentSource: res.paymentSource,
+    rifle,
   };
 }
 
