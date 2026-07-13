@@ -1,8 +1,9 @@
-import { Message, EmbedBuilder, Colors } from "discord.js";
+import { Message, Colors, MessageFlags, ContainerBuilder, MediaGalleryBuilder, MediaGalleryItemBuilder } from "discord.js";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { creditGamePayout, debitGameBet } from "../../services/gameService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
-import { errorEmbed } from "../../utils/embed";
+import { errorContainer, plainContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { Mascot } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { getGuildPrefix } from "../../utils/guildContext";
@@ -32,6 +33,39 @@ const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 6;
 const LOBBY_TIME = 60 * 1000; // 60 seconds to join
 
+// --- Render helpers (Components V2) ---
+// Lobby frame rebuilt from state each time a player joins.
+function buildLobbyContainer(lobby: RRLobby, prefix: string): ContainerBuilder {
+    const hostName = lobby.players.find(p => p.id === lobby.hostId)?.username ?? "Host";
+    const playerLines = lobby.players.map((p, i) => `${i + 1}. ${p.username}`).join("\n");
+    const body =
+        `## ${Mascot.Emotes.Gun} Russian Roulette | Bet: ${fmtCurrency(lobby.betAmount)}\n` +
+        `**${hostName}** has loaded the gun!\n\n` +
+        `Type \`${prefix}rr join\` to play.\n` +
+        `Type \`${prefix}rr start\` to begin immediately.\n\n` +
+        `**Players (${lobby.players.length}/6):**\n${playerLines}`;
+    return plainContainer(body);
+}
+
+// In-game round frame. Turn order persists across every frame like the old embed field did.
+function buildRoundContainer(opts: {
+    title: string;
+    description: string;
+    players: RRPlayer[];
+    imageUrl?: string;
+}): ContainerBuilder {
+    const turnOrder = opts.players.map((p, i) => `${i + 1}. ${p.username}`).join(" -> ");
+    const container = plainContainer(`## ${opts.title}\n${opts.description}\n\n**Turn Order:** ${turnOrder}`);
+    if (opts.imageUrl) {
+        container.addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems(
+                new MediaGalleryItemBuilder().setURL(opts.imageUrl),
+            ),
+        );
+    }
+    return container;
+}
+
 export async function handleRussianRoulette(message: Message, args: string[]) {
     const prefix = await getGuildPrefix(message.guildId!);
     const sub = args[0]?.toLowerCase();
@@ -40,7 +74,7 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
     // --- START ---
     if (sub === "start" || sub === "create") {
         if (lobby) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Game Active", "A game is already active in this channel. Join it!")] });
+            return message.reply(v2Reply(errorContainer("Game Active", "A game is already active in this channel. Join it!")));
         }
 
         const amountStr = args[1];
@@ -48,17 +82,17 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
         const bet = parseBetAmount(amountStr, user.wallet!.balance);
 
         if (isNaN(bet) || bet <= 0) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Invalid Bet", "Please specify a valid bet amount.")] });
+            return message.reply(v2Reply(errorContainer("Invalid Bet", "Please specify a valid bet amount.")));
         }
         const { min, max } = getGameBetLimits("russian_roulette");
         if (bet < min) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Russian Roulette is **${fmtCurrency(min)}**.`)] });
+            return message.reply(v2Reply(errorContainer("Bet Too Low", `The minimum bet for Russian Roulette is **${fmtCurrency(min)}**.`)));
         }
         if (bet > max) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Russian Roulette is **${fmtCurrency(max)}**.`)] });
+            return message.reply(v2Reply(errorContainer("Bet Too High", `The maximum bet for Russian Roulette is **${fmtCurrency(max)}**.`)));
         }
         if (user.wallet!.balance < bet) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You can't afford this bet.")] });
+            return message.reply(v2Reply(errorContainer("Insufficient Funds", "You can't afford this bet.")));
         }
 
         await debitGameBet(user.wallet!.id, bet, {
@@ -80,14 +114,7 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
             timeout: null
         };
 
-        const embed = new EmbedBuilder()
-            .setTitle(`${Mascot.Emotes.Gun} Russian Roulette | Bet: ${fmtCurrency(bet)}`)
-            .setDescription(`**${message.author.username}** has loaded the gun!\n\nType \`${prefix}rr join\` to play.\nType \`${prefix}rr start\` to begin immediately.`)
-            .addFields({ name: "Players (1/6)", value: `1. ${message.author.username}` })
-            .setColor(Colors.DarkRed)
-            .setFooter({ text: "Lobby closes in 60s" });
-
-        const msg = await message.reply({ embeds: [embed] });
+        const msg = await message.reply(v2Reply(buildLobbyContainer(newLobby, prefix)));
         newLobby.message = msg;
 
         // Auto-start timer
@@ -109,18 +136,18 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
     // --- JOIN ---
     if (sub === "join") {
         if (!lobby || lobby.status !== "WAITING") {
-            return message.reply({ embeds: [errorEmbed(message.author, "No Lobby", "There is no open lobby in this channel. Start one with `" + prefix + "rr start <amount>`!")] });
+            return message.reply(v2Reply(errorContainer("No Lobby", "There is no open lobby in this channel. Start one with `" + prefix + "rr start <amount>`!")));
         }
         if (lobby.players.some(p => p.id === message.author.id)) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Already Joined", "You are already in the game.")] });
+            return message.reply(v2Reply(errorContainer("Already Joined", "You are already in the game.")));
         }
         if (lobby.players.length >= MAX_PLAYERS) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Lobby Full", "Maximum 6 players allowed.")] });
+            return message.reply(v2Reply(errorContainer("Lobby Full", "Maximum 6 players allowed.")));
         }
 
         const user = await ensureUserAndWallet(message.author.id, message.guildId!, message.author.username);
         if (user.wallet!.balance < lobby.betAmount) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", `You need **${fmtCurrency(lobby.betAmount)}** to join.`)] });
+            return message.reply(v2Reply(errorContainer("Insufficient Funds", `You need **${fmtCurrency(lobby.betAmount)}** to join.`)));
         }
 
         await debitGameBet(user.wallet!.id, lobby.betAmount, {
@@ -134,11 +161,8 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
 
         lobby.players.push({ id: message.author.id, username: message.author.username, walletId: user.wallet!.id });
 
-        // Update Embed
-        const embed = new EmbedBuilder(lobby.message!.embeds[0].data)
-            .setFields({ name: `Players (${lobby.players.length}/6)`, value: lobby.players.map((p, i) => `${i + 1}. ${p.username}`).join("\n") });
-
-        await lobby.message!.edit({ embeds: [embed] });
+        // Update lobby frame from state
+        await lobby.message!.edit({ components: [buildLobbyContainer(lobby, prefix)], flags: MessageFlags.IsComponentsV2 });
         message.delete().catch(() => { }); // Clean up join command
         return;
     }
@@ -147,10 +171,10 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
     if ((sub === "force" || sub === "start") && lobby) {
         if (message.author.id !== lobby.hostId) {
             // Allow start if it's "start" command but check lobby existence handled above
-            return message.reply({ embeds: [errorEmbed(message.author, "Not Host", "Only the host can force start.")] });
+            return message.reply(v2Reply(errorContainer("Not Host", "Only the host can force start.")));
         }
         if (lobby.players.length < MIN_PLAYERS) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Not Enough Players", `Need at least ${MIN_PLAYERS} players.`)] });
+            return message.reply(v2Reply(errorContainer("Not Enough Players", `Need at least ${MIN_PLAYERS} players.`)));
         }
         if (lobby.timeout) clearTimeout(lobby.timeout);
         startGame(message.channelId, message);
@@ -158,14 +182,14 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
     }
 
     // Default Help
-    const helpEmbed = new EmbedBuilder()
-        .setTitle(`${Mascot.Emotes.Gun} Russian Roulette Help`)
-        .setDescription(`High stakes, one bullet. Survivor takes the dead man's share.\n\n` +
-            `\`${prefix}rr start <amount>\` - Host a game\n` +
-            `\`${prefix}rr join\` - Join a game\n` +
-            `\`${prefix}rr force\` - Start game immediately (Host only)`)
-        .setColor(Colors.DarkButNotBlack);
-    return message.reply({ embeds: [helpEmbed] });
+    const helpContainer = plainContainer(
+        `## ${Mascot.Emotes.Gun} Russian Roulette Help\n` +
+        `High stakes, one bullet. Survivor takes the dead man's share.\n\n` +
+        `\`${prefix}rr start <amount>\` - Host a game\n` +
+        `\`${prefix}rr join\` - Join a game\n` +
+        `\`${prefix}rr force\` - Start game immediately (Host only)`
+    );
+    return message.reply(v2Reply(helpContainer));
 }
 
 async function cancelGame(channelId: string, message: Message, reason: string) {
@@ -187,8 +211,8 @@ async function cancelGame(channelId: string, message: Message, reason: string) {
         });
     }
 
-    const embed = errorEmbed(message.author, "Game Cancelled", reason + "\nAll bets refunded.");
-    if (lobby.message) await lobby.message.reply({ embeds: [embed] });
+    const container = errorContainer("Game Cancelled", reason + "\nAll bets refunded.");
+    if (lobby.message) await lobby.message.reply(v2Reply(container));
 }
 
 async function startGame(channelId: string, message: Message) {
@@ -201,14 +225,15 @@ async function startGame(channelId: string, message: Message) {
     // Shuffle players
     const players = lobby.players.sort(() => Math.random() - 0.5);
 
-    // Initial Game Embed
-    const embed = new EmbedBuilder()
-        .setTitle(`${Mascot.Emotes.Rip} Russian Roulette Started`)
-        .setDescription(`The cylinder is spun... **${players.length}** players stand in a circle.\nThere is **1 bullet** in **6 chambers**.\n\nChecking chamber 1...`)
-        .setColor(Colors.Gold)
-        .addFields({ name: "Turn Order", value: players.map((p, i) => `${i + 1}. ${p.username}`).join(" -> ") });
+    // Initial Game Frame
+    const startTitle = `${Mascot.Emotes.Rip} Russian Roulette Started`;
+    const gameContainer = buildRoundContainer({
+        title: startTitle,
+        description: `The cylinder is spun... **${players.length}** players stand in a circle.\nThere is **1 bullet** in **6 chambers**.\n\nChecking chamber 1...`,
+        players,
+    });
 
-    const newMsg = await (message.channel as any).send({ embeds: [embed] });
+    const newMsg = await (message.channel as any).send(v2Reply(gameContainer));
     lobby.message = newMsg;
 
     // Game Loop
@@ -232,27 +257,32 @@ async function startGame(channelId: string, message: Message) {
         // Build status string
         let status = `Round ${chamber} | **${currentPlayer.username}** holds the gun...`;
 
-        // Update Embed with "Thinking..." state
-        const suspenseEmbed = new EmbedBuilder(embed.data)
-            .setDescription(status + `\n${Mascot.Emotes.Shocked} *Sweating...*`)
-            .setColor(Colors.Yellow);
-        await lobby.message!.edit({ embeds: [suspenseEmbed] });
+        // Update frame with "Thinking..." state
+        const suspenseContainer = buildRoundContainer({
+            title: startTitle,
+            description: status + `\n${Mascot.Emotes.Shocked} *Sweating...*`,
+            players,
+        });
+        await lobby.message!.edit({ components: [suspenseContainer], flags: MessageFlags.IsComponentsV2 });
 
         await new Promise(r => setTimeout(r, 2500));
 
         if (isHit) {
             deadPlayer = currentPlayer;
-            const deathEmbed = new EmbedBuilder(embed.data)
-                .setTitle(`${Mascot.Emotes.Fail} BANG!`)
-                .setDescription(`**${currentPlayer.username}** pulled the trigger... **BANG!**\nThey drop to the floor.`)
-                .setColor(Colors.Red)
-                .setImage("https://media.tenor.com/tH0-x5aC0HAAAAAC/gun-reload.gif"); // Placeholder or just use text
-            await lobby.message!.edit({ embeds: [deathEmbed] });
+            const deathContainer = buildRoundContainer({
+                title: `${Mascot.Emotes.Fail} BANG!`,
+                description: `**${currentPlayer.username}** pulled the trigger... **BANG!**\nThey drop to the floor.`,
+                players,
+                imageUrl: "https://media.tenor.com/tH0-x5aC0HAAAAAC/gun-reload.gif", // Placeholder or just use text
+            });
+            await lobby.message!.edit({ components: [deathContainer], flags: MessageFlags.IsComponentsV2 });
         } else {
-            const safeEmbed = new EmbedBuilder(embed.data)
-                .setDescription(`**${currentPlayer.username}** pulled the trigger... **CLICK!**\nThey sigh in relief. Passing the gun.`)
-                .setColor(Colors.Green);
-            await lobby.message!.edit({ embeds: [safeEmbed] });
+            const safeContainer = buildRoundContainer({
+                title: startTitle,
+                description: `**${currentPlayer.username}** pulled the trigger... **CLICK!**\nThey sigh in relief. Passing the gun.`,
+                players,
+            });
+            await lobby.message!.edit({ components: [safeContainer], flags: MessageFlags.IsComponentsV2 });
 
             chamber++;
             turnIndex++;
@@ -306,15 +336,16 @@ async function startGame(channelId: string, message: Message) {
 
         const winMsg = winners.map(w => `**${w.username}** (+${fmtCurrency(winAmount - lobby.betAmount)})`).join(", ");
 
-        const finalEmbed = new EmbedBuilder()
-            .setTitle(`${Mascot.Emotes.Rip} Game Over`)
-            .setDescription(`**${deadPlayer.username}** is eliminated!\n\nThe survivors split the pot:\n${winMsg}`)
-            .setColor(Colors.DarkButNotBlack)
-            .setTimestamp();
+        const finalBlocks = [
+            `## ${Mascot.Emotes.Rip} Game Over\n**${deadPlayer.username}** is eliminated!\n\nThe survivors split the pot:\n${winMsg}`,
+        ];
+        const hint = nextStepHint("casino", prefix);
+        if (hint) finalBlocks.push(hint);
+        const finalContainer = plainContainer(...finalBlocks);
 
         // Final delay before showing results
         await new Promise(r => setTimeout(r, 1000));
-        await lobby.message!.reply({ embeds: [finalEmbed] });
+        await lobby.message!.reply(v2Reply(finalContainer));
     } else {
         // Should not happen in 1-bullet fixed logic unless logic fails
         cancelGame(channelId, message, "The gun jammed? (Error)");

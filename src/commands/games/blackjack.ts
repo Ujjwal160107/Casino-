@@ -1,8 +1,9 @@
-import { Message, EmbedBuilder, Colors, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ButtonInteraction } from "discord.js";
+import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ButtonInteraction, ContainerBuilder, SectionBuilder, SeparatorBuilder, SeparatorSpacingSize, TextDisplayBuilder, ThumbnailBuilder, MessageFlags } from "discord.js";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { placeBetWithTransaction } from "../../services/gameService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
-import { successEmbed, errorEmbed } from "../../utils/embed";
+import { errorContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage, acquireActiveGameLock, releaseActiveGameLock } from "../../services/casinoCooldownService";
 import { formatDuration } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
@@ -135,7 +136,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
     const user = await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
     const bet = parseBetAmount(args[0], user.wallet!.balance);
     if (isNaN(bet) || bet <= 0) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Bet", "Please enter a valid amount (e.g., 500, 1k, all).")] });
+        return message.reply(v2Reply(errorContainer("Invalid Bet", "Please enter a valid amount (e.g., 500, 1k, all).")));
     }
     const amount = bet;
     const prefix = await getGuildPrefix(message.guildId!);
@@ -144,29 +145,29 @@ export async function handleBlackjack(message: Message, args: string[]) {
     const eCasino = "<a:casino:1456568719374553138>";
 
     if (amount < min) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Blackjack is **${fmtCurrency(min)}**.`)] });
+        return message.reply(v2Reply(errorContainer("Bet Too Low", `The minimum bet for Blackjack is **${fmtCurrency(min)}**.`)));
     }
     if (amount > max) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Blackjack is **${fmtCurrency(max)}**.`)] });
+        return message.reply(v2Reply(errorContainer("Bet Too High", `The maximum bet for Blackjack is **${fmtCurrency(max)}**.`)));
     }
     const cd = await checkCasinoCooldown("blackjack", message.author.id);
     if (cd.active) {
         const msg = cd.unavailable
             ? "Casino cooldown service is temporarily unavailable. Try again soon."
             : formatCasinoCooldownMessage("blackjack", cd.availableAtUnix!);
-        const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Cooldown Active", msg)] });
+        const cdMsg = await message.reply(v2Reply(errorContainer("Cooldown Active", msg)));
         setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
         return;
     }
 
     if (user.wallet!.balance < amount) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You don't have enough money.")] });
+        return message.reply(v2Reply(errorContainer("Insufficient Funds", "You don't have enough money.")));
     }
 
     // Active-game lock acquired AFTER all validation — so failed checks never lock the user out
     const lockAcquired = await acquireActiveGameLock("blackjack", message.author.id);
     if (!lockAcquired) {
-        const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Game In Progress", "You already have an active Blackjack game. Finish it first.")] });
+        const cdMsg = await message.reply(v2Reply(errorContainer("Game In Progress", "You already have an active Blackjack game. Finish it first.")));
         setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
         return;
     }
@@ -211,27 +212,51 @@ export async function handleBlackjack(message: Message, args: string[]) {
             payout = Math.ceil(currentBet * 2.5 * luckyCoinMultiplier);
         }
     }
-    const getEmbed = (reveal: boolean) => {
+    const getContainer = (reveal: boolean) => {
         const pScore = calculateScore(playerHand);
         const dScore = reveal ? calculateScore(dealerHand) : calculateScore(dealerHand.slice(1));
-        const embed = new EmbedBuilder().setTitle(`${eCasino} Blackjack Table`).setColor(gameOver ? (payout > currentBet ? Colors.Green : (payout === currentBet ? Colors.Yellow : Colors.Red)) : Colors.Blue).addFields({ name: `Your Hand (${pScore})`, value: formatHand(playerHand), inline: true }, { name: `Dealer's Hand (${dScore})`, value: formatHand(dealerHand, !reveal), inline: true });
-        let statusText = `**Bet:** ${fmtCurrency(currentBet)}`;
+
+        let body = `## ${eCasino} Blackjack Table\n`;
+        body += `**Your Hand (${pScore})**\n${formatHand(playerHand)}\n`;
+        body += `**Dealer's Hand (${dScore})**\n${formatHand(dealerHand, !reveal)}\n\n`;
+        body += `**Bet:** ${fmtCurrency(currentBet)}`;
+
+        let thumbUrl: string | undefined;
         if (gameOver) {
-            statusText += `\n\n**${result}**\n${payout > 0 ? `**Payout:** ${fmtCurrency(payout)}` : ""}`;
+            body += `\n\n**${result}**\n${payout > 0 ? `**Payout:** ${fmtCurrency(payout)}` : ""}`;
 
             const winUrl = getEmoteUrl(Mascot.Emotes.Money);
             const failUrl = getEmoteUrl(Mascot.Emotes.Fail);
 
-            if (payout > currentBet && winUrl) embed.setThumbnail(winUrl);
-            else if (payout === 0 && failUrl) embed.setThumbnail(failUrl);
+            if (payout > currentBet && winUrl) thumbUrl = winUrl;
+            else if (payout === 0 && failUrl) thumbUrl = failUrl;
 
         } else {
-            statusText += `\n\n**Hit** - Take another card\n**Stand** - End the game\n**Double Down** - Double your bet, hit once, then stand`;
-            if (hasLuckyCoin) statusText += `\n\n🪙 **Lucky Coin active!** Wins pay **${(luckyCoinMultiplier * 100).toFixed(0)}%** more.`;
+            body += `\n\n**Hit** - Take another card\n**Stand** - End the game\n**Double Down** - Double your bet, hit once, then stand`;
+            if (hasLuckyCoin) body += `\n\n🪙 **Lucky Coin active!** Wins pay **${(luckyCoinMultiplier * 100).toFixed(0)}%** more.`;
         }
-        embed.setDescription(statusText);
-        embed.setFooter({ text: `${Mascot.Name} • ${message.author.username}'s Game` });
-        return embed;
+
+        const container = new ContainerBuilder();
+        if (thumbUrl) {
+            container.addSectionComponents(
+                new SectionBuilder()
+                    .addTextDisplayComponents(new TextDisplayBuilder().setContent(body))
+                    .setThumbnailAccessory(new ThumbnailBuilder().setURL(thumbUrl)),
+            );
+        } else {
+            container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+        }
+
+        if (gameOver) {
+            const hint = nextStepHint("casino", prefix);
+            if (hint) {
+                container.addSeparatorComponents(
+                    new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false),
+                );
+                container.addTextDisplayComponents(new TextDisplayBuilder().setContent(hint));
+            }
+        }
+        return container;
     };
 
     const getRows = (disabled: boolean) => {
@@ -255,12 +280,14 @@ export async function handleBlackjack(message: Message, args: string[]) {
             questBus.emit("casino:play", { discordId: user.discordId, bet: amount });
             if (payout > currentBet) questBus.emit("casino:win", { discordId: user.discordId, game: "blackjack" });
         } catch (e) {
-            return message.reply({ content: "Transaction failed." });
+            return message.reply(v2Reply(errorContainer("Transaction Failed", "Transaction failed.")));
         }
-        return message.reply({ embeds: [getEmbed(true)] });
+        return message.reply(v2Reply(getContainer(true)));
     }
 
-    const msg = await message.reply({ embeds: [getEmbed(false)], components: getRows(false) });
+    const dealContainer = getContainer(false);
+    for (const row of getRows(false)) dealContainer.addActionRowComponents(row);
+    const msg = await message.reply(v2Reply(dealContainer));
     const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60_000 });
 
     collector.on("collect", async (i) => {
@@ -299,7 +326,9 @@ export async function handleBlackjack(message: Message, args: string[]) {
         }
 
         if (!gameOver) {
-            await i.update({ embeds: [getEmbed(false)], components: getRows(false) });
+            const updateContainer = getContainer(false);
+            for (const row of getRows(false)) updateContainer.addActionRowComponents(row);
+            await i.update({ components: [updateContainer], flags: MessageFlags.IsComponentsV2 });
         } else {
             if (playerScore <= 21) {
                 while (dealerScore < 17) {
@@ -329,7 +358,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
                 if (cp2 === 0 && currentBet > 300_000) await recordPotentialSoulLedgerLoss(user.discordId, cs2);
                 actualPayout = await placeBetWithTransaction(user.discordId, user.wallet!.id, "blackjack", cs2, "blackjack", cp2 > cs2, cp2, message.guildId!);
             } catch (e) {
-                await msg.edit({ content: `Transaction failed: ${(e as Error).message}`, embeds: [], components: [] });
+                await msg.edit(v2Reply(errorContainer("Transaction Failed", (e as Error).message)));
                 return;
             }
             payout = actualPayout;
@@ -349,7 +378,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
                 }).catch(() => { });
             });
 
-            await msg.edit({ embeds: [getEmbed(true)], components: [] });
+            await msg.edit({ components: [getContainer(true)], flags: MessageFlags.IsComponentsV2 });
         }
     });
 
@@ -365,7 +394,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
                 if (cp3 === 0 && currentBet > 300_000) await recordPotentialSoulLedgerLoss(user.discordId, cs3);
                 actualPayout = await placeBetWithTransaction(user.discordId, user.wallet!.id, "blackjack", cs3, "blackjack", cp3 > cs3, cp3, message.guildId!);
             } catch (e) {
-                await msg.edit({ content: `Transaction failed: ${(e as Error).message}`, components: [] });
+                await msg.edit(v2Reply(errorContainer("Transaction Failed", (e as Error).message)));
                 return;
             }
             payout = actualPayout;
@@ -374,7 +403,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
             questBus.emit("casino:play", { discordId: user.discordId, bet: amount });
             // No WIN_BLACKJACK update
 
-            await msg.edit({ embeds: [getEmbed(true)], components: [] });
+            await msg.edit({ components: [getContainer(true)], flags: MessageFlags.IsComponentsV2 });
         }
     });
 }

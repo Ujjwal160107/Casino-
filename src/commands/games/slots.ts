@@ -1,9 +1,9 @@
-import { ContainerBuilder, Message, MessageFlags, TextDisplayBuilder } from "discord.js";
-import { Mascot } from "../../config/branding";
+import { Message } from "discord.js";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { placeBetWithTransaction } from "../../services/gameService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
-import { errorEmbed } from "../../utils/embed";
+import { successContainer, errorContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage } from "../../services/casinoCooldownService";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { questBus } from "../../services/questEvents";
@@ -27,14 +27,6 @@ export const SLOTS_PAYOUT_TABLE = [
   { chance: 0.070, multiplier: 3, symbols: [GRAPES, MELON] },
   { chance: 0.150, multiplier: 2, symbols: [CHERRY, BANANA] }
 ];
-
-function buildSlotsContainer(title: string, body: string, accent: number) {
-  return new ContainerBuilder()
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`## ${title}`),
-      new TextDisplayBuilder().setContent(body),
-    );
-}
 
 export function getSpinResult(): { reels: string[], win: boolean, multiplier: number, payout: number } {
   return getSpinResultWithLuck(50);
@@ -81,15 +73,15 @@ export async function handleSlots(message: Message, args: string[]) {
   
 
   if (!Number.isInteger(amount) || amount <= 0) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Invalid Bet", `Usage: \`${prefix}slots <amount>\``)] });
+    return message.reply(v2Reply(errorContainer("Invalid Bet", `Usage: \`${prefix}slots <amount>\``)));
   }
 
   const { min, max } = getGameBetLimits("slots");
   if (amount < min) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Slots is **${fmtCurrency(min)}**.`)] });
+    return message.reply(v2Reply(errorContainer("Bet Too Low", `The minimum bet for Slots is **${fmtCurrency(min)}**.`)));
   }
   if (amount > max) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Slots is **${fmtCurrency(max)}**.`)] });
+    return message.reply(v2Reply(errorContainer("Bet Too High", `The maximum bet for Slots is **${fmtCurrency(max)}**.`)));
   }
 
   const cd = await checkCasinoCooldown("slots", message.author.id);
@@ -97,13 +89,13 @@ export async function handleSlots(message: Message, args: string[]) {
     const msg = cd.unavailable
       ? "Casino cooldown service is temporarily unavailable. Try again soon."
       : formatCasinoCooldownMessage("slots", cd.availableAtUnix!);
-    const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Cooldown Active", msg)] });
+    const cdMsg = await message.reply(v2Reply(errorContainer("Cooldown Active", msg)));
     setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
     return;
   }
 
   if (!user.wallet || user.wallet.balance < amount) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You don't have enough money in your wallet.")] });
+    return message.reply(v2Reply(errorContainer("Insufficient Funds", "You don't have enough money in your wallet.")));
   }
 
   const luckyCoinMult = await checkLuckyCoin(message.author.id);
@@ -164,8 +156,9 @@ export async function handleSlots(message: Message, args: string[]) {
     `Wallet: **${fmtCurrency(wallet)}**`
   ].join("\n");
 
-  return message.reply({
-    components: [buildSlotsContainer(win ? "Slots Won" : "Slots Lost", body, win ? 0x2ECC71 : 0xE74C3C)],
-    flags: MessageFlags.IsComponentsV2
-  });
+  const resultContainer = win
+    ? successContainer("Slots Won", body, { hint: nextStepHint("casino") })
+    : errorContainer("Slots Lost", body, { hint: nextStepHint("casino") });
+
+  return message.reply(v2Reply(resultContainer));
 }

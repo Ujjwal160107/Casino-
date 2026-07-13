@@ -1,19 +1,21 @@
 import {
   Message,
-  EmbedBuilder,
-  Colors,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
   ButtonInteraction,
-  AttachmentBuilder
+  AttachmentBuilder,
+  MessageFlags,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder
 } from "discord.js";
 import path from "path";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { placeBetWithTransaction } from "../../services/gameService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
-import { successEmbed, errorEmbed } from "../../utils/embed";
+import { errorContainer, plainContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage } from "../../services/casinoCooldownService";
 import { formatDuration } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
@@ -37,12 +39,6 @@ export async function handleRouletteMenu(message: Message) {
   const bannerPath = path.join(process.cwd(), "src", "assets", "roulette_banner.png");
   const attachment = new AttachmentBuilder(bannerPath, { name: "roulette_banner.png" });
 
-  const embed = new EmbedBuilder()
-    .setTitle(`${eCasino} Roulette Table`)
-    .setDescription(`Welcome to ${Mascot.Name}'s Casino! Test your luck on the wheel.`)
-    .setColor(Colors.Red)
-    .setImage("attachment://roulette_banner.png")
-    .setFooter({ text: "Click 'Guide' for rules or 'Play' to start." });
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId("roul_guide")
@@ -55,7 +51,19 @@ export async function handleRouletteMenu(message: Message) {
       .setStyle(ButtonStyle.Success)
       .setEmoji(parseEmojiId(eDicesBtn))
   );
-  const sent = await message.reply({ embeds: [embed], components: [row], files: [attachment] });
+
+  const menuContainer = plainContainer(
+    `## ${eCasino} Roulette Table\n` +
+    `Welcome to ${Mascot.Name}'s Casino! Test your luck on the wheel.`
+  );
+  menuContainer.addMediaGalleryComponents(
+    new MediaGalleryBuilder().addItems(
+      new MediaGalleryItemBuilder().setURL("attachment://roulette_banner.png")
+    )
+  );
+  menuContainer.addActionRowComponents(row);
+
+  const sent = await message.reply(v2Reply(menuContainer, [attachment]));
   const collector = sent.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 60_000
@@ -69,22 +77,23 @@ export async function handleRouletteMenu(message: Message) {
       const bannerPath = path.join(process.cwd(), "src", "assets", "roulette_guide.png");
       const guideAttachment = new AttachmentBuilder(bannerPath, { name: "roulette_guide.png" });
 
-      const guideEmbed = new EmbedBuilder()
-        .setTitle(`Roulette Rules`)
-        .setColor(Colors.Blue)
-        .setDescription(
-          `**Payout Multipliers:**\n` +
-          `[x36] Single Number\n` +
-          `[x 3] Dozens (1-12, 13-24, 25-36)\n` +
-          `[x 3] Columns (1st, 2nd, 3rd)\n` +
-          `[x 2] Halves (1-18, 19-36)\n` +
-          `[x 2] Odd/Even\n` +
-          `[x 2] Colours (red, black)`
+      const guideContainer = plainContainer(
+        `## Roulette Rules\n` +
+        `**Payout Multipliers:**\n` +
+        `[x36] Single Number\n` +
+        `[x 3] Dozens (1-12, 13-24, 25-36)\n` +
+        `[x 3] Columns (1st, 2nd, 3rd)\n` +
+        `[x 2] Halves (1-18, 19-36)\n` +
+        `[x 2] Odd/Even\n` +
+        `[x 2] Colours (red, black)`
+      );
+      guideContainer.addMediaGalleryComponents(
+        new MediaGalleryBuilder().addItems(
+          new MediaGalleryItemBuilder().setURL("attachment://roulette_guide.png")
         )
-        .setImage("attachment://roulette_guide.png")
-        .setFooter({ text: `${Mascot.Name} Tips` });
+      );
 
-      await i.reply({ embeds: [guideEmbed], files: [guideAttachment], ephemeral: true });
+      await i.reply(v2Reply(guideContainer, [guideAttachment], MessageFlags.Ephemeral));
     }
     if (i.customId === "roul_play") {
       await i.reply({
@@ -107,33 +116,29 @@ export async function handleBet(message: Message, args: string[]) {
   }
 
   if (isNaN(amount) || amount <= 0) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Invalid Wager", "Please bet a valid positive amount.")] });
+    return message.reply(v2Reply(errorContainer("Invalid Wager", "Please bet a valid positive amount.")));
   }
   const prefix = await getGuildPrefix(message.guildId!);
-  
+
   const { min, max } = getGameBetLimits("roulette");
   if (amount < min) {
-    return message.reply({
-      embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Roulette is **${fmtCurrency(min)}**.`)]
-    });
+    return message.reply(v2Reply(errorContainer("Bet Too Low", `The minimum bet for Roulette is **${fmtCurrency(min)}**.`)));
   }
   if (amount > max) {
-    return message.reply({
-      embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Roulette is **${fmtCurrency(max)}**.`)]
-    });
+    return message.reply(v2Reply(errorContainer("Bet Too High", `The maximum bet for Roulette is **${fmtCurrency(max)}**.`)));
   }
   const cd = await checkCasinoCooldown("roulette", message.author.id);
   if (cd.active) {
     const msg = cd.unavailable
       ? "Casino cooldown service is temporarily unavailable. Try again soon."
       : formatCasinoCooldownMessage("roulette", cd.availableAtUnix!);
-    const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Cooldown Active", msg)] });
+    const cdMsg = await message.reply(v2Reply(errorContainer("Cooldown Active", msg)));
     setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
     return;
   }
   // ... (validations passed) ...
   if (user.wallet!.balance < amount) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", "You don't have enough money in your wallet.")] });
+    return message.reply(v2Reply(errorContainer("Insufficient Funds", "You don't have enough money in your wallet.")));
   }
 
   const luckyCoinMult = await checkLuckyCoin(message.author.id);
@@ -141,13 +146,17 @@ export async function handleBet(message: Message, args: string[]) {
   // SPIN ANIMATION
   const spinTime = GAME_UI_TIMINGS.rouletteSpinSeconds;
   const eCasino = "<a:casino:1456568719374553138>";
-  const spinningEmbed = new EmbedBuilder()
-    .setTitle(`${eCasino} The wheel is spinning...`)
-    .setDescription(`Rolling the ball... Good luck!`)
-    .setColor(Colors.Yellow)
-    .setImage("https://media.tenor.com/7gKkK6W85GgAAAAC/roulette-casino.gif");
+  const spinningContainer = plainContainer(
+    `## ${eCasino} The wheel is spinning...\n` +
+    `Rolling the ball... Good luck!`
+  );
+  spinningContainer.addMediaGalleryComponents(
+    new MediaGalleryBuilder().addItems(
+      new MediaGalleryItemBuilder().setURL("https://media.tenor.com/7gKkK6W85GgAAAAC/roulette-casino.gif")
+    )
+  );
 
-  const spinMsg = await message.reply({ embeds: [spinningEmbed] });
+  const spinMsg = await message.reply(v2Reply(spinningContainer));
   await new Promise(resolve => setTimeout(resolve, spinTime * 1000));
 
   const spin = Math.floor(Math.random() * 37);
@@ -200,7 +209,7 @@ export async function handleBet(message: Message, args: string[]) {
     } else {
       // Clean up if error
       await spinMsg.delete().catch(() => { });
-      return message.reply({ embeds: [errorEmbed(message.author, "Invalid Choice", "Bet on `red`, `black`, `odd`, `even`, `1-12`, `13-24`, `25-36`, `1st`, `2nd`, `3rd`, `1-18`, `19-36`, or a number `0-36`.")] });
+      return message.reply(v2Reply(errorContainer("Invalid Choice", "Bet on `red`, `black`, `odd`, `even`, `1-12`, `13-24`, `25-36`, `1st`, `2nd`, `3rd`, `1-18`, `19-36`, or a number `0-36`.")));
     }
   }
   let payout = await placeBetWithTransaction(
@@ -236,15 +245,15 @@ export async function handleBet(message: Message, args: string[]) {
   const eRedCoin = "<:redcoin:1456569008273883176>";
   const eBlackCoin = "<:BlackCoin:1446217613632999565>";
   const displayColor = spin === 0 ? "🟢" : (isRed ? eRedCoin : eBlackCoin);
-  const resultEmbed = new EmbedBuilder()
-    .setTitle(didWin ? `${Mascot.Emotes.Money} Winner!` : `${Mascot.Emotes.Fail} You Lost`)
-    .setColor(didWin ? Colors.Green : Colors.Red)
-    .setDescription(
-      `**Result:** ${displayColor} **${spin}**\n` +
-      `**Your Bet:** ${choiceRaw}\n` +
-      `**${didWin ? "Won" : "Lost"}:** ${fmtCurrency(didWin ? payout : amount)}`
-    )
-    .setFooter({ text: `${Mascot.Name} • ${message.author.username}'s Wallet: ${(user.wallet!.balance - amount + payout).toLocaleString('en-US')}` });
+  const resultTitle = didWin ? `${Mascot.Emotes.Money} Winner!` : `${Mascot.Emotes.Fail} You Lost`;
+  const resultBody =
+    `**Result:** ${displayColor} **${spin}**\n` +
+    `**Your Bet:** ${choiceRaw}\n` +
+    `**${didWin ? "Won" : "Lost"}:** ${fmtCurrency(didWin ? payout : amount)}`;
 
-  return message.reply({ content: `<@${message.author.id}>`, embeds: [resultEmbed] });
+  const resultBlocks = [`<@${message.author.id}>\n## ${resultTitle}\n${resultBody}`];
+  const hint = nextStepHint("casino", prefix);
+  if (hint) resultBlocks.push(hint);
+
+  return message.reply(v2Reply(plainContainer(...resultBlocks)));
 }
