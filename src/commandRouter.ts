@@ -39,7 +39,7 @@ import { handleCoinflip } from "./commands/games/coinflip";
 import { handleRussianRoulette } from "./commands/games/russianRoulette";
 import { handleSlots } from "./commands/games/slots";
 import { handleCockFight } from "./commands/games/cockfight";
-import { errorEmbed } from "./utils/embed";
+import { errorContainer, v2Reply } from "./utils/componentsV2";
 import { findBestMatch } from "./utils/stringUtils";
 import { handleUse } from "./commands/economy/use";
 import { handleItemInfo } from "./commands/economy/iteminfo";
@@ -190,21 +190,16 @@ async function getUserRecord(message: Message) {
       return { ...user, isBanned: false, banExpiresAt: null };
     }
 
-    await message.reply({
-      embeds: [
-        errorEmbed(
-          message.author,
-          "Banned",
-          `You are banned from the casino until <t:${Math.floor(user.banExpiresAt.getTime() / 1000)}:R>.`
-        )
-      ]
-    });
+    await message.reply(
+      v2Reply(errorContainer(
+        "Banned",
+        `You are banned from the casino until <t:${Math.floor(user.banExpiresAt.getTime() / 1000)}:R>.`
+      ))
+    );
     return "blocked";
   }
 
-  await message.reply({
-    embeds: [errorEmbed(message.author, "Banned", "You are permanently banned from the casino.")]
-  });
+  await message.reply(v2Reply(errorContainer("Banned", "You are permanently banned from the casino.")));
   return "blocked";
 }
 
@@ -220,15 +215,11 @@ export async function routeMessage(client: Client, message: Message, prefix: str
   const botDeveloper = isBotDeveloper(message.author.id) || isTester(message.author.id);
 
   if (developerOnlyCommand && !botDeveloper) {
-    return message.reply({
-      embeds: [errorEmbed(message.author, "Developer Only", DEVELOPER_ONLY_COMMAND_MESSAGE)]
-    });
+    return message.reply(v2Reply(errorContainer("Developer Only", DEVELOPER_ONLY_COMMAND_MESSAGE)));
   }
 
   if (LEGACY_REMOVED_COMMANDS.has(normalized)) {
-    return message.reply({
-      embeds: [errorEmbed(message.author, "Removed Command", LEGACY_SYSTEM_REMOVED_MESSAGE)]
-    });
+    return message.reply(v2Reply(errorContainer("Removed Command", LEGACY_SYSTEM_REMOVED_MESSAGE)));
   }
 
   const restrictedInJail = new Set([
@@ -241,15 +232,12 @@ export async function routeMessage(client: Client, message: Message, prefix: str
   if (restrictedInJail.has(normalized) && user) {
     const { isJailed } = await checkJailStatus(user.discordId);
     if (isJailed) {
-      return message.reply({
-        embeds: [
-          errorEmbed(
-            message.author,
-            `${Mascot.Emotes.Lock} You are in Jail`,
-            `You cannot perform this action while incarcerated. Use \`${prefix}jail\` to check your status or \`${prefix}bail\` to pay your way out.`
-          )
-        ]
-      });
+      return message.reply(
+        v2Reply(errorContainer(
+          `${Mascot.Emotes.Lock} You are in Jail`,
+          `You cannot perform this action while incarcerated. Use \`${prefix}jail\` to check your status or \`${prefix}bail\` to pay your way out.`
+        ))
+      );
     }
   }
 
@@ -609,22 +597,22 @@ export async function routeMessage(client: Client, message: Message, prefix: str
         "credit", "ask", "ask-money", "set-prefix", "help", "guide", "jobs", "education", "relax"
       ];
 
-      const thinkUrl = getEmoteUrl(Mascot.Emotes.Think);
+      const thinkUrl = getEmoteUrl(Mascot.Emotes.Think) ?? undefined;
       const bestMatch = findBestMatch(normalized, validCommands);
 
       if (bestMatch) {
-        const embed = errorEmbed(message.author, "Unknown Command", `Did you mean \`${prefix}${bestMatch}\`?`);
-        if (thinkUrl) embed.setThumbnail(thinkUrl);
-        return message.reply({ embeds: [embed] });
+        return message.reply(
+          v2Reply(errorContainer("Unknown Command", `Did you mean \`${prefix}${bestMatch}\`?`, { thumbnailUrl: thinkUrl }))
+        );
       }
 
-      const embed = errorEmbed(
-        message.author,
-        "Unknown Command",
-        `Command not found. Try: \`${prefix}bal\`, \`${prefix}bank\`, \`${prefix}profile\`, \`${prefix}help\`.`
+      return message.reply(
+        v2Reply(errorContainer(
+          "Unknown Command",
+          `Command not found. Try: \`${prefix}bal\`, \`${prefix}bank\`, \`${prefix}profile\`, \`${prefix}help\`.`,
+          { thumbnailUrl: thinkUrl }
+        ))
       );
-      if (thinkUrl) embed.setThumbnail(thinkUrl);
-      return message.reply({ embeds: [embed] });
     }
   }
 }
