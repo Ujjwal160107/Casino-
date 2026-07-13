@@ -17,7 +17,7 @@ import { fmtCurrency } from "../../utils/format";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 import { getNetWorthMany, NetWorthBreakdown } from "../../services/netWorthService";
 
-type LbType = "net" | "cash" | "bank" | "shifts";
+type LbType = "net" | "cash" | "bank" | "shifts" | "passive";
 type LbScope = "global" | "server";
 
 const TITLES: Record<LbType, string> = {
@@ -25,6 +25,7 @@ const TITLES: Record<LbType, string> = {
     cash: "Cash Leaderboard",
     bank: "Bank Leaderboard",
     shifts: "Top Workers",
+    passive: "Passive Income Leaderboard",
 };
 
 const SUBTITLES: Record<LbType, string> = {
@@ -32,6 +33,7 @@ const SUBTITLES: Record<LbType, string> = {
     cash: "Highest wallet balance",
     bank: "Bank balance + active FD/RD deposits",
     shifts: "Most lifetime shifts worked",
+    passive: "Highest income per day — property rent + zoo",
 };
 
 type LbUser = {
@@ -56,16 +58,14 @@ function valueOf(u: LbUser, type: LbType): number {
         case "cash": return u.walletBalance;
         case "bank": return u.bankBalance + (u.net?.investments ?? 0);
         case "shifts": return u.shiftsWorked;
+        case "passive": return u.net?.passiveIncomePerDay ?? 0;
     }
 }
 
 function formatValue(u: LbUser, type: LbType): string {
     if (type === "shifts") return `${u.shiftsWorked.toLocaleString()} shifts`;
-    const base = fmtCurrency(valueOf(u, type));
-    if (type === "net" && u.net && u.net.passiveIncomePerDay > 0) {
-        return `${base} · ⚡${fmtCurrency(u.net.passiveIncomePerDay)}/day`;
-    }
-    return base;
+    if (type === "passive") return `${fmtCurrency(valueOf(u, type))}/day`;
+    return fmtCurrency(valueOf(u, type));
 }
 
 function sortUsers(users: LbUser[], type: LbType): LbUser[] {
@@ -85,12 +85,7 @@ function buildYourRankText(users: LbUser[], ownerId: string, type: LbType): stri
     const idx = sorted.findIndex((u) => u.discordId === ownerId);
     if (idx === -1) return null;
     const u = sorted[idx];
-    let line = `${Mascot.Emotes.Think} You are ranked **#${idx + 1}** — ${formatValue(u, type)}`;
-    if (type === "net" && u.net) {
-        const b = u.net;
-        line += `\n-# wallet ${fmtCurrency(b.wallet)} · bank ${fmtCurrency(b.bank + b.investments)} · stocks ${fmtCurrency(b.stocks)} · property ${fmtCurrency(b.properties)} · items ${fmtCurrency(b.items)} · animals ${fmtCurrency(b.animals)}`;
-    }
-    return line;
+    return `${Mascot.Emotes.Think} You are ranked **#${idx + 1}** — ${formatValue(u, type)}`;
 }
 
 function buildTypeSelect(active: LbType, ownerId: string, disabled = false) {
@@ -98,6 +93,7 @@ function buildTypeSelect(active: LbType, ownerId: string, disabled = false) {
         ["net", "Net Worth", "Everything you own, priced"],
         ["cash", "Cash", "Wallet only"],
         ["bank", "Bank", "Bank + FD/RD deposits"],
+        ["passive", "Passive Income", "Income per day — rent + zoo"],
         ["shifts", "Shifts", "Lifetime shifts worked"],
     ];
     return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
@@ -219,7 +215,7 @@ export async function handleLeaderboard(message: Message, args: string[]) {
 
     const render = async (): Promise<ContainerBuilder> => {
         const users = await scopedUsers();
-        if (currentType === "net" || currentType === "bank") {
+        if (currentType === "net" || currentType === "bank" || currentType === "passive") {
             await attachNetWorth(users);
         }
         return buildLeaderboardContainer(users, currentType, currentScope, ownerId);

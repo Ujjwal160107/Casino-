@@ -37,6 +37,12 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm run seed
+      - name: Collapse legacy multi-zoo owners onto their biggest zoo
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        # Idempotent: cleans up players who owned several zoos before the
+        # single-slot upgrade ladder. A harmless no-op once none remain.
+        run: npx ts-node src/scripts/collapseMultiZoos.ts
 
   deploy:
     needs: [build, sync-schema]

@@ -1,7 +1,7 @@
 import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { checkJailStatus, payBail } from "../../services/jailService";
 import { ensureUserAndWallet } from "../../services/walletService";
-import { fmtCurrency, formatDuration } from "../../utils/format";
+import { fmtCurrency, fmtAmount } from "../../utils/format";
 import { successContainer, errorContainer, infoContainer, statusContainer, v2Reply } from "../../utils/componentsV2";
 import { nextStepHint } from "../../config/nextSteps";
 import { DEFAULT_JAIL_FINE } from "../../utils/economyConfig";
@@ -34,7 +34,7 @@ export async function handleJail(message: Message) {
         .addComponents(
             new ButtonBuilder()
                 .setCustomId("pay_bail")
-                .setLabel(`Pay Bail (${fmtCurrency(DEFAULT_JAIL_FINE, "")})`)
+                .setLabel(`Pay Bail (${fmtAmount(DEFAULT_JAIL_FINE)})`)
                 .setStyle(ButtonStyle.Danger)
         );
 

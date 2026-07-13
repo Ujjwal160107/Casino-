@@ -67,7 +67,7 @@ const economy: ModuleDoc = {
       heading: "Keeping score",
       body: [
         "!balance is the quick look; !profile is the full dossier — six pages covering net worth (wallet + bank + stocks + inventory − card debt), career, education, cosmetics with your Flex Rank, relationship, and your hidden profile Luck out of 100.",
-        "!leaderboard is a page with two dropdowns: pick a board — Net Worth (default), Cash, Bank, or Shifts — and a scope, Global or This Server. Net Worth is the real thing: wallet, bank, FD/RD deposits, stocks, property, items, and animals all priced in, with your passive income per day shown alongside. Your own rank shows even when you're not top ten.",
+        "!leaderboard is a page with two dropdowns: pick a board — Net Worth (default), Cash, Bank, Passive Income, or Shifts — and a scope, Global or This Server. Net Worth is the real thing: wallet, bank, FD/RD deposits, stocks, property, items, and animals all priced in. The Passive Income board ranks players by earnings per day from property rent and zoo animals. Your own rank shows even when you're not top ten.",
       ],
     },
     {

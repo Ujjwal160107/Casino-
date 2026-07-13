@@ -135,7 +135,7 @@ const casino: ModuleDoc = {
     "Blackjack's 60-second timer auto-surrenders your whole bet. Never start a hand you can't finish.",
     "The 36× single number is the same house edge as red/black — but the variance will end your bankroll first. Outside bets last; straight-up numbers are lottery tickets.",
     "Russian roulette is the only zero-edge multiplayer game: no cooldown, no cut. It's also the fastest way to lose a full buy-in in one click. Both facts are true.",
-    "Bandage (25,000) exists so a hot streak doesn't have to wait 30 minutes. Cheap enough to keep two.",
+    "Bandage (25,000) exists so a hot streak doesn't have to wait 30 minutes — but it has its own 6-hour use cooldown, so it saves your single most impatient moment per cycle, not every cooldown.",
   ],
 };
 
