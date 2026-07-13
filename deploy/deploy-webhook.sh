@@ -43,27 +43,58 @@ do_deploy() {
     # caller, see handle_request) — never to stdout, which for a --handle
     # invocation is the live TCP socket.
 
+    # Record the pre-pull commit so we can run only the build steps whose inputs
+    # actually changed. Rebuilding everything on every push — especially the
+    # memory-heavy Next.js dashboard build — pegs a small VPS for minutes and
+    # starves the listener, which is what makes the *next* webhook's ack time
+    # out. Conditional builds keep a bot-only push fast and light.
+    local before after
+    before="$(git rev-parse HEAD 2>/dev/null)"
+
     # Pull latest code
     log "📥 Pulling latest code..."
     git pull origin main 2>&1 || { log "❌ git pull failed"; return 1; }
 
-    # --- Bot build ---
-    log "📦 Installing bot dependencies..."
-    npm install 2>&1 || { log "❌ npm install (bot) failed"; return 1; }
+    after="$(git rev-parse HEAD 2>/dev/null)"
+
+    # changed <paths...> → true if anything under those paths changed in the pull.
+    # Unknown baseline (fresh clone) → assume changed; nothing pulled → unchanged.
+    changed() {
+        [ -z "$before" ] && return 0
+        [ "$before" = "$after" ] && return 1
+        ! git diff --quiet "$before" "$after" -- "$@"
+    }
+
+    # --- Bot deps (only when manifests changed) ---
+    if changed package.json package-lock.json; then
+        log "📦 Installing bot dependencies..."
+        npm install 2>&1 || { log "❌ npm install (bot) failed"; return 1; }
+    else
+        log "📦 Bot dependencies unchanged — skipping npm install."
+    fi
 
     log "🔨 Building bot..."
     npm run build 2>&1 || { log "❌ npm run build (bot) failed"; return 1; }
 
-    # --- Prisma ---
-    log "🗄️  Running Prisma db push..."
-    npx prisma db push --accept-data-loss 2>&1 || { log "❌ prisma db push failed"; return 1; }
+    # --- Prisma (only when the schema changed) ---
+    if changed prisma; then
+        log "🗄️  Running Prisma db push..."
+        npx prisma db push --accept-data-loss 2>&1 || { log "❌ prisma db push failed"; return 1; }
+    else
+        log "🗄️  Prisma schema unchanged — skipping db push."
+    fi
 
-    # --- Dashboard build ---
-    log "📦 Installing dashboard dependencies..."
-    (cd dashboard && npm install) 2>&1 || { log "❌ npm install (dashboard) failed"; return 1; }
-
-    log "🔨 Building dashboard..."
-    (cd dashboard && npm run build) 2>&1 || { log "❌ npm run build (dashboard) failed"; return 1; }
+    # --- Dashboard build (only when the dashboard changed) ---
+    # This is the heavy, memory-hungry step; skipping it on bot-only pushes is
+    # the single biggest win for deploy speed and listener responsiveness.
+    if changed dashboard; then
+        log "📦 Installing dashboard dependencies..."
+        (cd dashboard && npm install) 2>&1 || { log "❌ npm install (dashboard) failed"; return 1; }
+        log "🔨 Building dashboard..."
+        (cd dashboard && npm run build) 2>&1 || { log "❌ npm run build (dashboard) failed"; return 1; }
+    else
+        log "🖥️  Dashboard unchanged — skipping build."
+    fi
 
     # --- Restart PM2 ---
     log "♻️  Restarting PM2 processes..."
@@ -127,10 +158,16 @@ handle_request() {
     #     real success/failure of each step is inspectable there.
     echo -ne "HTTP/1.1 200 OK\r\nContent-Length: 14\r\n\r\nDeploy queued!"
 
+    # Detach the background deploy from the socket. socat wires the TCP socket
+    # to this process's stdin (fd 0) as well as stdout; without re-pointing fd 0
+    # away from the socket, the backgrounded subshell keeps the connection's read
+    # end open and socat won't fully close the connection until the multi-minute
+    # build finishes. Redirect 0</dev/null (plus 1/2→log, 200→lock) so no socket
+    # fd leaks into the build and the ack connection closes immediately.
     (
         flock -w 900 200 || { log "❌ Timed out waiting for deploy lock — another deploy is still running"; exit 1; }
         do_deploy
-    ) >>"$LOG_FILE" 2>&1 200>"$LOCK_FILE" &
+    ) >>"$LOG_FILE" 2>&1 0</dev/null 200>"$LOCK_FILE" &
 }
 
 # --- Entrypoint ---
