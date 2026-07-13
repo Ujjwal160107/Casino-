@@ -483,13 +483,23 @@ export const COMMANDS: Command[] = [
     name: "!leaderboard",
     aliases: ["lb", "top", "rich", "lb-wallet", "lbwallet", "cashlb"],
     module: "economy",
-    short: "The server's net worth ranking, with toggles for wallet cash and top earners.",
-    usage: "!leaderboard [cash|work]",
+    short: "The rankings page — pick a board and a scope from the dropdowns.",
+    usage: "!leaderboard [net|cash|bank|shifts]",
     args: [
-      { name: "cash", desc: "Show the wallet-only board." },
-      { name: "work", desc: "Show the top employees board." },
+      { name: "net", desc: "True net worth — everything you own, priced (default)." },
+      { name: "cash", desc: "Wallet balance only." },
+      { name: "bank", desc: "Bank balance plus active FD/RD deposits." },
+      { name: "shifts", desc: "Most lifetime shifts worked." },
     ],
-    examples: ["!leaderboard", "!leaderboard cash", "!lb-wallet"],
+    examples: ["!leaderboard", "!leaderboard bank", "!lb shifts"],
+    keyNumbers: [
+      { label: "Boards", value: "Net worth, Cash, Bank, Shifts" },
+      { label: "Scope", value: "Global or This Server (dropdown)" },
+      {
+        label: "Net worth counts",
+        value: "wallet, bank, FD/RD, stocks, property, items, animals — plus passive income/day",
+      },
+    ],
     interactive: true,
   },
   {
