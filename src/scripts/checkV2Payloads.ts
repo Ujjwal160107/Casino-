@@ -1,0 +1,61 @@
+/**
+ * ComponentsV2 payload audit. Discord rejects messages with > 40 total
+ * components or > 4000 chars of text (50035 Invalid Form Body) — swallowed
+ * silently by the global handler, so we gate on it here.
+ *
+ * Run: npx ts-node --transpile-only src/scripts/checkV2Payloads.ts
+ */
+import { buildHuntResultPayload } from "../commands/games/hunt";
+import { ANIMAL_CATALOG } from "../utils/animalCatalog";
+import type { HuntGroup } from "../services/huntService";
+import { statusContainer, plainContainer } from "../utils/componentsV2";
+import { nextStepHint } from "../config/nextSteps";
+
+let failures = 0;
+
+function countComponents(node: any): number {
+    if (!node || typeof node !== "object") return 0;
+    let count = 1;
+    for (const child of node.components ?? []) count += countComponents(child);
+    if (node.accessory) count += countComponents(node.accessory);
+    return count;
+}
+
+function countChars(node: any): number {
+    if (!node || typeof node !== "object") return 0;
+    let chars = typeof node.content === "string" ? node.content.length : 0;
+    for (const child of node.components ?? []) chars += countChars(child);
+    if (node.accessory) chars += countChars(node.accessory);
+    return chars;
+}
+
+function check(label: string, payload: { components: any[]; files?: any[] }) {
+    const json = payload.components.map((c: any) => (typeof c.toJSON === "function" ? c.toJSON() : c));
+    const components = json.reduce((sum: number, c: any) => sum + countComponents(c), 0);
+    const chars = json.reduce((sum: number, c: any) => sum + countChars(c), 0);
+    const files = payload.files?.length ?? 0;
+    const ok = components <= 40 && chars <= 4000 && files <= 10;
+    console.log(`${ok ? "PASS" : "FAIL"}: ${label} — ${components}/40 components, ${chars}/4000 chars, ${files}/10 files`);
+    if (!ok) failures++;
+}
+
+// --- Kit sanity: worst-case long status message with a hint ---
+const longDesc = "x".repeat(600);
+check("statusContainer(success, long desc, hint)", {
+    components: [statusContainer("success", "A Long Title For Auditing", longDesc, { hint: nextStepHint("deposit") })],
+});
+check("plainContainer x3 blocks", { components: [plainContainer("## A", "B".repeat(1000), "-# c")] });
+
+// --- Hunt worst case: 5 species, zoo owned, recipe unlock (regression from checkHuntPayload) ---
+const defs = ANIMAL_CATALOG.slice(0, 5);
+const groups: HuntGroup[] = defs.map((def) => ({ animalKey: def.key, count: 3, def, ids: [] }));
+check(
+    "hunt worst case",
+    buildHuntResultPayload("123456789012345678", groups, "legendary rifle", ["Fox Fur Cloak"], true),
+);
+
+if (failures > 0) {
+    console.log(`\n${failures} payload(s) exceed Discord limits`);
+    process.exit(1);
+}
+console.log("\nAll payloads within Discord limits");
