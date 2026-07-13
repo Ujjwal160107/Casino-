@@ -26,11 +26,51 @@ function randomFloat(min: number, max: number) {
     return Math.random() * (max - min) + min;
 }
 
+type RobTarget = { id: string; name: string };
+
+async function resolveRobTarget(
+    message: Message,
+    args: string[],
+): Promise<RobTarget | { error: string }> {
+    const mention = message.mentions.members?.first();
+    if (mention) {
+        if (mention.user.bot) return { error: "Bots are broke." };
+        return { id: mention.id, name: mention.displayName };
+    }
+
+    const raw = args[0]?.replace(/[<@!>]/g, "").trim();
+    if (!raw) {
+        return { error: "Rob who? Mention them, or use their username or user ID." };
+    }
+
+    if (/^\d{17,20}$/.test(raw)) {
+        const target = await prisma.user.findUnique({ where: { discordId: raw } });
+        if (!target) return { error: "No Fortuna player with that ID." };
+        const member = message.guild?.members.cache.get(raw);
+        return { id: target.discordId, name: member?.displayName ?? target.username };
+    }
+
+    const matches = await prisma.user.findMany({
+        where: { username: { equals: raw, mode: "insensitive" } },
+        take: 2,
+    });
+    if (matches.length === 0) {
+        return { error: `No Fortuna player named **${raw}**. Names must match exactly — or use their user ID.` };
+    }
+    if (matches.length > 1) {
+        return { error: "Multiple players share that name — rob them by user ID instead." };
+    }
+    const member = message.guild?.members.cache.get(matches[0].discordId);
+    return { id: matches[0].discordId, name: member?.displayName ?? matches[0].username };
+}
+
 export async function handleRob(message: Message, args: string[]) {
-    const targetUser = message.mentions.members?.first();
-    if (!targetUser) return message.reply({ embeds: [errorEmbed(message.author, "Error", "Mention a user to rob.")] });
-    if (targetUser.id === message.author.id) return message.reply({ embeds: [errorEmbed(message.author, "Error", "You cannot rob yourself.")] });
-    if (targetUser.user.bot) return message.reply({ embeds: [errorEmbed(message.author, "Error", "Bots are broke.")] });
+    const resolved = await resolveRobTarget(message, args);
+    if ("error" in resolved) {
+        return message.reply({ embeds: [errorEmbed(message.author, "Error", resolved.error)] });
+    }
+    const target = resolved;
+    if (target.id === message.author.id) return message.reply({ embeds: [errorEmbed(message.author, "Error", "You cannot rob yourself.")] });
 
     const jail = await checkJailStatus(message.author.id);
     if (jail.isJailed) {
@@ -54,33 +94,33 @@ export async function handleRob(message: Message, args: string[]) {
     }
 
     await ensureBankingUser(message.author.id, message.author.username);
-    await ensureBankingUser(targetUser.id, targetUser.user.username);
+    await ensureBankingUser(target.id, target.name);
 
-    const victimPadlocked = await checkPadlock(targetUser.id);
+    const victimPadlocked = await checkPadlock(target.id);
     if (victimPadlocked) {
         void notifyPadlockUsed(
             message.client,
-            targetUser.id,
+            target.id,
             message.member?.displayName ?? message.author.username,
             message.guild?.name ?? null,
         );
         return message.reply({
-            embeds: [errorEmbed(message.author, "Robbery Blocked!", `**${targetUser.displayName}** has a **Padlock** active — their wallet is protected. Your attempt was foiled.`)]
+            embeds: [errorEmbed(message.author, "Robbery Blocked!", `**${target.name}** has a **Padlock** active — their wallet is protected. Your attempt was foiled.`)]
         });
     }
 
-    const craftedDefense = await redisService.get<{ active: boolean }>(`crafted_rob_defense:${targetUser.id}`);
+    const craftedDefense = await redisService.get<{ active: boolean }>(`crafted_rob_defense:${target.id}`);
     if (craftedDefense?.active) {
-        await redisService.del(`crafted_rob_defense:${targetUser.id}`);
+        await redisService.del(`crafted_rob_defense:${target.id}`);
         return message.reply({
-            embeds: [errorEmbed(message.author, "Robbery Blocked!", `**${targetUser.displayName}** had Crocodile Hide Armor active. It blocked your robbery attempt.`)]
+            embeds: [errorEmbed(message.author, "Robbery Blocked!", `**${target.name}** had Crocodile Hide Armor active. It blocked your robbery attempt.`)]
         });
     }
 
     // Pre-fetch all item states before success roll
     const [eclipseActive, demonicVuln] = await Promise.all([
         checkEclipseMask(message.author.id),       // consumed here regardless of outcome
-        checkDemonicVulnerability(targetUser.id),   // not consumed, just checked
+        checkDemonicVulnerability(target.id),   // not consumed, just checked
     ]);
 
     // Compute final success chance
@@ -112,7 +152,7 @@ export async function handleRob(message: Message, args: string[]) {
         const result = await prisma.$transaction(async (tx) => {
             const [robber, victim] = await Promise.all([
                 tx.user.findUnique({ where: { discordId: message.author.id }, include: { wallet: true } }),
-                tx.user.findUnique({ where: { discordId: targetUser.id }, include: { wallet: true } })
+                tx.user.findUnique({ where: { discordId: target.id }, include: { wallet: true } })
             ]);
 
             if (!robber?.wallet) throw new Error("Robber wallet not found.");
@@ -133,21 +173,21 @@ export async function handleRob(message: Message, args: string[]) {
 
         void notifyRobbed(
             message.client,
-            targetUser.id,
+            target.id,
             message.member?.displayName ?? message.author.username,
             result.robAmount,
             message.guild?.name ?? null,
         );
 
         return message.reply({
-            embeds: [successEmbed(message.author, "Robbery Successful!", `Stole **${fmtCurrency(result.robAmount)}** from **${targetUser.displayName}**!\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**${craftedRobBoost ? "\n\nWolf Fang Dagger boosted the loot." : ""}`)]
+            embeds: [successEmbed(message.author, "Robbery Successful!", `Stole **${fmtCurrency(result.robAmount)}** from **${target.name}**!\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**${craftedRobBoost ? "\n\nWolf Fang Dagger boosted the loot." : ""}`)]
         });
     }
 
     // Failure path — fine is a multiple of what this attempt would have
     // stolen, so getting caught always costs more than succeeding would
     // have earned.
-    const victimForFine = await prisma.wallet.findUnique({ where: { userId: targetUser.id } });
+    const victimForFine = await prisma.wallet.findUnique({ where: { userId: target.id } });
     const hypotheticalSteal = Math.floor((victimForFine?.balance ?? 0) * percent);
     const basePenalty = Math.max(ROB_CONFIG.failFineMinimum, Math.floor(hypotheticalSteal * ROB_CONFIG.failFineMultiplier));
     const crownLoss = await checkCrownOfGreed(message.author.id);
@@ -168,7 +208,7 @@ export async function handleRob(message: Message, args: string[]) {
             : robber.wallet;
 
         if (actualPenalty > 0) {
-            await tx.transaction.create({ data: { walletId: robber.wallet.id, amount: -actualPenalty, type: "rob_fine", meta: { victim: targetUser.id, requestedPenalty: basePenalty } } });
+            await tx.transaction.create({ data: { walletId: robber.wallet.id, amount: -actualPenalty, type: "rob_fine", meta: { victim: target.id, requestedPenalty: basePenalty } } });
         }
 
         return { actualPenalty, updatedWallet };
