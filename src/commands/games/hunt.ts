@@ -18,7 +18,7 @@ import { hunt, HuntGroup } from "../../services/huntService";
 import { seedHuntShop } from "../../services/shopService";
 import { ZOO_CAPACITY, RIFLE_TIERS, RARITY_INCOME } from "../../utils/animalCatalog";
 import { fmtCurrency } from "../../utils/format";
-import { errorEmbed } from "../../utils/embed";
+import { errorContainer, v2Reply } from "../../utils/componentsV2";
 import { AnimalEmojis } from "../../config/branding";
 import prisma from "../../utils/prisma";
 import { buildHuntCraftPayload } from "../../services/huntCraftService";
@@ -214,18 +214,14 @@ export async function handleHunt(message: Message, args: string[]) {
     result = await hunt(ownerId, message.author.username, guildId);
   } catch (err: any) {
     if (err.message === "NO_RIFLE") {
-      return message.reply({
-        embeds: [errorEmbed(message.author, "No Rifle", "You need a rifle to go hunting! Visit `!shop hunt` to buy one.")],
-      });
+      return message.reply(v2Reply(errorContainer("No Rifle", "You need a rifle to go hunting! Visit `!shop hunt` to buy one.")));
     }
     if (err.message === "COOLDOWN") {
       const readyAt = Math.floor((Date.now() + err.ttl * 1000) / 1000);
-      return message.reply({
-        embeds: [errorEmbed(message.author, "Hunt Cooldown", `Your rifle needs time to cool down. Ready <t:${readyAt}:R>.`)],
-      });
+      return message.reply(v2Reply(errorContainer("Hunt Cooldown", `Your rifle needs time to cool down. Ready <t:${readyAt}:R>.`)));
     }
     console.error("handleHunt error:", err);
-    return message.reply({ embeds: [errorEmbed(message.author, "Error", "Something went wrong while hunting.")] });
+    return message.reply(v2Reply(errorContainer("Error", "Something went wrong while hunting.")));
   }
 
   const { groups, rifleName, newlyUnlockedRecipes } = result;

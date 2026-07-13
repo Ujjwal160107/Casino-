@@ -1,8 +1,9 @@
 
-import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ButtonInteraction } from "discord.js";
+import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ButtonInteraction, MessageFlags } from "discord.js";
 import prisma from "../../utils/prisma";
 import { globalCatalogGuildFilter } from "../../utils/globalCatalog";
-import { errorEmbed } from "../../utils/embed";
+import { errorContainer, plainContainer, statusContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { calculateTotalStats, calculateCombatScore, getWinChance } from "../../utils/gameUtils";
 import { GameConfig } from "../../config/gameConfig";
 import { Mascot } from "../../config/branding";
@@ -46,9 +47,6 @@ export async function handleChicken(message: Message, args: string[]) {
 // ...
 
 async function handleTop(message: Message) {
-    const guildId = message.guildId!;
-    const prefix = await getGuildPrefix(guildId);
-
     const shopItem = await prisma.shopItem.findFirst({
         where: globalCatalogGuildFilter({
             name: { equals: "Chicken", mode: "insensitive" },
@@ -100,24 +98,20 @@ async function handleTop(message: Message) {
         return `${rankEmoji} **${inv.user.username}** — ${name} (Lvl ${level} | ${wins} Wins)`;
     }).join("\n");
 
-    const embed = new EmbedBuilder()
-        .setColor("#FFD700")
-        .setTitle(`${EMOJI_TROPHY} Chicken Leaderboard`)
-        .setDescription(description || "No active chickens.")
-        .setFooter({ text: `Use ${prefix}chicken top to see this list.` });
+    const container = plainContainer(`## ${EMOJI_TROPHY} Chicken Leaderboard\n${description || "No active chickens."}`);
 
-    return message.reply({ embeds: [embed] });
+    return message.reply(v2Reply(container));
 }
 
 async function handleName(message: Message, args: string[]) {
     const prefix = await getGuildPrefix(message.guildId!);
     if (args.length < 1) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}chicken name <New Name>\``)] });
+        return message.reply(v2Reply(errorContainer("Invalid Usage", `Usage: \`${prefix}chicken name <New Name>\``)));
     }
 
     const newName = args.join(" ");
     if (newName.length > 30) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Name Too Long", "Chicken names must be under 30 characters.")] });
+        return message.reply(v2Reply(errorContainer("Name Too Long", "Chicken names must be under 30 characters.")));
     }
 
     const guildId = message.guildId!;
@@ -139,7 +133,7 @@ async function handleName(message: Message, args: string[]) {
     });
 
     if (!inventoryItem || inventoryItem.amount < 1) {
-        return message.reply({ embeds: [errorEmbed(user, "No Chicken", "You need a chicken to name it!")] });
+        return message.reply(v2Reply(errorContainer("No Chicken", "You need a chicken to name it!")));
     }
 
     const meta = (inventoryItem.meta as any) || {};
@@ -152,18 +146,12 @@ async function handleName(message: Message, args: string[]) {
 
 
     const EMOJI_CHICKEN = "<:cock:1451281426329768172>";
-    const embed = new EmbedBuilder()
-        .setColor("#FFD700")
-        .setTitle(`${EMOJI_CHICKEN} Chicken Renamed!`)
-        .setDescription(`Your chicken has been renamed to **${newName}**!`)
-        .setFooter({ text: "May it fight with honor!" });
+    const container = plainContainer(`## ${EMOJI_CHICKEN} Chicken Renamed!\nYour chicken has been renamed to **${newName}**!`);
 
-    return message.reply({ embeds: [embed] });
+    return message.reply(v2Reply(container));
 }
 
 async function handleTraitsInfo(message: Message) {
-    const prefix = await getGuildPrefix(message.guildId!);
-
     // Trait Definitions
     const traits = [
         { name: "Aggressive", effect: "**+2** Str, **-1** Def" },
@@ -175,13 +163,9 @@ async function handleTraitsInfo(message: Message) {
 
     const description = traits.map(t => `• **${t.name}**: ${t.effect}`).join("\n");
 
-    const embed = new EmbedBuilder()
-        .setColor("#3498db")
-        .setTitle("🧬 Chicken Traits")
-        .setDescription(`Chickens are born with a random trait that affects their combat stats.\n\n${description}`)
-        .setFooter({ text: `Traits are permanent and assigned at birth. Use ${prefix}chicken traits` });
+    const container = plainContainer(`## 🧬 Chicken Traits\nChickens are born with a random trait that affects their combat stats.\n\n${description}`);
 
-    return message.reply({ embeds: [embed] });
+    return message.reply(v2Reply(container));
 }
 
 async function handleView(message: Message, args: string[]) {
@@ -195,7 +179,7 @@ async function handleView(message: Message, args: string[]) {
         const userData = await prisma.user.findUnique({ where: { discordId: user.id } });
 
         if (!userData) {
-            return message.reply({ embeds: [errorEmbed(user, "Error", "User not found.")] });
+            return message.reply(v2Reply(errorContainer("Error", "User not found.")));
         }
 
         const shopItem = await prisma.shopItem.findFirst({
@@ -205,7 +189,7 @@ async function handleView(message: Message, args: string[]) {
         });
 
         if (!shopItem) {
-            return message.reply({ embeds: [errorEmbed(user, "Error", "The 'Chicken' item does not exist in the shop.")] });
+            return message.reply(v2Reply(errorContainer("Error", "The 'Chicken' item does not exist in the shop.")));
         }
 
         const inventoryItem = await prisma.inventory.findUnique({
@@ -213,9 +197,7 @@ async function handleView(message: Message, args: string[]) {
         });
 
         if (!inventoryItem) {
-            return message.reply({
-                embeds: [errorEmbed(user, "No Chicken", "You do not own a chicken! Buy one from the shop.")]
-            });
+            return message.reply(v2Reply(errorContainer("No Chicken", "You do not own a chicken! Buy one from the shop.")));
         }
 
         const meta = (inventoryItem.meta as any) || {};
@@ -237,23 +219,16 @@ async function handleView(message: Message, args: string[]) {
                     data: { meta }
                 });
 
-                const embed = new EmbedBuilder()
-                    .setColor("#00FF00")
-                    .setTitle("<:cock:1451281426329768172> Training Complete!")
-                    .setDescription(`Your chicken has finished training!\n\n**${stat.toUpperCase()}** +1`);
+                const container = plainContainer(`## <:cock:1451281426329768172> Training Complete!\nYour chicken has finished training!\n\n**${stat.toUpperCase()}** +1`);
 
-                return message.reply({ embeds: [embed] });
+                return message.reply(v2Reply(container));
             } else {
                 // Still Training
                 const endTimeUnix = Math.floor(activeTraining.endTime / 1000);
                 const originalCost = activeTraining.cost || 0;
                 const speedUpCost = Math.floor(originalCost * 0.5);
 
-                const embed = new EmbedBuilder()
-                    .setColor("#3498db")
-                    .setTitle("<:cock:1451281426329768172> Training Room")
-                    .setDescription(`Your chicken is currently training **${activeTraining.stat.toUpperCase()}**.\n\n⏳ Completes <t:${endTimeUnix}:R>`)
-                    .setFooter({ text: "You cannot fight while training." });
+                const container = plainContainer(`## <:cock:1451281426329768172> Training Room\nYour chicken is currently training **${activeTraining.stat.toUpperCase()}**.\n\n⏳ Completes <t:${endTimeUnix}:R>`);
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder().setCustomId("train_wakeup").setLabel("Wake Up (Cancel)").setStyle(ButtonStyle.Danger)
@@ -269,7 +244,9 @@ async function handleView(message: Message, args: string[]) {
                     );
                 }
 
-                const reply = await message.reply({ embeds: [embed], components: [row] });
+                container.addActionRowComponents(row);
+
+                const reply = await message.reply(v2Reply(container));
 
                 // --- AUTO COMPLETE LOGIC ---
                 const msRemaining = activeTraining.endTime - Date.now();
@@ -291,13 +268,10 @@ async function handleView(message: Message, args: string[]) {
                                 data: { meta: checkMeta }
                             });
 
-                            // 3. Edit Embed
-                            const completeEmbed = new EmbedBuilder()
-                                .setColor("#00FF00")
-                                .setTitle("🎓 Training Complete!")
-                                .setDescription(`Your chicken has finished training!\n\n**${stat.toUpperCase()}** +1`);
+                            // 3. Edit Container
+                            const completeContainer = plainContainer(`## 🎓 Training Complete!\nYour chicken has finished training!\n\n**${stat.toUpperCase()}** +1`);
 
-                            await reply.edit({ embeds: [completeEmbed], components: [] });
+                            await reply.edit({ components: [completeContainer], flags: MessageFlags.IsComponentsV2 });
 
                         } catch (e) {
                             console.error("Auto-complete error:", e);
@@ -322,9 +296,8 @@ async function handleView(message: Message, args: string[]) {
                         });
 
                         await i.update({
-                            content: "Training Cancelled. You got 10 XP for the effort.",
-                            embeds: [],
-                            components: []
+                            components: [plainContainer("Training Cancelled. You got 10 XP for the effort.")],
+                            flags: MessageFlags.IsComponentsV2
                         });
                         collector.stop();
                     }
@@ -364,7 +337,7 @@ async function handleView(message: Message, args: string[]) {
                                 });
                             });
 
-                            await i.update({ content: "⚡ Training Speed Up! Time remaining halved.", embeds: [], components: [] });
+                            await i.update({ components: [plainContainer("⚡ Training Speed Up! Time remaining halved.")], flags: MessageFlags.IsComponentsV2 });
                             // Note: The original setTimeout will still fire but find nothing or update harmlessly? 
                             // Ideally we should clear it but we can't.
                             // However, our auto-complete logic checks DB state (checkMeta.training).
@@ -391,25 +364,20 @@ async function handleView(message: Message, args: string[]) {
             if (now >= meta.critical.endTime) {
                 // Timer expired → permadeath
                 await prisma.inventory.delete({ where: { id: inventoryItem.id } });
-                const embed = new EmbedBuilder()
-                    .setColor("#000000")
-                    .setTitle("💀 Your Chicken Has Died")
-                    .setDescription("The critical window expired. Your chicken could not be saved.\n\nRest in peace. You can buy a new chicken from the Cock Store.");
-                return message.reply({ embeds: [embed] });
+                const container = plainContainer("## 💀 Your Chicken Has Died\nThe critical window expired. Your chicken could not be saved.\n\nRest in peace. You can buy a new chicken from the Cock Store.");
+                return message.reply(v2Reply(container));
             }
 
             const endTimeUnix = Math.floor(meta.critical.endTime / 1000);
-            const embed = new EmbedBuilder()
-                .setColor("#8B0000")
-                .setTitle("💀 CRITICAL CONDITION")
-                .setDescription(
-                    `Your chicken is **dying** and will be lost permanently if not saved!\n\n` +
-                    `⏰ **Death in:** <t:${endTimeUnix}:R>\n\n` +
-                    `**Only a Phoenix Serum can save it.**\n` +
-                    `\`${prefix}use phoenix serum\`\n\n` +
-                    `-# No coin heal available. No other items work. Act fast.`
-                );
-            return message.reply({ embeds: [embed] });
+            const container = plainContainer(
+                `## 💀 CRITICAL CONDITION\n` +
+                `Your chicken is **dying** and will be lost permanently if not saved!\n\n` +
+                `⏰ **Death in:** <t:${endTimeUnix}:R>\n\n` +
+                `**Only a Phoenix Serum can save it.**\n` +
+                `\`${prefix}use phoenix serum\`\n\n` +
+                `-# No coin heal available. No other items work. Act fast.`
+            );
+            return message.reply(v2Reply(container));
         }
 
         // --- INJURY CHECK ---
@@ -424,23 +392,23 @@ async function handleView(message: Message, args: string[]) {
                 const recoveryHours = activeInjury.recoveryHours ?? 2;
                 const healCost = Math.floor(50_000 * (recoveryHours / 2));
 
-                const embed = new EmbedBuilder()
-                    .setColor("#E74C3C")
-                    .setTitle("<:clinic:1456568728883040287> Veterinary Clinic")
-                    .setDescription(
-                        `Your chicken is **Injured** and cannot fight or train.\n\n` +
-                        `<a:bandaid:1456568701737500753> Recovers <t:${endTimeUnix}:R> (${recoveryHours.toFixed(1)}h total)`
-                    )
-                    .addFields(
-                        { name: "💰 Coin Heal", value: `Pay **${healCost.toLocaleString()}** coins to heal instantly.`, inline: true },
-                        { name: "🏪 Cock Store", value: `\`${prefix}use feather bandage\` — Instant heal\n\`${prefix}use phoenix serum\` — Full recovery`, inline: false },
-                    );
+                const container = plainContainer(
+                    `## <:clinic:1456568728883040287> Veterinary Clinic\n` +
+                    `Your chicken is **Injured** and cannot fight or train.\n\n` +
+                    `<a:bandaid:1456568701737500753> Recovers <t:${endTimeUnix}:R> (${recoveryHours.toFixed(1)}h total)\n\n` +
+                    `**💰 Coin Heal**\n` +
+                    `Pay **${healCost.toLocaleString()}** coins to heal instantly.\n` +
+                    `**🏪 Cock Store**\n` +
+                    `\`${prefix}use feather bandage\` — Instant heal\n\`${prefix}use phoenix serum\` — Full recovery`
+                );
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder().setCustomId("chicken_heal").setLabel(`Heal (${healCost.toLocaleString()})`).setStyle(ButtonStyle.Success).setEmoji("<:medicine:1456568989340930138>")
                 );
 
-                const reply = await message.reply({ embeds: [embed], components: [row] });
+                container.addActionRowComponents(row);
+
+                const reply = await message.reply(v2Reply(container));
 
                 const collector = reply.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
                 collector.on("collect", async (i) => {
@@ -468,7 +436,7 @@ async function handleView(message: Message, args: string[]) {
                                 });
                             });
 
-                            await i.update({ content: `${Mascot.Emotes.Accept} Your chicken has been healed!`, embeds: [], components: [] });
+                            await i.update({ components: [plainContainer(`${Mascot.Emotes.Accept} Your chicken has been healed!`)], flags: MessageFlags.IsComponentsV2 });
                         } catch (e) {
                             await i.reply({ content: `Heal failed. You might lack funds (${healCost.toLocaleString()}) or an error occurred.`, ephemeral: true });
                         }
@@ -520,41 +488,34 @@ async function handleView(message: Message, args: string[]) {
             equipText = `**Legacy:** ${legacyEquip}`;
         }
 
-        const embed = new EmbedBuilder()
-            .setColor("#FFD700")
-            .setTitle(`${EMOJI_CHICKEN} ${chickenName}`)
-            .setThumbnail(user.displayAvatarURL())
-            .setDescription(`**Level ${level}** Battle Chicken`)
-            .addFields(
-                { name: "Name", value: chickenName, inline: true },
-                { name: "XP", value: `${progressBar} ${xp}/${requiredXp}`, inline: true },
-                { name: "Wins", value: `${wins}`, inline: true },
-                {
-                    name: "Stats",
-                    value: `
+        const body =
+            `**Level ${level}** Battle Chicken\n\n` +
+            `**Name**\n${chickenName}\n` +
+            `**XP**\n${progressBar} ${xp}/${requiredXp}\n` +
+            `**Wins**\n${wins}\n` +
+            `**Stats**` + `
 **Strength:** ${drawStatBar(baseStats.str, finalStats.str - baseStats.str)} ${finalStats.str}
 **Agility:** ${drawStatBar(baseStats.agi, finalStats.agi - baseStats.agi)} ${finalStats.agi}
 **Defense:** ${drawStatBar(baseStats.def, finalStats.def - baseStats.def)} ${finalStats.def}
 **Trait:** ${meta.trait || "None"}
-`,
-                    inline: false
-                },
-                { name: "Equipment", value: equipText, inline: false },
-                {
-                    name: "Win Probabilities (Est.)", value: `
+` +
+            `**Equipment**\n${equipText}\n` +
+            `**Win Probabilities (Est.)**` + `
 Vs Lvl 0: **${getProb(0)}%**
 Vs Lvl 5: **${getProb(5)}%**
 Vs Lvl 10: **${getProb(10)}%**
-`, inline: false
-                }
-            )
-            .setFooter({ text: `Use ${prefix}chicken name <name> to rename!` });
+`;
 
-        return message.reply({ embeds: [embed] });
+        const container = statusContainer("info", `${EMOJI_CHICKEN} ${chickenName}`, body, {
+            thumbnailUrl: user.displayAvatarURL(),
+            hint: nextStepHint("chicken", prefix)!,
+        });
+
+        return message.reply(v2Reply(container));
 
     } catch (error) {
         console.error("Chicken Command Error:", error);
-        return message.reply({ embeds: [errorEmbed(user, "System Error", "An error occurred while fetching chicken stats.")] });
+        return message.reply(v2Reply(errorContainer("System Error", "An error occurred while fetching chicken stats.")));
     }
 }
 
@@ -597,9 +558,7 @@ async function handleTrain(message: Message, args: string[]) {
     const validStats = ["strength", "agility", "defense"];
 
     if (!validStats.includes(stat)) {
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Invalid Stat", `Usage: \`${prefix}chicken train <strength|agility|defense>\`\nValid stats: Strength, Agility, Defense.`)]
-        });
+        return message.reply(v2Reply(errorContainer("Invalid Stat", `Usage: \`${prefix}chicken train <strength|agility|defense>\`\nValid stats: Strength, Agility, Defense.`)));
     }
 
     const guildId = message.guildId!;
@@ -614,7 +573,7 @@ async function handleTrain(message: Message, args: string[]) {
     if (!shopItem) return message.reply("Chicken item missing.");
 
     const inv = await prisma.inventory.findUnique({ where: { userId_shopItemId: { userId: await getUserId(user.id, guildId), shopItemId: shopItem.id } } });
-    if (!inv || inv.amount < 1) return message.reply({ embeds: [errorEmbed(user, "No Chicken", "You need a chicken to train!")] });
+    if (!inv || inv.amount < 1) return message.reply(v2Reply(errorContainer("No Chicken", "You need a chicken to train!")));
 
     const meta = (inv.meta as any) || {};
 
@@ -642,23 +601,21 @@ async function handleTrain(message: Message, args: string[]) {
     // 1. Check Money
     const wallet = await prisma.wallet.findUnique({ where: { userId: inv.userId } });
     if (!wallet || wallet.balance < cost) {
-        return message.reply({ embeds: [errorEmbed(user, "Insufficient Funds", `Training costs **${cost}**. You have **${wallet?.balance || 0}**.`)] });
+        return message.reply(v2Reply(errorContainer("Insufficient Funds", `Training costs **${cost}**. You have **${wallet?.balance || 0}**.`)));
     }
 
     const EMOJI_CHICKEN = "<:cock:1451281426329768172>";
 
-    const confirmEmbed = new EmbedBuilder()
-        .setColor("#FFA500")
-        .setTitle(`${EMOJI_CHICKEN} Training: ${stat.toUpperCase()}`)
-        .setDescription(`Training will boost **${stat}** permanently.\n\n**Cost:** ${cost} coins\n**Duration:** ${durationMins} minutes\n\nYour chicken will be unavailable for fights during this time.`)
-        .setFooter({ text: "Confirm payment to start." });
+    const confirmContainer = plainContainer(`## ${EMOJI_CHICKEN} Training: ${stat.toUpperCase()}\nTraining will boost **${stat}** permanently.\n\n**Cost:** ${cost} coins\n**Duration:** ${durationMins} minutes\n\nYour chicken will be unavailable for fights during this time.`);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId("train_confirm").setLabel(`Pay ${cost} & Start`).setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId("train_cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
     );
 
-    const reply = await message.reply({ embeds: [confirmEmbed], components: [row] });
+    confirmContainer.addActionRowComponents(row);
+
+    const reply = await message.reply(v2Reply(confirmContainer));
 
     const collector = reply.createMessageComponentCollector({ componentType: ComponentType.Button, time: 30000 });
 
@@ -666,7 +623,7 @@ async function handleTrain(message: Message, args: string[]) {
         if (i.user.id !== user.id) return i.reply({ content: "Not your chicken.", ephemeral: true });
 
         if (i.customId === "train_cancel") {
-            await i.update({ content: "Training cancelled.", embeds: [], components: [] });
+            await i.update({ components: [plainContainer("Training cancelled.")], flags: MessageFlags.IsComponentsV2 });
             return;
         }
 
@@ -704,14 +661,8 @@ async function handleTrain(message: Message, args: string[]) {
                 const endTimeUnix = Math.floor((Date.now() + durationMs) / 1000);
 
                 await i.update({
-                    content: null,
-                    embeds: [
-                        new EmbedBuilder()
-                            .setColor("#00FF00")
-                            .setTitle(`${EMOJI_CHICKEN} Training Started!`)
-                            .setDescription(`Your chicken has entered the Training Room!\n\nCompletes <t:${endTimeUnix}:R>`)
-                    ],
-                    components: []
+                    components: [plainContainer(`## ${EMOJI_CHICKEN} Training Started!\nYour chicken has entered the Training Room!\n\nCompletes <t:${endTimeUnix}:R>`)],
+                    flags: MessageFlags.IsComponentsV2
                 });
 
                 // --- AUTO COMPLETE LOGIC FOR START MESSAGE ---
@@ -738,13 +689,10 @@ async function handleTrain(message: Message, args: string[]) {
                                 data: { meta: checkMeta }
                             });
 
-                            // 3. Edit Embed
-                            const completeEmbed = new EmbedBuilder()
-                                .setColor("#00FF00")
-                                .setTitle("🎓 Training Complete!")
-                                .setDescription(`Your chicken has finished training!\n\n**${stat.toUpperCase()}** +1`);
+                            // 3. Edit Container
+                            const completeContainer = plainContainer(`## 🎓 Training Complete!\nYour chicken has finished training!\n\n**${stat.toUpperCase()}** +1`);
 
-                            await reply.edit({ embeds: [completeEmbed], components: [] });
+                            await reply.edit({ components: [completeContainer], flags: MessageFlags.IsComponentsV2 });
 
                         } catch (e) {
                             // Ignore if already edited or permission lost
@@ -754,7 +702,7 @@ async function handleTrain(message: Message, args: string[]) {
                 // ---------------------------------------------
 
             } catch (err) {
-                await i.update({ content: "Transaction failed (Maybe insufficient funds).", embeds: [], components: [] });
+                await i.update({ components: [plainContainer("Transaction failed (Maybe insufficient funds).")], flags: MessageFlags.IsComponentsV2 });
             }
         }
     });

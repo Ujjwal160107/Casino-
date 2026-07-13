@@ -20,7 +20,8 @@ import {
 } from "discord.js";
 import prisma from "../../utils/prisma";
 import { globalCatalogGuildFilter } from "../../utils/globalCatalog";
-import { errorEmbed } from "../../utils/embed";
+import { errorContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { generateVsImage, generateWinnerImage } from "../../utils/imageUtils";
 import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage, acquireActiveGameLock, releaseActiveGameLock } from "../../services/casinoCooldownService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
@@ -126,31 +127,29 @@ export async function handleCockFight(message: Message, args: string[]) {
     const rawAmount = args.find(a => !a.startsWith("<@"));
 
     if (!targetUser || !rawAmount) {
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}cockfight @user <amount>\`\nMin Bet logic applies.`)]
-        });
+        return message.reply(v2Reply(errorContainer("Invalid Usage", `Usage: \`${prefix}cockfight @user <amount>\`\nMin Bet logic applies.`)));
     }
 
     if (targetUser.id === message.author.id) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Error", "You cannot fight yourself.")] });
+        return message.reply(v2Reply(errorContainer("Error", "You cannot fight yourself.")));
     }
 
     if (targetUser.bot) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Error", "You cannot fight a bot.")] });
+        return message.reply(v2Reply(errorContainer("Error", "You cannot fight a bot.")));
     }
 
     const betAmount = parseBetAmount(rawAmount);
 
     if (!Number.isInteger(betAmount) || betAmount <= 0) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please enter a valid positive integer (e.g. 100, 10k, 1e5).")] });
+        return message.reply(v2Reply(errorContainer("Invalid Amount", "Please enter a valid positive integer (e.g. 100, 10k, 1e5).")));
     }
 
     const { min, max } = getGameBetLimits("cockfight");
     if (betAmount < min) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too Low", `The minimum bet for Cockfight is **${fmtCurrency(min)}**.`)] });
+        return message.reply(v2Reply(errorContainer("Bet Too Low", `The minimum bet for Cockfight is **${fmtCurrency(min)}**.`)));
     }
     if (betAmount > max) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Bet Too High", `The maximum bet for Cockfight is **${fmtCurrency(max)}**.`)] });
+        return message.reply(v2Reply(errorContainer("Bet Too High", `The maximum bet for Cockfight is **${fmtCurrency(max)}**.`)));
     }
 
     // Cooldown Check for Challenger
@@ -159,7 +158,7 @@ export async function handleCockFight(message: Message, args: string[]) {
         const msg = challengerCd.unavailable
             ? "Casino cooldown service is temporarily unavailable. Try again soon."
             : formatCasinoCooldownMessage("cockfight", challengerCd.availableAtUnix!);
-        const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Cooldown Active", msg)] });
+        const cdMsg = await message.reply(v2Reply(errorContainer("Cooldown Active", msg)));
         setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
         return;
     }
@@ -171,7 +170,7 @@ export async function handleCockFight(message: Message, args: string[]) {
     });
 
     if (!shopItem) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Configuration Error", "There is no item named **Chicken** in the shop. An admin must add it first.")] });
+        return message.reply(v2Reply(errorContainer("Configuration Error", "There is no item named **Chicken** in the shop. An admin must add it first.")));
     }
 
     const challengerMember = await fetchMemberDisplay(message, message.author);
@@ -186,21 +185,19 @@ export async function handleCockFight(message: Message, args: string[]) {
     });
 
     if (!invChallenger || invChallenger.amount < 1) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Missing Item", `You need a ${EMOJI_CHICKEN} **Chicken** to fight!`)] });
+        return message.reply(v2Reply(errorContainer("Missing Item", `You need a ${EMOJI_CHICKEN} **Chicken** to fight!`)));
     }
 
     const challengerMeta = (invChallenger.meta as any) || {};
     if (challengerMeta.critical) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Critical", `Your chicken is in **critical condition**! Use \`${prefix}use phoenix serum\` to save it.`)] });
+        return message.reply(v2Reply(errorContainer("Critical", `Your chicken is in **critical condition**! Use \`${prefix}use phoenix serum\` to save it.`)));
     }
     if (challengerMeta.training) {
         const endTime = Math.floor(challengerMeta.training.endTime / 1000);
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Busy", `Your chicken is training! Come back <t:${endTime}:R>.`)]
-        });
+        return message.reply(v2Reply(errorContainer("Busy", `Your chicken is training! Come back <t:${endTime}:R>.`)));
     }
     if (challengerMeta.injured) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Injured", `Your chicken is injured! Heal it via \`${prefix}chicken\` or \`${prefix}use feather bandage\`.`)] });
+        return message.reply(v2Reply(errorContainer("Injured", `Your chicken is injured! Heal it via \`${prefix}chicken\` or \`${prefix}use feather bandage\`.`)));
     }
 
     const invTarget = await prisma.inventory.findUnique({
@@ -208,35 +205,33 @@ export async function handleCockFight(message: Message, args: string[]) {
     });
 
     if (!invTarget || invTarget.amount < 1) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Opponent Missing Item", `${targetName} needs a ${EMOJI_CHICKEN} **Chicken** to fight!`)] });
+        return message.reply(v2Reply(errorContainer("Opponent Missing Item", `${targetName} needs a ${EMOJI_CHICKEN} **Chicken** to fight!`)));
     }
 
     const targetMeta = (invTarget.meta as any) || {};
     if (targetMeta.critical) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Critical", `**${targetName}**'s chicken is in critical condition!`)] });
+        return message.reply(v2Reply(errorContainer("Critical", `**${targetName}**'s chicken is in critical condition!`)));
     }
     if (targetMeta.training) {
         const endTime = Math.floor(targetMeta.training.endTime / 1000);
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Busy", `**${targetName}**'s chicken is training! Ends <t:${endTime}:R>.`)]
-        });
+        return message.reply(v2Reply(errorContainer("Busy", `**${targetName}**'s chicken is training! Ends <t:${endTime}:R>.`)));
     }
     if (targetMeta.injured) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Injured", `**${targetName}**'s chicken is injured!`)] });
+        return message.reply(v2Reply(errorContainer("Injured", `**${targetName}**'s chicken is injured!`)));
     }
 
     if (!challenger.wallet || challenger.wallet.balance < betAmount) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Funds", `You only have **${fmtCurrency(challenger.wallet?.balance ?? 0)}** in your wallet.`)] });
+        return message.reply(v2Reply(errorContainer("Insufficient Funds", `You only have **${fmtCurrency(challenger.wallet?.balance ?? 0)}** in your wallet.`)));
     }
 
     if (!target.wallet || target.wallet.balance < betAmount) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Opponent Funds", `${targetName} needs **${fmtCurrency(betAmount)}** in their wallet to accept.`)] });
+        return message.reply(v2Reply(errorContainer("Opponent Funds", `${targetName} needs **${fmtCurrency(betAmount)}** in their wallet to accept.`)));
     }
 
     // Active-game lock acquired AFTER all validation — so failed checks never lock the user out
     const challengerLockAcquired = await acquireActiveGameLock("cockfight", message.author.id);
     if (!challengerLockAcquired) {
-        const cdMsg = await message.reply({ embeds: [errorEmbed(message.author, "Game In Progress", "You already have an active Cockfight challenge. Wait for it to resolve.")] });
+        const cdMsg = await message.reply(v2Reply(errorContainer("Game In Progress", "You already have an active Cockfight challenge. Wait for it to resolve.")));
         setTimeout(() => { cdMsg.delete().catch(() => {}); message.delete().catch(() => {}); }, 12_000);
         return;
     }
@@ -339,7 +334,8 @@ export async function handleCockFight(message: Message, args: string[]) {
             // Release challenger lock — acceptor never accepted, so no acceptor lock to release
             releaseActiveGameLock("cockfight", message.author.id).catch(() => {});
             reply.edit({
-                components: [buildContainer("Cockfight Expired", "The challenge expired with no wallet changes.", 0x95A5A6), buildAcceptRow(fightId, true)]
+                components: [buildContainer("Cockfight Expired", "The challenge expired with no wallet changes.", 0x95A5A6), buildAcceptRow(fightId, true)],
+                flags: COCKFIGHT_FLAGS
             }).catch(() => { });
         }
     });
@@ -986,6 +982,9 @@ async function runCockFight(
             winnerIsP1 ? 0x2ECC71 : 0xE74C3C
         );
         addImageSection(resultContainer, "Winner Banner", `Side winners:\n${sideWinnersText}`, "winner.png", "Cockfight winner");
+        resultContainer.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(nextStepHint("cockfight", prefix)!)
+        );
 
         // LOGGING
         const logColor = winnerIsP1 ? 0x00FF00 : 0xFF0000;

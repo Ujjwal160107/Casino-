@@ -19,7 +19,7 @@ import {
   sellAnimalsByKey,
 } from "../services/huntService";
 import { buildZooContainer } from "../commands/games/zoo";
-import { successEmbed } from "../utils/embed";
+import { successContainer, v2Reply } from "../utils/componentsV2";
 import { fmtCurrency } from "../utils/format";
 import { getAnimal } from "../utils/animalCatalog";
 import {
@@ -103,14 +103,14 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
         .slice(0, 10)
         .map(([name, amount]) => `**${name}:** ${amount}`)
         .join(" | ");
-      await safeFollowUp(interaction, {
-        embeds: [successEmbed(
-          interaction.user,
+      await safeFollowUp(interaction, v2Reply(
+        successContainer(
           "All Hunted Animals Sold",
           `Sold **${count}** hunted animal${count === 1 ? "" : "s"} for **${fmtCurrency(earned)}**.\n\n${lines}`,
-        )],
-        flags: MessageFlags.Ephemeral,
-      });
+        ),
+        undefined,
+        MessageFlags.Ephemeral,
+      ));
       await disableAllHuntButtons(interaction, ownerId);
     } catch (err: any) {
       await safeFollowUp(interaction, { content: err.message || "Could not sell hunted animals.", flags: MessageFlags.Ephemeral });
@@ -126,14 +126,14 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
     try {
       const def = getAnimal(animalKey);
       const { earned, count } = await sellAnimalsByKey(ownerId, animalKey, interaction.user.username);
-      await safeFollowUp(interaction, {
-        embeds: [successEmbed(
-          interaction.user,
+      await safeFollowUp(interaction, v2Reply(
+        successContainer(
           "Animals Sold",
           `Sold **${count}x** **${def?.name ?? animalKey}** for **${fmtCurrency(earned)}**.`,
-        )],
-        flags: MessageFlags.Ephemeral,
-      });
+        ),
+        undefined,
+        MessageFlags.Ephemeral,
+      ));
       await disableGroupButtons(interaction, animalKey, ownerId);
     } catch (err: any) {
       await safeFollowUp(interaction, { content: err.message, flags: MessageFlags.Ephemeral });
@@ -312,7 +312,7 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
       });
       const container = await buildZooContainer(ownerId, interaction.user.username, interaction.guildId ?? "", interaction.guild);
       const files = (container as any).__files ?? [];
-      await safeEditReply(interaction, { components: [container], files });
+      await safeEditReply(interaction, { components: [container], files, flags: MessageFlags.IsComponentsV2 });
     } catch (err: any) {
       await safeFollowUp(interaction, { content: err.message, flags: MessageFlags.Ephemeral });
     }
@@ -326,17 +326,17 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
     if (!await ensureDeferredUpdate(interaction)) return;
     try {
       const { claimed, hoursSinceLastClaim } = await claimZooIncome(ownerId, interaction.user.username);
-      await safeFollowUp(interaction, {
-        embeds: [successEmbed(
-          interaction.user,
+      await safeFollowUp(interaction, v2Reply(
+        successContainer(
           "Zoo Income Collected",
           `Collected **${fmtCurrency(claimed)}** for **${hoursSinceLastClaim}h** of zoo income.`,
-        )],
-        flags: MessageFlags.Ephemeral,
-      });
+        ),
+        undefined,
+        MessageFlags.Ephemeral,
+      ));
       const container = await buildZooContainer(ownerId, interaction.user.username, interaction.guildId ?? "", interaction.guild);
       const files = (container as any).__files ?? [];
-      await safeEditReply(interaction, { components: [container], files });
+      await safeEditReply(interaction, { components: [container], files, flags: MessageFlags.IsComponentsV2 });
     } catch (err: any) {
       await safeFollowUp(interaction, { content: err.message, flags: MessageFlags.Ephemeral });
     }
