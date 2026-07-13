@@ -6,8 +6,9 @@
  * Run: npx ts-node --transpile-only src/scripts/checkV2Payloads.ts
  */
 import { buildHuntResultPayload } from "../commands/games/hunt";
-import { ANIMAL_CATALOG } from "../utils/animalCatalog";
-import type { HuntGroup } from "../services/huntService";
+import { buildZooPayload } from "../commands/games/zoo";
+import { ANIMAL_CATALOG, RARITY_INCOME } from "../utils/animalCatalog";
+import type { HuntGroup, ZooSlot } from "../services/huntService";
 import { statusContainer, plainContainer } from "../utils/componentsV2";
 import { nextStepHint } from "../config/nextSteps";
 
@@ -52,6 +53,31 @@ const groups: HuntGroup[] = defs.map((def) => ({ animalKey: def.key, count: 3, d
 check(
     "hunt worst case",
     buildHuntResultPayload("123456789012345678", groups, "legendary rifle", ["Fox Fur Cloak"], true),
+);
+
+// --- Zoo worst case: a full World Zoo (16 distinct types) with an upgrade offer ---
+const zooDefs = ANIMAL_CATALOG.slice(0, 16);
+const zooSlots: ZooSlot[] = zooDefs.map((def) => ({
+    animalKey: def.key,
+    count: 3,
+    def,
+    incomePerHour: RARITY_INCOME[def.rarity] * 3,
+}));
+check(
+    "zoo worst case (16 types)",
+    buildZooPayload(
+        "123456789012345678",
+        {
+            slots: zooSlots,
+            maxSlots: 16,
+            ratePerHour: zooSlots.reduce((s, z) => s + z.incomePerHour, 0),
+            hoursPending: 24,
+            zooName: "City Zoo",
+            zooKey: "city_zoo",
+            nextTier: { key: "world_zoo", name: "World Zoo", price: 75_000_000 },
+        },
+        null,
+    ),
 );
 
 if (failures > 0) {
