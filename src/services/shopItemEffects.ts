@@ -36,7 +36,7 @@ export async function handleSpecialItemUse(
 ): Promise<ShopItemUseResult | null> {
   switch (itemKey) {
     case "lucky_coin":
-      return handleLuckyCoin(discordId, guildId);
+      return withBuffCooldown("lucky_coin", discordId, () => handleLuckyCoin(discordId, guildId));
     case "padlock":
       return handlePadlock(discordId, guildId);
     case "thief_gloves":
@@ -44,13 +44,13 @@ export async function handleSpecialItemUse(
     case "mystery_box":
       return handleMysteryBox(discordId, guildId);
     case "bandage":
-      return handleBandage(discordId, guildId);
+      return withBuffCooldown("bandage", discordId, () => handleBandage(discordId, guildId));
     case "energy_drink":
-      return handleEnergyDrink(discordId);
+      return withBuffCooldown("energy_drink", discordId, () => handleEnergyDrink(discordId));
     case "counterfeit_kit":
       return handleCounterfeitKit(discordId, guildId);
     case "tax_shield":
-      return handleTaxShield(discordId, guildId);
+      return withBuffCooldown("tax_shield", discordId, () => handleTaxShield(discordId, guildId));
     case "treasure_map":
       return handleTreasureMap(discordId, guildId);
     // New page 2 items
@@ -78,9 +78,9 @@ export async function handleSpecialItemUse(
     case "warranty_card":
       return handleWarrantyCard(discordId);
     case "stress_pills":
-      return handleStressPills(discordId);
+      return withBuffCooldown("stress_pills", discordId, () => handleStressPills(discordId));
     case "energy_flask":
-      return handleEnergyFlask(discordId);
+      return withBuffCooldown("energy_flask", discordId, () => handleEnergyFlask(discordId));
     case "focus_headphones":
       return handleFocusHeadphones(discordId);
     case "lucky_tie":
@@ -90,9 +90,9 @@ export async function handleSpecialItemUse(
     case "emergency_pager":
       return handleEmergencyPager(discordId);
     case "overtime_contract":
-      return handleOvertimeContract(discordId, guildId);
+      return withBuffCooldown("overtime_contract", discordId, () => handleOvertimeContract(discordId, guildId));
     case "blackmarket_resume":
-      return handleBlackMarketResume(discordId, guildId);
+      return withBuffCooldown("blackmarket_resume", discordId, () => handleBlackMarketResume(discordId, guildId));
     case "corporate_blessing":
       return handleCorporateBlessing(discordId, guildId);
     // Uni Store
@@ -500,6 +500,55 @@ async function withClaimedCooldown(itemKey: string, discordId: string, fn: () =>
   try {
     const result = await fn();
     if (!result.success) await releaseItemCooldown(itemKey, discordId);
+    return result;
+  } catch (err) {
+    await releaseItemCooldown(itemKey, discordId);
+    throw err;
+  }
+}
+
+/**
+ * Per-use cooldowns for buff/utility items whose benefit is otherwise
+ * repeatable enough to break the economy — the classic case being the Energy
+ * Drink loop (buy → clear work cooldown → work → repeat for infinite money).
+ * Durations are tuned to each item's exploit power; see the design doc.
+ */
+const BUFF_ITEM_COOLDOWN_SECONDS: Record<string, number> = {
+  energy_drink: 8 * 3600,        // clears the 1h work cooldown
+  energy_flask: 8 * 3600,        // clears the 1h work cooldown (bigger reduction)
+  overtime_contract: 12 * 3600,  // instant extra shift
+  stress_pills: 6 * 3600,        // removes the stress gate on working
+  lucky_coin: 6 * 3600,          // repeatable casino payout buff
+  bandage: 6 * 3600,             // clears a casino game cooldown
+  tax_shield: 6 * 3600,          // bypasses transaction taxes
+  blackmarket_resume: 24 * 3600, // skips lifetime-shift career gates
+};
+
+export function isBuffCooldownItem(itemKey: string): boolean {
+  return itemKey in BUFF_ITEM_COOLDOWN_SECONDS;
+}
+
+/**
+ * Wraps a buff item's handler with an atomic per-use cooldown. The claim is
+ * taken BEFORE the handler runs (SET NX) so two concurrent uses can never both
+ * resolve, and it is released if the item did not actually grant its benefit —
+ * i.e. a validation failure (success:false) or a no-op use (shouldConsume:false,
+ * e.g. Energy Drink with no active shift). Only a real, consumed use holds the
+ * cooldown. Testers bypass entirely (claimItemCooldown returns null).
+ */
+async function withBuffCooldown(
+  itemKey: string,
+  discordId: string,
+  fn: () => Promise<ShopItemUseResult>,
+): Promise<ShopItemUseResult> {
+  const seconds = BUFF_ITEM_COOLDOWN_SECONDS[itemKey] ?? ITEM_COOLDOWN_SECONDS;
+  const blocked = await claimItemCooldown(itemKey, discordId, seconds);
+  if (blocked) return blocked;
+  try {
+    const result = await fn();
+    if (!result.success || result.shouldConsume === false) {
+      await releaseItemCooldown(itemKey, discordId);
+    }
     return result;
   } catch (err) {
     await releaseItemCooldown(itemKey, discordId);
