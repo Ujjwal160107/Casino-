@@ -85,46 +85,31 @@ function buildGlobalRow(ownerId: string): ActionRowBuilder<ButtonBuilder> {
   );
 }
 
-export async function handleHunt(message: Message, args: string[]) {
-  const guildId = message.guildId!;
-  const ownerId = message.author.id;
+// Discord rejects ComponentsV2 messages with more than 40 total components
+// (50035 Invalid Form Body). Each detailed group costs up to 9 components
+// (separator + section + text + thumbnail + action row + 4 buttons), so only
+// the top groups get their own section/buttons; the rest render as text.
+const MAX_DETAILED_GROUPS = 3;
 
-  await seedHuntShop(guildId);
+const RARITY_SORT: Record<string, number> = { Legendary: 0, Rare: 1, Uncommon: 2, Common: 3 };
 
-  if ((args[0] ?? "").toLowerCase() === "craft") {
-    return message.reply(await buildHuntCraftPayload(ownerId, ownerId, 1));
-  }
-
-  let result: Awaited<ReturnType<typeof hunt>>;
-  try {
-    result = await hunt(ownerId, message.author.username, guildId);
-  } catch (err: any) {
-    if (err.message === "NO_RIFLE") {
-      return message.reply({
-        embeds: [errorEmbed(message.author, "No Rifle", "You need a rifle to go hunting! Visit `!shop hunt` to buy one.")],
-      });
-    }
-    if (err.message === "COOLDOWN") {
-      const readyAt = Math.floor((Date.now() + err.ttl * 1000) / 1000);
-      return message.reply({
-        embeds: [errorEmbed(message.author, "Hunt Cooldown", `Your rifle needs time to cool down. Ready <t:${readyAt}:R>.`)],
-      });
-    }
-    console.error("handleHunt error:", err);
-    return message.reply({ embeds: [errorEmbed(message.author, "Error", "Something went wrong while hunting.")] });
-  }
-
-  const { groups, rifleName, newlyUnlockedRecipes } = result;
+export function buildHuntResultPayload(
+  ownerId: string,
+  groups: HuntGroup[],
+  rifleName: string,
+  newlyUnlockedRecipes: string[],
+  hasZoo: boolean,
+): { components: ContainerBuilder[]; files: AttachmentBuilder[]; flags: number } {
   const totalCaught = groups.reduce((sum, g) => sum + g.count, 0);
-
-  const hasZoo = !!(await prisma.ownedProperty.findFirst({
-    where: {
-      userId: ownerId,
-      property: { key: { in: Object.keys(ZOO_CAPACITY) } },
-    },
-  }));
-
   const tier = RIFLE_TIERS[rifleName];
+
+  const sorted = [...groups].sort((a, b) => {
+    const byRarity = (RARITY_SORT[a.def.rarity] ?? 9) - (RARITY_SORT[b.def.rarity] ?? 9);
+    if (byRarity !== 0) return byRarity;
+    return b.def.sellValue * b.count - a.def.sellValue * a.count;
+  });
+  const detailed = sorted.slice(0, MAX_DETAILED_GROUPS);
+  const overflow = sorted.slice(MAX_DETAILED_GROUPS);
   const readyAt = Math.floor((Date.now() + tier.cooldownSeconds * 1000) / 1000);
   const rifleDisplay = rifleName.split(" ").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 
@@ -137,8 +122,8 @@ export async function handleHunt(message: Message, args: string[]) {
     )
   );
 
-  for (let i = 0; i < groups.length; i++) {
-    const group = groups[i];
+  for (let i = 0; i < detailed.length; i++) {
+    const group = detailed[i];
     const emojiDisplay = AnimalEmojis[group.def.key] ?? "";
     const zooPerDay = RARITY_INCOME[group.def.rarity] * group.count * 24;
     const totalSell = group.def.sellValue * group.count;
@@ -172,6 +157,23 @@ export async function handleHunt(message: Message, args: string[]) {
     container.addActionRowComponents(buildGroupRow(group, ownerId, hasZoo));
   }
 
+  if (overflow.length > 0) {
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true),
+    );
+    const overflowLines = overflow.map((group) => {
+      const emojiDisplay = AnimalEmojis[group.def.key] ?? "";
+      const zooPerDay = RARITY_INCOME[group.def.rarity] * group.count * 24;
+      const totalSell = group.def.sellValue * group.count;
+      return `${emojiDisplay} **${group.count}×** **${group.def.name}** — ${group.def.rarity} · Sell: **${fmtCurrency(totalSell)}** | Zoo: **+${fmtCurrency(zooPerDay)}/day**`;
+    });
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        overflowLines.join("\n") + "\n-# Manage these with **Sell All** below, `!zoo`, or the black market."
+      )
+    );
+  }
+
   container.addSeparatorComponents(
     new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
   );
@@ -190,9 +192,67 @@ export async function handleHunt(message: Message, args: string[]) {
   }
   container.addActionRowComponents(buildGlobalRow(ownerId));
 
-  return message.reply({
+  return {
     components: [container],
     files,
     flags: MessageFlags.IsComponentsV2,
-  });
+  };
+}
+
+export async function handleHunt(message: Message, args: string[]) {
+  const guildId = message.guildId!;
+  const ownerId = message.author.id;
+
+  await seedHuntShop(guildId);
+
+  if ((args[0] ?? "").toLowerCase() === "craft") {
+    return message.reply(await buildHuntCraftPayload(ownerId, ownerId, 1));
+  }
+
+  let result: Awaited<ReturnType<typeof hunt>>;
+  try {
+    result = await hunt(ownerId, message.author.username, guildId);
+  } catch (err: any) {
+    if (err.message === "NO_RIFLE") {
+      return message.reply({
+        embeds: [errorEmbed(message.author, "No Rifle", "You need a rifle to go hunting! Visit `!shop hunt` to buy one.")],
+      });
+    }
+    if (err.message === "COOLDOWN") {
+      const readyAt = Math.floor((Date.now() + err.ttl * 1000) / 1000);
+      return message.reply({
+        embeds: [errorEmbed(message.author, "Hunt Cooldown", `Your rifle needs time to cool down. Ready <t:${readyAt}:R>.`)],
+      });
+    }
+    console.error("handleHunt error:", err);
+    return message.reply({ embeds: [errorEmbed(message.author, "Error", "Something went wrong while hunting.")] });
+  }
+
+  const { groups, rifleName, newlyUnlockedRecipes } = result;
+
+  const hasZoo = !!(await prisma.ownedProperty.findFirst({
+    where: {
+      userId: ownerId,
+      property: { key: { in: Object.keys(ZOO_CAPACITY) } },
+    },
+  }));
+
+  const payload = buildHuntResultPayload(ownerId, groups, rifleName, newlyUnlockedRecipes, hasZoo);
+
+  try {
+    return await message.reply(payload);
+  } catch (err) {
+    // The cooldown is already consumed and the animals are saved — never let a
+    // render failure eat the hunt silently. Fall back to a plain-text summary.
+    console.error("handleHunt: hunt results reply failed, sending fallback:", err);
+    const totalCaught = groups.reduce((sum, g) => sum + g.count, 0);
+    const summary = groups.map((g) => `${g.count}× ${g.def.name}`).join(", ");
+    const readyAt = Math.floor((Date.now() + RIFLE_TIERS[rifleName].cooldownSeconds * 1000) / 1000);
+    return message.reply({
+      content:
+        `**Hunt Results** — you caught **${totalCaught}** animal${totalCaught !== 1 ? "s" : ""}: ${summary}.\n` +
+        `Your catch is saved — manage it with \`!zoo\`, the black market, or \`!hunt craft\`.\n` +
+        `-# Next hunt <t:${readyAt}:R>`,
+    });
+  }
 }

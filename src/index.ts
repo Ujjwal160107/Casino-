@@ -299,7 +299,14 @@ client.on("messageCreate", async (message) => {
       (message as any).content = originalContent;
     }
   } catch (err: any) {
-    if (err.code === 10008 || err.code === 50035) return;
+    if (err.code === 50035) {
+      // Invalid Form Body — the reply payload itself was rejected by Discord.
+      // Don't reply (we likely can't), but never swallow this silently: it
+      // means a command produced an invalid message and the user saw nothing.
+      console.error("Message handler: reply rejected with 50035 Invalid Form Body:", err);
+      return;
+    }
+    if (err.code === 10008) return;
 
     console.error("Message handler error:", err);
     try {
