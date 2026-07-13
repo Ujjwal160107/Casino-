@@ -5,7 +5,7 @@ import { checkJailStatus } from "../../services/jailService";
 import { getOrCreateCrimeSession, getLastCrimeResult } from "../../services/crimeService";
 import { buildCrimeBoardPayload, buildCrimeCooldownPayload } from "./crimeUi";
 import { getGuildPrefix } from "../../utils/guildContext";
-import { errorEmbed } from "../../utils/embed";
+import { errorContainer, v2Reply } from "../../utils/componentsV2";
 import { Mascot } from "../../config/branding";
 
 export async function handleCrime(message: Message) {
@@ -13,15 +13,14 @@ export async function handleCrime(message: Message) {
 
   const jail = await checkJailStatus(message.author.id);
   if (jail.isJailed) {
-    return message.reply({
-      embeds: [
-        errorEmbed(
-          message.author,
+    return message.reply(
+      v2Reply(
+        errorContainer(
           "Incarcerated",
           `${Mascot.Emotes.Lock} You cannot commit crimes while jailed. Use \`,bail\` or wait for release.`,
         ),
-      ],
-    });
+      ),
+    );
   }
 
   const config = GRINDING_COMMANDS.crime;

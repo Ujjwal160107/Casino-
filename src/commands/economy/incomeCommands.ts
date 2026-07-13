@@ -3,7 +3,8 @@ import { GRINDING_COMMANDS } from "../../utils/economyConfig";
 import { checkCooldown, formatDiscordRelativeTime, setCooldown } from "../../services/cooldownService";
 import { addBalance } from "../../services/walletService";
 import { checkLuckyCoin } from "../../services/shopBuffs";
-import { errorEmbed, successEmbed } from "../../utils/embed";
+import { errorContainer, successContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { fmtCurrency } from "../../utils/format";
 
 type GrindCommand = "beg" | "slut";
@@ -54,32 +55,32 @@ export async function handleIncome(message: Message) {
   const commandKey = cmd.toLowerCase() as GrindCommand;
 
   if (!["beg", "slut"].includes(commandKey)) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Unknown", "Use: !beg or !slut")] });
+    return message.reply(v2Reply(errorContainer("Unknown", "Use: !beg or !slut")));
   }
 
   const config = GRINDING_COMMANDS[commandKey];
   const cooldown = await checkCooldown(message.author.id, config.commandName);
 
   if (cooldown.active && cooldown.expiresAt) {
-    return message.reply({
-      embeds: [errorEmbed(message.author, "Cooldown Active", `You can use \`${commandKey}\` again ${formatDiscordRelativeTime(cooldown.expiresAt)}.`)]
-    });
+    return message.reply(
+      v2Reply(errorContainer("Cooldown Active", `You can use \`${commandKey}\` again ${formatDiscordRelativeTime(cooldown.expiresAt)}.`))
+    );
   }
 
   const reserved = await setCooldown(message.author.id, config.commandName, config.cooldownSeconds);
   if (reserved.active && reserved.expiresAt) {
-    return message.reply({
-      embeds: [errorEmbed(message.author, "Cooldown Active", `You can use \`${commandKey}\` again ${formatDiscordRelativeTime(reserved.expiresAt)}.`)]
-    });
+    return message.reply(
+      v2Reply(errorContainer("Cooldown Active", `You can use \`${commandKey}\` again ${formatDiscordRelativeTime(reserved.expiresAt)}.`))
+    );
   }
 
   const won = Math.random() < config.winRate;
 
   if (!won) {
     const failMessages = commandKey === "beg" ? BEG_LOSS_MESSAGES : SLUT_LOSS_MESSAGES;
-    return message.reply({
-      embeds: [errorEmbed(message.author, `${commandKey.toUpperCase()} FAILED`, randomMessage(failMessages))]
-    });
+    return message.reply(
+      v2Reply(errorContainer(`${commandKey.toUpperCase()} FAILED`, randomMessage(failMessages)))
+    );
   }
 
   const luckyCoinMult = await checkLuckyCoin(message.author.id);
@@ -88,11 +89,15 @@ export async function handleIncome(message: Message) {
   const winMessages = commandKey === "beg" ? BEG_WIN_MESSAGES : SLUT_WIN_MESSAGES;
   const capNotice = result.capped ? "\n\nYour wallet hit the maximum balance limit, so part of this payout was withheld." : "";
 
-  const embed = successEmbed(
-    message.author,
-    `${commandKey.toUpperCase()} SUCCESS`,
-    `${randomMessage(winMessages, result.appliedAmount)}${capNotice}`
-  ).addFields({ name: "Wallet", value: fmtCurrency(result.newBalance), inline: true });
+  const winBody = `${randomMessage(winMessages, result.appliedAmount)}${capNotice}`;
 
-  return message.reply({ embeds: [embed] });
+  return message.reply(
+    v2Reply(
+      successContainer(
+        `${commandKey.toUpperCase()} SUCCESS`,
+        `${winBody}\n\n**Wallet:** ${fmtCurrency(result.newBalance)}`,
+        { hint: nextStepHint("beg") }
+      )
+    )
+  );
 }

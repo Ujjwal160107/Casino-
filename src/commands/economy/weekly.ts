@@ -4,7 +4,8 @@ import { checkCooldown, formatDiscordRelativeTime, setCooldown } from "../../ser
 import { addBalance } from "../../services/walletService";
 import { checkCounterfeitKit, checkCrownOfGreed, checkDevilContract } from "../../services/shopBuffs";
 import { applyIncomeTax } from "../../services/taxService";
-import { errorEmbed, successEmbed } from "../../utils/embed";
+import { errorContainer, successContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { fmtCurrency } from "../../utils/format";
 
 export async function handleWeekly(message: Message) {
@@ -12,16 +13,16 @@ export async function handleWeekly(message: Message) {
     const cooldown = await checkCooldown(message.author.id, reward.commandName);
 
     if (cooldown.active && cooldown.expiresAt) {
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Weekly Cooldown", `You already claimed your weekly reward. Come back ${formatDiscordRelativeTime(cooldown.expiresAt)}.`)]
-        });
+        return message.reply(
+            v2Reply(errorContainer("Weekly Cooldown", `You already claimed your weekly reward. Come back ${formatDiscordRelativeTime(cooldown.expiresAt)}.`))
+        );
     }
 
     const reserved = await setCooldown(message.author.id, reward.commandName, reward.cooldownSeconds);
     if (reserved.active && reserved.expiresAt) {
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Weekly Cooldown", `You already claimed your weekly reward. Come back ${formatDiscordRelativeTime(reserved.expiresAt)}.`)]
-        });
+        return message.reply(
+            v2Reply(errorContainer("Weekly Cooldown", `You already claimed your weekly reward. Come back ${formatDiscordRelativeTime(reserved.expiresAt)}.`))
+        );
     }
 
     const counterfeitMult = await checkCounterfeitKit(message.author.id);
@@ -34,18 +35,17 @@ export async function handleWeekly(message: Message) {
     const capNotice = result.capped ? "\n\nYour wallet is at the maximum balance limit, so only part of the reward could be added." : "";
 
     const tax = await applyIncomeTax(message.author.id, result.appliedAmount);
-    const taxField = tax.shielded
-      ? { name: "Tax", value: "🛡️ Shielded", inline: true }
-      : { name: "Tax (8%)", value: `-${fmtCurrency(tax.taxPaid)}`, inline: true };
+    const taxLine = tax.shielded
+      ? "**Tax:** 🛡️ Shielded"
+      : `**Tax (8%):** -${fmtCurrency(tax.taxPaid)}`;
 
-    const embed = successEmbed(
-        message.author,
-        "Weekly Reward Claimed!",
-        `You claimed **${fmtCurrency(result.appliedAmount)}** from your weekly reward.${capNotice}`
-    ).addFields(
-      taxField,
-      { name: "Wallet", value: fmtCurrency(result.newBalance - tax.taxPaid), inline: true }
+    return message.reply(
+        v2Reply(
+            successContainer(
+                "Weekly Reward Claimed!",
+                `You claimed **${fmtCurrency(result.appliedAmount)}** from your weekly reward.${capNotice}\n\n${taxLine}\n**Wallet:** ${fmtCurrency(result.newBalance - tax.taxPaid)}`,
+                { hint: nextStepHint("weekly") }
+            )
+        )
     );
-
-    return message.reply({ embeds: [embed] });
 }

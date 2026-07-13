@@ -1,6 +1,7 @@
 import { Message } from "discord.js";
 import { depositToBank, ensureBankingUser, getBankByUserId } from "../../services/bankService";
-import { successEmbed, errorEmbed } from "../../utils/embed";
+import { successContainer, errorContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { fmtCurrency, parseSmartAmount } from "../../utils/format";
 
 export async function handleDeposit(message: Message, args: string[]) {
@@ -9,12 +10,12 @@ export async function handleDeposit(message: Message, args: string[]) {
   const amountStr = args[0];
 
   if (!amountStr) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Usage: `!dep <amount/all>`")] });
+    return message.reply(v2Reply(errorContainer("Invalid Amount", "Usage: `!dep <amount/all>`")));
   }
 
   const amount = parseSmartAmount(amountStr, wallet.balance);
   if (isNaN(amount) || amount <= 0) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please enter a valid positive number.")] });
+    return message.reply(v2Reply(errorContainer("Invalid Amount", "Please enter a valid positive number.")));
   }
 
   try {
@@ -22,16 +23,16 @@ export async function handleDeposit(message: Message, args: string[]) {
     const updatedBank = await getBankByUserId(user.discordId);
     const partialMsg = capped ? " (Wallet cap reached)" : "";
 
-    return message.reply({
-      embeds: [
-        successEmbed(
-          message.author,
+    return message.reply(
+      v2Reply(
+        successContainer(
           capped ? "Partial Deposit" : "Deposit Successful",
-          `Deposited **${fmtCurrency(actualAmount)}**${partialMsg}.\nBank balance: **${fmtCurrency(updatedBank?.balance ?? 0)}**`
+          `Deposited **${fmtCurrency(actualAmount)}**${partialMsg}.\nBank balance: **${fmtCurrency(updatedBank?.balance ?? 0)}**`,
+          { hint: nextStepHint("deposit") }
         )
-      ]
-    });
+      )
+    );
   } catch (err) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Failed", (err as Error).message)] });
+    return message.reply(v2Reply(errorContainer("Failed", (err as Error).message)));
   }
 }

@@ -1,6 +1,6 @@
-import { Message, EmbedBuilder } from "discord.js";
+import { Message } from "discord.js";
 import prisma from "../../utils/prisma";
-import { errorEmbed } from "../../utils/embed";
+import { errorContainer, successContainer, v2Reply } from "../../utils/componentsV2";
 import { getEquipmentSlot } from "../../utils/gameUtils";
 import { GameConfig, EquipmentSlot } from "../../config/gameConfig";
 import { Mascot } from "../../config/branding";
@@ -13,7 +13,7 @@ export async function handleEquip(message: Message, args: string[]) {
     const itemName = args.join(" ");
 
     if (!itemName) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}equip <item name>\``)] });
+        return message.reply(v2Reply(errorContainer("Invalid Usage", `Usage: \`${prefix}equip <item name>\``)));
     }
 
     const guildId = message.guild.id;
@@ -32,22 +32,27 @@ export async function handleEquip(message: Message, args: string[]) {
         }),
     });
 
-    if (!shopItem) return message.reply({ embeds: [errorEmbed(user, "Item Not Found", "That item does not exist via shop.")] });
+    if (!shopItem) return message.reply(v2Reply(errorContainer("Item Not Found", "That item does not exist via shop.")));
 
     const invItem = await prisma.inventory.findUnique({
         where: { userId_shopItemId: { userId: userData.discordId, shopItemId: shopItem.id } }
     });
 
     if (!invItem || invItem.amount < 1) {
-        return message.reply({ embeds: [errorEmbed(user, "Missing Item", `You do not own **${shopItem.name}**.`)] });
+        return message.reply(v2Reply(errorContainer("Missing Item", `You do not own **${shopItem.name}**.`)));
     }
 
     // 3. Determine Slot
     const slot = getEquipmentSlot(shopItem.name);
     if (!slot) {
-        return message.reply({
-            embeds: [errorEmbed(user, "Not Equippable", "This item cannot be equipped to a chicken.\nOnly weapons (spurs, swords), armor (shields, helmets), and accessories (gloves, boots) can be equipped.")]
-        });
+        return message.reply(
+            v2Reply(
+                errorContainer(
+                    "Not Equippable",
+                    "This item cannot be equipped to a chicken.\nOnly weapons (spurs, swords), armor (shields, helmets), and accessories (gloves, boots) can be equipped.",
+                ),
+            ),
+        );
     }
 
     // 4. Get Chicken
@@ -63,7 +68,7 @@ export async function handleEquip(message: Message, args: string[]) {
     });
 
     if (!chickenInv || chickenInv.amount < 1) {
-        return message.reply({ embeds: [errorEmbed(user, "No Chicken", "You need a chicken to equip items!")] });
+        return message.reply(v2Reply(errorContainer("No Chicken", "You need a chicken to equip items!")));
     }
 
     // 5. Equip Logic
@@ -93,15 +98,12 @@ export async function handleEquip(message: Message, args: string[]) {
     const EMOJI_CHECK = GameConfig.Emojis.Tick || Mascot.Emotes.Accept;
     const slotName = slot.charAt(0).toUpperCase() + slot.slice(1);
 
-    const embed = new EmbedBuilder()
-        .setColor("#00FF00")
-        .setTitle(`${EMOJI_CHECK} Equipped ${shopItem.name}`)
-        .setDescription(`**${shopItem.name}** has been equipped to the **${slotName}** slot!`)
-        .addFields(
-            { name: "Slot", value: slotName, inline: true },
-            { name: "Replaced", value: oldItem, inline: true }
-        )
-        .setFooter({ text: `Check stats with ${prefix}chicken` });
-
-    return message.reply({ embeds: [embed] });
+    return message.reply(
+        v2Reply(
+            successContainer(
+                `${EMOJI_CHECK} Equipped ${shopItem.name}`,
+                `**${shopItem.name}** has been equipped to the **${slotName}** slot!\n\n**Slot:** ${slotName}\n**Replaced:** ${oldItem}`,
+            ),
+        ),
+    );
 }

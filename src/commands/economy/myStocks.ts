@@ -1,15 +1,16 @@
-import { Message, EmbedBuilder } from "discord.js";
+import { Message } from "discord.js";
 import { getPortfolio } from "../../services/stockService";
 import { fmtCurrency } from "../../utils/format";
 import { Mascot } from "../../config/branding";
-import { errorEmbed } from "../../utils/embed";
+import { errorContainer, plainContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 
 export async function handleMyStocks(message: Message) {
     if (!message.guildId) return;
 
     const pf = await getPortfolio(message.author.id);
     if (!pf || pf.holdings.length === 0) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Portfolio Empty", "You don't own any stocks.")] });
+        return message.reply(v2Reply(errorContainer("Portfolio Empty", "You don't own any stocks.")));
     }
 
     let totalValue = 0;
@@ -31,10 +32,11 @@ export async function handleMyStocks(message: Message) {
     const totalPnl = totalValue - totalCost;
     const totalPnlStr = totalPnl >= 0 ? `+${fmtCurrency(totalPnl)}` : `-${fmtCurrency(Math.abs(totalPnl))}`;
 
-    const embed = new EmbedBuilder()
-        .setTitle(`📊 Stock Portfolio: ${message.author.username}`)
-        .setDescription(`**Total Value:** ${fmtCurrency(totalValue)}\n**Total Profit:** ${totalPnlStr}\n\n${lines.join("\n\n")}`)
-        .setColor(Mascot.Colors.Base as any);
+    const body = `**Total Value:** ${fmtCurrency(totalValue)}\n**Total Profit:** ${totalPnlStr}\n\n${lines.join("\n\n")}`;
+    const container = plainContainer(
+        `## 📊 Stock Portfolio: ${message.author.username}\n${body}`,
+        nextStepHint("mystocks")!,
+    );
 
-    return message.reply({ embeds: [embed] });
+    return message.reply(v2Reply(container));
 }

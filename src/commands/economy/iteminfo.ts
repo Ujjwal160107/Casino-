@@ -1,7 +1,7 @@
-import { Message, EmbedBuilder, Colors } from "discord.js";
+import { Message } from "discord.js";
 import { getShopItemByName, getShopItems } from "../../services/shopService";
 import { fmtCurrency, formatDuration } from "../../utils/format";
-import { errorEmbed } from "../../utils/embed";
+import { errorContainer, plainContainer, v2Reply } from "../../utils/componentsV2";
 import { ItemEffect } from "../../services/effectService";
 import { getGuildPrefix } from "../../utils/guildContext";
 
@@ -37,31 +37,21 @@ export async function handleItemInfo(message: Message, args: string[]) {
         const item = await getShopItemByName(message.guildId!, itemName);
 
         if (!item) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Not Found", `Item "${itemName}" not found in the shop.`)] });
+            return message.reply(v2Reply(errorContainer("Not Found", `Item "${itemName}" not found in the shop.`)));
         }
 
         const effects = (item.effects as unknown as ItemEffect[]) || [];
         const stockText = item.stock === -1 ? "∞ Unlimited" : `${item.stock} in stock`;
 
-        const embed = new EmbedBuilder()
-            .setTitle(`<a:BoxBox:1449707866079494154> ${item.name}`)
-            .setColor(Colors.Blue)
-            .setDescription(item.description || "*No description provided*")
-            .addFields(
-                { name: "<:pricee:1449707707442528387> Price", value: fmtCurrency(item.price), inline: true },
-                { name: "<a:BoxBox:1449707866079494154> Stock", value: stockText, inline: true }
-            );
+        const effectsText = effects.length > 0
+            ? effects.map((e, i) => `${i + 1}. ${formatEffectDescription(e)}`).join("\n")
+            : "*No special effects*";
 
-        if (effects.length > 0) {
-            const effectsText = effects.map((e, i) => `${i + 1}. ${formatEffectDescription(e)}`).join("\n");
-            embed.addFields({ name: "<:sparks:1456569026292744303> Effects", value: effectsText, inline: false });
-        } else {
-            embed.addFields({ name: "<:sparks:1456569026292744303> Effects", value: "*No special effects*", inline: false });
-        }
+        const titleBlock = `## <a:BoxBox:1449707866079494154> ${item.name}\n${item.description || "*No description provided*"}`;
+        const statsBlock = `**<:pricee:1449707707442528387> Price:** ${fmtCurrency(item.price)}\n**<a:BoxBox:1449707866079494154> Stock:** ${stockText}`;
+        const effectsBlock = `**<:sparks:1456569026292744303> Effects**\n${effectsText}`;
 
-        embed.setFooter({ text: `Use ${prefix}shop buy ${item.name} to purchase` });
-
-        return message.reply({ embeds: [embed] });
+        return message.reply(v2Reply(plainContainer(titleBlock, statsBlock, effectsBlock)));
 
     } catch (err) {
         console.error("iteminfo error:", err);

@@ -1,6 +1,7 @@
-import { Message, EmbedBuilder, Colors } from "discord.js";
+import { Message } from "discord.js";
 import prisma from "../../utils/prisma";
-import { errorEmbed } from "../../utils/embed";
+import { errorContainer, successContainer, infoContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { GLOBAL_CURRENCY_EMOJI, Mascot } from "../../config/branding";
 import { ensureUserAndWallet } from "../../services/walletService";
 import fetch from "node-fetch";
@@ -27,9 +28,9 @@ export async function handleVote(message: Message, args: string[]) {
         const prefs = await getReminderPrefs(user.discordId);
         const currentlyOn = prefs.remindersEnabled && !prefs.disabledReminders.includes("vote");
         const newState = await setReminderTypeEnabled(user.discordId, "vote", !currentlyOn);
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Reminder Settings", `Vote reminders are now **${newState ? "ENABLED" : "DISABLED"}**. Manage all reminders with \`${prefix}settings\`.`)]
-        });
+        return message.reply(v2Reply(
+            errorContainer("Reminder Settings", `Vote reminders are now **${newState ? "ENABLED" : "DISABLED"}**. Manage all reminders with \`${prefix}settings\`.`)
+        ));
     }
 
     // Check if user has voted recently (local DB cooldown)
@@ -37,9 +38,9 @@ export async function handleVote(message: Message, args: string[]) {
         const diff = now.getTime() - user.lastVote.getTime();
         if (diff < cooldown) {
             const readyAt = new Date(user.lastVote.getTime() + cooldown);
-            return message.reply({
-                embeds: [errorEmbed(message.author, "Already Voted", `You can vote again <t:${Math.floor(readyAt.getTime() / 1000)}:R>.`)]
-            });
+            return message.reply(v2Reply(
+                errorContainer("Already Voted", `You can vote again <t:${Math.floor(readyAt.getTime() / 1000)}:R>.`)
+            ));
         }
     }
 
@@ -64,7 +65,9 @@ export async function handleVote(message: Message, args: string[]) {
         } catch (err) {
             console.error("Top.gg API Error:", err);
             // Fallback? If API fails, we probably shouldn't give money to prevent exploit, or just warn.
-            return message.reply({ embeds: [errorEmbed(message.author, "API Error", "Could not verify vote status with Top.gg. Please try again later.")] });
+            return message.reply(v2Reply(
+                errorContainer("API Error", "Could not verify vote status with Top.gg. Please try again later.")
+            ));
         }
     } else {
         // Dev mode / No token: Assume true or warn?
@@ -100,35 +103,33 @@ export async function handleVote(message: Message, args: string[]) {
             }
         });
 
-        const embed = new EmbedBuilder()
-            .setTitle(`${Mascot.Emotes.Success} Vote Verified!`)
-            .setDescription(`Thank you for voting for **Fortuna**!\n\nYou have received **${voteReward.toLocaleString()} ${GLOBAL_CURRENCY_EMOJI}**.`)
-            .setColor(Colors.Green)
-            .setFooter({ text: "Vote again in 12 hours!" });
+        const container = successContainer(
+            `${Mascot.Emotes.Success} Vote Verified!`,
+            `Thank you for voting for **Fortuna**!\n\nYou have received **${voteReward.toLocaleString()} ${GLOBAL_CURRENCY_EMOJI}**.`,
+            { hint: nextStepHint("vote") }
+        );
 
-        return message.reply({ embeds: [embed] });
+        return message.reply(v2Reply(container));
 
     } else {
         // Show Vote Links (Default State)
-        const embed = new EmbedBuilder()
-            .setTitle(`🗳️ Vote for ${message.client.user?.username || "Us"}`)
-            .setDescription(
-                `Support the bot and earn **${voteReward.toLocaleString()} ${GLOBAL_CURRENCY_EMOJI}** every 12 hours!\n\n` +
-                `**[Click Here to Vote](${VOTE_LINK})**\n` +
-                `If you're enjoying Fortuna, please consider leaving a review!\n` +
-                `**[Leave a Review](${REVIEW_LINK})**\n\n` +
-                `**Instructions:**\n` +
-                `1. Click the link above and vote.\n` +
-                `2. Come back here and run \`${prefix}vote\` again to claim your reward!`
-            )
-            .setColor(Colors.Gold)
-            .setThumbnail(message.client.user?.displayAvatarURL() || "")
-            .setFooter({ text: "Rewards available every 12 hours." });
+        const configWarning = (!topggToken && process.env.NODE_ENV !== "development")
+            ? `\n\n**⚠️ Config Warning:** Top.gg Token not configured. Automatic verification unavailable.`
+            : "";
 
-        if (!topggToken && process.env.NODE_ENV !== "development") {
-            embed.addFields({ name: "⚠️ Config Warning", value: "Top.gg Token not configured. Automatic verification unavailable." });
-        }
+        const container = infoContainer(
+            `🗳️ Vote for ${message.client.user?.username || "Us"}`,
+            `Support the bot and earn **${voteReward.toLocaleString()} ${GLOBAL_CURRENCY_EMOJI}** every 12 hours!\n\n` +
+            `**[Click Here to Vote](${VOTE_LINK})**\n` +
+            `If you're enjoying Fortuna, please consider leaving a review!\n` +
+            `**[Leave a Review](${REVIEW_LINK})**\n\n` +
+            `**Instructions:**\n` +
+            `1. Click the link above and vote.\n` +
+            `2. Come back here and run \`${prefix}vote\` again to claim your reward!` +
+            configWarning,
+            { thumbnailUrl: message.client.user?.displayAvatarURL() || undefined }
+        );
 
-        return message.reply({ embeds: [embed] });
+        return message.reply(v2Reply(container));
     }
 }
