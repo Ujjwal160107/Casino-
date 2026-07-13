@@ -54,8 +54,8 @@ Drop-in replacement for `src/utils/embed.ts`:
 - `plainContainer(...lines: string[])` → bare container of TextDisplays for custom screens.
 - `v2Reply(containers: ContainerBuilder[] | ContainerBuilder, files?: AttachmentBuilder[], extraFlags?: number)`
   → `{ components, files, flags: MessageFlags.IsComponentsV2 | extraFlags }`.
-- `balanceContainer(...)` — V2 equivalent of the old `balanceEmbed` (wallet/bank lines,
-  money mascot thumbnail).
+- The old `balanceEmbed` has a single caller (balance.ts), which uses `statusContainer`
+  with a Money-emote thumbnail override directly — no dedicated builder needed.
 
 The kit is the single place that enforces: no accent color, no footer, no timestamp.
 
@@ -114,11 +114,9 @@ Copy is reviewable/editable in this one file without touching command code.
 
 ## Component 3: pagination — `src/utils/pagination.ts`
 
-`sendPaginatedEmbed(message, embeds[])` becomes
-`sendPaginatedContainers(message, containers: ContainerBuilder[])`: same Prev/Next
-collector logic, but pages are containers sent with `IsComponentsV2`, and the page
-indicator moves into a `-# Page x/y` TextDisplay appended to each page. All callers
-updated in the same commit as their module batch.
+Investigation during planning found `sendPaginatedEmbed` has **zero callers** — it is
+dead code and gets deleted outright (YAGNI). If a V2 pager is ever needed, it can be
+written fresh against containers.
 
 ## Component 4: commandRouter + shared error surfaces
 
