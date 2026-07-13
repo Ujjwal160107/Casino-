@@ -1,9 +1,9 @@
-import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
+import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { checkJailStatus, payBail } from "../../services/jailService";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { fmtCurrency, formatDuration } from "../../utils/format";
-import { errorEmbed, successEmbed, infoEmbed } from "../../utils/embed";
-import { getGuildPrefix } from "../../utils/guildContext";
+import { successContainer, errorContainer, infoContainer, statusContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { DEFAULT_JAIL_FINE } from "../../utils/economyConfig";
 
 const POLICE_EMOTE = "<:fortuna_police:1457053051582939237>";
@@ -14,24 +14,21 @@ export async function handleJail(message: Message) {
     const status = await checkJailStatus(user.discordId);
 
     if (!status.isJailed) {
-        return message.reply({
-            embeds: [infoEmbed(message.author, "Clean Record", "You are currently **not** in jail.")]
-        });
+        return message.reply(
+            v2Reply(infoContainer("Clean Record", "You are currently **not** in jail."))
+        );
     }
 
-    const timeLeft = status.releaseTime ? Math.max(0, status.releaseTime.getTime() - Date.now()) : 0;
-    const prefix = await getGuildPrefix(message.guildId!);
+    const desc = [
+        "You are currently incarcerated.",
+        `**Release In:** ${status.releaseTime ? `<t:${Math.floor(status.releaseTime.getTime() / 1000)}:R>` : "N/A"}`,
+        `**Bail Cost:** ${fmtCurrency(DEFAULT_JAIL_FINE)}`,
+    ].join("\n");
 
-    const embed = new EmbedBuilder()
-        .setTitle(`${POLICE_EMOTE} JAIL STATUS`)
-        .setDescription(`You are currently incarcerated.`)
-        .addFields(
-            { name: "Release In", value: status.releaseTime ? `<t:${Math.floor(status.releaseTime.getTime() / 1000)}:R>` : "N/A", inline: true },
-            { name: "Bail Cost", value: fmtCurrency(DEFAULT_JAIL_FINE), inline: true }
-        )
-        .setColor(0xFF0000)
-        .setThumbnail("https://cdn.discordapp.com/emojis/1457053051582939237.png")
-        .setFooter({ text: `Type ${prefix}bail to pay the fine and leave.` });
+    const container = statusContainer("info", `${POLICE_EMOTE} JAIL STATUS`, desc, {
+        thumbnailUrl: "https://cdn.discordapp.com/emojis/1457053051582939237.png",
+        hint: nextStepHint("jail"),
+    });
 
     const row = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(
@@ -41,7 +38,9 @@ export async function handleJail(message: Message) {
                 .setStyle(ButtonStyle.Danger)
         );
 
-    return message.reply({ embeds: [embed], components: [row] });
+    container.addActionRowComponents(row);
+
+    return message.reply(v2Reply(container));
 }
 
 export async function handleBail(message: Message) {
@@ -49,20 +48,20 @@ export async function handleBail(message: Message) {
     const status = await checkJailStatus(user.discordId);
 
     if (!status.isJailed) {
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Not Jailed", "You are not in jail, why are you trying to pay bail?")]
-        });
+        return message.reply(
+            v2Reply(errorContainer("Not Jailed", "You are not in jail, why are you trying to pay bail?"))
+        );
     }
 
     const result = await payBail(user.discordId, message.guildId!);
 
     if (result.success) {
-        return message.reply({
-            embeds: [successEmbed(message.author, "Bail Paid", result.message)]
-        });
+        return message.reply(
+            v2Reply(successContainer("Bail Paid", result.message, { hint: nextStepHint("bail") }))
+        );
     } else {
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Bail Failed", result.message)]
-        });
+        return message.reply(
+            v2Reply(errorContainer("Bail Failed", result.message))
+        );
     }
 }

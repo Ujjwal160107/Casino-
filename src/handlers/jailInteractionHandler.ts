@@ -1,7 +1,8 @@
 import { Interaction } from "discord.js";
 import { payBail, checkJailStatus } from "../services/jailService";
 import { ensureUserAndWallet } from "../services/walletService";
-import { errorEmbed, successEmbed } from "../utils/embed";
+import { errorContainer, successContainer, v2Reply } from "../utils/componentsV2";
+import { nextStepHint } from "../config/nextSteps";
 import { ensureDeferredEphemeralReply, safeEditReply } from "../utils/interactionHelpers";
 
 export async function handleJailInteraction(interaction: Interaction) {
@@ -14,20 +15,17 @@ export async function handleJailInteraction(interaction: Interaction) {
   const status = await checkJailStatus(user.discordId);
 
   if (!status.isJailed) {
-    return safeEditReply(interaction, {
-      embeds: [errorEmbed(interaction.user, "Not Jailed", "You are not in jail!")],
-    });
+    return safeEditReply(interaction, v2Reply(errorContainer("Not Jailed", "You are not in jail!")));
   }
 
   const result = await payBail(user.discordId, interaction.guildId!);
 
   if (result.success) {
-    return safeEditReply(interaction, {
-      embeds: [successEmbed(interaction.user, "Bail Paid", result.message)],
-    });
+    return safeEditReply(
+      interaction,
+      v2Reply(successContainer("Bail Paid", result.message, { hint: nextStepHint("bail") }))
+    );
   }
 
-  return safeEditReply(interaction, {
-    embeds: [errorEmbed(interaction.user, "Bail Failed", result.message)],
-  });
+  return safeEditReply(interaction, v2Reply(errorContainer("Bail Failed", result.message)));
 }

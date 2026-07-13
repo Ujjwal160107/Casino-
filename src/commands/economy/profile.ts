@@ -4,7 +4,6 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
-  EmbedBuilder,
   Message,
   MessageFlags,
   SectionBuilder,
@@ -538,10 +537,12 @@ export async function handleProfile(message: Message, args: string[]) {
           await i.editReply({
             components: [newPayload.container, ...controls()],
             files: newPayload.files,
+            flags: MessageFlags.IsComponentsV2,
           });
         } catch {
           await i.editReply({
             components: [textContainer("Profile Failed", "Failed to switch profile view.", 0xE74C3C)],
+            flags: MessageFlags.IsComponentsV2,
           });
         }
         return;
@@ -555,10 +556,12 @@ export async function handleProfile(message: Message, args: string[]) {
           await i.editReply({
             components: [newPayload.container, ...controls()],
             files: newPayload.files,
+            flags: MessageFlags.IsComponentsV2,
           });
         } catch {
           await i.editReply({
             components: [textContainer("Refresh Failed", "Failed to refresh profile.", 0xE74C3C)],
+            flags: MessageFlags.IsComponentsV2,
           });
         }
       }
@@ -573,12 +576,8 @@ export async function handleProfile(message: Message, args: string[]) {
   } catch (e: any) {
     console.error("Profile Error:", e);
     message.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor("Red")
-          .setTitle("Error")
-          .setDescription("Failed to load profile."),
-      ],
+      components: [textContainer("Error", "Failed to load profile.", 0xE74C3C)],
+      flags: MessageFlags.IsComponentsV2,
     });
   }
 }

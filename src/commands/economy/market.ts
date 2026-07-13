@@ -16,6 +16,7 @@ import {
   TextInputStyle,
 } from "discord.js";
 import { Mascot } from "../../config/branding";
+import { nextStepHint } from "../../config/nextSteps";
 import {
   ensureDeferredEphemeralReply,
   ensureDeferredUpdate,
@@ -169,6 +170,9 @@ export async function handleMarket(message: Message, args: string[]) {
           );
           container.addSeparatorComponents(softSeparator());
         }
+
+        container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false));
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("market")!));
 
         const navRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
           new ButtonBuilder()

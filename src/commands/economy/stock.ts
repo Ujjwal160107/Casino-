@@ -10,6 +10,7 @@ import {
 import { fmtCurrency } from "../../utils/format";
 import { Mascot } from "../../config/branding";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { nextStepHint } from "../../config/nextSteps";
 
 const STOCK_ACCENT_COLOR = 0x9b59b6;
 const STOCK_BANNER_NAME = "stock_market.jpg";
@@ -199,11 +200,14 @@ export async function handleStock(message: Message, args: string[]) {
     }
     try {
       const res = await buyStock(message.author.id, symbol, qty);
+      const buyContainer = textContainer("Stock Purchased",
+        `Bought **${qty}x ${res.stock.symbol}** at avg **${fmtCurrency(res.avgPrice)}**/share ` +
+        `(slippage ${res.impactPct.toFixed(1)}%).\nTotal **${fmtCurrency(res.cost)}**. You now own **${res.newQty}** shares.`,
+        0x2ecc71)
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("stock_trade", prefix)!));
       return message.reply({
-        components: [textContainer("Stock Purchased",
-          `Bought **${qty}x ${res.stock.symbol}** at avg **${fmtCurrency(res.avgPrice)}**/share ` +
-          `(slippage ${res.impactPct.toFixed(1)}%).\nTotal **${fmtCurrency(res.cost)}**. You now own **${res.newQty}** shares.`,
-          0x2ecc71)],
+        components: [buyContainer],
         flags: MessageFlags.IsComponentsV2,
       });
     } catch (e: any) {
@@ -220,11 +224,14 @@ export async function handleStock(message: Message, args: string[]) {
     try {
       const res = await sellStock(message.author.id, symbol, qty);
       const profitText = res.profit >= 0 ? `+${fmtCurrency(res.profit)}` : `-${fmtCurrency(Math.abs(res.profit))}`;
+      const sellContainer = textContainer("Stock Sold",
+        `Sold **${qty}x ${res.stock.symbol}** at avg **${fmtCurrency(res.avgPrice)}**/share ` +
+        `(slippage ${res.impactPct.toFixed(1)}%).\nReceived **${fmtCurrency(res.value)}**. Profit/Loss: **${profitText}**.`,
+        0x2ecc71)
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("stock_trade", prefix)!));
       return message.reply({
-        components: [textContainer("Stock Sold",
-          `Sold **${qty}x ${res.stock.symbol}** at avg **${fmtCurrency(res.avgPrice)}**/share ` +
-          `(slippage ${res.impactPct.toFixed(1)}%).\nReceived **${fmtCurrency(res.value)}**. Profit/Loss: **${profitText}**.`,
-          0x2ecc71)],
+        components: [sellContainer],
         flags: MessageFlags.IsComponentsV2,
       });
     } catch (e: any) {

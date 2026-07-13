@@ -2,12 +2,15 @@ import {
   ContainerBuilder,
   Message,
   MessageFlags,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
   TextDisplayBuilder,
 } from "discord.js";
 import { ensureBankingUser } from "../../services/bankService";
 import { getCardEligibilitySummary } from "../../services/creditCardService";
 import { Mascot } from "../../config/branding";
 import { buildMyCardsPayload } from "./bank";
+import { nextStepHint } from "../../config/nextSteps";
 
 export async function handleCredit(message: Message, _args: string[]) {
   if (!message.guild) return;
@@ -37,6 +40,9 @@ export async function handleCredit(message: Message, _args: string[]) {
     );
 
   const myCardsPayload = await buildMyCardsPayload(message.author.id, displayName, message.guild!.id);
+
+  intro.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false));
+  intro.addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("credit")!));
 
   return message.reply({
     components: [intro, ...myCardsPayload.components],

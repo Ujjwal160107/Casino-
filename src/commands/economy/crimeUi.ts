@@ -11,6 +11,7 @@ import {
   TextDisplayBuilder,
 } from "discord.js";
 import { Mascot } from "../../config/branding";
+import { nextStepHint } from "../../config/nextSteps";
 import { getCrimeByKey } from "../../data/crimeCatalog";
 import { getCrimePrepItem } from "../../data/crimePrepWhitelist";
 import {
@@ -254,12 +255,22 @@ export function buildCrimeResultPayload(
   title: string,
   body: string,
   accentColor: number,
+  outcome?: "success" | "jailed",
+  prefix?: string,
 ) {
   const container = new ContainerBuilder()
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${title}`),
       new TextDisplayBuilder().setContent(body),
     );
+
+  if (outcome === "success") {
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("crime_success", prefix)!));
+  } else if (outcome === "jailed") {
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("crime_jailed", prefix)!));
+  }
 
   return { components: [container], flags: CRIME_V2_FLAGS };
 }

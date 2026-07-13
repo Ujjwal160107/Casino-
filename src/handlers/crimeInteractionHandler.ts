@@ -53,7 +53,9 @@ async function finishCrimeResult(
   }
 
   const accent = result.success ? 0x2ecc71 : 0xe74c3c;
-  await safeEditReply(interaction, buildCrimeResultPayload(title, body, accent));
+  const outcome = result.success ? "success" : result.jailed ? "jailed" : undefined;
+  const prefix = interaction.guild ? await getGuildPrefix(interaction.guild.id) : undefined;
+  await safeEditReply(interaction, buildCrimeResultPayload(title, body, accent, outcome, prefix));
 
   if (
     result.success &&

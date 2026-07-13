@@ -13,7 +13,8 @@ import {
     checkCrownOfGreed,
     recordPotentialSoulLedgerLoss,
 } from "../../services/shopBuffs";
-import { successEmbed, errorEmbed } from "../../utils/embed";
+import { successContainer, errorContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { fmtCurrency } from "../../utils/format";
 import { redisService } from "../../services/redisService";
 import { notifyRobbed, notifyPadlockUsed } from "../../services/victimNotifyService";
@@ -67,30 +68,30 @@ async function resolveRobTarget(
 export async function handleRob(message: Message, args: string[]) {
     const resolved = await resolveRobTarget(message, args);
     if ("error" in resolved) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Error", resolved.error)] });
+        return message.reply(v2Reply(errorContainer("Error", resolved.error)));
     }
     const target = resolved;
-    if (target.id === message.author.id) return message.reply({ embeds: [errorEmbed(message.author, "Error", "You cannot rob yourself.")] });
+    if (target.id === message.author.id) return message.reply(v2Reply(errorContainer("Error", "You cannot rob yourself.")));
 
     const jail = await checkJailStatus(message.author.id);
     if (jail.isJailed) {
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Incarcerated", `You cannot rob while jailed. Use \`,bail\` or wait for release.`)]
-        });
+        return message.reply(
+            v2Reply(errorContainer("Incarcerated", `You cannot rob while jailed. Use \`,bail\` or wait for release.`))
+        );
     }
 
     const cooldown = await checkCooldown(message.author.id, "rob");
     if (cooldown.active && cooldown.expiresAt) {
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Cooldown", `Wait ${formatDiscordRelativeTime(cooldown.expiresAt)}.`)]
-        });
+        return message.reply(
+            v2Reply(errorContainer("Cooldown", `Wait ${formatDiscordRelativeTime(cooldown.expiresAt)}.`))
+        );
     }
 
     const reserved = await setCooldown(message.author.id, "rob", ROB_CONFIG.cooldownSeconds);
     if (reserved.active && reserved.expiresAt) {
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Cooldown", `Wait ${formatDiscordRelativeTime(reserved.expiresAt)}.`)]
-        });
+        return message.reply(
+            v2Reply(errorContainer("Cooldown", `Wait ${formatDiscordRelativeTime(reserved.expiresAt)}.`))
+        );
     }
 
     await ensureBankingUser(message.author.id, message.author.username);
@@ -104,17 +105,17 @@ export async function handleRob(message: Message, args: string[]) {
             message.member?.displayName ?? message.author.username,
             message.guild?.name ?? null,
         );
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Robbery Blocked!", `**${target.name}** has a **Padlock** active — their wallet is protected. Your attempt was foiled.`)]
-        });
+        return message.reply(
+            v2Reply(errorContainer("Robbery Blocked!", `**${target.name}** has a **Padlock** active — their wallet is protected. Your attempt was foiled.`))
+        );
     }
 
     const craftedDefense = await redisService.get<{ active: boolean }>(`crafted_rob_defense:${target.id}`);
     if (craftedDefense?.active) {
         await redisService.del(`crafted_rob_defense:${target.id}`);
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Robbery Blocked!", `**${target.name}** had Crocodile Hide Armor active. It blocked your robbery attempt.`)]
-        });
+        return message.reply(
+            v2Reply(errorContainer("Robbery Blocked!", `**${target.name}** had Crocodile Hide Armor active. It blocked your robbery attempt.`))
+        );
     }
 
     // Pre-fetch all item states before success roll
@@ -179,9 +180,15 @@ export async function handleRob(message: Message, args: string[]) {
             message.guild?.name ?? null,
         );
 
-        return message.reply({
-            embeds: [successEmbed(message.author, "Robbery Successful!", `Stole **${fmtCurrency(result.robAmount)}** from **${target.name}**!\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**${craftedRobBoost ? "\n\nWolf Fang Dagger boosted the loot." : ""}`)]
-        });
+        return message.reply(
+            v2Reply(
+                successContainer(
+                    "Robbery Successful!",
+                    `Stole **${fmtCurrency(result.robAmount)}** from **${target.name}**!\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**${craftedRobBoost ? "\n\nWolf Fang Dagger boosted the loot." : ""}`,
+                    { hint: nextStepHint("rob_success") },
+                ),
+            ),
+        );
     }
 
     // Failure path — fine is a multiple of what this attempt would have
@@ -218,7 +225,12 @@ export async function handleRob(message: Message, args: string[]) {
     const releaseTime = await jailUser(message.author.id, message.guildId!, DEFAULT_JAIL_TIME_SECONDS);
 
     const eclipseNote = eclipseActive ? "\n\nThe Eclipse Mask's backlash added an extra penalty." : "";
-    return message.reply({
-        embeds: [errorEmbed(message.author, "Caught!", `The robbery failed and cost you **${fmtCurrency(result.actualPenalty)}**.${eclipseNote}\nYou've been thrown in jail — released ${formatDiscordRelativeTime(releaseTime)}.\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**`)]
-    });
+    return message.reply(
+        v2Reply(
+            errorContainer(
+                "Caught!",
+                `The robbery failed and cost you **${fmtCurrency(result.actualPenalty)}**.${eclipseNote}\nYou've been thrown in jail — released ${formatDiscordRelativeTime(releaseTime)}.\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**`,
+            ),
+        ),
+    );
 }

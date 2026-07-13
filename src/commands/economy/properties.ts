@@ -26,6 +26,7 @@ import { fmtCurrency, fmtAmount } from "../../utils/format";
 import { GLOBAL_CURRENCY_EMOJI, Mascot } from "../../config/branding";
 import { Property } from "@prisma/client";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { nextStepHint } from "../../config/nextSteps";
 
 const PROPERTY_ACCENT_COLOR = 0x9B59B6;
 const PROPERTIES_PER_PAGE = 3;
@@ -207,6 +208,9 @@ export function buildPropertiesMarketContainer(
         ),
     );
 
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("properties", options.prefix)!));
+
     return container;
 }
 
@@ -340,6 +344,7 @@ function buildMyPropertiesContainer(
 
 function buildCollectReceiptContainer(
     result: Awaited<ReturnType<typeof collectIncome>>,
+    prefix?: string,
 ): ContainerBuilder {
     const container = new ContainerBuilder();
 
@@ -431,6 +436,9 @@ function buildCollectReceiptContainer(
         new TextDisplayBuilder().setContent(lines.join("\n")),
     );
 
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("collect_rent", prefix)!));
+
     return container;
 }
 
@@ -450,7 +458,7 @@ export const propertiesHandler = async (message: Message, args: string[]) => {
     if (subCommand === "collect") {
         try {
             const result = await collectIncome(message.author.id, guildId);
-            const container = buildCollectReceiptContainer(result);
+            const container = buildCollectReceiptContainer(result, prefix);
             return message.reply({
                 components: [container],
                 flags: MessageFlags.IsComponentsV2,
@@ -535,14 +543,19 @@ export const buyPropertyHandler = async (message: Message, args: string[]) => {
 
     const result = await PropertyService.buyProperty(message.author.id, message.guildId!, key);
 
+    const buyResultContainer = buildTextOnlyContainer(
+        result.success ? "Purchase Successful" : "Purchase Failed",
+        result.message,
+        result.success ? 0x2ECC71 : 0xE74C3C,
+    );
+
+    if (result.success) {
+        buyResultContainer.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false));
+        buyResultContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("buy_property", prefix)!));
+    }
+
     return message.reply({
-        components: [
-            buildTextOnlyContainer(
-                result.success ? "Purchase Successful" : "Purchase Failed",
-                result.message,
-                result.success ? 0x2ECC71 : 0xE74C3C,
-            ),
-        ],
+        components: [buyResultContainer],
         flags: MessageFlags.IsComponentsV2,
     });
 };
@@ -619,8 +632,9 @@ export const myPropertiesHandler = async (message: Message) => {
 
 export const collectRentHandler = async (message: Message) => {
     try {
+        const prefix = await getGuildPrefix(message.guildId!);
         const result = await collectIncome(message.author.id, message.guildId!);
-        const container = buildCollectReceiptContainer(result);
+        const container = buildCollectReceiptContainer(result, prefix);
         return message.reply({
             components: [container],
             flags: MessageFlags.IsComponentsV2,

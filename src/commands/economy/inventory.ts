@@ -36,6 +36,7 @@ import { buildHuntCraftPayload } from "../../services/huntCraftService";
 import { getHuntParts, listPartFromInventory } from "../../services/huntPartService";
 import { getInventoryAnimals } from "../../services/huntService";
 import { listItem } from "../../services/marketService";
+import { nextStepHint } from "../../config/nextSteps";
 
 const ITEMS_PER_PAGE = 4;
 const COLLECTOR_TIMEOUT = 120_000;
@@ -330,6 +331,9 @@ function buildInventoryPayload(
   } else {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent("-# Use **Details** to use, quick sell, or list on the Black Market."));
   }
+
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("inventory")!));
 
   const components: any[] = [container, buildCategorySelect(category, items, huntParts, huntAnimals, ownerId, disabled)];
   if (category === "HUNT" && canAct) {

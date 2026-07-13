@@ -1,4 +1,4 @@
-import { Interaction, EmbedBuilder, MessageFlags, ButtonInteraction } from "discord.js";
+import { Interaction, MessageFlags, ButtonInteraction, ContainerBuilder, TextDisplayBuilder } from "discord.js";
 import { transferMoney } from "../services/walletService";
 import { logToChannel } from "../utils/discordLogger";
 import { Mascot } from "../config/branding";
@@ -11,9 +11,19 @@ import {
   safeReply,
 } from "../utils/interactionHelpers";
 
-function disabledRequestEmbed(interaction: ButtonInteraction, footer: string) {
-  return EmbedBuilder.from(interaction.message.embeds[0])
-    .setFooter({ text: footer });
+/**
+ * Rebuilds the request container from the live message, drops the resolved
+ * Accept/Decline/Block row, and appends a small status line (the V2
+ * replacement for the old embed footer).
+ */
+function disabledRequestContainer(interaction: ButtonInteraction, statusLine: string): ContainerBuilder {
+  const rawContainer = interaction.message.components[0] as any;
+  const container = rawContainer?.toJSON
+    ? new ContainerBuilder(rawContainer.toJSON())
+    : new ContainerBuilder();
+  container.components.pop(); // drop the resolved Accept/Decline/Block action row
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${statusLine}`));
+  return container;
 }
 
 export async function handleAskInteraction(interaction: Interaction) {
@@ -21,7 +31,8 @@ export async function handleAskInteraction(interaction: Interaction) {
   if (!interaction.guild) return;
 
   const [action, requesterId, amountStr] = interaction.customId.split(":");
-  const mentionMatch = interaction.message.content.match(/<@!?(\d+)>/);
+  const firstTextContent: string = (interaction.message.components[0] as any)?.components?.[0]?.content ?? "";
+  const mentionMatch = firstTextContent.match(/<@!?(\d+)>/);
   const targetUserId = mentionMatch ? mentionMatch[1] : null;
 
   if (!targetUserId || interaction.user.id !== targetUserId) {
@@ -35,10 +46,9 @@ export async function handleAskInteraction(interaction: Interaction) {
 
   try {
     if (action === "ask_decline") {
-      const embed = disabledRequestEmbed(interaction, `Declined by ${interaction.user.username}`)
-        .setColor(0xFF0000);
+      const container = disabledRequestContainer(interaction, `Declined by ${interaction.user.username}`);
 
-      await safeEditReply(interaction, { components: [], embeds: [embed] });
+      await safeEditReply(interaction, { components: [container], flags: MessageFlags.IsComponentsV2 });
 
       await logToChannel(interaction.client, {
         guild: interaction.guild!,
@@ -54,10 +64,9 @@ export async function handleAskInteraction(interaction: Interaction) {
       await blockRequester(interaction.user.id, requesterId);
 
       const prefix = await getGuildPrefix(interaction.guild!.id);
-      const embed = disabledRequestEmbed(interaction, `Blocked by ${interaction.user.username}`)
-        .setColor(0x95A5A6);
+      const container = disabledRequestContainer(interaction, `Blocked by ${interaction.user.username}`);
 
-      await safeEditReply(interaction, { components: [], embeds: [embed] });
+      await safeEditReply(interaction, { components: [container], flags: MessageFlags.IsComponentsV2 });
       await safeFollowUp(interaction, {
         content: `${Mascot.Emotes.Accept} You blocked <@${requesterId}>. They cannot ask you for money until you run \`${prefix}ask unblock @user\`.`,
         flags: MessageFlags.Ephemeral,
@@ -78,10 +87,9 @@ export async function handleAskInteraction(interaction: Interaction) {
       try {
         await transferMoney(interaction.user.id, requesterId, amount, interaction.guildId!);
 
-        const embed = disabledRequestEmbed(interaction, `Accepted by ${interaction.user.username} • Transfer Complete`)
-          .setColor(0x00FF00);
+        const container = disabledRequestContainer(interaction, `Accepted by ${interaction.user.username} • Transfer Complete`);
 
-        await safeEditReply(interaction, { components: [], embeds: [embed] });
+        await safeEditReply(interaction, { components: [container], flags: MessageFlags.IsComponentsV2 });
 
         await logToChannel(interaction.client, {
           guild: interaction.guild!,

@@ -1,4 +1,11 @@
-import { ContainerBuilder, Message, MessageFlags, TextDisplayBuilder } from "discord.js";
+import {
+  ContainerBuilder,
+  Message,
+  MessageFlags,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder
+} from "discord.js";
 import { ensureBankingUser } from "../../services/bankService";
 import {
   closeCard,
@@ -8,6 +15,7 @@ import {
   upgradeCard,
   withdrawFromCard
 } from "../../services/creditCardService";
+import { nextStepHint } from "../../config/nextSteps";
 import { fmtCurrency, parseSmartAmount } from "../../utils/format";
 import { buildBankCardsPayload, buildMyCardsPayload } from "./bank";
 
@@ -84,6 +92,9 @@ export async function handleCard(message: Message, args: string[]) {
     const summary = await getCardSummary(message.author.id);
     const view = summary.card ? "mine" as const : "catalog" as const;
     const payload = await buildBankCardsPayload(message.author.id, displayName, view, message.guild!.id);
+    payload.components[0]
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false))
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("card")!));
     return message.reply({
       ...payload,
       flags: MessageFlags.IsComponentsV2

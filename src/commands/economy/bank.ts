@@ -37,6 +37,7 @@ import {
 import { fmtCurrency, parseSmartAmount } from "../../utils/format";
 import { getGuildPrefix } from "../../utils/guildContext";
 import { Mascot } from "../../config/branding";
+import { nextStepHint } from "../../config/nextSteps";
 
 const BANK_ACCENT_COLOR = 0x9B59B6;
 const CARD_ACCENT_COLOR = 0x5865F2;
@@ -532,7 +533,9 @@ export function buildBankMainContainer(
                 .setDivider(true)
                 .setSpacing(SeparatorSpacingSize.Small),
         )
-        .addActionRowComponents(buildBankActionRow(ownerId));
+        .addActionRowComponents(buildBankActionRow(ownerId))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("bank")!));
 }
 
 export function buildBankInvestmentsContainer(

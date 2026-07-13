@@ -25,6 +25,7 @@ import { getCardSummary } from "../../services/creditCardService";
 import { fmtCurrency } from "../../utils/format";
 import { logToChannel } from "../../utils/discordLogger";
 import { Mascot } from "../../config/branding";
+import { nextStepHint } from "../../config/nextSteps";
 import {
   GENERAL_SHOP_CATALOG,
   HUNT_SHOP_CATALOG,
@@ -1234,6 +1235,9 @@ async function executeBuy(
     }
   }
 
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("shop_buy")!));
+
   const files: AttachmentBuilder[] = [];
   if (hasAsset && assetPath && safeName) {
     files.push(new AttachmentBuilder(assetPath, { name: safeName }));
@@ -1332,8 +1336,11 @@ export async function handleShop(message: Message, args: string[]) {
         if (paymentSource === "card" && cardInfo) {
           confirmMsg += `\n\n${Mascot.Emotes.Credit} **Charged to Credit Card**\nBalance: **${formatAmount(cardInfo.currentBalance)}** / ${formatAmount(cardInfo.creditLimit)} limit\nWeekly spend cap: **${formatAmount(cardInfo.spentThisCycle)}** / ${formatAmount(cardInfo.weeklySpendCap)}`;
         }
+        const buySuccessContainer = v2Container("Purchase Successful", confirmMsg, 0x2ECC71);
+        buySuccessContainer.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false));
+        buySuccessContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("shop_buy")!));
         await message.reply({
-          components: [v2Container("Purchase Successful", confirmMsg, 0x2ECC71)],
+          components: [buySuccessContainer],
           flags: MessageFlags.IsComponentsV2,
         });
         await sendEffectMessages(message, results);
