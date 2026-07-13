@@ -59,12 +59,16 @@ jobs:
             --arg sha "$COMMIT_SHA" \
             --arg message "$COMMIT_MESSAGE" \
             '{ref: $ref, sha: $sha, message: $message}')
-          # --max-time bounds the request: the webhook acknowledges within a
-          # second (the real build runs on the VPS afterward), so anything
-          # longer means a network/listener problem — fail fast instead of
-          # letting the CI run hang. --fail-with-body makes a non-2xx response
-          # (e.g. 403 bad secret) fail the step instead of silently passing.
-          curl -sS --max-time 30 --fail-with-body -o /dev/null -w "%{http_code}\n" \
+          # The VPS webhook is meant to ack within ~1s (the real build runs on
+          # the VPS afterward), but it intermittently takes longer than the old
+          # 30s cap — a slow/blocked ack, not a bad request (curl 28, "0 bytes
+          # received", means the POST was delivered). So: give each attempt a
+          # roomier 90s window and retry a few times with backoff so a transient
+          # slow ack self-heals instead of failing the whole deploy.
+          # --retry-all-errors makes it retry on timeouts too (not just 5xx);
+          # --fail-with-body makes a genuine non-2xx (e.g. 403 bad secret) fail.
+          curl -sS --max-time 90 --retry 4 --retry-delay 15 --retry-all-errors --retry-connrefused \
+            --fail-with-body -o /dev/null -w "%{http_code}\n" \
             -X POST "${{ secrets.DEPLOY_WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
             -H "X-Deploy-Secret: ${{ secrets.DEPLOY_SECRET }}" \
