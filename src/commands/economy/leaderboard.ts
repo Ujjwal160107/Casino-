@@ -1,7 +1,5 @@
 import {
     ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
     ComponentType,
     ContainerBuilder,
     Message,
@@ -9,36 +7,48 @@ import {
     SectionBuilder,
     SeparatorBuilder,
     SeparatorSpacingSize,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
     TextDisplayBuilder,
     ThumbnailBuilder,
 } from "discord.js";
 import prisma from "../../utils/prisma";
 import { fmtCurrency } from "../../utils/format";
 import { Mascot, getEmoteUrl } from "../../config/branding";
+import { getNetWorthMany, NetWorthBreakdown } from "../../services/netWorthService";
 
-type LbType = "net" | "cash" | "employees";
+type LbType = "net" | "cash" | "bank" | "shifts";
+type LbScope = "global" | "server";
 
 const ACCENT: Record<LbType, number> = {
     net: 0x9B59B6,
     cash: 0x2ECC71,
-    employees: 0xE67E22,
+    bank: 0x3498DB,
+    shifts: 0xE67E22,
 };
 
 const TITLES: Record<LbType, string> = {
     net: "Net Worth Leaderboard",
     cash: "Cash Leaderboard",
-    employees: "Top Employees",
+    bank: "Bank Leaderboard",
+    shifts: "Top Workers",
 };
 
 const SUBTITLES: Record<LbType, string> = {
-    net: "Richest players · wallet + bank",
+    net: "True net worth — everything you own, priced",
     cash: "Highest wallet balance",
-    employees: "Most shifts worked",
+    bank: "Bank balance + active FD/RD deposits",
+    shifts: "Most lifetime shifts worked",
 };
 
-function lbId(type: LbType, ownerId: string) {
-    return `lb:${type}:${ownerId}`;
-}
+type LbUser = {
+    discordId: string;
+    username: string | null;
+    walletBalance: number;
+    bankBalance: number;
+    shiftsWorked: number;
+    net?: NetWorthBreakdown;
+};
 
 function rankLabel(i: number): string {
     if (i === 0) return Mascot.Emotes.MedalGold;
@@ -47,98 +57,148 @@ function rankLabel(i: number): string {
     return `**${i + 1}.**`;
 }
 
-function sortUsers(users: any[], type: LbType) {
-    return [...users].sort((a, b) => {
-        if (type === "employees") return ((b as any).shiftsWorked || 0) - ((a as any).shiftsWorked || 0);
-        const valA = (a.wallet?.balance ?? 0) + (type === "net" ? (a.bank?.balance ?? 0) : 0);
-        const valB = (b.wallet?.balance ?? 0) + (type === "net" ? (b.bank?.balance ?? 0) : 0);
-        return valB - valA;
-    });
+function valueOf(u: LbUser, type: LbType): number {
+    switch (type) {
+        case "net": return u.net?.total ?? (u.walletBalance + u.bankBalance);
+        case "cash": return u.walletBalance;
+        case "bank": return u.bankBalance + (u.net?.investments ?? 0);
+        case "shifts": return u.shiftsWorked;
+    }
 }
 
-function buildRankingsText(users: any[], type: LbType): string {
+function formatValue(u: LbUser, type: LbType): string {
+    if (type === "shifts") return `${u.shiftsWorked.toLocaleString()} shifts`;
+    const base = fmtCurrency(valueOf(u, type));
+    if (type === "net" && u.net && u.net.passiveIncomePerDay > 0) {
+        return `${base} · ⚡${fmtCurrency(u.net.passiveIncomePerDay)}/day`;
+    }
+    return base;
+}
+
+function sortUsers(users: LbUser[], type: LbType): LbUser[] {
+    return [...users].sort((a, b) => valueOf(b, type) - valueOf(a, type));
+}
+
+function buildRankingsText(users: LbUser[], type: LbType): string {
     const top10 = sortUsers(users, type).slice(0, 10);
     if (top10.length === 0) return "No players found.";
-    return top10.map((u, i) => {
-        const val = type === "employees"
-            ? `${((u as any).shiftsWorked || 0).toLocaleString()} shifts`
-            : fmtCurrency((u.wallet?.balance ?? 0) + (type === "net" ? (u.bank?.balance ?? 0) : 0));
-        return `${rankLabel(i)} **${u.username ?? "Unknown"}** — ${val}`;
-    }).join("\n");
+    return top10
+        .map((u, i) => `${rankLabel(i)} **${u.username ?? "Unknown"}** — ${formatValue(u, type)}`)
+        .join("\n");
 }
 
-function buildYourRankText(users: any[], ownerId: string, type: LbType): string | null {
+function buildYourRankText(users: LbUser[], ownerId: string, type: LbType): string | null {
     const sorted = sortUsers(users, type);
-    const idx = sorted.findIndex(u => u.discordId === ownerId);
+    const idx = sorted.findIndex((u) => u.discordId === ownerId);
     if (idx === -1) return null;
     const u = sorted[idx];
-    const val = type === "employees"
-        ? `${((u as any).shiftsWorked || 0).toLocaleString()} shifts`
-        : fmtCurrency((u.wallet?.balance ?? 0) + (type === "net" ? (u.bank?.balance ?? 0) : 0));
-    return `${Mascot.Emotes.Think} You are ranked **#${idx + 1}** — ${val}`;
+    let line = `${Mascot.Emotes.Think} You are ranked **#${idx + 1}** — ${formatValue(u, type)}`;
+    if (type === "net" && u.net) {
+        const b = u.net;
+        line += `\n-# wallet ${fmtCurrency(b.wallet)} · bank ${fmtCurrency(b.bank + b.investments)} · stocks ${fmtCurrency(b.stocks)} · property ${fmtCurrency(b.properties)} · items ${fmtCurrency(b.items)} · animals ${fmtCurrency(b.animals)}`;
+    }
+    return line;
 }
 
-function buildTabRow(active: LbType, ownerId: string, disabled = false) {
-    return new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-            .setCustomId(lbId("net", ownerId))
-            .setLabel("Net Worth")
-            .setStyle(active === "net" ? ButtonStyle.Primary : ButtonStyle.Secondary)
-            .setEmoji(Mascot.Emotes.Graph)
-            .setDisabled(disabled || active === "net"),
-        new ButtonBuilder()
-            .setCustomId(lbId("cash", ownerId))
-            .setLabel("Cash Only")
-            .setStyle(active === "cash" ? ButtonStyle.Primary : ButtonStyle.Secondary)
-            .setEmoji(Mascot.Emotes.Currency)
-            .setDisabled(disabled || active === "cash"),
-        new ButtonBuilder()
-            .setCustomId(lbId("employees", ownerId))
-            .setLabel("Top Employees")
-            .setStyle(active === "employees" ? ButtonStyle.Primary : ButtonStyle.Secondary)
-            .setEmoji(Mascot.Emotes.JobWorking)
-            .setDisabled(disabled || active === "employees"),
+function buildTypeSelect(active: LbType, ownerId: string, disabled = false) {
+    const options: [LbType, string, string][] = [
+        ["net", "Net Worth", "Everything you own, priced"],
+        ["cash", "Cash", "Wallet only"],
+        ["bank", "Bank", "Bank + FD/RD deposits"],
+        ["shifts", "Shifts", "Lifetime shifts worked"],
+    ];
+    return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+        new StringSelectMenuBuilder()
+            .setCustomId(`lb:type:${ownerId}`)
+            .setPlaceholder("Board")
+            .setDisabled(disabled)
+            .addOptions(options.map(([value, label, description]) =>
+                new StringSelectMenuOptionBuilder()
+                    .setValue(value)
+                    .setLabel(label)
+                    .setDescription(description)
+                    .setDefault(value === active),
+            )),
     );
 }
 
-function buildLeaderboardContainer(users: any[], type: LbType, ownerId: string, expired = false) {
-    const thumbUrl = getEmoteUrl(type === "employees" ? Mascot.Emotes.JobWorking : Mascot.Emotes.Money);
-    const rankings = buildRankingsText(users, type);
-    const yourRank = buildYourRankText(users, ownerId, type);
+function buildScopeSelect(active: LbScope, ownerId: string, disabled = false) {
+    return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+        new StringSelectMenuBuilder()
+            .setCustomId(`lb:scope:${ownerId}`)
+            .setPlaceholder("Scope")
+            .setDisabled(disabled)
+            .addOptions(
+                new StringSelectMenuOptionBuilder()
+                    .setValue("global").setLabel("Global")
+                    .setDescription("Every Fortuna player, every server")
+                    .setDefault(active === "global"),
+                new StringSelectMenuOptionBuilder()
+                    .setValue("server").setLabel("This Server")
+                    .setDescription("Only players in this server")
+                    .setDefault(active === "server"),
+            ),
+    );
+}
+
+function buildLeaderboardContainer(
+    users: LbUser[],
+    type: LbType,
+    scope: LbScope,
+    ownerId: string,
+    expired = false,
+) {
+    const thumbUrl = getEmoteUrl(type === "shifts" ? Mascot.Emotes.JobWorking : Mascot.Emotes.Money);
+    const scopeLabel = scope === "global" ? "Global" : "This server";
 
     const header = new SectionBuilder().addTextDisplayComponents(
         new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.MedalGold} ${TITLES[type]}`),
-        new TextDisplayBuilder().setContent(SUBTITLES[type]),
+        new TextDisplayBuilder().setContent(`${SUBTITLES[type]} · ${scopeLabel}`),
     );
     if (thumbUrl) {
-        header.setThumbnailAccessory(
-            new ThumbnailBuilder().setURL(thumbUrl).setDescription(TITLES[type]),
-        );
+        header.setThumbnailAccessory(new ThumbnailBuilder().setURL(thumbUrl).setDescription(TITLES[type]));
     }
 
     const container = new ContainerBuilder()
         .setAccentColor(ACCENT[type])
         .addSectionComponents(header)
-        .addSeparatorComponents(
-            new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
-        )
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(rankings));
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(buildRankingsText(users, type)));
 
+    const yourRank = buildYourRankText(users, ownerId, type);
     if (yourRank) {
         container
-            .addSeparatorComponents(
-                new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
-            )
-            .addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${yourRank}`));
+            .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(yourRank));
     }
 
     container
-        .addSeparatorComponents(
-            new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
-        )
-        .addActionRowComponents(buildTabRow(type, ownerId, expired));
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(buildTypeSelect(type, ownerId, expired))
+        .addActionRowComponents(buildScopeSelect(scope, ownerId, expired));
 
     return container;
+}
+
+async function loadUsers(): Promise<LbUser[]> {
+    const users = await prisma.user.findMany({ include: { wallet: true, bank: true } });
+    return users.map((u: any) => ({
+        discordId: u.discordId,
+        username: u.username ?? null,
+        walletBalance: u.wallet?.balance ?? 0,
+        bankBalance: u.bank?.balance ?? 0,
+        shiftsWorked: u.shiftsWorked ?? 0,
+    }));
+}
+
+async function attachNetWorth(users: LbUser[]): Promise<void> {
+    const missing = users.filter((u) => !u.net);
+    if (missing.length === 0) return;
+    const map = await getNetWorthMany(missing.map((u) => u.discordId));
+    for (const u of missing) {
+        const b = map.get(u.discordId);
+        if (b) u.net = b;
+    }
 }
 
 export async function handleLeaderboard(message: Message, args: string[]) {
@@ -147,19 +207,39 @@ export async function handleLeaderboard(message: Message, args: string[]) {
     let currentType: LbType = "net";
     const arg = args[0]?.toLowerCase();
     if (arg === "cash") currentType = "cash";
-    if (arg === "work" || arg === "shift" || arg === "employees" || arg === "employee") currentType = "employees";
+    if (arg === "bank") currentType = "bank";
+    if (arg === "net") currentType = "net";
+    if (arg === "shifts" || arg === "work" || arg === "shift" || arg === "employees" || arg === "employee") currentType = "shifts";
 
-    const users = await prisma.user.findMany({
-        include: { wallet: true, bank: true },
-    });
+    let currentScope: LbScope = "global";
+
+    const allUsers = await loadUsers();
+    let serverMemberIds: Set<string> | null = null;
+
+    const scopedUsers = async (): Promise<LbUser[]> => {
+        if (currentScope === "global") return allUsers;
+        if (!serverMemberIds) {
+            const members = await message.guild!.members.fetch();
+            serverMemberIds = new Set(members.keys());
+        }
+        return allUsers.filter((u) => serverMemberIds!.has(u.discordId));
+    };
+
+    const render = async (): Promise<ContainerBuilder> => {
+        const users = await scopedUsers();
+        if (currentType === "net" || currentType === "bank") {
+            await attachNetWorth(users);
+        }
+        return buildLeaderboardContainer(users, currentType, currentScope, ownerId);
+    };
 
     const sent = await message.reply({
-        components: [buildLeaderboardContainer(users, currentType, ownerId)],
+        components: [await render()],
         flags: MessageFlags.IsComponentsV2,
     });
 
     const collector = sent.createMessageComponentCollector({
-        componentType: ComponentType.Button,
+        componentType: ComponentType.StringSelect,
         time: 120_000,
     });
 
@@ -168,18 +248,21 @@ export async function handleLeaderboard(message: Message, args: string[]) {
             await i.reply({ content: "This leaderboard was opened by someone else.", ephemeral: true });
             return;
         }
-        const parts = i.customId.split(":");
-        currentType = (parts[1] as LbType) ?? currentType;
+        const kind = i.customId.split(":")[1];
+        const value = i.values[0];
+        if (kind === "type") currentType = value as LbType;
+        if (kind === "scope") currentScope = value as LbScope;
         await i.update({
-            components: [buildLeaderboardContainer(users, currentType, ownerId)],
+            components: [await render()],
             flags: MessageFlags.IsComponentsV2,
         });
     });
 
     collector.on("end", async () => {
         try {
+            const users = await scopedUsers();
             await sent.edit({
-                components: [buildLeaderboardContainer(users, currentType, ownerId, true)],
+                components: [buildLeaderboardContainer(users, currentType, currentScope, ownerId, true)],
                 flags: MessageFlags.IsComponentsV2,
             });
         } catch { }
