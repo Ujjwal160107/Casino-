@@ -1,4 +1,4 @@
-import { Interaction, ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Message, TextChannel, MessageFlags, ContainerBuilder, TextDisplayBuilder } from "discord.js";
+import { Interaction, ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Message, TextChannel, MessageFlags, ContainerBuilder, TextDisplayBuilder } from "discord.js";
 import { enroll, claimScholarship, dropout } from "../services/educationService";
 import { fmtCurrency, formatDuration } from "../utils/format";
 import { Mascot, getEmoteUrl } from "../config/branding";
@@ -13,6 +13,7 @@ import { getRequiredGearKey } from "../services/jobService";
 import { JOB_SHOP_CATALOG } from "../utils/shopCatalog";
 import { seedJobShop } from "../services/shopService";
 import { getGuildPrefix } from "../utils/guildContext";
+import { nextStepHint } from "../config/nextSteps";
 import { enqueueWorkReminder } from "../services/cooldownReminderService";
 import { globalCatalogGuildFilter } from "../utils/globalCatalog";
 import { MAX_SAFE_BALANCE } from "../utils/economyConfig";
@@ -25,6 +26,7 @@ import {
     safeReply,
     safeUpdate,
 } from "../utils/interactionHelpers";
+import { successContainer, errorContainer, statusContainer, plainContainer, v2Reply } from "../utils/componentsV2";
 
 function textContainer(title: string, body: string, color = 0x2ECC71) {
     return new ContainerBuilder()
@@ -69,17 +71,14 @@ async function handleButton(interaction: ButtonInteraction) {
         try {
             const result = await enroll(user.id, guild.id, degreeId, paymentMethod);
 
-            const embed = new EmbedBuilder()
-                .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
-                .setTitle(`${Mascot.Emotes.Accept} Enrollment Successful`)
-                .setDescription(`You have successfully enrolled in **${result.degree.name}**!`)
-                .addFields(
-                    { name: "Tuition Paid", value: fmtCurrency(result.degree.tuitionPerSem) },
-                    { name: "Payment Method", value: paymentMethod === "card" ? "Fortuna Card" : "Wallet" }
-                )
-                .setColor("#2ECC71");
+            const container = plainContainer(
+                `## ${Mascot.Emotes.Accept} Enrollment Successful\n` +
+                `You have successfully enrolled in **${result.degree.name}**!\n\n` +
+                `**Tuition Paid:** ${fmtCurrency(result.degree.tuitionPerSem)}\n` +
+                `**Payment Method:** ${paymentMethod === "card" ? "Fortuna Card" : "Wallet"}`
+            );
 
-            await safeEditReply(interaction, { embeds: [embed] });
+            await safeEditReply(interaction, v2Reply(container));
 
         } catch (err: any) {
             await safeEditReply(interaction, { content: `${Mascot.Emotes.Fail} **Enrollment Failed**: ${err.message}` });
@@ -148,12 +147,12 @@ async function handleButton(interaction: ButtonInteraction) {
         try {
             const amount = await claimScholarship(user.id, guild.id, milestone);
 
-            const embed = new EmbedBuilder()
-                .setTitle(`${Mascot.Emotes.MoneyBag} Scholarship Claimed!`)
-                .setDescription(`You claimed **${fmtCurrency(amount)}** for reaching **${milestone}% Education XP**!`)
-                .setColor("#F1C40F");
+            const container = plainContainer(
+                `## ${Mascot.Emotes.MoneyBag} Scholarship Claimed!\n` +
+                `You claimed **${fmtCurrency(amount)}** for reaching **${milestone}% Education XP**!`
+            );
 
-            await safeEditReply(interaction, { embeds: [embed] });
+            await safeEditReply(interaction, v2Reply(container));
         } catch (err: any) {
             await safeEditReply(interaction, { content: `${Mascot.Emotes.Fail} **Claim Failed**: ${err.message}` });
         }
@@ -176,59 +175,60 @@ async function handleButton(interaction: ButtonInteraction) {
             const dashboard = await buildRelaxDashboard(user.id, guild.id, user.username);
             await safeEditReply(interaction, {
                 components: [dashboard.container],
-                embeds: [],
                 flags: MessageFlags.IsComponentsV2,
             });
         } catch (err: any) {
             await safeEditReply(interaction, {
                 components: [textContainer("Relax Failed", `${Mascot.Emotes.Fail} ${err.message}`, 0xE74C3C)],
-                embeds: [],
                 flags: MessageFlags.IsComponentsV2,
             });
         }
     }
     else if (customId === "cancel_stress") {
-        await safeUpdate(interaction, { content: `${Mascot.Emotes.Decline} Activity cancelled.`, embeds: [], components: [] });
+        await safeUpdate(interaction, { content: `${Mascot.Emotes.Decline} Activity cancelled.`, components: [] });
     }
     else if (customId === "dropout_confirm") {
         if (!await ensureDeferredUpdate(interaction)) return;
         try {
             const res = await dropout(user.id, guild.id);
+            const prefix = await getGuildPrefix(guild.id);
 
-            const embed = new EmbedBuilder()
-                .setTitle(`${Mascot.Emotes.Shocked} Dropped Out`)
-                .setDescription(`You have dropped out of **${res.degreeName}**.\n\nYour tuition fees are non-refundable. You are now free to enroll in another program.`)
-                .setColor("#E74C3C")
-                .setThumbnail(getEmoteUrl(Mascot.Emotes.Shocked));
+            const container = statusContainer(
+                "error",
+                `${Mascot.Emotes.Shocked} Dropped Out`,
+                `You have dropped out of **${res.degreeName}**.\n\nYour tuition fees are non-refundable. You are now free to enroll in another program.`,
+                { thumbnailUrl: getEmoteUrl(Mascot.Emotes.Shocked) ?? undefined, hint: nextStepHint("dropout", prefix) },
+            );
 
-            await safeEditReply(interaction, { embeds: [embed], components: [] });
+            await safeEditReply(interaction, v2Reply(container));
 
         } catch (err: any) {
-            await safeEditReply(interaction, { content: `${Mascot.Emotes.Fail} **Dropout Failed**: ${err.message}`, components: [] });
+            await safeEditReply(interaction, v2Reply(errorContainer("Dropout Failed", err.message)));
         }
     }
     else if (customId === "dropout_cancel") {
-        await safeUpdate(interaction, { content: `${Mascot.Emotes.Decline} Dropout cancelled. Phew!`, embeds: [], components: [] });
+        await safeUpdate(interaction, v2Reply(plainContainer(`${Mascot.Emotes.Decline} Dropout cancelled. Phew!`)));
     }
     // JOB HANDLERS
     else if (customId === "work_resign") {
         if (!await ensureDeferredEphemeralReply(interaction)) return;
 
         const shockedUrl = getEmoteUrl(Mascot.Emotes.Shocked);
-        const embed = new EmbedBuilder()
-            .setTitle(`${Mascot.Emotes.Alert} Confirm Resignation`)
-            .setDescription("Are you sure you want to resign from your job?\n\n**You will lose:**\n- Your current job title\n- Current shift streak\n\nYour **lifetime shift count is preserved** and still counts toward future job requirements.")
-            .setColor("#E74C3C")
-            .setFooter({ text: "This action cannot be undone." });
-
-        if (shockedUrl) embed.setThumbnail(shockedUrl);
+        const container = statusContainer(
+            "error",
+            `${Mascot.Emotes.Alert} Confirm Resignation`,
+            "Are you sure you want to resign from your job?\n\n**You will lose:**\n- Your current job title\n- Current shift streak\n\nYour **lifetime shift count is preserved** and still counts toward future job requirements.\n\nThis action cannot be undone.",
+            { thumbnailUrl: shockedUrl ?? undefined },
+        );
 
         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder().setCustomId("work_resign_confirm").setLabel("Confirm Resignation").setStyle(ButtonStyle.Danger),
             new ButtonBuilder().setCustomId("work_resign_cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
         );
 
-        await safeEditReply(interaction, { embeds: [embed], components: [row] });
+        container.addActionRowComponents(row);
+
+        await safeEditReply(interaction, v2Reply(container));
     }
     else if (customId.startsWith("work_promote_")) {
         if (!await ensureDeferredEphemeralReply(interaction)) return;
@@ -266,17 +266,14 @@ async function handleButton(interaction: ButtonInteraction) {
         });
 
                 
-        const promoEmbed = new EmbedBuilder()
-            .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
-            .setTitle(`${Mascot.Emotes.JobPromotion} Promoted!`)
-            .setDescription(
-                `**${prevJob?.title ?? "Previous Role"}** → **${nextJob.title}**\n\n` +
-                `**New Pay:** ${fmtCurrency(nextJob.pay)}/shift\n` +
-                `**Sector:** ${nextJob.sector.charAt(0).toUpperCase() + nextJob.sector.slice(1)}\n` +
-                `**Level:** ${nextJob.level}`
-            )
-            .setColor("#F1C40F")
-            .setFooter({ text: "Use !work to start your next shift in your new role." });
+        const promoContainer = plainContainer(
+            `## ${Mascot.Emotes.JobPromotion} Promoted!\n` +
+            `**${prevJob?.title ?? "Previous Role"}** → **${nextJob.title}**\n\n` +
+            `**New Pay:** ${fmtCurrency(nextJob.pay)}/shift\n` +
+            `**Sector:** ${nextJob.sector.charAt(0).toUpperCase() + nextJob.sector.slice(1)}\n` +
+            `**Level:** ${nextJob.level}\n\n` +
+            `Use !work to start your next shift in your new role.`
+        );
 
         logToChannel(interaction.client, {
             guild,
@@ -287,7 +284,7 @@ async function handleButton(interaction: ButtonInteraction) {
             thumbnail: user.displayAvatarURL(),
         }).catch(() => {});
 
-        return safeEditReply(interaction, { embeds: [promoEmbed] });
+        return safeEditReply(interaction, v2Reply(promoContainer));
     }
     else if (customId === "work_resign_confirm") {
         if (!await ensureDeferredUpdate(interaction)) return;
@@ -297,12 +294,12 @@ async function handleButton(interaction: ButtonInteraction) {
                 data: { jobId: null, lastShift: null }
             });
 
-            const embed = new EmbedBuilder()
-                .setTitle(`${Mascot.Emotes.Shocked} Resignation Processed`)
-                .setDescription("**You have resigned.**\n\nYou are now unemployed. Your lifetime shift count is preserved — it still counts toward future job requirements.")
-                .setColor("#95A5A6");
+            const container = plainContainer(
+                `## ${Mascot.Emotes.Shocked} Resignation Processed\n` +
+                "**You have resigned.**\n\nYou are now unemployed. Your lifetime shift count is preserved — it still counts toward future job requirements."
+            );
 
-            await safeEditReply(interaction, { embeds: [embed], components: [] });
+            await safeEditReply(interaction, v2Reply(container));
 
             // Log resignation
             logToChannel(interaction.client, {
@@ -317,11 +314,11 @@ async function handleButton(interaction: ButtonInteraction) {
                 color: 0xE74C3C
             });
         } catch (e: any) {
-            await safeEditReply(interaction, { content: `Error: ${e.message}`, components: [] });
+            await safeEditReply(interaction, v2Reply(errorContainer("Error", e.message)));
         }
     }
     else if (customId === "work_resign_cancel") {
-        await safeUpdate(interaction, { content: `${Mascot.Emotes.Success} Cancelled resignation. Get back to work!`, embeds: [], components: [] });
+        await safeUpdate(interaction, v2Reply(plainContainer(`${Mascot.Emotes.Success} Cancelled resignation. Get back to work!`)));
     }
     else if (customId.startsWith("work_event_choice_")) {
         const parts = customId.split("_"); // work_event_choice_eventId_choiceIdx
@@ -340,7 +337,7 @@ async function handleButton(interaction: ButtonInteraction) {
         const event = WORK_EVENTS.find((e: any) => e.id === targetEventId);
 
         if (!event) {
-            return safeUpdate(interaction, { content: "Event expired or invalid.", embeds: [], components: [] });
+            return safeUpdate(interaction, v2Reply(plainContainer("Event expired or invalid.")));
         }
 
         const choice = event.choices[choiceIdx];
@@ -376,7 +373,6 @@ async function handleButton(interaction: ButtonInteraction) {
 
         let msg = success ? choice.successMsg : choice.failMsg;
         if (pagerSaved) msg = `Emergency Pager activated! Disaster averted.\n${msg}`;
-        let color = success ? "#2ECC71" : pagerSaved ? "#F1C40F" : "#E74C3C";
 
         // Outcome
         const { money = 0, stress = 0 } = choice.outcome;
@@ -531,10 +527,9 @@ async function handleButton(interaction: ButtonInteraction) {
             }
         }
 
-        const resEmbed = new EmbedBuilder()
-            .setTitle(success ? `${Mascot.Emotes.Success} Event Resolved` : pagerSaved ? `${Mascot.Emotes.Alert} Event Saved` : `${Mascot.Emotes.Fail} Event Failed`)
-            .setDescription(`**${choice.label}**\n${msg}\n\n**Result:**\n${Mascot.Emotes.MoneyBag} ${fmtCurrency(earnings)}\n${Mascot.Emotes.Alert} +${stressGain} Stress`)
-            .setColor(color as any);
+        const resTitle = success ? `${Mascot.Emotes.Success} Event Resolved` : pagerSaved ? `${Mascot.Emotes.Alert} Event Saved` : `${Mascot.Emotes.Fail} Event Failed`;
+        let resBody = `## ${resTitle}\n` +
+            `**${choice.label}**\n${msg}\n\n**Result:**\n${Mascot.Emotes.MoneyBag} ${fmtCurrency(earnings)}\n${Mascot.Emotes.Alert} +${stressGain} Stress`;
 
         const eventRows: ActionRowBuilder<ButtonBuilder>[] = [];
 
@@ -542,8 +537,7 @@ async function handleButton(interaction: ButtonInteraction) {
             // Re-check promotion to get the object
             const promoCheck = await checkPromotion({ ...userData, shiftsWorked: (userData.shiftsWorked ?? 0) + 1 }, guild.id);
             if (promoCheck.eligible && promoCheck.nextJob) {
-                resEmbed.addFields({ name: `${Mascot.Emotes.JobPromotion} Promotion Available!`, value: `You are ready for **${promoCheck.nextJob.title}**! Use \`!work\` and click **Promote**.` });
-                resEmbed.setColor("#F1C40F");
+                resBody += `\n\n**${Mascot.Emotes.JobPromotion} Promotion Available!**\nYou are ready for **${promoCheck.nextJob.title}**! Use \`!work\` and click **Promote**.`;
 
                 eventRows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder()
@@ -553,16 +547,18 @@ async function handleButton(interaction: ButtonInteraction) {
                         .setEmoji(Mascot.Emotes.JobPromotion)
                 ));
             } else if (promoCheck.nextJob) {
-                resEmbed.setFooter({ text: `Progress to ${promoCheck.nextJob.title}: need ${promoCheck.missingShifts} more shifts` });
+                resBody += `\n\nProgress to ${promoCheck.nextJob.title}: need ${promoCheck.missingShifts} more shifts`;
             }
         } else if (footerText) {
-            resEmbed.setFooter({ text: footerText });
+            resBody += `\n\n${footerText}`;
         }
 
-        if (eventDemoField) resEmbed.addFields(eventDemoField);
-        if (eventDemoField?.name.startsWith("🚨")) resEmbed.setColor("#E74C3C");
+        if (eventDemoField) resBody += `\n\n**${eventDemoField.name}**\n${eventDemoField.value}`;
 
-        await safeEditReply(interaction, { embeds: [resEmbed], components: eventRows });
+        const resContainer = plainContainer(resBody);
+        for (const r of eventRows) resContainer.addActionRowComponents(r);
+
+        await safeEditReply(interaction, v2Reply(resContainer));
 
         // Log it
         logToChannel(interaction.client, {
@@ -610,17 +606,14 @@ async function handleButton(interaction: ButtonInteraction) {
             
 
             // DO NOT AUTO PROMOTE. Tell user to apply.
-            const embed = new EmbedBuilder()
-                .setTitle(`🎉 Promotion Eligibility Confirmed!`)
-                .setDescription(`You have met the requirements for **${nextJob.title}**!`)
-                .addFields(
-                    { name: "Next Step", value: `To officially secure this position, you must pass the application process.\n\nType the following command:` },
-                    { name: "Command", value: `\`${prefix}apply ${nextJob.id}\`` }
-                )
-                .setColor("#F1C40F") // Gold
-                .setThumbnail(getEmoteUrl(Mascot.Emotes.Success));
+            const container = successContainer(
+                `🎉 Promotion Eligibility Confirmed!`,
+                `You have met the requirements for **${nextJob.title}**!\n\n` +
+                `**Next Step:** To officially secure this position, you must pass the application process.\n\nType the following command:\n` +
+                `**Command:** \`${prefix}apply ${nextJob.id}\``
+            );
 
-            await safeEditReply(interaction, { embeds: [embed] });
+            await safeEditReply(interaction, v2Reply(container));
 
         } catch (err: any) {
             console.error("Promotion Error:", err);
@@ -754,14 +747,13 @@ async function handleButton(interaction: ButtonInteraction) {
 
                 
 
-                const burnoutEmbed = new EmbedBuilder()
-                    .setTitle(`${Mascot.Emotes.Alert} BURNOUT!`)
-                    .setDescription(`You are too stressed to work well! You collapsed from exhaustion.\n\n**Stress Level:** ${userData.jobStress}/100\n\nUse \`${prefix}relax\` to recover before working again.`)
-                    .setColor("#E74C3C")
-                    .setThumbnail(getEmoteUrl(Mascot.Emotes.Fail));
+                const burnoutContainer = errorContainer(
+                    `${Mascot.Emotes.Alert} BURNOUT!`,
+                    `You are too stressed to work well! You collapsed from exhaustion.\n\n**Stress Level:** ${userData.jobStress}/100\n\nUse \`${prefix}relax\` to recover before working again.`,
+                );
 
                 await interaction.deleteReply().catch(() => { });
-                return safeFollowUp(interaction, { embeds: [burnoutEmbed], flags: MessageFlags.Ephemeral });
+                return safeFollowUp(interaction, v2Reply(burnoutContainer, undefined, MessageFlags.Ephemeral));
             }
         }
 
@@ -776,12 +768,11 @@ async function handleButton(interaction: ButtonInteraction) {
         if (Math.random() < eventChance) {
             const event = getWorkEvent(job.sector, recentEventIds);
             if (event) {
-                const evEmbed = new EmbedBuilder()
-                    .setTitle(event.title)
-                    .setDescription(event.description)
-                    .setColor("#E67E22") // Orange
-                    .setThumbnail(getEmoteUrl(Mascot.Emotes.Think))
-                    .setFooter({ text: "Choose wisely..." });
+                const evContainer = statusContainer(
+                    "info",
+                    event.title,
+                    `${event.description}\n\nChoose wisely...`,
+                );
 
                 const rows = event.choices.map((c: any, idx: number) =>
                     new ButtonBuilder().setCustomId(`work_event_choice_${event.id}_${idx}`).setLabel(c.label).setStyle(
@@ -792,9 +783,10 @@ async function handleButton(interaction: ButtonInteraction) {
                 );
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(rows);
+                evContainer.addActionRowComponents(row);
 
                 await recordRecentId(user.id, "event", event.id);
-                return safeEditReply(interaction, { embeds: [evEmbed], components: [row] });
+                return safeEditReply(interaction, v2Reply(evContainer));
             }
         }
 
@@ -805,26 +797,23 @@ async function handleButton(interaction: ButtonInteraction) {
         let isWin = false;
         let userMessage: Message | null = null;
 
-        const embed = new EmbedBuilder()
-            .setTitle(game.title)
-            .setDescription(`${game.description}\n\nYou have **${game.time}** seconds!`)
-            .setColor("#3498DB"); // Blue
+        const buildQuestionContainer = () => plainContainer(
+            `## ${game.title}\n${game.description}\n\nYou have **${game.time}** seconds!`
+        );
 
         if (game.previewTime && game.previewTime > 0) {
             // Show Preview
-            const previewEmbed = new EmbedBuilder()
-                .setTitle(game.title)
-                .setDescription(game.previewText || game.description)
-                .setColor("#3498DB")
-                .setFooter({ text: `Memorize this for ${game.previewTime} seconds!` });
+            const previewContainer = plainContainer(
+                `## ${game.title}\n${game.previewText || game.description}\n\nMemorize this for ${game.previewTime} seconds!`
+            );
 
-            reply = await safeEditReply(interaction, { embeds: [previewEmbed] });
+            reply = await safeEditReply(interaction, v2Reply(previewContainer));
 
             // Wait
             await new Promise(resolve => setTimeout(resolve, game.previewTime! * 1000));
 
             // Update to Question
-            await safeEditReply(interaction, { embeds: [embed] });
+            await safeEditReply(interaction, v2Reply(buildQuestionContainer()));
         }
 
         // --- BUTTON GAME ---
@@ -841,7 +830,8 @@ async function handleButton(interaction: ButtonInteraction) {
             // Since we already deferred, we always use editReply
             // If reply was set by preview logic, we edit.
             // If not set, we still edit the deferred message.
-            await safeEditReply(interaction, { embeds: [embed], components: [row] });
+            const questionContainer = buildQuestionContainer().addActionRowComponents(row);
+            await safeEditReply(interaction, v2Reply(questionContainer));
 
             try {
                 reply = await interaction.fetchReply();
@@ -863,7 +853,7 @@ async function handleButton(interaction: ButtonInteraction) {
         else {
             // TYPING GAME
             // We just edit the embed to show the question
-            reply = await safeEditReply(interaction, { embeds: [embed], components: [] });
+            reply = await safeEditReply(interaction, v2Reply(buildQuestionContainer()));
 
             if (interaction.channel) {
                 try {
@@ -1090,28 +1080,23 @@ async function handleButton(interaction: ButtonInteraction) {
                 earningsText += `\n${jobEffectNotes.map(n => `- ${n}`).join("\n")}`;
             }
 
-            const winEmbed = new EmbedBuilder()
-                .setAuthor({ name: `${user.username}`, iconURL: user.displayAvatarURL() })
-                .setTitle(`${Mascot.Emotes.JobWorking} Shift Complete`)
-                .setDescription(`Great work! You finished your shift as a **${job.title}**.\n\n**Earnings:** ${earningsText}\n\n**Lifetime Shifts:** ${(userData.shiftsWorked ?? 0) + 1}\n**Stress:** +5`)
-                .setColor("#2ECC71");
+            let winBody = `## ${Mascot.Emotes.JobWorking} Shift Complete\n` +
+                `Great work! You finished your shift as a **${job.title}**.\n\n**Earnings:** ${earningsText}\n\n**Lifetime Shifts:** ${(userData.shiftsWorked ?? 0) + 1}\n**Stress:** +5`;
 
             if (!walletFull) {
-                winEmbed.addFields(workTax.shielded
-                    ? { name: "Tax", value: "🛡️ Shielded", inline: true }
-                    : { name: "Tax (8%)", value: `-${fmtCurrency(workTax.taxPaid)}`, inline: true }
-                );
+                winBody += workTax.shielded
+                    ? `\n\n**Tax:** 🛡️ Shielded`
+                    : `\n\n**Tax (8%):** -${fmtCurrency(workTax.taxPaid)}`;
             }
 
             if (newStreak > 1) {
-                winEmbed.addFields({ name: "Job Streak", value: `${newStreak} Days`, inline: true });
+                winBody += `\n**Job Streak:** ${newStreak} Days`;
             }
 
             const rows: ActionRowBuilder<ButtonBuilder>[] = [];
 
             if (promoCheck.eligible && promoCheck.nextJob) {
-                winEmbed.addFields({ name: `${Mascot.Emotes.JobPromotion} Promotion Available!`, value: `You are ready for **${promoCheck.nextJob.title}**! Click **Promote** below.` });
-                winEmbed.setColor("#F1C40F");
+                winBody += `\n\n**${Mascot.Emotes.JobPromotion} Promotion Available!**\nYou are ready for **${promoCheck.nextJob.title}**! Click **Promote** below.`;
 
                 rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder()
@@ -1121,11 +1106,11 @@ async function handleButton(interaction: ButtonInteraction) {
                         .setEmoji(Mascot.Emotes.JobPromotion)
                 ));
             } else if (promoCheck.nextJob) {
-                winEmbed.setFooter({ text: `Progress to ${promoCheck.nextJob.title}: need ${promoCheck.missingShifts} more shifts` });
+                winBody += `\n\nProgress to ${promoCheck.nextJob.title}: need ${promoCheck.missingShifts} more shifts`;
             }
 
             // Disable buttons on the original game embed
-            await safeEditReply(interaction, { components: [] });
+            await safeEditReply(interaction, v2Reply(buildQuestionContainer()));
 
             // Create Work Log
             await prisma.workLog.create({
@@ -1157,10 +1142,14 @@ async function handleButton(interaction: ButtonInteraction) {
             // Update Quest Progress
             questBus.emit("work:complete", { discordId: userData.discordId });
 
+            const workPrefix = await getGuildPrefix(guild.id);
+            const winContainer = plainContainer(winBody, nextStepHint("work", workPrefix)!);
+            for (const r of rows) winContainer.addActionRowComponents(r);
+
             if (userMessage) {
-                await (userMessage as Message).reply({ embeds: [winEmbed], components: rows });
+                await (userMessage as Message).reply(v2Reply(winContainer));
             } else {
-                await safeFollowUp(interaction, { embeds: [winEmbed], components: rows });
+                await safeFollowUp(interaction, v2Reply(winContainer));
             }
 
         } else {
@@ -1180,23 +1169,16 @@ async function handleButton(interaction: ButtonInteraction) {
 
             const desc = `You messed up the task!\n\n**Correct Answer:** ${game.answer}\n\n**Penalty:**\n- No Pay\n- **+10 Stress**\n- No lifetime shift credit\n\nCome back in **${cooldownSeconds > 0 ? formatDuration(cooldownMs) : "a moment"}**.`;
 
-            const failEmbed = new EmbedBuilder()
-                .setAuthor({ name: `${user.username}`, iconURL: user.displayAvatarURL() })
-                .setTitle(`${Mascot.Emotes.Fail} Shift Failed`)
-                .setDescription(desc)
-                .setColor("#E74C3C");
+            let failBody = `## ${Mascot.Emotes.Fail} Shift Failed\n${desc}`;
 
             if (demoCheck.demoted) {
-                failEmbed.addFields({
-                    name: "🚨 Demoted",
-                    value: `**${prevJobTitleFail}** → **${demoCheck.prevJob?.title ?? "previous role"}**\n${demoCheck.msg}`,
-                });
+                failBody += `\n\n**🚨 Demoted**\n**${prevJobTitleFail}** → **${demoCheck.prevJob?.title ?? "previous role"}**\n${demoCheck.msg}`;
             } else if (demoCheck.msg) {
-                failEmbed.addFields({ name: "⚠️ Warning", value: demoCheck.msg });
+                failBody += `\n\n**⚠️ Warning**\n${demoCheck.msg}`;
             }
 
             // Disable buttons on the original game embed
-            await safeEditReply(interaction, { components: [] });
+            await safeEditReply(interaction, v2Reply(buildQuestionContainer()));
 
             // Create Work Log
             await prisma.workLog.create({
@@ -1224,10 +1206,12 @@ async function handleButton(interaction: ButtonInteraction) {
                 color: 0xE74C3C
             });
 
+            const failContainer = plainContainer(failBody);
+
             if (userMessage) {
-                await (userMessage as Message).reply({ embeds: [failEmbed] });
+                await (userMessage as Message).reply(v2Reply(failContainer));
             } else {
-                await safeFollowUp(interaction, { embeds: [failEmbed] });
+                await safeFollowUp(interaction, v2Reply(failContainer));
             }
         }
     }

@@ -1,12 +1,13 @@
-import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, TextChannel } from "discord.js";
+import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, TextChannel } from "discord.js";
 import { study } from "../../services/educationService";
-import { errorEmbed } from "../../utils/embed";
+import { successContainer, errorContainer, infoContainer, plainContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { checkCooldown, getCooldownExpiry } from "../../utils/cooldown";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 import { fmtCurrency } from "../../utils/format";
 
 import prisma from "../../utils/prisma";
-import { getStudyGame } from "../../services/minigameService";
+import { getStudyGame, Minigame } from "../../services/minigameService";
 import { redisService } from "../../services/redisService";
 import { isTesterMember } from "../../utils/developerAccess";
 import { getGuildPrefix } from "../../utils/guildContext";
@@ -20,6 +21,23 @@ function withStudyFooter(prefix: string, text: string) {
     return `${text} · ${studyEducationNote(prefix)}`;
 }
 
+// Preview (memorize) frame — matches the classic embed: no thumbnail, just title/desc/footer.
+function buildPreviewContainer(game: Minigame, prefix: string) {
+    return plainContainer(
+        `## ${game.title}\n${game.previewText || "Get ready..."}`,
+        withStudyFooter(prefix, `Memorize for ${game.previewTime}s...`)
+    );
+}
+
+// Real-question frame — mascot "Think" thumbnail via infoContainer default.
+function buildQuestionContainer(game: Minigame, prefix: string) {
+    return infoContainer(
+        "🧠 Quick Study Session",
+        `${game.description}\n\nYou have **${game.time}** seconds!`,
+        { hint: withStudyFooter(prefix, `You have ${game.time} seconds!`) }
+    );
+}
+
 export async function handleStudy(message: Message, _args: string[] = []) {
     if (!message.guild) return;
 
@@ -31,7 +49,7 @@ export async function handleStudy(message: Message, _args: string[] = []) {
     });
 
     if (!user?.currentEducation) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Not Enrolled", `You are not enrolled in any degree. Use \`${prefix}education\` to start your education!`)] });
+        return message.reply(v2Reply(errorContainer("Not Enrolled", `You are not enrolled in any degree. Use \`${prefix}education\` to start your education!`)));
     }
 
     // DB-Based Cooldown (Dynamic)
@@ -45,14 +63,13 @@ export async function handleStudy(message: Message, _args: string[] = []) {
         const remainingMs = cooldownMs - (now - lastStudyTime);
         const expiresAt = Math.floor((now + remainingMs) / 1000);
 
-        const embed = new EmbedBuilder()
-            .setTitle(`Cooldown`)
-            .setDescription(`You are tired of studying! Try again <t:${expiresAt}:R>.`)
-            .setColor("#E74C3C") // Red
-            .setFooter({ text: studyEducationNote(prefix) });
         const angryUrl = getEmoteUrl(Mascot.Emotes.TeacherAngry);
-        if (angryUrl) embed.setThumbnail(angryUrl);
-        return message.reply({ embeds: [embed] });
+        const cooldownContainer = errorContainer(
+            "Cooldown",
+            `You are tired of studying! Try again <t:${expiresAt}:R>.`,
+            { hint: studyEducationNote(prefix), thumbnailUrl: angryUrl ?? undefined }
+        );
+        return message.reply(v2Reply(cooldownContainer));
     }
 
     // Fetch active Uni Store buffs
@@ -79,34 +96,13 @@ export async function handleStudy(message: Message, _args: string[] = []) {
     // 2. Pick Game
     const game = getStudyGame();
 
-    const embed = new EmbedBuilder()
-        .setTitle("🧠 Quick Study Session")
-        .setDescription(game.description)
-        .setColor(Mascot.Colors.Base as any)
-        .setFooter({ text: withStudyFooter(prefix, `You have ${game.time} seconds!`) });
-
-    const thinkUrl = getEmoteUrl(Mascot.Emotes.Think);
-    if (thinkUrl) embed.setThumbnail(thinkUrl);
-
     let isWin = false;
     let reply: Message | null = null;
 
     // --- PREVIEW PHASE ---
     if (game.previewTime) {
-        const previewEmbed = new EmbedBuilder()
-            .setTitle(game.title)
-            .setDescription(game.previewText || "Get ready...")
-            .setColor(Mascot.Colors.Base as any)
-            .setFooter({ text: withStudyFooter(prefix, `Memorize for ${game.previewTime}s...`) });
-
-        reply = await message.reply({ embeds: [previewEmbed] });
+        reply = await message.reply(v2Reply(buildPreviewContainer(game, prefix)));
         await new Promise(r => setTimeout(r, game.previewTime! * 1000));
-
-        // Show Real Question
-        embed.setDescription(`${game.description}\n\nYou have **${game.time}** seconds!`);
-        await reply.edit({ embeds: [embed] });
-    } else {
-        embed.setDescription(`${game.description}\n\nYou have **${game.time}** seconds!`);
     }
 
     // --- BUTTON GAME ---
@@ -120,10 +116,12 @@ export async function handleStudy(message: Message, _args: string[] = []) {
             )
         );
 
+        const questionContainer = buildQuestionContainer(game, prefix).addActionRowComponents(row);
+
         if (!reply) {
-            reply = await message.reply({ embeds: [embed], components: [row] });
+            reply = await message.reply(v2Reply(questionContainer));
         } else {
-            await reply.edit({ components: [row] });
+            await reply.edit(v2Reply(questionContainer));
         }
 
         try {
@@ -144,7 +142,9 @@ export async function handleStudy(message: Message, _args: string[] = []) {
     // --- TYPING GAME ---
     else {
         if (!reply) {
-            reply = await message.reply({ embeds: [embed] });
+            reply = await message.reply(v2Reply(buildQuestionContainer(game, prefix)));
+        } else {
+            await reply.edit(v2Reply(buildQuestionContainer(game, prefix)));
         }
 
         try {
@@ -165,8 +165,8 @@ export async function handleStudy(message: Message, _args: string[] = []) {
         }
     }
 
-    // Disable buttons on game message
-    if (reply) await reply.edit({ components: [] }).catch(() => { });
+    // Disable buttons on game message (re-send text-only frame, no action row)
+    if (reply) await reply.edit(v2Reply(buildQuestionContainer(game, prefix))).catch(() => { });
 
     // Fail rescue: if user failed but has active buffs with failReduction, attempt rescue
     let rescued = false;
@@ -179,13 +179,13 @@ export async function handleStudy(message: Message, _args: string[] = []) {
     if (!isWin) {
         if (tutorPass) await redisService.del(`tutor_pass:${userId}`);
 
-        const failEmbed = new EmbedBuilder()
-            .setTitle("📖 Study Session Failed")
-            .setDescription(`${Mascot.Emotes.Confused} You failed the test!\n\n**Correct Answer:** ${game.answer}`)
-            .setColor("#E74C3C")
-            .setFooter({ text: studyEducationNote(prefix) });
+        const failContainer = errorContainer(
+            "📖 Study Session Failed",
+            `${Mascot.Emotes.Confused} You failed the test!\n\n**Correct Answer:** ${game.answer}`,
+            { hint: studyEducationNote(prefix) }
+        );
 
-        await message.reply({ embeds: [failEmbed] });
+        await message.reply(v2Reply(failContainer));
         return;
     }
 
@@ -234,34 +234,36 @@ export async function handleStudy(message: Message, _args: string[] = []) {
         if (xpMultiplier > 1.0) footerText += ` (${xpMultiplier.toFixed(2)}x buff)`;
         if (rescued) footerText = bonusXp > 0 ? `Rescued by buff! +${bonusXp} Bonus XP!` : "Rescued by buff!";
 
-        const resultEmbed = new EmbedBuilder()
-            .setTitle("📚 Study Successful!")
-            .setDescription(res.msg + focusBonus + (rescued ? "\n✨ **Your study items rescued the attempt!**" : ""))
-            .setColor(res.newStress > 80 ? "#E74C3C" : "#2ECC71")
-            .setFooter({ text: withStudyFooter(prefix, footerText) });
+        let resultDesc = res.msg + focusBonus + (rescued ? "\n✨ **Your study items rescued the attempt!**" : "");
 
-        const comps: any[] = [];
+        let claimRow: ActionRowBuilder<ButtonBuilder> | null = null;
         if (res.scholarship) {
-            resultEmbed.addFields({
-                name: "🎉 Scholarship Unlocked!",
-                value: `You reached **${res.scholarship.milestone}%** XP!\nReward: **${fmtCurrency(res.scholarship.amount)}**`
-            });
-            const claimRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            resultDesc += `\n\n**🎉 Scholarship Unlocked!:** You reached **${res.scholarship.milestone}%** XP!\nReward: **${fmtCurrency(res.scholarship.amount)}**`;
+            claimRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`claim_scholarship_${res.scholarship.milestone}`)
                     .setLabel("Claim Scholarship")
                     .setStyle(ButtonStyle.Success)
                     .setEmoji(Mascot.Emotes.MoneyBag)
             );
-            comps.push(claimRow);
         }
 
-        const thumb = getEmoteUrl(Mascot.Emotes.Teacher);
-        if (thumb) resultEmbed.setThumbnail(thumb);
+        // Study success is the ONLY spot that gets the next-step tip
+        const studyTip = nextStepHint("study", prefix);
+        const footerLine = withStudyFooter(prefix, footerText);
+        const hintText = studyTip ? `${footerLine}\n${studyTip}` : footerLine;
 
-        await message.reply({ embeds: [resultEmbed], components: comps });
+        const teacherUrl = getEmoteUrl(Mascot.Emotes.Teacher);
+        const resultContainer = successContainer(
+            "📚 Study Successful!",
+            resultDesc,
+            { hint: hintText, thumbnailUrl: teacherUrl ?? undefined }
+        );
+        if (claimRow) resultContainer.addActionRowComponents(claimRow);
+
+        await message.reply(v2Reply(resultContainer));
 
     } catch (err: any) {
-        await message.reply({ embeds: [errorEmbed(message.author, "Study Error", err.message)] });
+        await message.reply(v2Reply(errorContainer("Study Error", err.message)));
     }
 }

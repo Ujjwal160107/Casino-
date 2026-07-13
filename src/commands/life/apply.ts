@@ -1,9 +1,10 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, EmbedBuilder, Message } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, Message, MessageFlags } from "discord.js";
 import { JobDefinition, getJobApplicationStatus, getJobByName } from "../../services/jobService";
 import { getInterview, resolveInterviewChoice, evaluateInterview, InterviewResult } from "../../services/interviewService";
 import { Mascot } from "../../config/branding";
 import prisma from "../../utils/prisma";
-import { errorEmbed } from "../../utils/embed";
+import { successContainer, errorContainer, infoContainer, plainContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { logToChannel } from "../../utils/discordLogger";
 import { redisService } from "../../services/redisService";
 import { getGuildPrefix } from "../../utils/guildContext";
@@ -34,9 +35,7 @@ export async function startJobApplicationFromMessage(message: Message, job: JobD
 
     const status = getJobApplicationStatus(user, job);
     if (!status.canApply) {
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Job Locked", status.missing.join("\n"))]
-        });
+        return message.reply(v2Reply(errorContainer("Job Locked", status.missing.join("\n"))));
     }
 
     const reply = await message.reply(buildInterviewIntro(job));
@@ -54,10 +53,7 @@ export async function startJobApplicationFromInteraction(interaction: ButtonInte
 
     const status = getJobApplicationStatus(user, job);
     if (!status.canApply) {
-        return interaction.reply({
-            embeds: [errorEmbed(interaction.user as any, "Job Locked", status.missing.join("\n"))],
-            ephemeral: true,
-        });
+        return interaction.reply(v2Reply(errorContainer("Job Locked", status.missing.join("\n")), undefined, MessageFlags.Ephemeral));
     }
 
     await interaction.deferReply();
@@ -66,16 +62,14 @@ export async function startJobApplicationFromInteraction(interaction: ButtonInte
 }
 
 function buildInterviewIntro(job: JobDefinition) {
-    const introEmbed = new EmbedBuilder()
-        .setTitle(`Interview: ${job.title}`)
-        .setDescription(
-            `You are being interviewed for **${job.title}**.\n\n` +
-            `Answer **5 workplace scenario questions**.\n` +
-            `Each question has choices with different success odds.\n` +
-            `Score **60/100 or higher** to get hired.\n\n` +
-            `-# Lucky Tie active? Your odds improve on each question.`
-        )
-        .setColor(Mascot.Colors.Base as any);
+    const container = plainContainer(
+        `## Interview: ${job.title}\n` +
+        `You are being interviewed for **${job.title}**.\n\n` +
+        `Answer **5 workplace scenario questions**.\n` +
+        `Each question has choices with different success odds.\n` +
+        `Score **60/100 or higher** to get hired.\n\n` +
+        `-# Lucky Tie active? Your odds improve on each question.`
+    );
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
@@ -84,7 +78,9 @@ function buildInterviewIntro(job: JobDefinition) {
             .setStyle(ButtonStyle.Success)
     );
 
-    return { embeds: [introEmbed], components: [row] };
+    container.addActionRowComponents(row);
+
+    return v2Reply(container);
 }
 
 async function runInterview(reply: Message, source: Message | ButtonInteraction, job: JobDefinition, discordId: string) {
@@ -104,17 +100,13 @@ async function runInterview(reply: Message, source: Message | ButtonInteraction,
         });
         await confirmation.deferUpdate();
     } catch {
-        return reply.edit({ content: "Interview cancelled (timeout).", embeds: [], components: [] });
+        return reply.edit(v2Reply(errorContainer("Interview Cancelled", "Interview cancelled (timeout).")));
     }
 
     for (let index = 0; index < scenarios.length; index++) {
         const scenario = scenarios[index];
 
-        const questionEmbed = new EmbedBuilder()
-            .setTitle(`Question ${index + 1}/${scenarios.length}`)
-            .setDescription(scenario.prompt)
-            .setColor("#3498DB")
-            .setFooter({ text: luckyTieActive ? "Lucky Tie is active — your odds are slightly boosted." : "Choose wisely." });
+        const questionContainer = plainContainer(`## Question ${index + 1}/${scenarios.length}\n${scenario.prompt}`);
 
         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
             scenario.choices.map((choice, i) =>
@@ -125,7 +117,9 @@ async function runInterview(reply: Message, source: Message | ButtonInteraction,
             )
         );
 
-        await reply.edit({ embeds: [questionEmbed], components: [row] });
+        questionContainer.addActionRowComponents(row);
+
+        await reply.edit(v2Reply(questionContainer));
 
         try {
             const answer = await reply.awaitMessageComponent({
@@ -138,20 +132,15 @@ async function runInterview(reply: Message, source: Message | ButtonInteraction,
             const result = await resolveInterviewChoice(scenario, selectedIndex, discordId);
             results.push(result);
 
-            // Brief feedback embed
-            const feedbackEmbed = new EmbedBuilder()
-                .setTitle(result.success ? "Good answer!" : "Rough answer.")
-                .setDescription(
-                    result.success
-                        ? `${result.choice.successMsg}\n\n+${result.scoreGained} points`
-                        : `${result.choice.failMsg}\n\n+0 points`
-                )
-                .setColor(result.success ? "#2ECC71" : "#E74C3C");
+            // Brief feedback container
+            const feedbackContainer = result.success
+                ? successContainer("Good answer!", `${result.choice.successMsg}\n\n+${result.scoreGained} points`)
+                : errorContainer("Rough answer.", `${result.choice.failMsg}\n\n+0 points`);
 
-            await reply.edit({ embeds: [feedbackEmbed], components: [] });
+            await reply.edit(v2Reply(feedbackContainer));
             await new Promise(res => setTimeout(res, 2000));
         } catch {
-            return reply.edit({ content: "Timeout! Interview failed.", embeds: [], components: [] });
+            return reply.edit(v2Reply(errorContainer("Interview Failed", "Timeout! Interview failed.")));
         }
     }
 
@@ -162,18 +151,18 @@ async function runInterview(reply: Message, source: Message | ButtonInteraction,
         `${r.success ? "✅" : "❌"} Q${i + 1}: ${r.choice.label.slice(0, 40)} (+${r.scoreGained})`
     ).join("\n");
 
-    const resultEmbed = new EmbedBuilder()
-        .setTitle(passed ? "Hired!" : "Rejected")
-        .setDescription(
-            passed
-                ? `${Mascot.Emotes.Success} You passed the interview! (**${totalScore}/100**)\nYou are now employed as a **${job.title}**.`
-                : `${Mascot.Emotes.Fail} You failed the interview (**${totalScore}/100**). You need at least **60/100** to pass.`
-        )
-        .addFields({ name: "Your Answers", value: resultLines })
-        .setColor(passed ? "#2ECC71" : "#E74C3C");
+    const resultBody =
+        (passed
+            ? `${Mascot.Emotes.Success} You passed the interview! (**${totalScore}/100**)\nYou are now employed as a **${job.title}**.`
+            : `${Mascot.Emotes.Fail} You failed the interview (**${totalScore}/100**). You need at least **60/100** to pass.`)
+        + `\n\n**Your Answers:**\n${resultLines}`;
 
-    if (luckyTieActive) {
-        resultEmbed.setFooter({ text: "Lucky Tie was active this interview — your odds were boosted." });
+    let resultContainer;
+    if (passed) {
+        const prefix = guild ? await getGuildPrefix(guild.id) : undefined;
+        resultContainer = successContainer("Hired!", resultBody, { hint: nextStepHint("apply", prefix) });
+    } else {
+        resultContainer = errorContainer("Rejected", resultBody);
     }
 
     if (passed) {
@@ -201,5 +190,5 @@ async function runInterview(reply: Message, source: Message | ButtonInteraction,
         });
     }
 
-    return reply.edit({ embeds: [resultEmbed], components: [] });
+    return reply.edit(v2Reply(resultContainer));
 }

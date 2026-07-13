@@ -13,6 +13,7 @@ import { fmtCurrency } from "../../utils/format";
 import { getJob } from "../../services/jobService";
 import { getAllSectorReputation } from "../../services/jobReputationService";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { nextStepHint } from "../../config/nextSteps";
 
 export async function handleCareer(message: Message) {
     if (!message.guild) return;
@@ -99,6 +100,9 @@ export async function handleCareer(message: Message) {
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`### Sector Reputation\n${repLines}`)
         );
+
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("career", prefix)!));
 
     return message.reply({ components: [container], flags: MessageFlags.IsComponentsV2 });
 }

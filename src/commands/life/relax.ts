@@ -11,6 +11,7 @@ import {
   TextDisplayBuilder
 } from "discord.js";
 import { Mascot } from "../../config/branding";
+import { nextStepHint } from "../../config/nextSteps";
 import { getRelaxSnapshot, listRelaxOptions } from "../../services/relaxService";
 import { fmtCurrency } from "../../utils/format";
 import { getGuildPrefix } from "../../utils/guildContext";
@@ -89,6 +90,10 @@ export async function buildRelaxDashboard(ownerId: string, guildId: string, user
   }
 
   if (currentRow.components.length > 0) rows.push(currentRow);
+
+  container
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("relax", prefix)!));
 
   return {
     container,

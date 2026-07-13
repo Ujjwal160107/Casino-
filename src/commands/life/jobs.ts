@@ -14,6 +14,7 @@ import {
 } from "discord.js";
 import { JOBS, JobDefinition, getJob, getJobApplicationStatus, getJobsBySector, getJobPaySync } from "../../services/jobService";
 import { Mascot } from "../../config/branding";
+import { nextStepHint } from "../../config/nextSteps";
 import { fmtCurrency } from "../../utils/format";
 import prisma from "../../utils/prisma";
 import { startJobApplicationFromInteraction } from "./apply";
@@ -89,6 +90,9 @@ function buildMenuContainer(prefix: string, ownerId: string) {
             )
             .addSeparatorComponents(separator());
     }
+
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("jobs", prefix)!));
 
     return container;
 }

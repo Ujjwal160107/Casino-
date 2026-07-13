@@ -4,7 +4,6 @@ import {
     ButtonStyle,
     ComponentType,
     ContainerBuilder,
-    EmbedBuilder,
     Message,
     MessageFlags,
     SectionBuilder,
@@ -14,7 +13,8 @@ import {
 } from "discord.js";
 import { getDegrees } from "../../services/educationService";
 import { fmtCurrency } from "../../utils/format";
-import { errorEmbed } from "../../utils/embed";
+import { errorContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { Mascot } from "../../config/branding";
 import { getUser } from "../../services/userService";
 import { getGuildPrefix } from "../../utils/guildContext";
@@ -47,7 +47,7 @@ export async function handleEducation(message: Message, args: string[]) {
         const user = await getUser(userId, guildId);
 
         if (!user) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Profile Not Found", `You need to start your journey first. Use \`${prefix}start\` to create a profile!`)] });
+            return message.reply(v2Reply(errorContainer("Profile Not Found", `You need to start your journey first. Use \`${prefix}start\` to create a profile!`)));
         }
 
         if (user.currentEducation) {
@@ -212,11 +212,15 @@ export async function handleEducation(message: Message, args: string[]) {
                 }
             });
 
-            return container
+            container
                 .addSeparatorComponents(separator())
                 .addTextDisplayComponents(
                     new TextDisplayBuilder().setContent(`Page ${pageIndex + 1}/${totalPages} - You can also use \`${prefix}enroll <name>\`.`),
-                );
+                )
+                .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false))
+                .addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("education", prefix)!));
+
+            return container;
         };
 
         const buildNavigationRow = (pageIndex: number, disabled = false) => {
@@ -278,7 +282,7 @@ export async function handleEducation(message: Message, args: string[]) {
         }
     } catch (error) {
         console.error("Education Command Error:", error);
-        message.reply({ embeds: [errorEmbed(message.author, "Use Error", "Something went wrong while loading the education dashboard.")] });
+        message.reply(v2Reply(errorContainer("Use Error", "Something went wrong while loading the education dashboard.")));
     }
 }
 
@@ -293,7 +297,7 @@ export async function handleListDegrees(message: Message) {
     const user = await getUser(userId, guildId);
 
     if (!user || user.degrees.length === 0) {
-        return message.reply({ embeds: [errorEmbed(message.author, "No Degrees", `You haven't earned any degrees yet. Use \`${prefix}education\` to find a program!`)] });
+        return message.reply(v2Reply(errorContainer("No Degrees", `You haven't earned any degrees yet. Use \`${prefix}education\` to find a program!`)));
     }
 
     const lines = user.degrees.map((ud) => {
