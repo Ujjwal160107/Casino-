@@ -287,9 +287,14 @@ export const COMMANDS: Command[] = [
     aliases: ["steal"],
     module: "economy",
     short: "Steal from another wallet directly. Fails loud, and the fine hurts.",
-    usage: "!rob <@user>",
-    args: [{ name: "@user", desc: "Your target." }],
-    examples: ["!rob @Someone"],
+    usage: "!rob <@user | username>",
+    args: [
+      {
+        name: "@user | username",
+        desc: "A mention, exact username, or user ID — works across servers.",
+      },
+    ],
+    examples: ["!rob @Someone", "!rob riko"],
     cooldown: "5 min",
     keyNumbers: [
       { label: "Base success", value: "45% (clamped 5–85%)" },
