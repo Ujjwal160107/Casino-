@@ -93,9 +93,10 @@ export function buildZooPayload(
     )
   );
 
+  // Plain number, not fmtCurrency — button labels don't render <:fortunes:…>.
   const collectLabel = collectDisabled
     ? "Nothing to collect yet"
-    : `Collect ${fmtCurrency(pendingIncome)} (${hoursPending}h accumulated)`;
+    : `Collect ${fmtAmount(pendingIncome)} (${hoursPending}h accumulated)`;
 
   const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
