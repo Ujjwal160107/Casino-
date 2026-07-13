@@ -61,10 +61,37 @@ export class PropertyService {
     const property = await this.getPropertyByKey(guildId, key);
     if (!property) return { success: false, message: "Property not found." };
 
-    const existing = await prisma.ownedProperty.findUnique({
-      where: { userId_propertyId: { userId: discordId, propertyId: property.id } },
-    });
-    if (existing) return { success: false, message: "You already own this property." };
+    // Zoos are a single-slot upgrade ladder (Mini 5 < City 10 < World 16): a
+    // player holds at most one zoo, and buying a bigger tier REPLACES the old
+    // one. Animals are user-scoped (CaughtAnimal.inZoo, no relation to the
+    // zoo), so removing the old OwnedProperty row cannot lose any animal — the
+    // catch simply stays in the zoo. No refund on upgrade.
+    let zooRowsToReplace: string[] = [];
+    if (ZOO_KEYS.has(key)) {
+      const ownedZoos = await prisma.ownedProperty.findMany({
+        where: { userId: discordId, property: { key: { in: Array.from(ZOO_KEYS) } } },
+        include: { property: true },
+      });
+      if (ownedZoos.length > 0) {
+        const newCap = ZOO_CAPACITY[key] ?? 0;
+        const best = ownedZoos.reduce((b, op) =>
+          (ZOO_CAPACITY[op.property.key] ?? 0) > (ZOO_CAPACITY[b.property.key] ?? 0) ? op : b
+        );
+        const bestCap = ZOO_CAPACITY[best.property.key] ?? 0;
+        if (newCap <= bestCap) {
+          return {
+            success: false,
+            message: `You already own the **${best.property.name}**. Zoos upgrade — you can only buy a bigger one.`,
+          };
+        }
+        zooRowsToReplace = ownedZoos.map((op) => op.id);
+      }
+    } else {
+      const existing = await prisma.ownedProperty.findUnique({
+        where: { userId_propertyId: { userId: discordId, propertyId: property.id } },
+      });
+      if (existing) return { success: false, message: "You already own this property." };
+    }
 
     const wallet = await prisma.wallet.findUnique({ where: { userId: discordId } });
     if (!wallet || wallet.balance < property.price) {
@@ -72,6 +99,12 @@ export class PropertyService {
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      // Upgrade: drop the old zoo(s) first. Animals (CaughtAnimal) are never
+      // touched — no relation to OwnedProperty — so the whole collection moves
+      // to the new zoo automatically.
+      if (zooRowsToReplace.length > 0) {
+        await tx.ownedProperty.deleteMany({ where: { id: { in: zooRowsToReplace } } });
+      }
       await tx.wallet.update({ where: { userId: discordId }, data: { balance: { decrement: property.price } } });
       await tx.ownedProperty.create({
         data: { userId: discordId, propertyId: property.id, purchasedPrice: property.price, lastCollected: new Date() },
@@ -79,6 +112,17 @@ export class PropertyService {
       const updated = await tx.property.update({ where: { id: property.id }, data: { totalSold: { increment: 1 } } });
       const newPrice = this.calculateDynamicPrice(updated.basePrice, updated.totalSold);
       await tx.property.update({ where: { id: property.id }, data: { price: newPrice } });
+
+      if (zooRowsToReplace.length > 0) {
+        const animalCount = await tx.caughtAnimal.count({ where: { discordId, inZoo: true } });
+        const cap = ZOO_CAPACITY[key] ?? 0;
+        return {
+          success: true,
+          message:
+            `Upgraded to **${property.name}** for ${property.price.toLocaleString()} coins! ` +
+            `Your **${animalCount}** zoo animal${animalCount !== 1 ? "s" : ""} came with you. Capacity is now **${cap} types**.`,
+        };
+      }
       return { success: true, message: `Successfully purchased **${property.name}** for ${property.price.toLocaleString()} coins!` };
     });
     await invalidatePropertiesCache();

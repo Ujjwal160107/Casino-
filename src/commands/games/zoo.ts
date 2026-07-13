@@ -58,7 +58,7 @@ export async function buildZooContainer(
   guildId: string,
   guild: import("discord.js").Guild | null
 ): Promise<ContainerBuilder> {
-  const { slots, maxSlots, ratePerHour, hoursPending } = await getZooStatus(discordId, guildId);
+  const { slots, maxSlots, ratePerHour, hoursPending, zooName, zooKey } = await getZooStatus(discordId, guildId);
 
   const pendingIncome = Math.floor(ratePerHour * hoursPending);
   const collectDisabled = hoursPending < 1;
@@ -68,7 +68,7 @@ export async function buildZooContainer(
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `## ${Mascot.Emotes.Sparks} Your Zoo\n` +
+      `## ${Mascot.Emotes.Sparks} Your ${zooName ?? "Zoo"}\n` +
       `**${slots.length}/${maxSlots}** animal types | **+${fmtCurrency(ratePerHour)}/hr** | **~${fmtCurrency(ratePerHour * 24)}/day** max`
     )
   );
@@ -77,15 +77,30 @@ export async function buildZooContainer(
     ? "Nothing to collect yet"
     : `Collect ${fmtCurrency(pendingIncome)} (${hoursPending}h accumulated)`;
 
-  container.addActionRowComponents(
-    new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`zoo_collect:${discordId}`)
-        .setLabel(collectLabel)
-        .setStyle(ButtonStyle.Success)
-        .setDisabled(collectDisabled)
-    )
+  const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`zoo_collect:${discordId}`)
+      .setLabel(collectLabel)
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(collectDisabled)
   );
+
+  // Single-slot upgrade ladder: offer the next-bigger zoo if one exists.
+  const nextTier = zooKey
+    ? ZOO_PROPERTY_DEFS.find((d) => (ZOO_CAPACITY[d.key] ?? 0) > (ZOO_CAPACITY[zooKey] ?? 0))
+    : null;
+  if (nextTier) {
+    const nextProp = await prisma.property.findFirst({ where: { key: nextTier.key } });
+    const nextPrice = nextProp?.price ?? nextTier.price;
+    actionRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`buy_property_${nextTier.key}`)
+        .setLabel(`Upgrade to ${nextTier.name} (${fmtCurrency(nextPrice)})`)
+        .setStyle(ButtonStyle.Primary)
+    );
+  }
+
+  container.addActionRowComponents(actionRow);
 
   container.addSeparatorComponents(
     new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)

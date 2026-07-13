@@ -352,7 +352,9 @@ export async function addAnimalsByKeyToZoo(
   const zooProps = ownedZoos.filter((op) => Object.keys(ZOO_CAPACITY).includes(op.property.key));
   if (zooProps.length === 0) throw new Error("You need to own a zoo property to house animals.");
 
-  const maxSlots = zooProps.reduce((sum, op) => sum + (ZOO_CAPACITY[op.property.key] ?? 0), 0);
+  // Zoos are a single-slot upgrade ladder — capacity is the biggest zoo owned,
+  // not the sum. (max, so legacy multi-owners are handled before migration.)
+  const maxSlots = zooProps.reduce((max, op) => Math.max(max, ZOO_CAPACITY[op.property.key] ?? 0), 0);
 
   // Count distinct animal types already in zoo
   const existingTypes = await prisma.caughtAnimal.groupBy({
@@ -389,7 +391,7 @@ export async function addAnimalToZoo(discordId: string, animalId: string, guildI
   const zooProps = ownedZoos.filter((op) => Object.keys(ZOO_CAPACITY).includes(op.property.key));
   if (zooProps.length === 0) throw new Error("You need to own a zoo property to house animals.");
 
-  const maxSlots = zooProps.reduce((sum, op) => sum + (ZOO_CAPACITY[op.property.key] ?? 0), 0);
+  const maxSlots = zooProps.reduce((max, op) => Math.max(max, ZOO_CAPACITY[op.property.key] ?? 0), 0);
   const existingTypes = await prisma.caughtAnimal.groupBy({
     by: ["animalKey"],
     where: { discordId, inZoo: true },
@@ -513,6 +515,8 @@ export async function getZooStatus(
   ratePerHour: number;
   hoursPending: number;
   lastClaim: Date | null;
+  zooName: string | null;
+  zooKey: string | null;
 }> {
   const slots = await getZooSlots(discordId);
 
@@ -521,7 +525,13 @@ export async function getZooStatus(
     include: { property: true },
   });
   const zooProps = ownedZoos.filter((op) => Object.keys(ZOO_CAPACITY).includes(op.property.key));
-  const maxSlots = zooProps.reduce((sum, op) => sum + (ZOO_CAPACITY[op.property.key] ?? 0), 0);
+  // Single-slot upgrade ladder: the active zoo is the biggest one owned.
+  const activeZoo = zooProps.reduce<typeof zooProps[number] | null>(
+    (best, op) =>
+      (ZOO_CAPACITY[op.property.key] ?? 0) > (best ? ZOO_CAPACITY[best.property.key] ?? 0 : -1) ? op : best,
+    null,
+  );
+  const maxSlots = activeZoo ? ZOO_CAPACITY[activeZoo.property.key] ?? 0 : 0;
 
   const zooBoost = await getCraftEffect(discordId, `crafted_zoo_boost:${discordId}`, "zoo_boost", (v) => ({ multiplier: v }));
   const ratePerHour = Math.floor(slots.reduce((sum, s) => sum + s.incomePerHour, 0) * (zooBoost?.multiplier ?? 1));
@@ -544,5 +554,13 @@ export async function getZooStatus(
     }
   }
 
-  return { slots, maxSlots, ratePerHour, hoursPending, lastClaim };
+  return {
+    slots,
+    maxSlots,
+    ratePerHour,
+    hoursPending,
+    lastClaim,
+    zooName: activeZoo?.property.name ?? null,
+    zooKey: activeZoo?.property.key ?? null,
+  };
 }
