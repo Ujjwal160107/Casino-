@@ -1,4 +1,4 @@
-import { Client, EmbedBuilder, TextChannel, Colors, Guild } from "discord.js";
+import { Client, ContainerBuilder, Guild, MessageFlags, SectionBuilder, TextChannel, TextDisplayBuilder, ThumbnailBuilder } from "discord.js";
 
 interface LogOptions {
     guild: Guild;
@@ -7,6 +7,7 @@ interface LogOptions {
     description: string;
     fields?: { name: string; value: string; inline?: boolean }[];
     thumbnail?: string;
+    /** Retained for call-site compatibility; Components V2 has no accent stripe. */
     color?: number;
 }
 
@@ -18,32 +19,32 @@ export async function logToChannel(client: Client, options: LogOptions) {
         const channel = await client.channels.fetch(logChannelId);
         if (!channel || !channel.isTextBased()) return;
 
-        const embed = new EmbedBuilder()
-            .setTitle(`📜 ${options.type}: ${options.title}`)
-            .setDescription(options.description)
-            .setColor(options.color || Colors.Blue)
-            .setTimestamp()
-            .setFooter({ text: "Casino Audit Log" });
-
-        if (options.fields) {
-            embed.addFields(options.fields);
+        const heading = `## 📜 ${options.type}: ${options.title}`;
+        let body = options.description;
+        if (options.fields && options.fields.length) {
+            body += "\n" + options.fields.map((f) => `**${f.name}:** ${f.value}`).join("\n");
         }
 
+        const container = new ContainerBuilder();
         if (options.thumbnail) {
-            embed.setThumbnail(options.thumbnail);
+            container.addSectionComponents(
+                new SectionBuilder()
+                    .addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(heading),
+                        new TextDisplayBuilder().setContent(body),
+                    )
+                    .setThumbnailAccessory(new ThumbnailBuilder().setURL(options.thumbnail)),
+            );
+        } else {
+            container.addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(heading),
+                new TextDisplayBuilder().setContent(body),
+            );
         }
 
-        if (!options.color) {
-            switch (options.type) {
-                case "ADMIN": embed.setColor(Colors.Red); break;
-                case "ECONOMY": embed.setColor(Colors.Green); break;
-                case "MARKET": embed.setColor(Colors.Gold); break;
-                case "TRADE": embed.setColor(Colors.Aqua); break;
-                case "MODERATION": embed.setColor(Colors.DarkOrange); break;
-            }
-        }
-
-        await (channel as TextChannel).send({ embeds: [embed] }).catch(() => { });
+        await (channel as TextChannel)
+            .send({ components: [container], flags: MessageFlags.IsComponentsV2 })
+            .catch(() => { });
     } catch (err) {
         console.error("Failed to send audit log:", err);
     }

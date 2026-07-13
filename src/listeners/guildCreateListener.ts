@@ -4,10 +4,14 @@ import {
   ButtonStyle,
   ChannelType,
   Client,
-  EmbedBuilder,
+  ContainerBuilder,
   Guild,
+  MessageFlags,
   PermissionFlagsBits,
-  TextChannel
+  SectionBuilder,
+  TextChannel,
+  TextDisplayBuilder,
+  ThumbnailBuilder,
 } from "discord.js";
 import { Mascot } from "../config/branding";
 
@@ -18,25 +22,37 @@ export const guildCreateListener = (client: Client) => {
     console.log(`[GuildCreate] Bot joined guild: ${guild.name} (${guild.id})`);
 
     try {
-      const welcomeEmbed = new EmbedBuilder()
-        .setTitle(`Thanks for adding ${Mascot.Name}!`)
-        .setDescription(
-          `I'm here to handle your server's economy, games, and life systems.\n\nHere are some quick links to help you get started:`
-        )
-        .addFields(
-          { name: "Getting Started", value: "Use `!help` to browse commands and `!set-prefix` if you want a different prefix.", inline: false },
-          { name: "Documentation", value: `[Docs](${Mascot.Links.Docs})`, inline: true },
-          { name: "Support", value: `[Support Server](${Mascot.Links.Support})`, inline: true }
-        )
-        .setColor(0x9b59b6)
-        .setThumbnail(client.user?.displayAvatarURL() || "")
-        .setFooter({ text: "Let's make this server awesome!" })
-        .setTimestamp();
+      const heading = `## Thanks for adding ${Mascot.Name}!`;
+      const body =
+        `I'm here to handle your server's economy, games, and life systems.\n\n` +
+        `Here are some quick links to help you get started:\n\n` +
+        "**Getting Started:** Use `!help` to browse commands and `!set-prefix` if you want a different prefix.\n" +
+        `**Documentation:** [Docs](${Mascot.Links.Docs})\n` +
+        `**Support:** [Support Server](${Mascot.Links.Support})`;
 
       const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setLabel("Documentation").setStyle(ButtonStyle.Link).setURL(Mascot.Links.Docs),
         new ButtonBuilder().setLabel("Support Server").setStyle(ButtonStyle.Link).setURL(Mascot.Links.Support)
       );
+
+      const container = new ContainerBuilder();
+      const avatarUrl = client.user?.displayAvatarURL();
+      if (avatarUrl) {
+        container.addSectionComponents(
+          new SectionBuilder()
+            .addTextDisplayComponents(
+              new TextDisplayBuilder().setContent(heading),
+              new TextDisplayBuilder().setContent(body),
+            )
+            .setThumbnailAccessory(new ThumbnailBuilder().setURL(avatarUrl)),
+        );
+      } else {
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(heading),
+          new TextDisplayBuilder().setContent(body),
+        );
+      }
+      container.addActionRowComponents(row);
 
       let targetChannel: TextChannel | null = null;
       const me = guild.members.me;
@@ -56,7 +72,7 @@ export const guildCreateListener = (client: Client) => {
       }
 
       if (targetChannel) {
-        await targetChannel.send({ embeds: [welcomeEmbed], components: [row] });
+        await targetChannel.send({ components: [container], flags: MessageFlags.IsComponentsV2 });
       }
     } catch (error) {
       console.error(`[GuildCreate] Error sending welcome message in ${guild.name}:`, error);
