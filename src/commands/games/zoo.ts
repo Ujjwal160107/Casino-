@@ -18,7 +18,7 @@ import { getZooStatus, getZooSlots, removeAnimalsByKey, ZooSlot } from "../../se
 import { errorEmbed, successEmbed } from "../../utils/embed";
 import { seedZooProperties } from "../../services/propertyService";
 import { ZOO_CAPACITY, RARITY_INCOME, ZOO_PROPERTY_DEFS } from "../../utils/animalCatalog";
-import { fmtCurrency } from "../../utils/format";
+import { fmtCurrency, fmtAmount } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import prisma from "../../utils/prisma";
 import { AnimalEmojis, Mascot } from "../../config/branding";
@@ -110,7 +110,9 @@ export function buildZooPayload(
     actionRow.addComponents(
       new ButtonBuilder()
         .setCustomId(`buy_property_${nextTier.key}`)
-        .setLabel(`Upgrade to ${nextTier.name} (${fmtCurrency(nextTier.price)})`)
+        // Button labels don't render custom-emoji markup, so use a plain number
+        // (fmtCurrency embeds the <:fortunes:…> emoji, which shows as raw text here).
+        .setLabel(`Upgrade to ${nextTier.name} (${fmtAmount(nextTier.price)})`)
         .setStyle(ButtonStyle.Primary)
     );
   }
