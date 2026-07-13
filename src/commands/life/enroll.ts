@@ -30,7 +30,7 @@ export async function handleExam(message: Message) {
     const res = await takeExam(userId, guildId);
 
     if (res.success) {
-      return message.reply(v2Reply(successContainer("🎓 GRADUATED!", res.msg, { hint: nextStepHint("exam_pass", prefix)! })));
+      return message.reply(v2Reply(successContainer("GRADUATED!", res.msg, { hint: nextStepHint("exam_pass", prefix)! })));
     }
 
     const sadUrl = getEmoteUrl(Mascot.Emotes.TeacherSad);

@@ -134,7 +134,7 @@ export async function executeRaid(
     const discordUser = await client.users.fetch(discordId).catch(() => null);
     if (discordUser) {
       await discordUser.send(v2Reply(errorContainer(
-        "🚨 TAX RAID",
+        "TAX RAID",
         `The IRS has audited your financial activity.\n\n` +
         `**Suspicious Income Detected:** Multiple undeclared earnings\n` +
         `**Amount Seized:** ${result.removedAmount.toLocaleString("en-US")} coins\n` +

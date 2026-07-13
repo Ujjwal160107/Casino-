@@ -126,7 +126,7 @@ async function applyEffect(
 
         case "CUSTOM_MESSAGE":
             return {
-                message: effect.message || "✨ Item used successfully!",
+                message: effect.message || "Item used successfully!",
                 type: "CUSTOM_MESSAGE"
             };
 
@@ -160,7 +160,7 @@ async function applyEffect(
             }
 
             return {
-                message: `💰 Received ${effect.amount.toLocaleString('en-US')} coins!`,
+                message: `Received ${effect.amount.toLocaleString('en-US')} coins!`,
                 type: "MONEY"
             };
 
@@ -193,7 +193,7 @@ async function applyEffect(
             if (client) await logEffectAction(client, guildId, "STAT_BOOST", `Boosted ${statName} by ${statAmount} for <@${userId}>`);
 
             return {
-                message: `💪 **${statName.toUpperCase()}** increased by ${statAmount}!`,
+                message: `**${statName.toUpperCase()}** increased by ${statAmount}!`,
                 type: "STAT_BOOST"
             };
 
@@ -214,7 +214,7 @@ async function applyEffect(
             if (client) await logEffectAction(client, guildId, "DEATH_SAVE", `Granted Death Save to <@${userId}>`);
 
             return {
-                message: `🛡️ **Death Save** active! Your chicken will survive the next death (expires in ${formatDuration(dsDuration)}).`,
+                message: `**Death Save** active! Your chicken will survive the next death (expires in ${formatDuration(dsDuration)}).`,
                 type: "DEATH_SAVE"
             };
 
@@ -266,7 +266,7 @@ async function applyEffect(
             if (client) await logEffectAction(client, guildId, "STRESS_REDUCTION", `Reduced stress for <@${userId}> by ${stressAmount}`);
 
             return {
-                message: `😌 **Relief!** Your job stress went down by ${stressAmount}. (Stress: ${newStress}%)`,
+                message: `**Relief!** Your job stress went down by ${stressAmount}. (Stress: ${newStress}%)`,
                 type: "STRESS_REDUCE"
             };
 
@@ -288,7 +288,7 @@ async function applyEffect(
             if (client) await logEffectAction(client, guildId, "EXAM_BOOST", `Granted Exam Boost (+${examBoostValue}) to <@${userId}>`);
 
             return {
-                message: `🤓 **Cheat Sheet Active!** You have +${examBoostValue} effective Intelligence for the next ${formatDuration(examBoostDuration)} (or until exam).`,
+                message: `**Cheat Sheet Active!** You have +${examBoostValue} effective Intelligence for the next ${formatDuration(examBoostDuration)} (or until exam).`,
                 type: "EXAM_BOOST"
             };
 
@@ -309,7 +309,7 @@ async function applyEffect(
             if (client) await logEffectAction(client, guildId, "XP_MULTIPLIER", `Activated XP Multiplier (${effect.multiplier}x) for <@${userId}>`);
 
             return {
-                message: `⚡ **XP Boost Active!** earning ${effect.multiplier}x XP for ${formatDuration(duration)}.`,
+                message: `**XP Boost Active!** earning ${effect.multiplier}x XP for ${formatDuration(duration)}.`,
                 type: "XP_MULTIPLIER"
             };
         }
@@ -326,7 +326,7 @@ async function applyEffect(
             if (client) await logEffectAction(client, guildId, "LEVEL_BOOST", `Granted +${levels} levels to <@${userId}>`);
 
             return {
-                message: `📈 **Leveled Up!** You gained +${levels} levels!`,
+                message: `**Leveled Up!** You gained +${levels} levels!`,
                 type: "LEVEL_BOOST"
             };
         }

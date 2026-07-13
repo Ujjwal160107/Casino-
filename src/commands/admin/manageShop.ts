@@ -85,7 +85,7 @@ export async function handleManageShop(message: Message, args: string[]) {
         new ButtonBuilder().setCustomId("btn_back").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("↩️")
       );
 
-      const container = plainContainer(`## ✨ Effects: ${item.name}\n${desc}`);
+      const container = plainContainer(`## Effects: ${item.name}\n${desc}`);
       container.addActionRowComponents(row1);
 
       return v2Reply(container);
@@ -156,7 +156,7 @@ export async function handleManageShop(message: Message, args: string[]) {
 
       if (btnId === "btn_delete") {
         await deleteShopItem(targetItem.id);
-        await interaction.update(v2Reply(plainContainer(`## Item Deleted\n🗑️ **${targetItem.name}** has been deleted.`)));
+        await interaction.update(v2Reply(plainContainer(`## Item Deleted\n**${targetItem.name}** has been deleted.`)));
         collector.stop();
         return;
       }

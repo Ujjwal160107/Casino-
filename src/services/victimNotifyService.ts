@@ -26,7 +26,7 @@ export async function notifyRobbed(
   await sendDm(
     client,
     victimId,
-    `🚨 **You've been robbed!** **${robberName}** lifted **${fmtCurrency(amount)}** from your wallet${where}.\n` +
+    `**You've been robbed!** **${robberName}** lifted **${fmtCurrency(amount)}** from your wallet${where}.\n` +
       "-# Wallet money can be robbed — bank what you don't need with `!deposit`.",
   );
 }
@@ -41,7 +41,7 @@ export async function notifyPadlockUsed(
   await sendDm(
     client,
     victimId,
-    `🔒 **Your Padlock just paid for itself.** **${robberName}** tried to rob you${where} — it blocked the hit and broke in the process.\n` +
+    `**Your Padlock just paid for itself.** **${robberName}** tried to rob you${where} — it blocked the hit and broke in the process.\n` +
       "-# Padlocks are single-use. Grab another: `!shop buy padlock`.",
   );
 }

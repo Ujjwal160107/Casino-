@@ -34,7 +34,7 @@ export async function handleMonthly(message: Message) {
 
     const tax = await applyIncomeTax(message.author.id, result.appliedAmount);
     const taxLine = tax.shielded
-      ? "**Tax:** 🛡️ Shielded"
+      ? "**Tax:** Shielded"
       : `**Tax (8%):** -${fmtCurrency(tax.taxPaid)}`;
 
     return message.reply(

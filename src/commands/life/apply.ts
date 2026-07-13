@@ -148,7 +148,7 @@ async function runInterview(reply: Message, source: Message | ButtonInteraction,
     const { totalScore, passed } = session;
 
     const resultLines = results.map((r, i) =>
-        `${r.success ? "✅" : "❌"} Q${i + 1}: ${r.choice.label.slice(0, 40)} (+${r.scoreGained})`
+        `Q${i + 1}: ${r.choice.label.slice(0, 40)} (+${r.scoreGained})`
     ).join("\n");
 
     const resultBody =

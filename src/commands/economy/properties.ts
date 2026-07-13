@@ -243,7 +243,7 @@ function buildMyPropertiesContainer(
 ): ContainerBuilder {
     const container = new ContainerBuilder()
         .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(`## 🏘️ Your Property Portfolio`),
+            new TextDisplayBuilder().setContent(`## Your Property Portfolio`),
         )
         .addSeparatorComponents(
             new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
@@ -255,7 +255,7 @@ function buildMyPropertiesContainer(
     // Regular properties section
     if (regularOwned.length > 0) {
         container.addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(`**🏠 Regular Properties (${regularOwned.length})**`),
+            new TextDisplayBuilder().setContent(`**Regular Properties (${regularOwned.length})**`),
         );
 
         regularOwned.slice(0, 5).forEach((ownedProperty, index) => {
@@ -295,7 +295,7 @@ function buildMyPropertiesContainer(
         }
 
         container.addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(`**🦁 Zoo Properties (${zooOwned.length})**`),
+            new TextDisplayBuilder().setContent(`**Zoo Properties (${zooOwned.length})**`),
         );
 
         zooOwned.forEach((ownedProperty, index) => {
@@ -360,12 +360,12 @@ function buildCollectReceiptContainer(
         }
 
         container.addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(`## 🏠 Income Collected\n\n${nextText}`),
+            new TextDisplayBuilder().setContent(`## Income Collected\n\n${nextText}`),
         );
         return container;
     }
 
-    let headerContent = `## 🏠 Income Collected`;
+    let headerContent = `## Income Collected`;
     container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(headerContent),
     );
@@ -381,7 +381,7 @@ function buildCollectReceiptContainer(
 
         container.addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
-                `**🏠 Regular Properties** (+${fmtCurrency(result.propertyTotal)})\n${propertyLines}`,
+                `**Regular Properties** (+${fmtCurrency(result.propertyTotal)})\n${propertyLines}`,
             ),
         );
     }
@@ -410,7 +410,7 @@ function buildCollectReceiptContainer(
 
         container.addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
-                `**🦁 Zoo Income** (+${fmtCurrency(result.zooTotal)})\n${zooLines}`,
+                `**Zoo Income** (+${fmtCurrency(result.zooTotal)})\n${zooLines}`,
             ),
         );
     }
