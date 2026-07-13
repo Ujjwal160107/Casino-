@@ -20,7 +20,6 @@ import { formatPartName, getHuntPartMap } from "./huntPartService";
 import { CRIME_PREP_CRAFT_KEYS } from "../data/crimePrepWhitelist";
 
 const CRAFTS_PER_PAGE = 4;
-const CRAFT_ACCENT = 0x8E44AD;
 
 export type HuntCraftEffect =
   | { type: "luck"; value: number; durationMs: number; source: string }
@@ -495,7 +494,6 @@ export async function buildHuntCraftPayload(userId: string, ownerId: string, pag
   const pageRows = rows.slice((safePage - 1) * CRAFTS_PER_PAGE, safePage * CRAFTS_PER_PAGE);
 
   const container = new ContainerBuilder()
-    .setAccentColor(CRAFT_ACCENT)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## Hunt Crafting\n-# Recipes sorted by availability. Page ${safePage}/${totalPages}`),
     )

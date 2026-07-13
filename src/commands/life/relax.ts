@@ -15,8 +15,6 @@ import { getRelaxSnapshot, listRelaxOptions } from "../../services/relaxService"
 import { fmtCurrency } from "../../utils/format";
 import { getGuildPrefix } from "../../utils/guildContext";
 
-const RELAX_ACCENT_COLOR = 0x2ECC71;
-
 function separator() {
   return new SeparatorBuilder()
     .setDivider(true)
@@ -33,7 +31,6 @@ export async function buildRelaxDashboard(ownerId: string, guildId: string, user
   const totalStress = snapshot.jobStress + (snapshot.educationStress ?? 0);
 
   const container = new ContainerBuilder()
-    .setAccentColor(RELAX_ACCENT_COLOR)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Meditation} Relax & Recover`),
       new TextDisplayBuilder().setContent(

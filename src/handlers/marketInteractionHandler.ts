@@ -18,7 +18,6 @@ import { getGuildPrefix } from "../utils/guildContext";
 
 function textContainer(title: string, body: string, color = 0x9B59B6) {
   return new ContainerBuilder()
-    .setAccentColor(color)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`**${title}**`),
       new TextDisplayBuilder().setContent(body),

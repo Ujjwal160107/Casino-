@@ -21,7 +21,6 @@ function separator() {
 
 function textContainer(title: string, body: string, color = STOCK_ACCENT_COLOR) {
   return new ContainerBuilder()
-    .setAccentColor(color)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`**${title}**`),
       new TextDisplayBuilder().setContent(body),
@@ -62,7 +61,6 @@ async function buildMarketContainer(prefix: string) {
   const forecastBySymbol = new Map(forecasts.map((f) => [f.symbol, f]));
 
   const container = new ContainerBuilder()
-    .setAccentColor(STOCK_ACCENT_COLOR)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## ${Mascot.Emotes.GraphUp} Global Stock Market\n` +
@@ -129,7 +127,6 @@ async function buildPortfolioContainer(discordId: string, username: string) {
   let totalCost = 0;
 
   const container = new ContainerBuilder()
-    .setAccentColor(STOCK_ACCENT_COLOR)
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Graph} Stock Portfolio: ${username}`))
     .addSeparatorComponents(separator());
 

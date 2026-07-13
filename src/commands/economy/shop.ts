@@ -262,7 +262,6 @@ function formatAmount(amount: number) {
 
 function v2Container(title: string, body: string, accentColor = SHOP_ACCENT_COLOR) {
   return new ContainerBuilder()
-    .setAccentColor(accentColor)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`**${title}**`),
       new TextDisplayBuilder().setContent(body),
@@ -354,7 +353,6 @@ function buildGeneralStoreMessage(page: number, ownerId: string, disabled = fals
   ];
 
   const container = new ContainerBuilder()
-    .setAccentColor(SHOP_ACCENT_COLOR)
     .addSectionComponents(
       new SectionBuilder()
         .addTextDisplayComponents(
@@ -431,7 +429,6 @@ function buildHuntStoreMessage(ownerId: string, disabled = false) {
   ];
 
   const container = new ContainerBuilder()
-    .setAccentColor(SHOP_ACCENT_COLOR)
     .addSectionComponents(
       new SectionBuilder()
         .addTextDisplayComponents(
@@ -509,7 +506,6 @@ function buildJobStoreMessage(page: number, ownerId: string, disabled = false) {
   ];
 
   const container = new ContainerBuilder()
-    .setAccentColor(SHOP_ACCENT_COLOR)
     .addSectionComponents(
       new SectionBuilder()
         .addTextDisplayComponents(
@@ -591,7 +587,6 @@ function buildUniStoreMessage(ownerId: string, disabled = false) {
   ];
 
   const container = new ContainerBuilder()
-    .setAccentColor(SHOP_ACCENT_COLOR)
     .addSectionComponents(
       new SectionBuilder()
         .addTextDisplayComponents(
@@ -649,7 +644,6 @@ function buildCockStoreMessage(ownerId: string, disabled = false) {
   ];
 
   const container = new ContainerBuilder()
-    .setAccentColor(SHOP_ACCENT_COLOR)
     .addSectionComponents(
       new SectionBuilder()
         .addTextDisplayComponents(
@@ -712,7 +706,6 @@ function buildCosmeticsStoreMessage(page: number, ownerId: string, disabled = fa
   ];
 
   const container = new ContainerBuilder()
-    .setAccentColor(SHOP_ACCENT_COLOR)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## ${CATEGORY_EMOJI_STRINGS["COSMETICS"] ?? ""} Cosmetics\n-# Page ${safePage}/${COS_TOTAL_PAGES} — press a number to view flex details`,
@@ -853,7 +846,7 @@ function buildItemInfoCard(item: ShopCatalogItem, ownerId: string, canUseCredit 
   const safeName = assetFile ? assetFile.replace(/\s+/g, "_") : null;
   const attachmentRef = safeName ? `attachment://${safeName}` : null;
 
-  const container = new ContainerBuilder().setAccentColor(SHOP_ACCENT_COLOR);
+  const container = new ContainerBuilder();
 
   // Header: use SectionBuilder with thumbnail if asset available, else plain TextDisplay
   if (hasAsset && attachmentRef && safeName) {
@@ -949,7 +942,6 @@ function buildShopContainer(
   const brandingEmoji = CATEGORY_EMOJI_STRINGS[category] ?? "";
 
   const container = new ContainerBuilder()
-    .setAccentColor(SHOP_ACCENT_COLOR)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## ${brandingEmoji} ${categoryInfo.label}\n` +
@@ -1167,7 +1159,7 @@ async function executeBuy(
         ? `-# This is equipment — it activates automatically when you work or use your job.`
         : `-# This item activates automatically.`;
 
-  const container = new ContainerBuilder().setAccentColor(0x2ECC71);
+  const container = new ContainerBuilder();
 
   if (hasAsset && assetPath && safeName) {
     container.addSectionComponents(

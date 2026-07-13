@@ -9,8 +9,6 @@ import { getCardEligibilitySummary } from "../../services/creditCardService";
 import { Mascot } from "../../config/branding";
 import { buildMyCardsPayload } from "./bank";
 
-const CARD_ACCENT = 0x5865F2;
-
 export async function handleCredit(message: Message, _args: string[]) {
   if (!message.guild) return;
 
@@ -23,7 +21,6 @@ export async function handleCredit(message: Message, _args: string[]) {
   const eligible = summary.eligibleTier?.tier ?? "None";
 
   const intro = new ContainerBuilder()
-    .setAccentColor(CARD_ACCENT)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Credit} Fortuna Credit`),
       new TextDisplayBuilder().setContent(

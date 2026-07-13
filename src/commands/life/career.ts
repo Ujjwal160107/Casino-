@@ -64,7 +64,6 @@ export async function handleCareer(message: Message) {
         : "No reputation earned yet. Work shifts to build it.";
 
     const container = new ContainerBuilder()
-        .setAccentColor(ratingColor)
         .addSectionComponents(
             new SectionBuilder()
                 .addTextDisplayComponents(

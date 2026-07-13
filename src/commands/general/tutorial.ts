@@ -19,7 +19,6 @@ import * as path from "path";
 import { Mascot } from "../../config/branding";
 import { getGuildPrefix } from "../../utils/guildContext";
 
-const ACCENT_COLOR = 0x9b59b6;
 const BANNER_NAME = "guide_banner.png";
 const BANNER_URL = `attachment://${BANNER_NAME}`;
 const MODULE_PREFIX = "tut:module:";
@@ -225,7 +224,6 @@ function buildTutorialHome(prefix: string, page: number, authorId: string): Cont
   const pageLessons = LESSONS.slice(start, start + PAGE_SIZE);
 
   const container = new ContainerBuilder()
-    .setAccentColor(ACCENT_COLOR)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## ${Mascot.Name} — How to Play\n` +
@@ -294,7 +292,6 @@ function buildTutorialHome(prefix: string, page: number, authorId: string): Cont
 /** Ephemeral lesson view for one system, with separators between sections. */
 function buildLessonView(lesson: SystemLesson, prefix: string): ContainerBuilder {
   const container = new ContainerBuilder()
-    .setAccentColor(ACCENT_COLOR)
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${lesson.emote} ${lesson.label}`))
     .addSeparatorComponents(separator())
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**How it works**\n${applyPrefix(lesson.howItWorks, prefix)}`))

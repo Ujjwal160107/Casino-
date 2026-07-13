@@ -14,7 +14,6 @@ const USE_ACCENT_COLOR = 0x3498DB;
 
 function v2Container(title: string, body: string, accentColor = USE_ACCENT_COLOR) {
   return new ContainerBuilder()
-    .setAccentColor(accentColor)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`**${title}**`),
       new TextDisplayBuilder().setContent(body),

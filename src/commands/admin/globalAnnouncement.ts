@@ -26,7 +26,6 @@ function separator() {
 
 function buildAnnouncementContainer() {
   return new ContainerBuilder()
-    .setAccentColor(ANNOUNCEMENT_ACCENT_COLOR)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## ${Mascot.Emotes.Casino} Fortuna Dev Announcement\n` +
@@ -76,7 +75,6 @@ function buildAnnouncementPayload() {
 
 function buildStatusContainer(title: string, body: string, color = ANNOUNCEMENT_ACCENT_COLOR) {
   return new ContainerBuilder()
-    .setAccentColor(color)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`**${title}**`),
       new TextDisplayBuilder().setContent(body),

@@ -19,7 +19,6 @@ import {
   QuestTask,
 } from "../../services/questService";
 
-const QUEST_ACCENT = 0x9B59B6;
 const E = Mascot.Emotes;
 
 const DIFFICULTY_EMOJI: Record<string, string> = {
@@ -62,7 +61,6 @@ export async function handleDailyQuest(message: Message, args: string[]) {
   const freeRerollAvailable = rerolls === 0;
 
   const container = new ContainerBuilder()
-    .setAccentColor(QUEST_ACCENT)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${E.Scroll} Daily Quests`),
       new TextDisplayBuilder().setContent(
@@ -142,7 +140,6 @@ export async function handleDailyQuest(message: Message, args: string[]) {
         ].filter(Boolean).join("\n");
 
         const claimContainer = new ContainerBuilder()
-          .setAccentColor(0x2ECC71)
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`## ${E.Scroll} Quest Complete`),
             new TextDisplayBuilder().setContent(msg),

@@ -38,7 +38,6 @@ import { getInventoryAnimals } from "../../services/huntService";
 import { listItem } from "../../services/marketService";
 
 const ITEMS_PER_PAGE = 4;
-const INV_ACCENT_COLOR = 0x9B59B6;
 const COLLECTOR_TIMEOUT = 120_000;
 
 type InventorySession = {
@@ -261,7 +260,6 @@ function buildInventoryPayload(
   const totalAmount = items.reduce((sum, slot) => sum + slot.amount, 0) + huntParts.reduce((sum, part) => sum + part.amount, 0) + huntAnimals.length;
 
   const container = new ContainerBuilder()
-    .setAccentColor(INV_ACCENT_COLOR)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## ${categoryEmoji("ALL")} ${username}'s Inventory\n` +
@@ -361,7 +359,6 @@ function buildItemDetailPayload(slot: InventorySlot, ownerId: string, canAct: bo
   const catalog = findCatalogByName(item.name);
 
   const container = new ContainerBuilder()
-    .setAccentColor(INV_ACCENT_COLOR)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${categoryEmoji(cat)} ${item.name}`),
       new TextDisplayBuilder().setContent(
@@ -427,7 +424,6 @@ function buildHuntPartMarketPayload(
   disabled = false,
 ) {
   const container = new ContainerBuilder()
-    .setAccentColor(INV_ACCENT_COLOR)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Gun || ""} List Hunt Materials`),
       new TextDisplayBuilder().setContent(
@@ -666,7 +662,7 @@ export async function handleInventory(message: Message, args: string[]) {
     const targetUser = message.mentions.users.first() || message.author;
     if (targetUser.bot) {
       return message.reply({
-        components: [new ContainerBuilder().setAccentColor(0xE74C3C).addTextDisplayComponents(new TextDisplayBuilder().setContent("Bots cannot hold items."))],
+        components: [new ContainerBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent("Bots cannot hold items."))],
         flags: MessageFlags.IsComponentsV2,
       });
     }
@@ -816,7 +812,7 @@ export async function handleInventory(message: Message, args: string[]) {
   } catch (err) {
     console.error("Inventory Error:", err);
     return message.reply({
-      components: [new ContainerBuilder().setAccentColor(0xE74C3C).addTextDisplayComponents(new TextDisplayBuilder().setContent("Failed to fetch inventory."))],
+      components: [new ContainerBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent("Failed to fetch inventory."))],
       flags: MessageFlags.IsComponentsV2,
     });
   }

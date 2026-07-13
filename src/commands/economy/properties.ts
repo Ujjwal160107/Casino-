@@ -106,7 +106,6 @@ export function buildPropertiesNavigationRow(totalPages: number, page = 1) {
 
 function buildTextOnlyContainer(title: string, body: string, accentColor = PROPERTY_ACCENT_COLOR) {
     return new ContainerBuilder()
-        .setAccentColor(accentColor)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`**${title}**`),
             new TextDisplayBuilder().setContent(body),
@@ -129,7 +128,6 @@ export function buildPropertiesMarketContainer(
     const hasProperties = properties.length > 0;
 
     const container = new ContainerBuilder()
-        .setAccentColor(PROPERTY_ACCENT_COLOR)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
                 `## Real Estate Market\nInvest in properties to earn passive income and grow your net worth.`,
@@ -240,7 +238,6 @@ function buildMyPropertiesContainer(
     prefix: string,
 ): ContainerBuilder {
     const container = new ContainerBuilder()
-        .setAccentColor(PROPERTY_ACCENT_COLOR)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`## 🏘️ Your Property Portfolio`),
         )
@@ -344,7 +341,7 @@ function buildMyPropertiesContainer(
 function buildCollectReceiptContainer(
     result: Awaited<ReturnType<typeof collectIncome>>,
 ): ContainerBuilder {
-    const container = new ContainerBuilder().setAccentColor(0x2ECC71);
+    const container = new ContainerBuilder();
 
     if (result.nothingReady) {
         let nextText = "Check back later.";

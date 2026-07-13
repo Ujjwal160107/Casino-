@@ -23,7 +23,6 @@ const COINFLIP_ACCENT = 0xF1C40F;
 
 function buildCoinflipContainer(title: string, body: string, accent = COINFLIP_ACCENT) {
   return new ContainerBuilder()
-    .setAccentColor(accent)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${title}`),
       new TextDisplayBuilder().setContent(body),

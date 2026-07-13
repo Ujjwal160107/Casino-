@@ -21,7 +21,6 @@ import {
     setMasterEnabled,
 } from "../../services/cooldownReminderService";
 
-const ACCENT_COLOR = 0x9B59B6;
 const TYPE_ORDER: ReminderType[] = ["daily", "weekly", "monthly", "crime", "hunt", "work", "vote"];
 
 function buildSettingsPayload(
@@ -30,7 +29,6 @@ function buildSettingsPayload(
     autoPaused: boolean,
 ) {
     const container = new ContainerBuilder()
-        .setAccentColor(ACCENT_COLOR)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent("## ⚙️ Your Settings — Cooldown alarms"),
             new TextDisplayBuilder().setContent(

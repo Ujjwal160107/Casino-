@@ -52,7 +52,6 @@ export async function handleWork(message: Message) {
 
     if (!user.jobId) {
         const container = new ContainerBuilder()
-            .setAccentColor(0x95A5A6)
             .addTextDisplayComponents(
                 new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.JobWorking} Employment Status`),
                 new TextDisplayBuilder().setContent(`**Position:** Unemployed\nUse \`${prefix}jobs\` to browse available careers and apply.`)
@@ -130,7 +129,6 @@ export async function handleWork(message: Message) {
     const accentColor = promo.eligible ? 0xF1C40F : hexColorToNumber(Mascot.Colors.Base);
 
     const container = new ContainerBuilder()
-        .setAccentColor(accentColor)
         .addSectionComponents(
             new SectionBuilder()
                 .addTextDisplayComponents(

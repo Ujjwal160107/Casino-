@@ -34,8 +34,6 @@ interface CategoryData {
   commands: CommandInfo[];
 }
 
-const ACCENT_COLOR = 0x9b59b6;
-
 // Every player-facing command + subcommand. Admin/developer commands are intentionally excluded.
 // {p} is replaced with the server prefix at render time.
 const CATEGORIES: CategoryData[] = [
@@ -364,7 +362,6 @@ function buildMainMenu(prefix: string, page: number, authorId: string): Containe
   const pageModules = CATEGORIES.slice(start, start + PAGE_SIZE);
 
   const container = new ContainerBuilder()
-    .setAccentColor(ACCENT_COLOR)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## ${Mascot.Name} Help\n` +
@@ -421,7 +418,6 @@ function buildMainMenu(prefix: string, page: number, authorId: string): Containe
 function buildModuleView(category: CategoryData, prefix: string): ContainerBuilder {
   const emote = MODULE_EMOTES[category.id] ?? "";
   const container = new ContainerBuilder()
-    .setAccentColor(ACCENT_COLOR)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${emote} ${category.label}\n${category.description}`)
     )

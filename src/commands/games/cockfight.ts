@@ -60,7 +60,6 @@ async function fetchMemberDisplay(message: Message, user: User): Promise<GuildMe
 
 function buildContainer(title: string, body: string, accent = COCKFIGHT_ACCENT) {
     return new ContainerBuilder()
-        .setAccentColor(accent)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`## ${title}`),
             new TextDisplayBuilder().setContent(body)

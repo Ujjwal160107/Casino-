@@ -43,7 +43,6 @@ const SUCCESS_COLOR = 0x2ECC71;
 
 function container(title: string, body: string, color = LOVE_COLOR) {
   return new ContainerBuilder()
-    .setAccentColor(color)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${title}`),
       new TextDisplayBuilder().setContent(body),

@@ -43,7 +43,6 @@ function separator() {
 
 function buildGuideContainer(title: string, body: string, accentColor = CASINO_ACCENT_COLOR, imageUrl?: string, imageDescription?: string) {
     const container = new ContainerBuilder()
-        .setAccentColor(accentColor)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`## ${title}`),
         )
@@ -76,7 +75,6 @@ function buildCasinoHomeContainer(
     const startIndex = (safePage - 1) * GUIDES_PER_PAGE;
     const visibleGuides = guides.slice(startIndex, startIndex + GUIDES_PER_PAGE);
     const container = new ContainerBuilder()
-        .setAccentColor(CASINO_ACCENT_COLOR)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
                 `## ${Mascot.Emotes.Casino} ${Mascot.Name} Casino\n` +

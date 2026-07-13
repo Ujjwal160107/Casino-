@@ -30,7 +30,6 @@ export const SLOTS_PAYOUT_TABLE = [
 
 function buildSlotsContainer(title: string, body: string, accent: number) {
   return new ContainerBuilder()
-    .setAccentColor(accent)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${title}`),
       new TextDisplayBuilder().setContent(body),

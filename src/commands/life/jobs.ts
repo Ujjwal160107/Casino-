@@ -21,7 +21,6 @@ import { getGuildPrefix } from "../../utils/guildContext";
 
 const SECTORS: JobDefinition["sector"][] = ["tech", "medical", "business", "legal", "service", "trade", "freelance"];
 const JOBS_PER_PAGE = 5;
-const JOBS_ACCENT_COLOR = 0x9B59B6;
 
 function jobsId(action: string, ownerId: string, detail?: string) {
     return detail ? `jobs:${action}:${detail}:${ownerId}` : `jobs:${action}:${ownerId}`;
@@ -63,7 +62,6 @@ function formatRequirement(job: JobDefinition) {
 
 function buildMenuContainer(prefix: string, ownerId: string) {
     const container = new ContainerBuilder()
-        .setAccentColor(JOBS_ACCENT_COLOR)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.JobWorking} Career Center`),
             new TextDisplayBuilder().setContent(`Browse V2 jobs by field. Apply with the job buttons or \`${prefix}apply <job name>\`.`),
@@ -103,7 +101,6 @@ function buildSectorContainer(sector: JobDefinition["sector"], page: number, pre
     const displayedJobs = jobs.slice(safePage * JOBS_PER_PAGE, safePage * JOBS_PER_PAGE + JOBS_PER_PAGE);
 
     const container = new ContainerBuilder()
-        .setAccentColor(JOBS_ACCENT_COLOR)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`## ${info.emoji} ${info.name} Careers`),
             new TextDisplayBuilder().setContent(`${info.desc}\nPage **${safePage + 1}** of **${totalPages}**`),

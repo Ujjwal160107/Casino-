@@ -20,13 +20,6 @@ import { getNetWorthMany, NetWorthBreakdown } from "../../services/netWorthServi
 type LbType = "net" | "cash" | "bank" | "shifts";
 type LbScope = "global" | "server";
 
-const ACCENT: Record<LbType, number> = {
-    net: 0x9B59B6,
-    cash: 0x2ECC71,
-    bank: 0x3498DB,
-    shifts: 0xE67E22,
-};
-
 const TITLES: Record<LbType, string> = {
     net: "Net Worth Leaderboard",
     cash: "Cash Leaderboard",
@@ -160,7 +153,6 @@ function buildLeaderboardContainer(
     }
 
     const container = new ContainerBuilder()
-        .setAccentColor(ACCENT[type])
         .addSectionComponents(header)
         .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(buildRankingsText(users, type)));

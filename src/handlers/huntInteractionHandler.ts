@@ -51,7 +51,6 @@ async function replyEphemeral(interaction: ButtonInteraction | import("discord.j
 
 function textContainer(title: string, body: string, color = 0x2C2F33) {
   return new ContainerBuilder()
-    .setAccentColor(color)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${title}`),
       new TextDisplayBuilder().setContent(body),

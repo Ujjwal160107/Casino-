@@ -15,7 +15,6 @@ const CARD_ACCENT_COLOR = 0x5865F2;
 
 function container(title: string, body: string, accentColor = CARD_ACCENT_COLOR) {
   return new ContainerBuilder()
-    .setAccentColor(accentColor)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${title}`),
       new TextDisplayBuilder().setContent(body)

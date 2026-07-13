@@ -26,7 +26,6 @@ import { CrimeMinigameStage } from "../../data/crimeMinigameCatalog";
 import { fmtCurrency } from "../../utils/format";
 import { formatDiscordRelativeTime } from "../../services/cooldownService";
 
-export const CRIME_ACCENT = 0x2C2F33;
 export const CRIME_V2_FLAGS = MessageFlags.IsComponentsV2 as const;
 
 function separator() {
@@ -96,7 +95,6 @@ export async function buildCrimeBoardPayload(ownerId: string, session: CrimeSess
   }
 
   const container = new ContainerBuilder()
-    .setAccentColor(CRIME_ACCENT)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Gun} Crime Board`),
       new TextDisplayBuilder().setContent(
@@ -165,7 +163,6 @@ export async function buildCrimePrepPayload(ownerId: string, session: CrimeSessi
   const stageLabel = preview.stageCount === 1 ? "1 stage" : `${preview.stageCount} stages`;
 
   const container = new ContainerBuilder()
-    .setAccentColor(CRIME_ACCENT)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${titlePrefix} — ${crime.name}`),
       new TextDisplayBuilder().setContent(
@@ -206,7 +203,6 @@ export function buildCrimeStagePayload(
   const deadlineUnix = Math.floor((run.stageStartedAt + stageDef.timeSeconds * 1000) / 1000);
 
   const container = new ContainerBuilder()
-    .setAccentColor(CRIME_ACCENT)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## ${Mascot.Emotes.Gun} ${crimeName} — Stage ${stageNum}/${totalStages}`,
@@ -244,7 +240,6 @@ export async function buildCrimeCooldownPayload(
   }
 
   const container = new ContainerBuilder()
-    .setAccentColor(CRIME_ACCENT)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.Cooldown} Crime Cooldown`),
       new TextDisplayBuilder().setContent(
@@ -261,7 +256,6 @@ export function buildCrimeResultPayload(
   accentColor: number,
 ) {
   const container = new ContainerBuilder()
-    .setAccentColor(accentColor)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${title}`),
       new TextDisplayBuilder().setContent(body),

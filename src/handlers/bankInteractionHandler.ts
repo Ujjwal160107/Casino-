@@ -227,7 +227,6 @@ async function handleButton(interaction: ButtonInteraction) {
         case "invest_new_btn": {
             await ensureDeferredUpdate(interaction);
             const container = new ContainerBuilder()
-                .setAccentColor(0x2ECC71)
                 .addTextDisplayComponents(
                     new TextDisplayBuilder().setContent("## Select Investment Type"),
                     new TextDisplayBuilder().setContent("Choose the type of investment you want to make."),

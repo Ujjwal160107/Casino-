@@ -74,7 +74,6 @@ export function parseBankCustomId(customId: string) {
 
 export function buildBankMessageContainer(title: string, body: string, accentColor = BANK_ACCENT_COLOR) {
     return new ContainerBuilder()
-        .setAccentColor(accentColor)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`## ${title}`),
             new TextDisplayBuilder().setContent(body),
@@ -393,7 +392,7 @@ export async function buildBankCardsPayload(
     const summary = await getCardEligibilitySummary(discordId);
     const prefix = guildId ? await getGuildPrefix(guildId) : "!";
     const files: AttachmentBuilder[] = [];
-    const container = new ContainerBuilder().setAccentColor(CARD_ACCENT_COLOR);
+    const container = new ContainerBuilder();
 
     if (view === "mine") {
         const card = summary.card;
@@ -502,7 +501,6 @@ export function buildBankMainContainer(
     ownerId: string,
 ) {
     return new ContainerBuilder()
-        .setAccentColor(BANK_ACCENT_COLOR)
         .addSectionComponents(
             buildBankHeaderSection(
                 `${displayName}'s Financial Dashboard`,
@@ -544,7 +542,6 @@ export function buildBankInvestmentsContainer(
     ownerId: string,
 ) {
     const container = new ContainerBuilder()
-        .setAccentColor(0x2ECC71)
         .addSectionComponents(
             buildBankHeaderSection(
                 `${displayName}'s Investment Portfolio`,

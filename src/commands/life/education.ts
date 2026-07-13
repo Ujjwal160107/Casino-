@@ -30,7 +30,6 @@ function separator() {
 
 function buildTextOnlyContainer(title: string, body: string, accentColor = EDUCATION_ACCENT_COLOR) {
     return new ContainerBuilder()
-        .setAccentColor(accentColor)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`**${title}**`),
             new TextDisplayBuilder().setContent(body),
@@ -82,7 +81,6 @@ export async function handleEducation(message: Message, args: string[]) {
             }).join("\n");
 
             const container = new ContainerBuilder()
-                .setAccentColor(edu.stress > 80 ? 0xFF0000 : 0x3498DB)
                 .addSectionComponents(
                     new SectionBuilder()
                         .addTextDisplayComponents(
@@ -157,7 +155,6 @@ export async function handleEducation(message: Message, args: string[]) {
             const pageDegrees = degrees.slice(start, start + ITEMS_PER_PAGE);
 
             const container = new ContainerBuilder()
-                .setAccentColor(EDUCATION_ACCENT_COLOR)
                 .addTextDisplayComponents(
                     new TextDisplayBuilder().setContent(
                         `## ${Mascot.Emotes.Graduate} Education & Careers\n` +

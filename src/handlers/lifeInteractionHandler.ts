@@ -28,7 +28,6 @@ import {
 
 function textContainer(title: string, body: string, color = 0x2ECC71) {
     return new ContainerBuilder()
-        .setAccentColor(color)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`**${title}**`),
             new TextDisplayBuilder().setContent(body),

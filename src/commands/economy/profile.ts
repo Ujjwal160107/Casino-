@@ -84,7 +84,6 @@ function progressBar(current: number, max: number, size = 10) {
 
 function textContainer(title: string, body: string, color = PROFILE_ACCENT_COLOR) {
   return new ContainerBuilder()
-    .setAccentColor(color)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`**${title}**`),
       new TextDisplayBuilder().setContent(body),
@@ -464,7 +463,6 @@ export async function getProfilePayload(
   const cardAsset = cardSummary.card ? resolveCardAsset(cardSummary.card.tier) : null;
 
   const container = new ContainerBuilder()
-    .setAccentColor(PROFILE_ACCENT_COLOR)
     .addSectionComponents(
       new SectionBuilder()
         .addTextDisplayComponents(

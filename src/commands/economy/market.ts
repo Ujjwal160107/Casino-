@@ -63,7 +63,6 @@ function softSeparator() {
 
 function bmContainer(title: string, body: string, accent = BM_ACCENT) {
   return new ContainerBuilder()
-    .setAccentColor(accent)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${title}`),
       new TextDisplayBuilder().setContent(body),
@@ -77,7 +76,6 @@ export async function handleMarket(message: Message, args: string[]) {
   const { total } = await getListings(1, 1);
 
   const hubContainer = new ContainerBuilder()
-    .setAccentColor(BM_ACCENT)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${E.Market} Black Market`),
       new TextDisplayBuilder().setContent(
@@ -140,7 +138,6 @@ export async function handleMarket(message: Message, args: string[]) {
         }
 
         const container = new ContainerBuilder()
-          .setAccentColor(BM_ACCENT)
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`## ${E.Market} Black Market`),
             new TextDisplayBuilder().setContent(`-# Page ${page}/${totalPages} ${E.Scroll} ${total} listings`),
@@ -205,7 +202,6 @@ export async function handleMarket(message: Message, args: string[]) {
         }
 
         const container = new ContainerBuilder()
-          .setAccentColor(BM_ACCENT)
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`## ${E.Market} Animal Parts`),
             new TextDisplayBuilder().setContent(`-# Page ${page}/${totalPages} ${E.Scroll} ${total} part listings`),
@@ -342,7 +338,6 @@ export async function handleMarket(message: Message, args: string[]) {
         const fees = calculateFees(listing.totalPrice);
 
         const confirmContainer = new ContainerBuilder()
-          .setAccentColor(BM_WARN)
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`## ${E.Alert} Confirm Purchase`),
             new TextDisplayBuilder().setContent(
@@ -381,7 +376,6 @@ export async function handleMarket(message: Message, args: string[]) {
         const result = await buyListing(ownerId, listingId);
 
         const successContainer = new ContainerBuilder()
-          .setAccentColor(BM_SUCCESS)
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`## ${E.Accept} Purchase Complete`),
             new TextDisplayBuilder().setContent(
@@ -493,7 +487,6 @@ export async function handleMarket(message: Message, args: string[]) {
         const fees = result.fees;
 
         const successContainer = new ContainerBuilder()
-          .setAccentColor(BM_SUCCESS)
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`## ${E.Accept} Listed Successfully`),
             new TextDisplayBuilder().setContent(
@@ -529,7 +522,6 @@ export async function handleMarket(message: Message, args: string[]) {
       }
 
       const container = new ContainerBuilder()
-        .setAccentColor(BM_ACCENT)
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(`## ${E.Inventory} My Listings (${listings.length + partListings.length}/5)`),
         )

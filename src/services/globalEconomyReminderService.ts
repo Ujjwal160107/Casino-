@@ -16,7 +16,6 @@ import { ensureUserAndWallet } from "./walletService";
 import { ensureDeferredEphemeralReply, safeEditReply, safeReply } from "../utils/interactionHelpers";
 
 const FEEDBACK_FORM_URL = "https://forms.gle/sWAH2EyWVNhu3eYV7";
-const REMINDER_ACCENT_COLOR = 0x9B59B6;
 const REMINDER_LIMIT_PER_DAY = 2;
 
 const EXCLUDED_COMMANDS = new Set([
@@ -42,7 +41,6 @@ function getUtcDayStart(date = new Date()) {
 
 function buildReminderContainer() {
   return new ContainerBuilder()
-    .setAccentColor(REMINDER_ACCENT_COLOR)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## ${Mascot.Emotes.Alert} Did you read Fortuna's recent alert?`,
@@ -151,7 +149,6 @@ export async function handleGlobalEconomyReminderInteraction(interaction: Button
   await safeEditReply(interaction, {
     components: [
       new ContainerBuilder()
-        .setAccentColor(0x2ECC71)
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(`**${Mascot.Emotes.Accept} Thank you!**`),
           new TextDisplayBuilder().setContent("I will stop showing you the global economy reminder in this server."),
