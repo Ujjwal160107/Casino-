@@ -1,5 +1,5 @@
 import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ButtonInteraction } from "discord.js";
-import { errorEmbed, successEmbed } from "../../utils/embed";
+import { errorContainer, v2Reply } from "../../utils/componentsV2";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
 import { getShopItems, resetShop } from "../../services/shopService";
 import { Mascot } from "../../config/branding";
@@ -7,7 +7,7 @@ import { Mascot } from "../../config/branding";
 export async function handleResetShop(message: Message, args: string[]) {
     // Permission check
     if (!(await canExecuteAdminCommand(message, message.member!))) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "Admins only.")] });
+        return message.reply(v2Reply(errorContainer("Access Denied", "Admins only.")));
     }
 
     // Count items

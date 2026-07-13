@@ -1,7 +1,7 @@
 import { Message } from "discord.js";
 import { PermissionFlagsBits } from "discord.js";
 import { getGuildSettings, updateGuildSettings } from "../../services/guildSettingsService";
-import { successEmbed, errorEmbed } from "../../utils/embed";
+import { successContainer, errorContainer, v2Reply } from "../../utils/componentsV2";
 import { isBotDeveloper } from "../../utils/developerAccess";
 
 export async function handleSetPrefix(message: Message, args: string[]) {
@@ -13,9 +13,9 @@ export async function handleSetPrefix(message: Message, args: string[]) {
     );
 
     if (!canManagePrefix) {
-      return message.reply({
-        embeds: [errorEmbed(message.author, "No Permission", "You need Manage Server permission to update this server's prefix.")]
-      });
+      return message.reply(
+        v2Reply(errorContainer("No Permission", "You need Manage Server permission to update this server's prefix."))
+      );
     }
 
     const settings = await getGuildSettings(message.guild.id);
@@ -23,19 +23,19 @@ export async function handleSetPrefix(message: Message, args: string[]) {
     const newPrefix = args[0];
 
     if (!newPrefix || newPrefix.length > 3) {
-      return message.reply({
-        embeds: [errorEmbed(message.author, "Invalid Prefix", `Usage: \`${currentPrefix}setprefix <symbol>\` (max 3 chars)`)]
-      });
+      return message.reply(
+        v2Reply(errorContainer("Invalid Prefix", `Usage: \`${currentPrefix}setprefix <symbol>\` (max 3 chars)`))
+      );
     }
 
     await updateGuildSettings(message.guildId!, { prefix: newPrefix });
-    return message.reply({
-      embeds: [successEmbed(message.author, "Prefix Updated", `New prefix set to **${newPrefix}**`)]
-    });
+    return message.reply(
+      v2Reply(successContainer("Prefix Updated", `New prefix set to **${newPrefix}**`))
+    );
   } catch (err) {
     console.error("handleSetPrefix error:", err);
-    return message.reply({
-      embeds: [errorEmbed(message.author, "Internal Error", "Failed to set prefix.")]
-    });
+    return message.reply(
+      v2Reply(errorContainer("Internal Error", "Failed to set prefix."))
+    );
   }
 }

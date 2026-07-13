@@ -1,8 +1,8 @@
-import { Message } from "discord.js";
+import { Message, MessageFlags } from "discord.js";
 import prisma from "../../utils/prisma";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { ensureBankForUser } from "../../services/bankService";
-import { successEmbed, errorEmbed } from "../../utils/embed";
+import { successContainer, errorContainer, v2Reply } from "../../utils/componentsV2";
 import { fmtCurrency, parseSmartAmount } from "../../utils/format";
 import { logToChannel } from "../../utils/discordLogger";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
@@ -11,14 +11,14 @@ import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleAddMoney(message: Message, args: string[]) {
   if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "You need Administrator or Bot Commander permissions.")] });
+    return message.reply(v2Reply(errorContainer("Access Denied", "You need Administrator or Bot Commander permissions.")));
   }
 
   // Cap at 32-bit signed integer max to prevent DB crashes
   const MAX_INT = 2147483647;
 
   if (args.length < 2) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", "Usage: `!add-money @user/@role <amount> [wallet/bank]`")] });
+    return message.reply(v2Reply(errorContainer("Invalid Usage", "Usage: `!add-money @user/@role <amount> [wallet/bank]`")));
   }
 
   const mention = args[0];
@@ -34,7 +34,7 @@ export async function handleAddMoney(message: Message, args: string[]) {
   const targetType = typeArg === "bank" ? "bank" : "wallet";
 
   if (isNaN(amount) || amount <= 0) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Usage: `!add-money @user <amount> [wallet/bank]`")] });
+    return message.reply(v2Reply(errorContainer("Invalid Amount", "Usage: `!add-money @user <amount> [wallet/bank]`")));
   }
 
   const prefix = await getGuildPrefix(message.guildId!);
@@ -48,7 +48,7 @@ export async function handleAddMoney(message: Message, args: string[]) {
     const role = await message.guild!.roles.fetch(roleId);
     if (!role) {
       console.log(`[AddMoney] Role not found for ID: ${roleId}`);
-      return message.reply({ embeds: [errorEmbed(message.author, "Role Not Found", "Could not find that role.")] });
+      return message.reply(v2Reply(errorContainer("Role Not Found", "Could not find that role.")));
     }
 
     // Ensure members are fetched
@@ -95,7 +95,8 @@ export async function handleAddMoney(message: Message, args: string[]) {
 
     return statusMsg.edit({
       content: "",
-      embeds: [successEmbed(message.author, "Role Payment Complete", `Added **${fmtCurrency(amount)}** to **${count}** users in **${role.name}** (**${targetType === "bank" ? "Bank" : "Wallet"}**).`)]
+      components: [successContainer("Role Payment Complete", `Added **${fmtCurrency(amount)}** to **${count}** users in **${role.name}** (**${targetType === "bank" ? "Bank" : "Wallet"}**).`)],
+      flags: MessageFlags.IsComponentsV2
     });
   }
 
@@ -136,9 +137,7 @@ export async function handleAddMoney(message: Message, args: string[]) {
       color: 0x00FF00
     });
     const displayAmount = amount === MAX_INT ? "Infinity" : fmtCurrency(amount);
-    return message.reply({
-      embeds: [successEmbed(message.author, "Money Added", `Added **${displayAmount}** to ${mention}'s **Bank**.\nNew Balance: **${fmtCurrency(updatedBank.balance)}**`)]
-    });
+    return message.reply(v2Reply(successContainer("Money Added", `Added **${displayAmount}** to ${mention}'s **Bank**.\nNew Balance: **${fmtCurrency(updatedBank.balance)}**`)));
   } else {
     const [_, updatedWallet] = await prisma.$transaction([
       prisma.transaction.create({
@@ -172,9 +171,7 @@ export async function handleAddMoney(message: Message, args: string[]) {
         color: 0x00FF00
       });
       const displayAmount = amount === MAX_INT ? "Infinity" : fmtCurrency(amount);
-      return message.reply({
-        embeds: [successEmbed(message.author, "Money Added", `Added **${displayAmount}** to ${mention}'s **Wallet**.\nNew Balance: **${fmtCurrency(updatedWallet.balance)}**`)]
-      });
+      return message.reply(v2Reply(successContainer("Money Added", `Added **${displayAmount}** to ${mention}'s **Wallet**.\nNew Balance: **${fmtCurrency(updatedWallet.balance)}**`)));
     }
   }
 }

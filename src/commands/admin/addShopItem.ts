@@ -1,6 +1,6 @@
 import { Message } from "discord.js";
 import { createShopItem } from "../../services/shopService";
-import { successEmbed, errorEmbed, infoEmbed } from "../../utils/embed";
+import { successContainer, errorContainer, infoContainer, v2Reply } from "../../utils/componentsV2";
 import { parseSmartAmount, fmtCurrency } from "../../utils/format";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
 import { ItemEffect } from "../../services/effectService";
@@ -22,20 +22,15 @@ export async function handleAddShopItem(message: Message, args: string[]) {
 
   // Type guard for text channels
   if (!message.channel.isSendable()) {
-    return message.reply({
-      embeds: [errorEmbed(message.author, "Error", "This command must be used in a text channel.")]
-    });
+    return message.reply(v2Reply(errorContainer("Error", "This command must be used in a text channel.")));
   }
 
   if (args.length < 2) {
-    return message.reply({
-      embeds: [errorEmbed(
-        message.author,
-        "Invalid Usage",
-        "Usage: `!add-shop-item <name> <price>`\n\n" +
-        "This will start an interactive setup process!"
-      )]
-    });
+    return message.reply(v2Reply(errorContainer(
+      "Invalid Usage",
+      "Usage: `!add-shop-item <name> <price>`\n\n" +
+      "This will start an interactive setup process!"
+    )));
   }
 
   const builder: ItemBuilder = {
@@ -48,19 +43,14 @@ export async function handleAddShopItem(message: Message, args: string[]) {
   };
 
   if (isNaN(builder.price) || builder.price <= 0) {
-    return message.reply({
-      embeds: [errorEmbed(message.author, "Invalid Price", "Price must be a positive number.")]
-    });
+    return message.reply(v2Reply(errorContainer("Invalid Price", "Price must be a positive number.")));
   }
 
-  await message.reply({
-    embeds: [infoEmbed(
-      message.author,
-      "🛒 Shop Item Builder Started",
-      `Creating: **${builder.name}** for ${fmtCurrency(builder.price)}\n\n` +
-      "Reply to each prompt below. Type `skip` to use defaults or `cancel` to abort."
-    )]
-  });
+  await message.reply(v2Reply(infoContainer(
+    "🛒 Shop Item Builder Started",
+    `Creating: **${builder.name}** for ${fmtCurrency(builder.price)}\n\n` +
+    "Reply to each prompt below. Type `skip` to use defaults or `cancel` to abort."
+  )));
 
   // Step 1: Description
   // @ts-ignore - guild text channels support send
@@ -132,21 +122,16 @@ export async function handleAddShopItem(message: Message, args: string[]) {
       ? "\n\n**Effects:**\n" + formatEffectList(builder.effects)
       : "";
 
-    await message.reply({
-      embeds: [successEmbed(
-        message.author,
-        `${Mascot.Emotes.Accept} Item Created!`,
-        `**${builder.name}** added to shop!\n\n` +
-        `💰 Price: ${fmtCurrency(builder.price)}\n` +
-        `📦 Type: ${builder.itemType}\n` +
-        `🔄 Consumable: ${builder.consumable ? "Yes" : "No"}\n` +
-        `✨ Effects: ${builder.effects.length}${effectsList}`
-      )]
-    });
+    await message.reply(v2Reply(successContainer(
+      `${Mascot.Emotes.Accept} Item Created!`,
+      `**${builder.name}** added to shop!\n\n` +
+      `💰 Price: ${fmtCurrency(builder.price)}\n` +
+      `📦 Type: ${builder.itemType}\n` +
+      `🔄 Consumable: ${builder.consumable ? "Yes" : "No"}\n` +
+      `✨ Effects: ${builder.effects.length}${effectsList}`
+    )));
   } catch (err: any) {
-    await message.reply({
-      embeds: [errorEmbed(message.author, "Error", err.message || "Failed to create item.")]
-    });
+    await message.reply(v2Reply(errorContainer("Error", err.message || "Failed to create item.")));
   }
 }
 

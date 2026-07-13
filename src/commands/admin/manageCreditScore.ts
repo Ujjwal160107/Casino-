@@ -1,6 +1,6 @@
 import { Message } from "discord.js";
 import { ensureUserAndWallet } from "../../services/walletService";
-import { successEmbed, errorEmbed } from "../../utils/embed";
+import { successContainer, errorContainer, v2Reply } from "../../utils/componentsV2";
 import { logToChannel } from "../../utils/discordLogger";
 import prisma from "../../utils/prisma";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
@@ -9,7 +9,7 @@ import { CARD_SCORE_RULES } from "../../utils/economyConfig";
 
 export async function handleSetCreditScore(message: Message, args: string[]) {
     if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "Admins or Bot Commanders only.")] });
+        return message.reply(v2Reply(errorContainer("Access Denied", "Admins or Bot Commanders only.")));
     }
 
     const prefix = await getGuildPrefix(message.guildId!);
@@ -19,13 +19,11 @@ export async function handleSetCreditScore(message: Message, args: string[]) {
     if (args[0]?.toLowerCase() === "all" || args[0]?.toLowerCase() === "everyone") {
         const amountArg = args[1];
         if (!amountArg) {
-            return message.reply({
-                embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}set-credit-score all <amount>\`\nExample: \`${prefix}set-credit-score all 500\``)]
-            });
+            return message.reply(v2Reply(errorContainer("Invalid Usage", `Usage: \`${prefix}set-credit-score all <amount>\`\nExample: \`${prefix}set-credit-score all 500\``)));
         }
         const amount = parseInt(amountArg);
         if (isNaN(amount) || amount < minScore || amount > maxScore) {
-            return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", `Score must be between **${minScore}** and **${maxScore}**.`)] });
+            return message.reply(v2Reply(errorContainer("Invalid Amount", `Score must be between **${minScore}** and **${maxScore}**.`)));
         }
 
         const result = await prisma.user.updateMany({
@@ -41,23 +39,19 @@ export async function handleSetCreditScore(message: Message, args: string[]) {
             color: 0xFF4500
         });
 
-        return message.reply({
-            embeds: [successEmbed(message.author, "Bulk Update Complete", `Set credit score to **${amount}** for **${result.count}** users.`)]
-        });
+        return message.reply(v2Reply(successContainer("Bulk Update Complete", `Set credit score to **${amount}** for **${result.count}** users.`)));
     }
 
     const targetUser = message.mentions.users.first();
     const amountArg = args.find(a => !a.startsWith("<@") && !isNaN(parseInt(a)));
 
     if (!targetUser || !amountArg) {
-        return message.reply({
-            embeds: [errorEmbed(message.author, "Invalid Usage", `Usage: \`${prefix}set-credit-score @user <amount>\` or \`${prefix}set-credit-score all <amount>\``)]
-        });
+        return message.reply(v2Reply(errorContainer("Invalid Usage", `Usage: \`${prefix}set-credit-score @user <amount>\` or \`${prefix}set-credit-score all <amount>\``)));
     }
 
     const amount = parseInt(amountArg);
     if (isNaN(amount) || amount < minScore || amount > maxScore) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", `Score must be between **${minScore}** and **${maxScore}**.`)] });
+        return message.reply(v2Reply(errorContainer("Invalid Amount", `Score must be between **${minScore}** and **${maxScore}**.`)));
     }
 
     const user = await ensureUserAndWallet(targetUser.id, message.guildId!, targetUser.tag);
@@ -74,7 +68,5 @@ export async function handleSetCreditScore(message: Message, args: string[]) {
         color: 0xFFA500
     });
 
-    return message.reply({
-        embeds: [successEmbed(message.author, "Credit Score Updated", `Set ${targetUser.username}'s credit score to **${updatedUser.creditScore}**.`)]
-    });
+    return message.reply(v2Reply(successContainer("Credit Score Updated", `Set ${targetUser.username}'s credit score to **${updatedUser.creditScore}**.`)));
 }

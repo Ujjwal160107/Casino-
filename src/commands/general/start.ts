@@ -1,8 +1,9 @@
-import { Message, EmbedBuilder } from "discord.js";
+import { Message } from "discord.js";
 import { getUser, createUser } from "../../services/userService";
 import { Mascot } from "../../config/branding";
 import { fmtCurrency } from "../../utils/format";
-import { errorEmbed } from "../../utils/embed";
+import { errorContainer, successContainer, v2Reply } from "../../utils/componentsV2";
+import { nextStepHint } from "../../config/nextSteps";
 import { getGuildPrefix } from "../../utils/guildContext";
 import { STARTING_WALLET_BALANCE } from "../../utils/economyConfig";
 
@@ -15,18 +16,16 @@ export async function handleStart(message: Message) {
     let user = await getUser(userId, guildId);
 
     if (user) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Already Started", "You already have a profile!")] });
+        return message.reply(v2Reply(errorContainer("Already Started", "You already have a profile!")));
     }
 
     // Create User
     await createUser(userId, guildId, message.author.username);
     const prefix = await getGuildPrefix(guildId);
 
-    const embed = new EmbedBuilder()
-        .setTitle(`${Mascot.Emotes.Success} Welcome to ${Mascot.Name}!`)
-        .setDescription(`Your profile has been created successfully!\n\n**Starting Balance:** ${fmtCurrency(STARTING_WALLET_BALANCE)}\n\nUse \`${prefix}guide\` or \`${prefix}tutorial\` to learn how to play.`)
-        .setColor(Mascot.Colors.Success as any)
-        .setThumbnail(message.author.displayAvatarURL());
-
-    message.reply({ embeds: [embed] });
+    message.reply(v2Reply(successContainer(
+        `${Mascot.Emotes.Success} Welcome to ${Mascot.Name}!`,
+        `Your profile has been created successfully!\n\n**Starting Balance:** ${fmtCurrency(STARTING_WALLET_BALANCE)}\n\nUse \`${prefix}guide\` or \`${prefix}tutorial\` to learn how to play.`,
+        { thumbnailUrl: message.author.displayAvatarURL(), hint: nextStepHint("start", prefix) }
+    )));
 }

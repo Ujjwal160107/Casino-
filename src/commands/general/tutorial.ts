@@ -18,6 +18,7 @@ import {
 import * as path from "path";
 import { Mascot } from "../../config/branding";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { nextStepHint } from "../../config/nextSteps";
 
 const BANNER_NAME = "guide_banner.png";
 const BANNER_URL = `attachment://${BANNER_NAME}`;
@@ -285,6 +286,10 @@ function buildTutorialHome(prefix: string, page: number, authorId: string): Cont
       )
     );
   }
+
+  container
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("tutorial", prefix)!));
 
   return container;
 }

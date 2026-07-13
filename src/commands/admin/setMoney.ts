@@ -2,7 +2,7 @@ import { Message } from "discord.js";
 import prisma from "../../utils/prisma";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { ensureBankForUser } from "../../services/bankService";
-import { successEmbed, errorEmbed } from "../../utils/embed";
+import { successContainer, errorContainer, v2Reply } from "../../utils/componentsV2";
 import { fmtCurrency, parseSmartAmount } from "../../utils/format";
 import { logToChannel } from "../../utils/discordLogger";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
@@ -10,11 +10,11 @@ import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleSetMoney(message: Message, args: string[]) {
     if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "You need Administrator or Bot Commander permissions.")] });
+        return message.reply(v2Reply(errorContainer("Access Denied", "You need Administrator or Bot Commander permissions.")));
     }
 
     if (args.length < 2) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", "Usage: `!set-money @user <amount> [wallet/bank]`")] });
+        return message.reply(v2Reply(errorContainer("Invalid Usage", "Usage: `!set-money @user <amount> [wallet/bank]`")));
     }
 
     const mention = args[0];
@@ -24,7 +24,7 @@ export async function handleSetMoney(message: Message, args: string[]) {
     const targetType = typeArg === "bank" ? "bank" : "wallet";
 
     if (isNaN(amount) || amount < 0) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Amount", "Please specify a valid positive amount (0 or more).")] });
+        return message.reply(v2Reply(errorContainer("Invalid Amount", "Please specify a valid positive amount (0 or more).")));
     }
 
     const prefix = await getGuildPrefix(message.guildId!);
@@ -67,9 +67,7 @@ export async function handleSetMoney(message: Message, args: string[]) {
             description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Old Balance:** ${fmtCurrency(oldBalance)}\n**New Balance:** ${fmtCurrency(updatedBank.balance)}`,
             color: 0xFFA500
         });
-        return message.reply({
-            embeds: [successEmbed(message.author, "Money Set", `Set ${mention}'s **Bank** balance to **${fmtCurrency(updatedBank.balance)}**.`)]
-        });
+        return message.reply(v2Reply(successContainer("Money Set", `Set ${mention}'s **Bank** balance to **${fmtCurrency(updatedBank.balance)}**.`)));
 
     } else {
         // Wallet
@@ -105,8 +103,6 @@ export async function handleSetMoney(message: Message, args: string[]) {
             description: `**Admin:** ${message.author.tag} (${message.author.id})\n**Target:** <@${target.discordId}>\n**Old Balance:** ${fmtCurrency(oldBalance)}\n**New Balance:** ${fmtCurrency(updatedWallet.balance)}`,
             color: 0xFFA500
         });
-        return message.reply({
-            embeds: [successEmbed(message.author, "Money Set", `Set ${mention}'s **Wallet** balance to **${fmtCurrency(updatedWallet.balance)}**.`)]
-        });
+        return message.reply(v2Reply(successContainer("Money Set", `Set ${mention}'s **Wallet** balance to **${fmtCurrency(updatedWallet.balance)}**.`)));
     }
 }

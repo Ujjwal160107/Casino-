@@ -1,26 +1,19 @@
 
-import { Message, EmbedBuilder } from "discord.js";
+import { Message } from "discord.js";
 import { PropertyService } from "../../services/propertyService";
 import { Mascot } from "../../config/branding";
 import { DEVELOPER_ONLY_COMMAND_MESSAGE, isBotDeveloper } from "../../utils/developerAccess";
+import { successContainer, errorContainer, infoContainer, v2Reply } from "../../utils/componentsV2";
 
 export const managePropertyHandler = async (message: Message, args: string[]) => {
     if (!isBotDeveloper(message.author.id)) {
-        const errorEmbed = new EmbedBuilder()
-            .setTitle(`${Mascot.Emotes.Fail} Access Denied`)
-            .setDescription(DEVELOPER_ONLY_COMMAND_MESSAGE)
-            .setColor("#FF0000"); // Red
-        return message.reply({ embeds: [errorEmbed] });
+        return message.reply(v2Reply(errorContainer(`${Mascot.Emotes.Fail} Access Denied`, DEVELOPER_ONLY_COMMAND_MESSAGE)));
     }
 
     const action = args[0]?.toLowerCase();
 
     if (!action) {
-        const helpEmbed = new EmbedBuilder()
-            .setTitle(`${Mascot.Name} Property Admin`)
-            .setDescription("Usage: `!manage-property <create|edit|delete> ...args`")
-            .setColor(Mascot.Colors.Base as any);
-        return message.reply({ embeds: [helpEmbed] });
+        return message.reply(v2Reply(infoContainer(`${Mascot.Name} Property Admin`, "Usage: `!manage-property <create|edit|delete> ...args`")));
     }
 
     // !manage-property create <key> <name> <price> <income>
@@ -30,11 +23,10 @@ export const managePropertyHandler = async (message: Message, args: string[]) =>
         const income = parseInt(args[args.length - 1]); // Last
 
         if (!key || isNaN(price) || isNaN(income)) {
-            const usageEmbed = new EmbedBuilder()
-                .setTitle("Admin: Create Property")
-                .setDescription("Usage: `!manage-property create <key> <name...> <price> <income>`\nExample: `!manage-property create shack Dusty Shack 5000 100`")
-                .setColor("Yellow");
-            return message.reply({ embeds: [usageEmbed] });
+            return message.reply(v2Reply(infoContainer(
+                "Admin: Create Property",
+                "Usage: `!manage-property create <key> <name...> <price> <income>`\nExample: `!manage-property create shack Dusty Shack 5000 100`"
+            )));
         }
 
         // Extract name (everything between key and price)
@@ -46,24 +38,19 @@ export const managePropertyHandler = async (message: Message, args: string[]) =>
         try {
             const property = await PropertyService.createProperty(message.guildId!, key, name, price, income);
 
-            const successEmbed = new EmbedBuilder()
-                .setTitle(`${Mascot.Emotes.Accept} Property Created`)
-                .setDescription(`Successfully created new property type.`)
-                .addFields(
-                    { name: "Name", value: property.name, inline: true },
-                    { name: "Key", value: `\`${property.key}\``, inline: true },
-                    { name: "Price", value: `${property.price}`, inline: true },
-                    { name: "Income", value: `${property.incomePerCycle}`, inline: true }
-                )
-                .setColor(Mascot.Colors.Success as any);
+            const fields = [
+                `**Name:** ${property.name}`,
+                `**Key:** \`${property.key}\``,
+                `**Price:** ${property.price}`,
+                `**Income:** ${property.incomePerCycle}`,
+            ].join("\n");
 
-            return message.reply({ embeds: [successEmbed] });
+            return message.reply(v2Reply(successContainer(
+                `${Mascot.Emotes.Accept} Property Created`,
+                `Successfully created new property type.\n\n${fields}`
+            )));
         } catch (e) {
-            const errorEmbed = new EmbedBuilder()
-                .setTitle(`${Mascot.Emotes.Fail} Error`)
-                .setDescription(`Failed to create property: ${e}`)
-                .setColor("#FF0000");
-            return message.reply({ embeds: [errorEmbed] });
+            return message.reply(v2Reply(errorContainer(`${Mascot.Emotes.Fail} Error`, `Failed to create property: ${e}`)));
         }
     }
 
@@ -74,17 +61,12 @@ export const managePropertyHandler = async (message: Message, args: string[]) =>
 
         try {
             await PropertyService.deleteProperty(message.guildId!, key);
-            const successEmbed = new EmbedBuilder()
-                .setTitle(`${Mascot.Emotes.Accept} Property Deleted`)
-                .setDescription(`Property with key \`${key}\` has been deleted from the system.`)
-                .setColor(Mascot.Colors.Success as any);
-            return message.reply({ embeds: [successEmbed] });
+            return message.reply(v2Reply(successContainer(
+                `${Mascot.Emotes.Accept} Property Deleted`,
+                `Property with key \`${key}\` has been deleted from the system.`
+            )));
         } catch (e) {
-            const errorEmbed = new EmbedBuilder()
-                .setTitle(`${Mascot.Emotes.Fail} Error`)
-                .setDescription(`Failed to delete property: ${e}`)
-                .setColor("#FF0000");
-            return message.reply({ embeds: [errorEmbed] });
+            return message.reply(v2Reply(errorContainer(`${Mascot.Emotes.Fail} Error`, `Failed to delete property: ${e}`)));
         }
     }
 
@@ -114,17 +96,12 @@ export const managePropertyHandler = async (message: Message, args: string[]) =>
 
         try {
             await PropertyService.editProperty(message.guildId!, key, data);
-            const successEmbed = new EmbedBuilder()
-                .setTitle(`${Mascot.Emotes.Accept} Property Updated`)
-                .setDescription(`Successfully updated **${field}** for property \`${key}\`.`)
-                .setColor(Mascot.Colors.Success as any);
-            return message.reply({ embeds: [successEmbed] });
+            return message.reply(v2Reply(successContainer(
+                `${Mascot.Emotes.Accept} Property Updated`,
+                `Successfully updated **${field}** for property \`${key}\`.`
+            )));
         } catch (e) {
-            const errorEmbed = new EmbedBuilder()
-                .setTitle(`${Mascot.Emotes.Fail} Error`)
-                .setDescription(`Failed to update property: ${e}`)
-                .setColor("#FF0000");
-            return message.reply({ embeds: [errorEmbed] });
+            return message.reply(v2Reply(errorContainer(`${Mascot.Emotes.Fail} Error`, `Failed to update property: ${e}`)));
         }
     }
 };

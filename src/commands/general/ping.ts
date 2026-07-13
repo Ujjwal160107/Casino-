@@ -1,6 +1,7 @@
-import { Message, EmbedBuilder } from "discord.js";
+import { Message } from "discord.js";
 import prisma from "../../utils/prisma";
 import { redisService } from "../../services/redisService";
+import { infoContainer, v2Reply } from "../../utils/componentsV2";
 
 export async function handlePing(message: Message) {
     const start = Date.now();
@@ -34,15 +35,9 @@ export async function handlePing(message: Message) {
     const memory = process.memoryUsage();
     const ramUsed = (memory.rss / 1024 / 1024).toFixed(2);
 
-    const embed = new EmbedBuilder()
-        .setTitle("System Status Dashboard")
-        .setColor("#2b2d31") // Dark/Technical gray
-        .addFields(
-            { name: "Latency Metrics", value: `**API Response:** ${apiLatency}ms\n**WebSocket:** ${wsLatency}ms\n**Database:** ${dbLatency}ms\n**Redis Cache:** ${redisLatency}ms`, inline: true },
-            { name: "System Health", value: `**Uptime:** ${uptimeHrs}h ${uptimeMins}m\n**RAM Usage:** ${ramUsed} MB\n**Status:** ONLINE`, inline: true }
-        )
-        .setFooter({ text: `Requested by ${message.author.tag}`, iconURL: message.author.displayAvatarURL() })
-        .setTimestamp();
+    const desc =
+        `**Latency Metrics**\n**API Response:** ${apiLatency}ms\n**WebSocket:** ${wsLatency}ms\n**Database:** ${dbLatency}ms\n**Redis Cache:** ${redisLatency}ms\n\n` +
+        `**System Health**\n**Uptime:** ${uptimeHrs}h ${uptimeMins}m\n**RAM Usage:** ${ramUsed} MB\n**Status:** ONLINE`;
 
-    await msg.edit({ content: null, embeds: [embed] });
+    await msg.edit(v2Reply(infoContainer("System Status Dashboard", desc)));
 }

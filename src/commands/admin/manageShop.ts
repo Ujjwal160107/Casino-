@@ -3,14 +3,12 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
   ComponentType,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  Colors,
   ButtonInteraction,
   StringSelectMenuInteraction,
   ModalSubmitInteraction,
@@ -18,7 +16,7 @@ import {
 } from "discord.js";
 import { getShopItems, getShopItemByName, updateShopItem, deleteShopItem } from "../../services/shopService";
 import { fmtCurrency } from "../../utils/format";
-import { successEmbed, errorEmbed } from "../../utils/embed";
+import { errorContainer, plainContainer, v2Reply } from "../../utils/componentsV2";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
 import { ItemEffect, EffectType } from "../../services/effectService";
 import { parseDuration } from "../../utils/duration";
@@ -26,7 +24,7 @@ import { getGuildPrefix } from "../../utils/guildContext";
 
 export async function handleManageShop(message: Message, args: string[]) {
   if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
-    return message.reply({ embeds: [errorEmbed(message.author, "Access Denied", "Admins or Bot Commanders only.")] });
+    return message.reply(v2Reply(errorContainer("Access Denied", "Admins or Bot Commanders only.")));
   }
 
   const prefix = await getGuildPrefix(message.guildId!);
@@ -81,32 +79,26 @@ export async function handleManageShop(message: Message, args: string[]) {
         ? effects.map((e, i) => `**${i + 1}. ${e.type}**\n${formatEffectDetails(e)}`).join("\n\n")
         : "No effects configured.";
 
-      const embed = new EmbedBuilder()
-        .setTitle(`✨ Effects: ${item.name}`)
-        .setColor(Colors.Purple)
-        .setDescription(desc);
-
       const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId("btn_add_effect").setLabel("Add Effect").setStyle(ButtonStyle.Success).setEmoji("➕"),
         new ButtonBuilder().setCustomId("btn_clear_effects").setLabel("Clear All").setStyle(ButtonStyle.Danger).setEmoji("<:Delete:1456568815398813756>"),
         new ButtonBuilder().setCustomId("btn_back").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("↩️")
       );
 
-      return { embeds: [embed], components: [row1] };
+      const container = plainContainer(`## ✨ Effects: ${item.name}\n${desc}`);
+      container.addActionRowComponents(row1);
+
+      return v2Reply(container);
     }
 
     // MAIN View
-    const embed = new EmbedBuilder()
-      .setTitle(`<a:setting:1445732449010319433> Managing: ${item.name}`)
-      .setColor(Colors.Orange)
-      .addFields(
-        { name: "<:pencill:1449707576475521102> Name", value: item.name, inline: true },
-        { name: "<:pricee:1449707707442528387> Price", value: fmtCurrency(item.price), inline: true },
-        { name: "<a:BoxBox:1449707866079494154> Stock", value: item.stock === -1 ? "Infinite" : String(item.stock), inline: true },
-        { name: "<:scrolll:1446218234171887760> Description", value: item.description || "None", inline: false },
-        { name: "Role ID (Legacy)", value: item.roleId || "None", inline: false },
-        { name: "<:sparks:1456569026292744303> Effects", value: `${(item.effects || []).length} active effects`, inline: false }
-      );
+    const fields =
+      `**<:pencill:1449707576475521102> Name:** ${item.name}\n` +
+      `**<:pricee:1449707707442528387> Price:** ${fmtCurrency(item.price)}\n` +
+      `**<a:BoxBox:1449707866079494154> Stock:** ${item.stock === -1 ? "Infinite" : String(item.stock)}\n` +
+      `**<:scrolll:1446218234171887760> Description:** ${item.description || "None"}\n` +
+      `**Role ID (Legacy):** ${item.roleId || "None"}\n` +
+      `**<:sparks:1456569026292744303> Effects:** ${(item.effects || []).length} active effects`;
 
     const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setCustomId("edit_name").setLabel("Name").setStyle(ButtonStyle.Secondary).setEmoji("<:pencill:1449707576475521102>"),
@@ -121,7 +113,10 @@ export async function handleManageShop(message: Message, args: string[]) {
       new ButtonBuilder().setCustomId("btn_done").setLabel("Done").setStyle(ButtonStyle.Success)
     );
 
-    return { embeds: [embed], components: [row1, row2] };
+    const container = plainContainer(`## <a:setting:1445732449010319433> Managing: ${item.name}`, fields);
+    container.addActionRowComponents(row1, row2);
+
+    return v2Reply(container);
   };
 
   const ui = renderPanel(targetItem, view);
@@ -154,14 +149,14 @@ export async function handleManageShop(message: Message, args: string[]) {
       }
 
       if (btnId === "btn_done") {
-        await interaction.update({ components: [] });
+        await interaction.update(v2Reply(plainContainer("Shop manager closed.")));
         collector.stop();
         return;
       }
 
       if (btnId === "btn_delete") {
         await deleteShopItem(targetItem.id);
-        await interaction.update({ content: `🗑️ **${targetItem.name}** has been deleted.`, embeds: [], components: [] });
+        await interaction.update(v2Reply(plainContainer(`## Item Deleted\n🗑️ **${targetItem.name}** has been deleted.`)));
         collector.stop();
         return;
       }
@@ -342,7 +337,7 @@ export async function handleManageShop(message: Message, args: string[]) {
   });
 
   collector.on("end", () => {
-    if (panelMsg.editable) panelMsg.edit({ components: [] }).catch(() => { });
+    if (panelMsg.editable) panelMsg.edit(v2Reply(plainContainer("Shop manager closed (timed out)."))).catch(() => { });
   });
 }
 

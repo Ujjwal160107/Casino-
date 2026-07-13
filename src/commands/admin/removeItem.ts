@@ -1,20 +1,20 @@
 import { Message } from "discord.js";
 import prisma from "../../utils/prisma";
-import { errorEmbed, successEmbed } from "../../utils/embed";
+import { errorContainer, successContainer, v2Reply } from "../../utils/componentsV2";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
 import { logToChannel } from "../../utils/discordLogger";
 
 export async function handleRemoveItem(message: Message, args: string[]) {
     // Usage: ,removeitem @user <item name | all> [quantity]
     if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
-        return message.reply({ embeds: [errorEmbed(message.author, "No Permission", "Admins or Bot Commanders only.")] });
+        return message.reply(v2Reply(errorContainer("No Permission", "Admins or Bot Commanders only.")));
     }
 
     const targetUser = message.mentions.users.first();
     const targetId = targetUser ? targetUser.id : args[0];
 
     if (!targetId) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", "Please mention a user or provide their ID.")] });
+        return message.reply(v2Reply(errorContainer("Invalid Usage", "Please mention a user or provide their ID.")));
     }
 
     // args[0] is user/id. args[1] starts item name? 
@@ -42,12 +42,12 @@ export async function handleRemoveItem(message: Message, args: string[]) {
     });
 
     if (!user) {
-        return message.reply({ embeds: [errorEmbed(message.author, "User Not Found", "This user does not exist in the database.")] });
+        return message.reply(v2Reply(errorContainer("User Not Found", "This user does not exist in the database.")));
     }
 
     const param = args.slice(1).join(" ");
     if (!param) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Invalid Usage", "Provide an item name or `all`.\nExample: `,removeitem @user all` or `,removeitem @user apple`")] });
+        return message.reply(v2Reply(errorContainer("Invalid Usage", "Provide an item name or `all`.\nExample: `,removeitem @user all` or `,removeitem @user apple`")));
     }
 
     // Check for "all" quantity flag or "all" item name
@@ -92,7 +92,7 @@ export async function handleRemoveItem(message: Message, args: string[]) {
             color: 0xFF0000
         });
 
-        return message.reply({ embeds: [successEmbed(message.author, "Inventory Cleared", `Removed all items from ${user.username}'s inventory.`)] });
+        return message.reply(v2Reply(successContainer("Inventory Cleared", `Removed all items from ${user.username}'s inventory.`)));
     }
 
     // Removing specific item
@@ -109,7 +109,7 @@ export async function handleRemoveItem(message: Message, args: string[]) {
     );
 
     if (invItems.length === 0) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Item Not Found", `User does not have any item matching "${itemName}".`)] });
+        return message.reply(v2Reply(errorContainer("Item Not Found", `User does not have any item matching "${itemName}".`)));
     }
 
     // If multiple matches, ask for specific? Or just take first. taking first strict match, else fuzzy.
@@ -121,7 +121,7 @@ export async function handleRemoveItem(message: Message, args: string[]) {
     }
 
     if (targetInvItem.amount < quantity) {
-        return message.reply({ embeds: [errorEmbed(message.author, "Insufficient Quantity", `User only has ${targetInvItem.amount}x ${targetInvItem.shopItem.name}.`)] });
+        return message.reply(v2Reply(errorContainer("Insufficient Quantity", `User only has ${targetInvItem.amount}x ${targetInvItem.shopItem.name}.`)));
     }
 
     let newAmount = targetInvItem.amount - quantity;
@@ -149,5 +149,5 @@ export async function handleRemoveItem(message: Message, args: string[]) {
         color: 0xFFA500
     });
 
-    return message.reply({ embeds: [successEmbed(message.author, "Item Removed", `Removed ${quantity}x ${targetInvItem.shopItem.name} from ${targetUsername}.`)] });
+    return message.reply(v2Reply(successContainer("Item Removed", `Removed ${quantity}x ${targetInvItem.shopItem.name} from ${targetUsername}.`)));
 }

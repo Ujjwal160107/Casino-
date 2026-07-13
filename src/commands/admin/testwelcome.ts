@@ -1,6 +1,19 @@
-import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, TextChannel } from "discord.js";
+import {
+    Message,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ChannelType,
+    PermissionFlagsBits,
+    TextChannel,
+    ContainerBuilder,
+    SectionBuilder,
+    TextDisplayBuilder,
+    ThumbnailBuilder,
+} from "discord.js";
 import { Mascot } from "../../config/branding";
 import { DEVELOPER_ONLY_COMMAND_MESSAGE, isBotDeveloper } from "../../utils/developerAccess";
+import { v2Reply } from "../../utils/componentsV2";
 
 export async function handleTestWelcome(message: Message) {
     // Basic Admin Check (Optional, but good practice even for debug)
@@ -17,22 +30,28 @@ export async function handleTestWelcome(message: Message) {
 
     await message.reply("🔍 Starting Welcome Message Simulation...");
 
-    // 1. Prepare Welcome Embed
-    const welcomeEmbed = new EmbedBuilder()
-        .setTitle(`🎉 Thanks for adding ${Mascot.Name}!`)
-        .setDescription(
-            `I'm here to handle your server's **Economy**, **Games**, and **Moderation** needs.\n\n` +
-            `Here are some quick links to help you get started:`
+    // 1. Prepare Welcome Container
+    const welcomeContainer = new ContainerBuilder();
+    welcomeContainer.addSectionComponents(
+        new SectionBuilder()
+            .addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(
+                    `## 🎉 Thanks for adding ${Mascot.Name}!\n` +
+                    `I'm here to handle your server's **Economy**, **Games**, and **Moderation** needs.\n\n` +
+                    `Here are some quick links to help you get started:`
+                )
+            )
+            .setThumbnailAccessory(
+                new ThumbnailBuilder().setURL(message.client.user?.displayAvatarURL() || "")
+            )
+    );
+    welcomeContainer.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+            `**🚀 Getting Started:** Use \`/setup\` to configure your server's economy and settings.\n` +
+            `**📚 Documentation:** Read our [Docs](${Mascot.Links.Docs}) for a full command list and guides.\n` +
+            `**🆘 Support:** Need help? Join our [Support Server](${Mascot.Links.Support}).`
         )
-        .addFields(
-            { name: "🚀 Getting Started", value: "Use \`/setup\` to configure your server's economy and settings.", inline: false },
-            { name: "📚 Documentation", value: `Read our [Docs](${Mascot.Links.Docs}) for a full command list and guides.`, inline: true },
-            { name: "🆘 Support", value: `Need help? Join our [Support Server](${Mascot.Links.Support}).`, inline: true }
-        )
-        .setColor(Mascot.Colors.Base as any)
-        .setThumbnail(message.client.user?.displayAvatarURL() || "")
-        .setFooter({ text: "Let's make this server awesome!" })
-        .setTimestamp();
+    );
 
     // 2. Prepare Buttons
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -45,6 +64,7 @@ export async function handleTestWelcome(message: Message) {
             .setStyle(ButtonStyle.Link)
             .setURL(Mascot.Links.Support)
     );
+    welcomeContainer.addActionRowComponents(row);
 
     // 3. Find a suitable channel to send the message
     let targetChannel: TextChannel | null = null;
@@ -80,7 +100,7 @@ export async function handleTestWelcome(message: Message) {
     // 4. Send Message
     if (targetChannel) {
         try {
-            await targetChannel.send({ embeds: [welcomeEmbed], components: [row] });
+            await targetChannel.send(v2Reply(welcomeContainer));
             log += `🎉 Message SENT successfully to ${targetChannel.toString()}.`;
         } catch (err: any) {
             log += `❌ Error sending message: ${err.message}`;

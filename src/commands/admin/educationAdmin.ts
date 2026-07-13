@@ -1,10 +1,11 @@
-import { Message, EmbedBuilder } from "discord.js";
+import { Message } from "discord.js";
 import prisma from "../../utils/prisma";
 import { GLOBAL_CATALOG_GUILD_ID } from "../../utils/globalCatalog";
 import { fmtCurrency } from "../../utils/format";
 import { Mascot } from "../../config/branding";
 import { DEVELOPER_ONLY_COMMAND_MESSAGE, isBotDeveloper } from "../../utils/developerAccess";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { successContainer, v2Reply } from "../../utils/componentsV2";
 
 const ADMIN_EMOJI = "<:admin:1451280807535968256>"; // Keep admin specific? Or make generic? User said remove default emojis. This looks custom.
 // Let's use Mascot.Emotes for Success/Fail/Etc.
@@ -56,11 +57,7 @@ export async function handleSetInt(message: Message, args: string[]) {
         });
     });
 
-    const embed = new EmbedBuilder()
-        .setTitle("Intelligence Updated")
-        .setDescription(`${Mascot.Emotes.Success} Set **${targetUser.username}**'s Intelligence to **${val.toFixed(1)}**`)
-        .setColor("#2ECC71");
-    message.reply({ embeds: [embed] });
+    message.reply(v2Reply(successContainer("Intelligence Updated", `${Mascot.Emotes.Success} Set **${targetUser.username}**'s Intelligence to **${val.toFixed(1)}**`)));
 }
 
 // !setdis @user <0-100>
@@ -87,11 +84,7 @@ export async function handleSetDis(message: Message, args: string[]) {
         data: { discipline: Math.floor(val) }
     });
 
-    const embed = new EmbedBuilder()
-        .setTitle("Discipline Updated")
-        .setDescription(`${Mascot.Emotes.Success} Set **${targetUser.username}**'s Discipline to **${val.toFixed(0)}**`)
-        .setColor("#2ECC71");
-    message.reply({ embeds: [embed] });
+    message.reply(v2Reply(successContainer("Discipline Updated", `${Mascot.Emotes.Success} Set **${targetUser.username}**'s Discipline to **${val.toFixed(0)}**`)));
 }
 
 export async function handleResetEdu(message: Message, args: string[]) {
@@ -189,10 +182,5 @@ export async function handleSetDegreeCost(message: Message, args: string[]) {
         data: { tuitionPerSem: cost }
     });
 
-    const embed = new EmbedBuilder()
-        .setTitle("Degree cost Updated")
-        .setDescription(`${Mascot.Emotes.Accept} Updated **${degree.name}** tuition to **${fmtCurrency(cost)}**`)
-        .setColor("#2ECC71");
-
-    message.reply({ embeds: [embed] });
+    message.reply(v2Reply(successContainer("Degree cost Updated", `${Mascot.Emotes.Accept} Updated **${degree.name}** tuition to **${fmtCurrency(cost)}**`)));
 }
