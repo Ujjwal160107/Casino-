@@ -16,9 +16,9 @@ export interface NetWorthBreakdown {
   investments: number;   // ACTIVE FD/RD principal (Investment.amount)
   stocks: number;        // Σ holding.quantity × current Stock price
   properties: number;    // Σ OwnedProperty → property.price
-  animals: number;       // Σ per CaughtAnimal: animal def sellValue if defined, else Σ PART_VALUES over partsAvailable
+  animals: number;       // Σ per CaughtAnimal: animal def sellValue (animalCatalog; every def has one)
   items: number;         // Σ Inventory.amount × ShopItem.price
-  passiveIncomePerDay: number; // Σ property incomePerCycle×(24/incomeCycleHours) + Σ RARITY_INCOME[rarity] for animals with inZoo=true
+  passiveIncomePerDay: number; // Σ property incomePerCycle×(24/incomeCycleHours) + Σ animal def zooIncomePerHour×24 for animals with inZoo=true
   total: number;         // sum of the seven value fields (passive income is NOT part of total — it's a rate, not an asset)
 }
 
