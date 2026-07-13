@@ -64,6 +64,7 @@ const crimeAndHeat: ModuleDoc = {
         "!rob @user takes a shot at another player's wallet on a 5-minute cooldown. Base success is 45%, shifted by Luck (roughly ±5% at the extremes), +12% if you're wearing an Eclipse Mask, and +5% if your target is cursed with Demonic Harp vulnerability — all clamped between 5% and 85%.",
         "A successful rob steals 8–20% of the target's wallet, hard-capped at 250,000. Thieves Gloves multiply the take ×1.25 (6 robs or 6 hours), Eclipse Mask adds +15%, a crafted Wolf Fang Dagger +10%. Failure costs a 60,000–120,000 fine — and if you failed wearing the Eclipse Mask, an extra 300,000–900,000 backlash on top.",
         "Defense is real: a Padlock (175,000) blocks one robbery outright, and the crafted Crocodile Hide Armor blocks one attempt for 24 hours. Both are consumed when they trigger.",
+        "Victims aren't left guessing: Fortuna DMs you who robbed you and for exactly how much — and when your Padlock takes the hit for you. These security alerts are always on.",
       ],
     },
     {
