@@ -509,7 +509,7 @@ export const COMMANDS: Command[] = [
     aliases: ["p", "me", "userinfo"],
     module: "economy",
     short:
-      "Your full dossier — wealth, career, education, relationship, cosmetics — one command.",
+      "Your full dossier — including live item buffs and debuffs on the Overview page.",
     usage: "!profile [@user]",
     args: [{ name: "@user", desc: "View someone else's profile." }],
     examples: ["!profile", "!profile @Someone"],

@@ -762,10 +762,17 @@ async function handleDevilContract(discordId: string, guildId: string): Promise<
     });
 
     if (existing) {
-      const currentUses = ((existing.meta as any)?.usesLeft ?? 0) as number;
+      const existingMeta = (existing.meta as Record<string, unknown> | null) ?? {};
+      const currentUses = (existingMeta.usesLeft ?? 0) as number;
       await prisma.activeEffect.update({
         where: { id: existing.id },
-        data: { meta: { usesLeft: currentUses + 3 } },
+        data: {
+          meta: {
+            ...existingMeta,
+            usesLeft: currentUses + 3,
+            sourceItem: { key: "devil_contract", name: "Devil Contract", emojiKey: "devil_contract" },
+          },
+        },
       });
     } else {
       await prisma.activeEffect.create({
@@ -773,7 +780,10 @@ async function handleDevilContract(discordId: string, guildId: string): Promise<
           userId: discordId,
           effectType: "devil_contract_debt",
           value: 0.8,
-          meta: { usesLeft: 3 },
+          meta: {
+            usesLeft: 3,
+            sourceItem: { key: "devil_contract", name: "Devil Contract", emojiKey: "devil_contract" },
+          },
           expiresAt: null,
         },
       });
@@ -850,7 +860,7 @@ async function handleSoulLedger(discordId: string, guildId: string): Promise<Sho
       userId: discordId,
       effectType: "soul_ledger_watch",
       value: 0,
-      meta: {},
+      meta: { sourceItem: { key: "soul_ledger", name: "Soul Ledger", emojiKey: "soul_ledger" } },
       expiresAt: null,
     },
   });

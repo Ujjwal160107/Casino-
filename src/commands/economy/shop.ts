@@ -40,6 +40,7 @@ import {
 import { isTester } from "../../utils/developerAccess";
 import { ItemEffectResult } from "../../services/effectService";
 import { ensureDeferredEphemeralReply, ensureDeferredUpdate, isInteractionExpiredError, safeEditReply, safeReply, shouldEarlyAcknowledgeInIndex, shouldIgnoreInteractionError, tryEarlyAcknowledge } from "../../utils/interactionHelpers";
+import { resolveShopItemThumbnailAsset } from "../../utils/shopItemAssets";
 
 const SHOP_EPHEMERAL_V2 = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
 
@@ -759,92 +760,16 @@ function buildCosmeticsStoreMessage(page: number, ownerId: string, disabled = fa
   } as any;
 }
 
-// Map item keys to their exact asset filenames in src/assets
-const ITEM_ASSET_MAP: Record<string, string> = {
-  // General Store — page 1
-  tax_shield:           "tax shield.png",
-  bandage:              "bandage.png",
-  counterfeit_kit:      "counterfeit kit.png",
-  lucky_coin:           "lucky coin.png",
-  thief_gloves:         "thieves gloves.png",
-  energy_drink:         "energy drink.png",
-  padlock:              "padlock.png",
-  mystery_box:          "mystery box.png",
-  treasure_map:         "treasure map.png",
-  // General Store — page 2
-  loaded_dice_of_ruin:  "dice.png",
-  celestial_harp:       "angelic harp.png",
-  demonic_harp:         "demonic harp.png",
-  pandora_box:          "pandoras box.png",
-  eclipse_mask:         "eclipse mask.png",
-  mirror_of_fate:       "mirror of fate.png",
-  crown_of_greed:       "crown of greed.png",
-  devil_contract:       "devils contract.png",
-  soul_ledger:          "soul ledger.png",
-  // Job Store — gear
-  work_laptop:            "work laptop.png",
-  medical_kit:            "medical kit.png",
-  business_briefcase:     "business briefcase.png",
-  legal_case_file:        "legal case file.png",
-  service_uniform:        "service uniform.png",
-  mechanic_toolkit:       "mechanic toolkit.png",
-  freelance_starter_pack: "freelance starter kit.png",
-  // Job Store — consumables
-  repair_coupon:          "repair token.png",
-  warranty_card:          "warranty card.png",
-  stress_pills:           "stress pills.png",
-  energy_flask:           "energy flask.png",
-  focus_headphones:       "focus headphones.png",
-  lucky_tie:              "lucky tie.png",
-  premium_tools_oil:      "premium tools oil.png",
-  emergency_pager:        "emergency pager.png",
-  overtime_contract:      "overtime contract.png",
-  blackmarket_resume:     "blackmarket resume.png",
-  corporate_blessing:     "golden resume.png",
-  // Uni Store
-  study_laptop:         "study laptop.png",
-  textbook_bundle:      "textbook bundle.png",
-  lab_kit:              "lab kit.png",
-  calculator_pro:       "calculator pro.png",
-  coffee_thermos:       "coffee thermos.png",
-  focus_notes:          "focus notes.png",
-  cheat_sheet:          "cheat sheet.png",
-  tutor_pass:           "tutor pass.png",
-  scholarship_letter:   "scholarship letter.png",
-  // Hunt Store
-  hunting_permit:       "hunting permit.png",
-  wooden_rifle:         "wooden rifle.png",
-  echo_whistle:         "echo whistle.png",
-  bait_box:             "bait box.png",
-  camouflage_kit:       "camouflage kit.png",
-  iron_rifle:           "iron rifle.png",
-  hunters_compass:      "hunter's compass.png",
-  sniper_rifle:         "sniper rifle.png",
-  legendary_rifle:      "legendary rifle.png",
-  // Cock Store
-  basic_feed:           "basic feed.png",
-  protein_feed:         "protein feed.png",
-  agility_vitamins:     "agility vitamins.png",
-  feather_bandage:      "feather bandage.png",
-  training_whistle:     "training whistle.png",
-  iron_spurs:           "iron spurs.png",
-  guard_vest:           "gaurd vest.png",
-  champion_feed:        "champion feed.png",
-  phoenix_serum:        "pheonix serum.png",
-};
-
 // Ephemeral info card for one item slot, with thumbnail if asset exists
 function buildItemInfoCard(item: ShopCatalogItem, ownerId: string, canUseCredit = false) {
   const typeLabel = item.consumable ? "Consumable" : item.itemType === "EQUIPMENT" ? "Equipment" : "Collectible";
   const usableLabel = item.usable ? "Yes" : "No";
   const maxStackLabel = item.maxStack === 1 ? "1 (one-time use)" : item.maxStack ? String(item.maxStack) : "Unlimited";
 
-  const assetFile = ITEM_ASSET_MAP[item.key];
-  const assetPath = assetFile
-    ? path.join(path.resolve(process.cwd(), "src", "assets"), assetFile)
-    : null;
-  const hasAsset = assetPath !== null && fs.existsSync(assetPath);
-  const safeName = assetFile ? assetFile.replace(/\s+/g, "_") : null;
+  const asset = resolveShopItemThumbnailAsset(item.key);
+  const assetPath = asset?.filePath ?? null;
+  const hasAsset = asset !== null;
+  const safeName = asset?.attachmentName ?? null;
   const attachmentRef = safeName ? `attachment://${safeName}` : null;
 
   const container = new ContainerBuilder();
@@ -1143,12 +1068,10 @@ async function executeBuy(
   });
 
   // Build purchase confirmation with thumbnail and usage hint
-  const assetFile = ITEM_ASSET_MAP[catalogItem.key];
-  const assetPath = assetFile
-    ? path.join(path.resolve(process.cwd(), "src", "assets"), assetFile)
-    : null;
-  const hasAsset = assetPath !== null && fs.existsSync(assetPath);
-  const safeName = assetFile ? assetFile.replace(/\s+/g, "_") : null;
+  const thumbnailAsset = resolveShopItemThumbnailAsset(catalogItem.key);
+  const assetPath = thumbnailAsset?.filePath ?? null;
+  const hasAsset = thumbnailAsset !== null;
+  const safeName = thumbnailAsset?.attachmentName ?? null;
 
   const effectLines = results?.length ? results.map((r: any) => r.message).join("\n") : null;
   const rifleInfo = purchase.rifle as { isNewBest: boolean; cooldownCleared: boolean; activeRifleName: string } | null;

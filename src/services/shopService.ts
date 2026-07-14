@@ -1,16 +1,26 @@
 import prisma from "../utils/prisma";
 import { GuildMember } from "discord.js";
-import { applyItemEffects, ItemEffect, ItemEffectResult } from "./effectService";
+import { applyItemEffects, ItemEffect, ItemEffectResult, ItemEffectSource } from "./effectService";
 import { logToChannel } from "../utils/discordLogger";
 import { Colors } from "discord.js";
 import { Mascot } from "../config/branding";
-import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG, JOB_SHOP_CATALOG, UNI_SHOP_CATALOG, COCK_SHOP_CATALOG, COCK_SYSTEM_ITEMS, COSMETICS_SHOP_CATALOG } from "../utils/shopCatalog";
+import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG, JOB_SHOP_CATALOG, UNI_SHOP_CATALOG, COCK_SHOP_CATALOG, COCK_SYSTEM_ITEMS, COSMETICS_SHOP_CATALOG, SHOP_CATALOG } from "../utils/shopCatalog";
 import { RIFLE_PRIORITY } from "../utils/animalCatalog";
 import { redisService } from "./redisService";
 import { isTester } from "../utils/developerAccess";
 import { ensureUserAndWallet } from "./walletService";
 import { GLOBAL_CATALOG_GUILD_ID, globalCatalogGuildFilter } from "../utils/globalCatalog";
 import type { ShopCatalogItem } from "../utils/shopCatalog";
+
+function getItemEffectSource(item: { catalogKey?: string | null; name: string; emoji?: string | null }): ItemEffectSource {
+  const catalog = SHOP_CATALOG.find((entry) => entry.key === item.catalogKey || entry.name.toLowerCase() === item.name.toLowerCase());
+  return {
+    key: item.catalogKey ?? catalog?.key,
+    name: item.name,
+    emojiKey: catalog?.asset ?? item.catalogKey ?? undefined,
+    emoji: item.emoji ?? undefined,
+  };
+}
 
 export async function resetShop(_guildId: string, category: string = "GENERAL") {
   return prisma.shopItem.deleteMany({
@@ -308,7 +318,7 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
   let results: ItemEffectResult[] = [];
   if (res.buyEffects.length > 0) {
     try {
-      results = await applyItemEffects(userId, guildId, res.buyEffects, member);
+      results = await applyItemEffects(userId, guildId, res.buyEffects, member, getItemEffectSource(res.item));
     } catch (err) {
       console.error("Failed to apply on-buy effects:", err);
       // We don't throw here because the purchase was successful
@@ -394,7 +404,7 @@ export async function useItem(userId: string, guildId: string, itemName: string,
   // Apply effects
   const allEffects = (item.effects as any) as ItemEffect[] || [];
   const effectsToApply = allEffects.filter(e => !e.trigger || e.trigger === "USE");
-  const results = await applyItemEffects(userId, guildId, effectsToApply, member);
+  const results = await applyItemEffects(userId, guildId, effectsToApply, member, getItemEffectSource(item));
 
   // Decrease or remove from inventory if consumable OR usable
   if (item.consumable || item.usable) {

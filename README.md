@@ -87,6 +87,10 @@ For a complete guide on how to use the bot, including a user manual, admin guide
 - **Build**: `npm run build`
 - **Dev**: `npm run dev`
 - **Lint**: `npm run lint`
+- **Validate shop application emojis**: `npm run validate:shop-emojis`
+- **Upload missing shop application emojis**: `npm run sync:shop-emojis`
+
+The emoji sync uses `DISCORD_TOKEN` (or `TOKEN`/`BOT_TOKEN`) from the environment. It only manages application emojis prefixed with `shop_`. Pass `--replace` to refresh existing images or `--prune` to remove stale managed emojis after a successful sync.
 
 ## Architecture
 

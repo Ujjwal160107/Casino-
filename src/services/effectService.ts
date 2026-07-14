@@ -37,17 +37,37 @@ export interface ItemEffectResult {
     type: EffectType | "ERROR";
 }
 
+export interface ItemEffectSource {
+    key?: string;
+    name: string;
+    emojiKey?: string;
+    emoji?: string;
+}
+
+function sourceItemMeta(source?: ItemEffectSource) {
+    if (!source) return {};
+    return {
+        sourceItem: {
+            ...(source.key ? { key: source.key } : {}),
+            name: source.name,
+            ...(source.emojiKey ? { emojiKey: source.emojiKey } : {}),
+            ...(source.emoji ? { emoji: source.emoji } : {}),
+        },
+    };
+}
+
 export async function applyItemEffects(
     userId: string,
     guildId: string,
     effects: ItemEffect[],
-    member?: GuildMember
+    member?: GuildMember,
+    source?: ItemEffectSource,
 ): Promise<ItemEffectResult[]> {
     const results: ItemEffectResult[] = [];
 
     for (const effect of effects) {
         try {
-            const result = await applyEffect(userId, guildId, effect, member);
+            const result = await applyEffect(userId, guildId, effect, member, source);
             results.push(result);
         } catch (err: any) {
             results.push({
@@ -64,7 +84,8 @@ async function applyEffect(
     userId: string,
     guildId: string,
     effect: ItemEffect,
-    member?: GuildMember
+    member?: GuildMember,
+    source?: ItemEffectSource,
 ): Promise<ItemEffectResult> {
     const client = member?.client;
 
@@ -109,7 +130,7 @@ async function applyEffect(
                     effectType: "TEMP_ROLE",
                     value: 0,
                     expiresAt,
-                    meta: { roleId: effect.roleId, guildId }
+                    meta: { roleId: effect.roleId, guildId, ...sourceItemMeta(source) }
                 }
             });
 
@@ -207,7 +228,8 @@ async function applyEffect(
                     userId,
                     effectType: "DEATH_SAVE",
                     value: 1,
-                    expiresAt: dsExpires
+                    expiresAt: dsExpires,
+                    meta: sourceItemMeta(source),
                 }
             });
 
@@ -229,7 +251,8 @@ async function applyEffect(
                     userId,
                     effectType: effect.type,
                     value: effect.value || 0,
-                    expiresAt: exp
+                    expiresAt: exp,
+                    meta: sourceItemMeta(source),
                 }
             });
 
@@ -281,7 +304,8 @@ async function applyEffect(
                     userId,
                     effectType: "EXAM_BOOST",
                     value: examBoostValue,
-                    expiresAt: new Date(Date.now() + examBoostDuration * 1000)
+                    expiresAt: new Date(Date.now() + examBoostDuration * 1000),
+                    meta: sourceItemMeta(source),
                 }
             });
 
@@ -302,7 +326,8 @@ async function applyEffect(
                     userId,
                     effectType: "XP_MULTIPLIER",
                     value: effect.multiplier || 1.5,
-                    expiresAt: exp
+                    expiresAt: exp,
+                    meta: sourceItemMeta(source),
                 }
             });
 
