@@ -3,10 +3,11 @@ import prisma from "../../utils/prisma";
 import { errorContainer, successContainer, infoContainer, v2Reply } from "../../utils/componentsV2";
 import { nextStepHint } from "../../config/nextSteps";
 import { GLOBAL_CURRENCY_EMOJI, Mascot } from "../../config/branding";
-import { ensureUserAndWallet } from "../../services/walletService";
+import { ensureUserAndWallet, addBalance } from "../../services/walletService";
 import fetch from "node-fetch";
 import { getGuildPrefix } from "../../utils/guildContext";
 import { enqueueReminder, setReminderTypeEnabled, getReminderPrefs } from "../../services/cooldownReminderService";
+import { conditionalClaim } from "../../anticheat/claim";
 
 const TOPGG_BOT_ID = "1371816936857669702";
 const VOTE_LINK = `https://top.gg/bot/${TOPGG_BOT_ID}?s=0825a328ae527`;
@@ -17,7 +18,6 @@ export async function handleVote(message: Message, args: string[]) {
     if (!message.guild || !message.member) return;
 
     const user = await ensureUserAndWallet(message.author.id, message.guild.id, message.author.username);
-    const wallet = user.wallet!;
     const prefix = await getGuildPrefix(message.guild.id);
     const voteReward = VOTE_REWARD;
     const now = new Date();
@@ -81,27 +81,26 @@ export async function handleVote(message: Message, args: string[]) {
     }
 
     if (hasVoted) {
-        // Grant Reward
-        await prisma.wallet.update({
-            where: { id: wallet.id },
-            data: { balance: { increment: voteReward } }
-        });
+        // Reserve the vote window atomically BEFORE crediting. Concurrent !vote
+        // calls all read the same stale lastVote; only one CAS can flip it.
+        const claimed = await conditionalClaim(() =>
+            prisma.user.updateMany({
+                where: { discordId: user.discordId, lastVote: user.lastVote ?? null },
+                data: { lastVote: now },
+            })
+        );
 
-        await prisma.user.update({
-            where: { discordId: user.discordId },
-            data: { lastVote: now }
-        });
+        if (!claimed) {
+            const readyAt = new Date(now.getTime() + cooldown);
+            return message.reply(v2Reply(
+                errorContainer("Already Claimed", `You already claimed this vote reward. Come back <t:${Math.floor(readyAt.getTime() / 1000)}:R>.`)
+            ));
+        }
+
         void enqueueReminder(user.discordId, "vote", new Date(now.getTime() + cooldown));
 
-        await prisma.transaction.create({
-            data: {
-                walletId: wallet.id,
-                amount: voteReward,
-                type: "vote_reward",
-                isEarned: true,
-                meta: { source: "top.gg" }
-            }
-        });
+        // Credit through addBalance so caps + logging + garnishment apply uniformly.
+        await addBalance(user.discordId, message.author.username, voteReward, "vote_reward", { source: "top.gg" }, true);
 
         const container = successContainer(
             `${Mascot.Emotes.Success} Vote Verified!`,
