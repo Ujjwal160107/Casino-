@@ -87,6 +87,7 @@ A: Join our **[Support Server](https://discord.gg/sK66U3vx6S)** and open a ticke
 - **`!blackjack <amount>`** - Play to 21.
 - **`!roulette <amount> <bet>`** - Bet and spin.
 - **`!slots <amount>`** - Spin to win.
+- **`!roll`** - Roll your Loaded Dice of Ruin once per day.
 - **`!coinflip <amount> <side>`** - 50/50 chance.
 - **`!cockfight <amount>`** - Pet battle.
 - **`!rr <amount>`** - Russian Roulette.

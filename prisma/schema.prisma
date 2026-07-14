@@ -35,6 +35,7 @@ model User {
   inventory   Inventory[] // Relation to Inventory items
   
     lastDaily   DateTime?
+    lastLoadedDiceRoll DateTime?
     lastWeekly  DateTime?
     lastMonthly DateTime?
     lastVote    DateTime?

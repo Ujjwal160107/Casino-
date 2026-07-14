@@ -41,6 +41,7 @@ import { isTester } from "../../utils/developerAccess";
 import { ItemEffectResult } from "../../services/effectService";
 import { ensureDeferredEphemeralReply, ensureDeferredUpdate, isInteractionExpiredError, safeEditReply, safeReply, shouldEarlyAcknowledgeInIndex, shouldIgnoreInteractionError, tryEarlyAcknowledge } from "../../utils/interactionHelpers";
 import { resolveShopItemThumbnailAsset } from "../../utils/shopItemAssets";
+import { LOADED_DICE_ITEM_KEY } from "../../utils/loadedDiceConfig";
 
 const SHOP_EPHEMERAL_V2 = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
 
@@ -762,9 +763,10 @@ function buildCosmeticsStoreMessage(page: number, ownerId: string, disabled = fa
 
 // Ephemeral info card for one item slot, with thumbnail if asset exists
 function buildItemInfoCard(item: ShopCatalogItem, ownerId: string, canUseCredit = false) {
+  const isLoadedDice = item.key === LOADED_DICE_ITEM_KEY;
   const typeLabel = item.consumable ? "Consumable" : item.itemType === "EQUIPMENT" ? "Equipment" : "Collectible";
   const usableLabel = item.usable ? "Yes" : "No";
-  const maxStackLabel = item.maxStack === 1 ? "1 (one-time use)" : item.maxStack ? String(item.maxStack) : "Unlimited";
+  const maxStackLabel = isLoadedDice ? "1 active die" : item.maxStack === 1 ? "1 (one-time use)" : item.maxStack ? String(item.maxStack) : "Unlimited";
 
   const asset = resolveShopItemThumbnailAsset(item.key);
   const assetPath = asset?.filePath ?? null;
@@ -803,7 +805,15 @@ function buildItemInfoCard(item: ShopCatalogItem, ownerId: string, canUseCredit 
     )
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(item.description),
-    )
+    );
+
+  if (isLoadedDice) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("-# Roll this relic with `!roll` once every 24 hours."),
+    );
+  }
+
+  container
     .addSeparatorComponents(
       new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small),
     )
@@ -1075,7 +1085,9 @@ async function executeBuy(
 
   const effectLines = results?.length ? results.map((r: any) => r.message).join("\n") : null;
   const rifleInfo = purchase.rifle as { isNewBest: boolean; cooldownCleared: boolean; activeRifleName: string } | null;
-  const usageHint = rifleInfo
+  const usageHint = catalogItem.key === LOADED_DICE_ITEM_KEY
+    ? "-# Use `!roll` once every 24 hours. Each new die begins at roll count 0."
+    : rifleInfo
     ? buildRifleHint(item.name, rifleInfo)
     : catalogItem.usable
       ? `-# To use: \`use ${catalogItem.name.toLowerCase()}\``

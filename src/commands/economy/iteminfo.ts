@@ -1,9 +1,11 @@
 import { Message } from "discord.js";
-import { getShopItemByName, getShopItems } from "../../services/shopService";
+import { getShopItemByName, seedGeneralShop } from "../../services/shopService";
 import { fmtCurrency, formatDuration } from "../../utils/format";
 import { errorContainer, plainContainer, v2Reply } from "../../utils/componentsV2";
 import { ItemEffect } from "../../services/effectService";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { getLoadedDiceStatus } from "../../services/loadedDiceService";
+import { LOADED_DICE_ITEM_KEY } from "../../utils/loadedDiceConfig";
 
 function formatEffectDescription(effect: ItemEffect): string {
     switch (effect.type) {
@@ -33,7 +35,11 @@ export async function handleItemInfo(message: Message, args: string[]) {
             return message.reply(`Usage: \`${prefix}iteminfo <item name>\``);
         }
 
-        const itemName = args.join(" ");
+        const requestedItemName = args.join(" ");
+        const itemName = requestedItemName.trim().toLowerCase() === "loaded dice of ruins"
+            ? "Loaded Dice of Ruin"
+            : requestedItemName;
+        await seedGeneralShop(message.guildId!);
         const item = await getShopItemByName(message.guildId!, itemName);
 
         if (!item) {
@@ -50,8 +56,30 @@ export async function handleItemInfo(message: Message, args: string[]) {
         const titleBlock = `## <a:BoxBox:1449707866079494154> ${item.name}\n${item.description || "*No description provided*"}`;
         const statsBlock = `**<:pricee:1449707707442528387> Price:** ${fmtCurrency(item.price)}\n**<a:BoxBox:1449707866079494154> Stock:** ${stockText}`;
         const effectsBlock = `**<:sparks:1456569026292744303> Effects**\n${effectsText}`;
+        const isLoadedDice = item.catalogKey === LOADED_DICE_ITEM_KEY
+            || item.name.toLowerCase() === "loaded dice of ruin";
+        let diceStatusBlock: string | null = null;
 
-        return message.reply(v2Reply(plainContainer(titleBlock, statsBlock, effectsBlock)));
+        if (isLoadedDice) {
+            const diceStatus = await getLoadedDiceStatus(message.author.id);
+            let nextRoll = "Ready now";
+            if (!diceStatus.owned) {
+                nextRoll = diceStatus.nextRollAt && diceStatus.nextRollAt.getTime() > Date.now()
+                    ? `After <t:${Math.floor(diceStatus.nextRollAt.getTime() / 1000)}:R> once you buy a new die`
+                    : "Buy a new die to roll";
+            } else if (!diceStatus.canRoll && diceStatus.nextRollAt) {
+                nextRoll = `<t:${Math.floor(diceStatus.nextRollAt.getTime() / 1000)}:R>`;
+            }
+
+            diceStatusBlock = `**<:inventory:1456568973452644383> Your Dice**\n**Rolls:** ${diceStatus.completedRolls}\n**Next roll:** ${nextRoll}`;
+        }
+
+        return message.reply(v2Reply(plainContainer(
+            titleBlock,
+            statsBlock,
+            effectsBlock,
+            ...(diceStatusBlock ? [diceStatusBlock] : []),
+        )));
 
     } catch (err) {
         console.error("iteminfo error:", err);

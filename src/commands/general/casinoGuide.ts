@@ -18,12 +18,17 @@ import * as path from "path";
 import { Mascot } from "../../config/branding";
 import { CHERRY, BANANA, GRAPES, MELON, BELL, GEM, SEVEN } from "../games/slots";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { emojiInline } from "../../utils/emojiRegistry";
+import { getShopApplicationEmojiName, resolveShopItemThumbnailAsset } from "../../utils/shopItemAssets";
+import { LOADED_DICE_ITEM_KEY } from "../../utils/loadedDiceConfig";
 
 const CASINO_ACCENT_COLOR = 0x9B59B6;
 const CASINO_BANNER_NAME = "casino_banner.png";
 const CASINO_BANNER_URL = `attachment://${CASINO_BANNER_NAME}`;
 const ROULETTE_GUIDE_NAME = "roulette_guide.png";
 const ROULETTE_GUIDE_URL = `attachment://${ROULETTE_GUIDE_NAME}`;
+const LOADED_DICE_GUIDE_NAME = "loaded_dice_of_ruin.png";
+const LOADED_DICE_GUIDE_URL = `attachment://${LOADED_DICE_GUIDE_NAME}`;
 const GUIDES_PER_PAGE = 5;
 
 type GuideListItem = {
@@ -135,6 +140,7 @@ function guideCommandPreview(prefix: string, customId: string) {
         case "guide_cockfight": return `${prefix}cockfight <amount>`;
         case "guide_feed": return `${prefix}feed`;
         case "guide_russianroulette": return `${prefix}russianroulette <amount>`;
+        case "guide_loadeddice": return `${prefix}roll`;
         default: return `${prefix}casino`;
     }
 }
@@ -161,6 +167,7 @@ export async function handleCasinoGuide(message: Message) {
     const bannerPath = path.join(process.cwd(), "src", "assets", "casino_banner.png");
     const attachment = new AttachmentBuilder(bannerPath, { name: CASINO_BANNER_NAME });
     const prefix = await getGuildPrefix(message.guildId!);
+    const loadedDiceEmoji = emojiInline(getShopApplicationEmojiName(LOADED_DICE_ITEM_KEY)) ?? Mascot.Emotes.Dices;
     
 
     const guideItems: GuideListItem[] = [
@@ -219,6 +226,14 @@ export async function handleCasinoGuide(message: Message) {
             style: ButtonStyle.Primary,
             title: `${Mascot.Emotes.Gun} Russian Roulette`,
             description: "High-risk survival betting with one dangerous chamber.",
+        },
+        {
+            customId: "guide_loadeddice",
+            label: "Loaded Dice",
+            emoji: loadedDiceEmoji,
+            style: ButtonStyle.Danger,
+            title: `${loadedDiceEmoji} Loaded Dice of Ruin`,
+            description: "A once-daily relic whose rewards and fragility grow with every surviving roll.",
         },
     ];
     let currentPage = 1;
@@ -457,6 +472,38 @@ export async function handleCasinoGuide(message: Message) {
                     0xE74C3C,
                 );
                 break;
+
+            case "guide_loadeddice": {
+                const diceAsset = resolveShopItemThumbnailAsset(LOADED_DICE_ITEM_KEY);
+                guideContainer = buildGuideContainer(
+                    `${loadedDiceEmoji} Loaded Dice of Ruin - How to Play`,
+                    `**Objective:** Keep a cursed die alive across daily rolls while its rewards grow richer.\n\n` +
+                    `**How to Play:**\n` +
+                    `${Mascot.Emotes.Shop} Buy **Loaded Dice of Ruin** from the General Shop\n` +
+                    `${Mascot.Emotes.Dices} Use \`${prefix}roll\` once every 24 hours\n` +
+                    `${Mascot.Emotes.GraphUp} Every surviving roll improves its future reward chances\n` +
+                    `${Mascot.Emotes.Alert} The die also becomes more fragile after every roll\n\n` +
+                    `**Important:**\n` +
+                    `${Mascot.Emotes.Success} Your reward is always granted before shattering is checked\n` +
+                    `${Mascot.Emotes.Rip} A shattered die is destroyed and must be purchased again\n` +
+                    `${Mascot.Emotes.Refresh} A replacement begins again at roll count **0**\n` +
+                    `${Mascot.Emotes.Cooldown} Rebuying never bypasses the player's daily cooldown\n\n` +
+                    `Check your current roll count and next roll with \`${prefix}iteminfo Loaded Dice of Ruin\`.\n\n` +
+                    `**Command:** \`${prefix}roll\``,
+                    CASINO_ACCENT_COLOR,
+                    diceAsset ? LOADED_DICE_GUIDE_URL : undefined,
+                    "Loaded Dice of Ruin",
+                );
+
+                await interaction.reply({
+                    components: [guideContainer],
+                    ...(diceAsset
+                        ? { files: [new AttachmentBuilder(diceAsset.filePath, { name: LOADED_DICE_GUIDE_NAME })] }
+                        : {}),
+                    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+                });
+                return;
+            }
 
             default:
                 return;

@@ -3,10 +3,10 @@ import type { ModuleDoc } from "../types";
 const casino: ModuleDoc = {
   slug: "casino",
   title: "Casino Games",
-  tagline: "Six tables, published odds — the house tells you exactly how it wins.",
+  tagline: "Six tables, one cursed relic, and published odds — the house tells you exactly how it wins.",
   icon: "Dice5",
   forBeginners: {
-    what: "Fortuna runs six games — coinflip, slots, blackjack, roulette, russian roulette, and cockfight. Every bet is wallet cash only, minimum 10,000, and each game runs its own cooldown that follows your account across every server. The odds below are the real ones from the bot's code, not marketing.",
+    what: "Fortuna runs six table games plus the Loaded Dice of Ruin. Every bet is wallet cash only, while !roll requires the 2,500,000 shop relic and runs once per day. Cooldowns follow your account across every server. The odds below are the real ones from the bot's code, not marketing.",
     firstCommands: ["!casino", "!coinflip 10000", "!blackjack 10000"],
     tip: "Coinflip at neutral luck is a genuinely fair 50/50 for 2× — the only zero-house-edge table in the building. Raise your Luck and it's better than fair.",
   },
@@ -34,6 +34,7 @@ const casino: ModuleDoc = {
           ["!bet (roulette)", "30 min", "1,000,000"],
           ["!rr (russian roulette)", "none", "750,000"],
           ["!cockfight", "45 min", "1,000,000"],
+          ["!roll", "24 hours", "Loaded Dice item"],
         ],
       },
       note: "Bets take smart amounts: all, 250k, 1m. !cf is the shorthand for coinflip; !bj for blackjack.",
@@ -103,6 +104,14 @@ const casino: ModuleDoc = {
       ],
     },
     {
+      heading: "Loaded Dice of Ruin: a relic that remembers",
+      body: [
+        "Buy one Loaded Dice of Ruin for 2,500,000, then use !roll once every 24 hours. A die remembers its own roll count: each survival pushes more probability into Rare, Epic, and Mythic rewards while its shatter chance rises.",
+        "The reward is committed before the shatter check, so a breaking die never steals the prize it just rolled. Shattering removes the relic; a replacement starts from roll 0, but the player-level daily cooldown still has to finish. Global Luck never changes these published odds.",
+      ],
+      note: "Use !iteminfo Loaded Dice of Ruin to see your completed roll count and next available roll.",
+    },
+    {
       heading: "Items at the tables",
       body: [
         "Lucky Coin (75,000): +50% on your next game payout within 5 minutes — works on coinflip, slots, blackjack, and roulette. Used on a won 1,000,000 blackjack hand, that's an extra million.",
@@ -124,6 +133,7 @@ const casino: ModuleDoc = {
     "casino",
     "coinflip",
     "slots",
+    "roll",
     "blackjack",
     "bet",
     "roulette-guide",

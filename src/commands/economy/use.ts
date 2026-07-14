@@ -152,6 +152,13 @@ export async function handleUse(message: Message, args: string[]) {
   }
 
   if (catalogKey) {
+    if (catalogKey === "loaded_dice_of_ruin") {
+      return message.reply({
+        components: [v2Container("Loaded Dice of Ruin", "This relic is rolled with the `roll` command, not `use`.")],
+        flags: MessageFlags.IsComponentsV2,
+      });
+    }
+
     if (catalogKey === "soul_ledger") {
       const existingLedger = await prisma.activeEffect.findFirst({
         where: {

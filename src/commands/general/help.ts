@@ -122,6 +122,7 @@ const CATEGORIES: CategoryData[] = [
     commands: [
       { name: "coinflip", aliases: [], description: "Bet on heads or tails.", usage: "{p}coinflip <amount>", example: "{p}coinflip 10000" },
       { name: "slots", aliases: ["slot"], description: "Spin the slot machine.", usage: "{p}slots <amount>", example: "{p}slots 10000" },
+      { name: "roll", aliases: [], description: "Roll your Loaded Dice of Ruin once per day.", example: "{p}roll" },
       { name: "blackjack", aliases: ["bj"], description: "Play a hand of blackjack against the dealer.", usage: "{p}blackjack <amount>", example: "{p}blackjack 25000" },
       {
         name: "bet", aliases: ["roulette", "roul"], description: "Place a roulette bet (number, color, or dozen).",

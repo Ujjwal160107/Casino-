@@ -21,6 +21,7 @@ This project provides a complete ecosystem for Discord servers looking to engage
 - **Roulette**: Bet on colors, numbers, or odd/even.
 - **Slots**: Visual slot machine with customizable winning combinations.
 - **Coinflip**: Simple high-stakes betting.
+- **Loaded Dice of Ruin**: A persistent once-daily relic with escalating rewards and shatter risk.
 
 ### Administration & Permissions
 - **Hierarchical System**: Multilayered permissions (Admin > User Permissions > Channel Overrides).
@@ -76,6 +77,7 @@ For a complete guide on how to use the bot, including a user manual, admin guide
 - `!blackjack <amount>`
 - `!bet <amount> <choice>` (Roulette)
 - `!slots <amount>`
+- `!roll` (requires Loaded Dice of Ruin)
 
 ### Permissions (Admin Only)
 - `!set casino channel add #channel` - Restrict bot to channels.

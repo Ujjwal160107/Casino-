@@ -224,7 +224,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
 
   const restrictedInJail = new Set([
     "work", "crime", "beg", "slut", "rob", "shop", "buy", "sell", "market",
-    "bet", "blackjack", "roulette", "slots", "coinflip", "cockfight", "chicken",
+    "bet", "blackjack", "roulette", "slots", "coinflip", "cockfight", "chicken", "roll",
     "withdraw", "deposit", "transfer", "daily", "weekly", "monthly", "bank", "card",
     "invest", "stock", "trade"
   ]);
@@ -379,6 +379,10 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "slots":
     case "slot":
       return handleSlots(message, args);
+    case "roll": {
+      const { handleRoll } = require("./commands/economy/roll");
+      return handleRoll(message, prefix);
+    }
     case "cockfight":
     case "cock-fight":
       return handleCockFight(message, args);
@@ -593,7 +597,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const validCommands = [
         "balance", "bank", "card", "mycards", "deposit", "withdraw", "transfer",
         "work", "crime", "beg", "slut", "rob", "shop", "inventory", "profile",
-        "leaderboard", "bet", "blackjack", "coinflip", "slots", "cockfight",
+        "leaderboard", "bet", "blackjack", "coinflip", "slots", "cockfight", "roll",
         "credit", "ask", "ask-money", "set-prefix", "help", "guide", "jobs", "education", "relax"
       ];
 

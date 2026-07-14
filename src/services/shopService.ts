@@ -11,6 +11,7 @@ import { isTester } from "../utils/developerAccess";
 import { ensureUserAndWallet } from "./walletService";
 import { GLOBAL_CATALOG_GUILD_ID, globalCatalogGuildFilter } from "../utils/globalCatalog";
 import type { ShopCatalogItem } from "../utils/shopCatalog";
+import { LOADED_DICE_ITEM_KEY } from "../utils/loadedDiceConfig";
 
 function getItemEffectSource(item: { catalogKey?: string | null; name: string; emoji?: string | null }): ItemEffectSource {
   const catalog = SHOP_CATALOG.find((entry) => entry.key === item.catalogKey || entry.name.toLowerCase() === item.name.toLowerCase());
@@ -189,6 +190,22 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
     }
 
     let metaData: any = {};
+
+    const isLoadedDice = item.catalogKey === LOADED_DICE_ITEM_KEY
+      || item.name.toLowerCase() === "loaded dice of ruin";
+
+    if (isLoadedDice) {
+      const existingDice = await tx.inventory.findUnique({
+        where: { userId_shopItemId: { userId: user.discordId, shopItemId: item.id } },
+      });
+      if (existingDice && existingDice.amount > 0) {
+        throw new Error("You can only own one Loaded Dice of Ruin at a time.");
+      }
+      metaData = {
+        rollCount: 0,
+        acquiredAt: new Date().toISOString(),
+      };
+    }
 
     if (item.name.toLowerCase() === "chicken") {
       const existingInfo = await tx.inventory.findUnique({
@@ -377,6 +394,10 @@ export async function useItem(userId: string, guildId: string, itemName: string,
   }
 
   const item = targetInvItem.shopItem;
+
+  if (item.catalogKey === LOADED_DICE_ITEM_KEY || item.name.toLowerCase() === "loaded dice of ruin") {
+    throw new Error("The Loaded Dice of Ruin is rolled with the `roll` command, not `use`.");
+  }
 
   // 4. STRICT CONSUMABLE CHECK
   // ONLY items marked as "consumable" (Usable toggle) can be used.
