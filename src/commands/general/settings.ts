@@ -30,7 +30,7 @@ function buildSettingsPayload(
 ) {
     const container = new ContainerBuilder()
         .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent("## ⚙️ Your Settings — Cooldown alarms"),
+            new TextDisplayBuilder().setContent("## Your Settings — Cooldown alarms"),
             new TextDisplayBuilder().setContent(
                 "Fortuna DMs you the moment these cooldowns lift. Toggle what you want.",
             ),

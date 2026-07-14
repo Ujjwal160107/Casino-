@@ -18,13 +18,17 @@ export async function handleBalance(message: Message) {
 
   const user = await ensureUserAndWallet(targetUser.id, guildId, targetUser.tag);
   const bank = await ensureBankForUser(user.discordId, targetUser.tag);
+  const bankDebt = bank.balance < 0;
   return message.reply(
     v2Reply(
       statusContainer(
         "info",
         `${targetUser.username}'s Balance`,
-        `**Wallet:** ${fmtCurrency(user.wallet?.balance ?? 0, GLOBAL_CURRENCY_EMOJI)}\n**Bank:** ${fmtCurrency(bank.balance, GLOBAL_CURRENCY_EMOJI)}`,
-        { thumbnailUrl: getEmoteUrl(Mascot.Emotes.Money) ?? undefined, hint: nextStepHint("balance") }
+        `**Wallet:** ${fmtCurrency(user.wallet?.balance ?? 0, GLOBAL_CURRENCY_EMOJI)}\n**Bank:** ${fmtCurrency(bank.balance, GLOBAL_CURRENCY_EMOJI)}${bankDebt ? " **(Debt)**" : ""}`,
+        {
+          thumbnailUrl: getEmoteUrl(Mascot.Emotes.Money) ?? undefined,
+          hint: bankDebt ? "Deposits repay your bank debt before building savings." : nextStepHint("balance"),
+        }
       )
     )
   );

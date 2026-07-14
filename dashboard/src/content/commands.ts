@@ -286,7 +286,7 @@ export const COMMANDS: Command[] = [
     name: "!rob",
     aliases: ["steal"],
     module: "economy",
-    short: "Steal from another wallet directly. Fails loud, and the fine hurts.",
+    short: "Steal from another wallet directly. On failure, the fine can push your bank into debt.",
     usage: "!rob <@user | username>",
     args: [
       {
@@ -870,7 +870,7 @@ export const COMMANDS: Command[] = [
     short: "A quick study minigame that chips away at your current program's XP bar.",
     usage: "!study",
     examples: ["!study"],
-    cooldown: "5 min",
+    cooldown: "30 min",
     interactive: true,
   },
   {

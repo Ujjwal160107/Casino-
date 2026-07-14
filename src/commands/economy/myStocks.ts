@@ -34,7 +34,7 @@ export async function handleMyStocks(message: Message) {
 
     const body = `**Total Value:** ${fmtCurrency(totalValue)}\n**Total Profit:** ${totalPnlStr}\n\n${lines.join("\n\n")}`;
     const container = plainContainer(
-        `## 📊 Stock Portfolio: ${message.author.username}\n${body}`,
+        `## Stock Portfolio: ${message.author.username}\n${body}`,
         nextStepHint("mystocks")!,
     );
 

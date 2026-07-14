@@ -34,56 +34,56 @@ function normalizeTypingTask(task: JobTask): JobTask {
 export function buildGlobalTasks(): JobTask[] {
   return [
     buttonTask("global_email_summary", undefined,
-      "📧 Email Crisis",
+      "Email Crisis",
       "Your manager sent a 47-word email. Which summary is correct?",
       pick(["Action required by EOD.", "Please review and respond.", "Meeting moved to Thursday."]),
       ["No action needed.", "Forward to all teams.", "Archive it immediately."]
     ),
     buttonTask("global_printer_jam", undefined,
-      "🖨️ Printer Chaos",
+      "Printer Chaos",
       "The printer is jammed 10 minutes before the deadline. What do you do?",
       "Send digital copies and explain",
       ["Restart the whole network", "Cancel the meeting", "Photocopy it by hand"]
     ),
     buttonTask("global_meeting_conflict", undefined,
-      "📅 Triple Booking",
+      "Triple Booking",
       "Three meetings overlap right now. Which one actually matters?",
       pick(["The client demo", "The investor call", "The executive review"]),
       ["The team icebreaker", "The lunch n learn", "The quarterly check-in"]
     ),
     buttonTask("global_urgent_matrix", undefined,
-      "🚨 Task Triage",
+      "Task Triage",
       "Which task is both Important AND Urgent?",
       pick(["Fix broken production login", "Respond to an angry client email", "Submit expense report before deadline"]),
       ["Update your LinkedIn profile", "Reorganise your calendar", "Order office supplies"]
     ),
     buttonTask("global_typo_catch", undefined,
-      "✍️ Typo Hunt",
+      "Typo Hunt",
       "Spot the typo in this contract line before signing.",
       pick(["The client shall receive a full refudn within 30 days.", "Payment is deu within 14 calendar days.", "Contractor is responsibel for all deliverables."]),
       ["The client shall receive a full refund within 30 days.", "Payment is due within 14 calendar days.", "Contractor is responsible for all deliverables."]
     ),
     buttonTask("global_angry_response", undefined,
-      "🔥 Client on Fire",
+      "Client on Fire",
       "A client is furious. Which response de-escalates without promising anything?",
       "I hear your concern — let me look into this right now.",
       ["That's not our problem.", "Have you tried restarting?", "I'll escalate to the CEO immediately."]
     ),
     buttonTask("global_excuse_selector", undefined,
-      "😅 Least Suspicious Excuse",
+      "Least Suspicious Excuse",
       "You missed the deadline. Pick the least suspicious excuse.",
       pick(["There was a dependency issue I flagged last week.", "My internet was down for 20 minutes.", "The file corrupted during upload."]),
       ["My dog ate the file.", "I forgot.", "Time zones are confusing."]
     ),
     buttonTask("global_fire_exit", undefined,
-      "🚪 Fire Drill Protocol",
+      "Fire Drill Protocol",
       "The alarm went off. What's the correct first action?",
       "Calmly leave via the nearest designated exit",
       ["Finish your current task first", "Look for the source of smoke", "Email your team first"]
     ),
     {
       id: "global_sticky_note", sector: undefined,
-      type: "typing", title: "📝 Sticky Note Emergency",
+      type: "typing", title: "Sticky Note Emergency",
       description: "Type the exact phrase from the sticky note before it blows off the desk!",
       previewText: pick([
         "ASAP: Call Dave re: Q3 pivot → `ASAP Call Dave Q3 pivot`",
@@ -95,7 +95,7 @@ export function buildGlobalTasks(): JobTask[] {
     },
     {
       id: "global_corporate_phrase", sector: undefined,
-      type: "typing", title: "🗣️ Corporate Speak",
+      type: "typing", title: "Corporate Speak",
       description: "Type this phrase backwards (word by word) before the sync starts.",
       previewText: pick([
         "Synergy unlocks scalable bandwidth → type: bandwidth scalable unlocks Synergy",
@@ -113,32 +113,32 @@ export function buildGlobalTasks(): JobTask[] {
 export function buildTechTasks(): JobTask[] {
   return [
     buttonTask("tech_kubectl", "tech",
-      "⚙️ Cluster Dying",
+      "Cluster Dying",
       "Which kubectl command deploys the fix before the cluster crashes?",
       "kubectl rollout restart deployment/api",
       ["kubectl delete pod --all", "kubectl exec -it api bash", "kubectl get nodes --verbose"]
     ),
     buttonTask("tech_rollback", "tech",
-      "🔄 Deploy Broke Everything",
+      "Deploy Broke Everything",
       "Build broke 3 minutes after deploy. Pick the rollback strategy.",
       "kubectl rollout undo deployment/api",
       ["Redeploy the broken version", "Restart all pods manually", "Wait and monitor"]
     ),
     buttonTask("tech_memory_kill", "tech",
-      "💾 Memory at 99%",
+      "Memory at 99%",
       "Memory usage is critical. Which service do you kill first?",
       pick(["The logging aggregator that's been leaking", "The dev-environment test runner", "The unused analytics service"]),
       ["The billing service", "The authentication service", "The database"]
     ),
     buttonTask("tech_pr_response", "tech",
-      "💬 47 PR Comments",
+      "47 PR Comments",
       "Your PR has 47 review comments. Which response style works best?",
       "Address each point with explanation, fix the valid ones",
       ["Resolve all comments without reading them", "Close the PR and reopen it fresh", "Comment 'LGTM' and merge yourself"]
     ),
     {
       id: "tech_error_code", sector: "tech",
-      type: "typing", title: "💥 Error Code Entry",
+      type: "typing", title: "Error Code Entry",
       description: "Type the exact error code from the terminal log.",
       previewText: pick([
         "Error: ECONNREFUSED 127.0.0.1:5432 → type: ECONNREFUSED 127.0.0.1:5432",
@@ -156,32 +156,32 @@ export function buildTechTasks(): JobTask[] {
 export function buildMedicalTasks(): JobTask[] {
   return [
     buttonTask("med_triage", "medical",
-      "🚨 Triage Decision",
+      "Triage Decision",
       "Three patients arrived simultaneously. Who gets seen first?",
       "Chest pain + shortness of breath",
       ["Mild headache for 3 days", "Sprained ankle from earlier today", "Non-urgent prescription refill"]
     ),
     buttonTask("med_allergy_check", "medical",
-      "⚠️ Allergy Alert",
+      "Allergy Alert",
       "Patient has a penicillin allergy. Which medication is safe?",
       "Azithromycin",
       ["Amoxicillin", "Ampicillin", "Dicloxacillin"]
     ),
     buttonTask("med_anxious_patient", "medical",
-      "😰 Anxious Patient",
+      "Anxious Patient",
       "Patient is extremely anxious before a procedure. Best first step?",
       "Acknowledge their fear and explain each step before doing it",
       ["Tell them to relax — it won't hurt", "Start immediately to get it over with", "Ask a colleague to deal with them"]
     ),
     buttonTask("med_priority_order", "medical",
-      "📋 Task Order",
+      "Task Order",
       "Which task should you do FIRST this shift?",
       pick(["Check morning labs for admitted patients", "Review critical patient flagged overnight", "Sign off discharge paperwork"]),
       ["Answer emails", "Restock supply cabinet", "Update spreadsheets"]
     ),
     {
       id: "med_dosage_code", sector: "medical",
-      type: "typing", title: "💊 Dosage Entry",
+      type: "typing", title: "Dosage Entry",
       description: "Enter the correct dosage code exactly as shown.",
       previewText: pick([
         "500mg PO BID × 7d → type: 500mg PO BID 7d",
@@ -199,26 +199,26 @@ export function buildMedicalTasks(): JobTask[] {
 export function buildBusinessTasks(): JobTask[] {
   return [
     buttonTask("biz_kpi_meeting", "business",
-      "📊 Board Meeting Agenda",
+      "Board Meeting Agenda",
       "Which agenda item actually belongs in the executive board meeting?",
       pick(["Q3 revenue shortfall and recovery plan", "Customer retention rate and churn analysis", "Strategic partnership proposal"]),
       ["Office microwave replacement", "Team lunch preferences", "Parking spot allocation"]
     ),
     buttonTask("biz_missed_deadline", "business",
-      "⏰ Missed Deadline",
+      "Missed Deadline",
       "You missed a client deliverable. Best first action?",
       "Contact the client proactively and give a new realistic timeline",
       ["Wait to see if they notice", "Blame a team member in the email", "Send something incomplete to show effort"]
     ),
     buttonTask("biz_fake_expense", "business",
-      "🧾 Suspicious Expense",
+      "Suspicious Expense",
       "Spot the fake expense in this report.",
       pick(["$2,400 team offsite — no receipt, no approval", "$850 software subscription billed twice", "Client dinner at $3,200 for two people with no guest named"]),
       ["$45 taxi to client site", "$180 conference registration fee", "$60 team lunch with receipt"]
     ),
     {
       id: "biz_invoice_code", sector: "business",
-      type: "typing", title: "🧾 Invoice Code",
+      type: "typing", title: "Invoice Code",
       description: "Enter the invoice reference code exactly before the payment window closes.",
       previewText: pick([
         "INV-2024-Q3-00847-FINAL → type: INV-2024-Q3-00847-FINAL",
@@ -236,26 +236,26 @@ export function buildBusinessTasks(): JobTask[] {
 export function buildLegalTasks(): JobTask[] {
   return [
     buttonTask("legal_clause_change", "legal",
-      "📄 Spot the Change",
+      "Spot the Change",
       "Opposing counsel made a 'minor' change. Which clause was altered?",
       pick(["'reasonable notice' changed to '5 business days'", "'net 30' changed to 'net 60'", "'mutual' removed from confidentiality clause"]),
       ["Company name updated", "Date corrected", "Formatting adjusted"]
     ),
     buttonTask("legal_scheduling", "legal",
-      "📅 Court Conflict",
+      "Court Conflict",
       "Two hearings were scheduled on the same day. Which gets priority?",
       pick(["The hearing with a judicial deadline", "The case closest to verdict", "The matter with the most senior judge"]),
       ["The case with the biggest retainer", "The alphabetically first case", "The one with free parking nearby"]
     ),
     buttonTask("legal_response", "legal",
-      "📨 Opposing Counsel Email",
+      "Opposing Counsel Email",
       "Opposing counsel sent an aggressive email. What's the best response?",
       "Professional acknowledgment, request for supporting documentation",
       ["Match their tone", "Ignore it for 3 days", "CC your client immediately"]
     ),
     {
       id: "legal_case_number", sector: "legal",
-      type: "typing", title: "⚖️ Case Reference",
+      type: "typing", title: "Case Reference",
       description: "Enter the case reference number exactly as it appears on the filing.",
       previewText: pick([
         "2024-CV-00183-DISTRICT → type: 2024-CV-00183-DISTRICT",
@@ -273,26 +273,26 @@ export function buildLegalTasks(): JobTask[] {
 export function buildServiceTasks(): JobTask[] {
   return [
     buttonTask("service_complaint", "service",
-      "😤 Customer Complaint",
+      "Customer Complaint",
       "Customer says their food was cold. Ideal response?",
       "Apologise immediately and offer to replace or refund",
       ["Tell them to use the microwave", "Ask if they tried it sooner", "Say the kitchen was very busy tonight"]
     ),
     buttonTask("service_vip", "service",
-      "🌟 VIP Table",
+      "VIP Table",
       "The VIP who knows the owner arrived without a reservation. You...",
       "Politely check if you can accommodate and check with manager",
       ["Turn them away — no reservation, no table", "Give them someone else's reserved table", "Pretend you don't know who they are"]
     ),
     buttonTask("service_kitchen_timing", "service",
-      "⏱️ Kitchen Timing",
+      "Kitchen Timing",
       "Starters, mains, and desserts for three tables all need to go out at once. What do you prioritise?",
       "Hottest/most time-sensitive dishes first",
       ["Alphabetical order by table name", "The table that tipped best last time", "Whatever is nearest the pass"]
     ),
     {
       id: "service_order_code", sector: "service",
-      type: "typing", title: "🍽️ Order Ticket",
+      type: "typing", title: "Order Ticket",
       description: "Type this order ticket exactly before it gets lost.",
       previewText: pick([
         "T3: 2xRisotto 1xSalad NO NUTS → type: T3 2xRisotto 1xSalad NO NUTS",
@@ -310,26 +310,26 @@ export function buildServiceTasks(): JobTask[] {
 export function buildTradeTasks(): JobTask[] {
   return [
     buttonTask("trade_tool_select", "trade",
-      "🔧 Right Tool",
+      "Right Tool",
       "Which tool do you use to tighten a M16 bolt to spec?",
       "Torque wrench set to spec value",
       ["Impact driver at full speed", "Adjustable pliers", "Best estimate by hand"]
     ),
     buttonTask("trade_safety_check", "trade",
-      "🦺 Safety First",
+      "Safety First",
       "Before starting electrical work, what is the FIRST step?",
       "Isolate the circuit and verify with a voltage tester",
       ["Start and be careful", "Check the breaker label and hope for the best", "Ask a colleague if it looks live"]
     ),
     buttonTask("trade_parts_order", "trade",
-      "📦 Parts Priority",
+      "Parts Priority",
       "Three parts are needed. Which one do you order first?",
       pick(["The critical safety component with a 5-day lead time", "The part that's stopping the whole job", "The recalled part that needs replacing"]),
       ["The cheapest part", "The part with the longest delivery time", "The part you've ordered before"]
     ),
     {
       id: "trade_part_number", sector: "trade",
-      type: "typing", title: "🔩 Part Number Entry",
+      type: "typing", title: "Part Number Entry",
       description: "Enter the part number exactly before the supplier line closes.",
       previewText: pick([
         "PT-4472-B-GALV-M16 → type: PT-4472-B-GALV-M16",

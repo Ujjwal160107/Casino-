@@ -76,7 +76,10 @@ function buildRankingsText(users: LbUser[], type: LbType): string {
     const top10 = sortUsers(users, type).slice(0, 10);
     if (top10.length === 0) return "No players found.";
     return top10
-        .map((u, i) => `${rankLabel(i)} **${u.username ?? "Unknown"}** — ${formatValue(u, type)}`)
+        .map((u, i) => {
+            const name = (u.username ?? "Unknown").replace(/`/g, "");
+            return `${rankLabel(i)} \`${name}\` — ${formatValue(u, type)}`;
+        })
         .join("\n");
 }
 

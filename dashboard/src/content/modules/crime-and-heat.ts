@@ -62,7 +62,7 @@ const crimeAndHeat: ModuleDoc = {
       heading: "Robbery: PvP crime",
       body: [
         "!rob @user takes a shot at another player's wallet on a 5-minute cooldown. Base success is 45%, shifted by Luck (roughly ±5% at the extremes), +12% if you're wearing an Eclipse Mask, and +5% if your target is cursed with Demonic Harp vulnerability — all clamped between 5% and 85%. You don't even need them in the room: !rob works by exact username or user ID, across every server Fortuna is in.",
-        "A successful rob steals 8–20% of the target's wallet, hard-capped at 250,000. Thieves Gloves multiply the take ×1.25 (6 robs or 6 hours), Eclipse Mask adds +15%, a crafted Wolf Fang Dagger +10%. Failure costs a 60,000–120,000 fine — and if you failed wearing the Eclipse Mask, an extra 300,000–900,000 backlash on top.",
+        "A successful rob steals 8–20% of the target's wallet, hard-capped at 250,000. Thieves Gloves multiply the take ×1.25 (6 robs or 6 hours), Eclipse Mask adds +15%, a crafted Wolf Fang Dagger +10%. Failure costs a 60,000–120,000 fine — and if you failed wearing the Eclipse Mask, an extra 300,000–900,000 backlash on top. Fines drain your wallet first, then charge the rest to your bank; if the bank cannot cover it, its balance goes negative as debt.",
         "Defense is real: a Padlock (175,000) blocks one robbery outright, and the crafted Crocodile Hide Armor blocks one attempt for 24 hours. Both are consumed when they trigger.",
         "Victims aren't left guessing: Fortuna DMs you who robbed you and for exactly how much — and when your Padlock takes the hit for you. These security alerts are always on.",
       ],
@@ -79,7 +79,7 @@ const crimeAndHeat: ModuleDoc = {
       body: [
         "Learn the scenarios, not the odds. The minigames repeat from a fixed catalog — every stage you've seen before is a stage you can't fail. Petty and medium crimes are free practice: no jail risk, cheap fines, same scenario style as the big jobs.",
         "Buy the gear once, profit forever. Prep items aren't consumed by crimes — a Business Briefcase or Cheat Sheet you already own for its day job doubles as a permanent crime key with a payout bonus attached.",
-        "Bank between jobs, always. The fine on a failed legendary can hit 700,000 and drains your wallet to zero if you can't cover it — and heat raids only see the wallet. A rich wallet is the only thing crime can actually take from you.",
+        "Bank between jobs to protect earnings from robbery and heat raids, but do not mistake the bank for fine insurance. A failed crime drains the wallet first and charges the remainder to the bank, creating a negative bank balance when necessary. Future deposits repay that debt before becoming savings.",
         "Respect the clock more than the police. The 1-hour crime cooldown means heat decays 10 while you gain 20 — every crime is net +10 heat. Take a break every 4–5 successes, or accept that the raid is a matter of when, not if.",
       ],
     },

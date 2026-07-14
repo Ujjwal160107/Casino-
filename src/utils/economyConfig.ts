@@ -1,7 +1,8 @@
 export const STARTING_WALLET_BALANCE = 1_000;
 export const DEFAULT_JAIL_FINE = 1_000;
 export const DEFAULT_JAIL_TIME_SECONDS = 600;
-export const DEFAULT_STUDY_COOLDOWN_SECONDS = 300;
+export const DEFAULT_STUDY_COOLDOWN_SECONDS = 1800;
+export const STUDY_DAILY_CAP = 16;
 
 export const GAME_UI_TIMINGS = {
   cockfightBetSeconds: 60,

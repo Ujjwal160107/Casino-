@@ -2,6 +2,11 @@ import type { GuildMember } from "discord.js";
 
 export const BOT_DEVELOPER_ID = "1288340046449086567";
 
+export const BOT_DEVELOPER_IDS = new Set<string>([
+  BOT_DEVELOPER_ID,
+  "761118244198285313",
+]);
+
 // Testing role: these users bypass cooldowns, can buy anything regardless of balance,
 // and have access to all admin commands.
 export const TESTER_IDS = new Set<string>([]);
@@ -22,7 +27,7 @@ export function isTester(userId: string, member?: GuildMember | null): boolean {
     });
     if (hasTesterName) return true;
   }
-  return TESTER_IDS.has(userId) || userId === BOT_DEVELOPER_ID;
+  return TESTER_IDS.has(userId) || isBotDeveloper(userId);
 }
 
 export function isTesterMember(member?: GuildMember | null): boolean {
@@ -58,7 +63,7 @@ const ADMIN_COMMANDS = new Set([
 ]);
 
 export function isBotDeveloper(userId: string) {
-  return userId === BOT_DEVELOPER_ID;
+  return BOT_DEVELOPER_IDS.has(userId);
 }
 
 export function isDeveloperOnlyCommand(command: string) {

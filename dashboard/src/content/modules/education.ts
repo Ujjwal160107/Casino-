@@ -6,7 +6,7 @@ const education: ModuleDoc = {
   tagline: "Eight degrees, an XP bar, and a scholarship system that pays back double if you finish.",
   icon: "GraduationCap",
   forBeginners: {
-    what: "Degrees unlock jobs, which unlock career tiers, which unlock credit cards — school is the bottom of that whole pyramid. You enroll, grind !study minigames every 5 minutes for XP, sit the exam, and graduate with a permanent intelligence boost. Hit the milestones and the scholarships refund double your tuition.",
+    what: "Degrees unlock jobs, which unlock career tiers, which unlock credit cards — school is the bottom of that whole pyramid. You enroll, grind !study minigames every 30 minutes for XP, sit the exam, and graduate with a permanent intelligence boost. Hit the milestones and the scholarships refund double your tuition.",
     firstCommands: ["!education", "!study", "!exam"],
     tip: "Scholarships pay 1.5× your tuition at 75% progress and 2× at 100% — finish any degree and school literally paid you to attend.",
   },
@@ -33,9 +33,9 @@ const education: ModuleDoc = {
       note: "Tuition can go on your Fortuna Card — !education's enroll flow offers wallet or credit. Enrollment blocks: already enrolled elsewhere, insufficient intelligence, or missing prerequisite.",
     },
     {
-      heading: "Studying: the 5-minute loop",
+      heading: "Studying: the 30-minute loop",
       body: [
-        "!study runs one of five minigames — math, word scramble, reaction test, trivia, typing — on a 5-minute cooldown. A win banks 50 XP base; a loss banks nothing. UNI shop items stack onto wins: the best owned study book adds ~+20 XP, multipliers like Study Laptop (1.25×) or Tutor Pass (1.6×) amplify further (multiplier total caps at 2×), and Focus Notes drops +45 on your next success. The crafted Duck Feather Quill from hunting adds +25 once.",
+        "!study runs one of five minigames — math, word scramble, reaction test, trivia, typing — on a 30-minute cooldown that applies whether you win or lose, and you can study at most 16 times a day. A win banks 50 XP base; a loss banks nothing. UNI shop items stack onto wins: the best owned study book adds ~+20 XP, multipliers like Study Laptop (1.15×) or Tutor Pass (1.6×) amplify further (multiplier total caps at 2×), and Focus Notes drops +45 on your next success. The crafted Duck Feather Quill from hunting adds +25 once.",
         "Every session also adds stress — 20 base, reduced by your discipline stat, floored at 5. Push past 90 education stress and each study risks a 25% chance of burnout that wipes 100 XP. !relax is the release valve (Meditation Retreat: −35 education stress for 150,000).",
         "One session in four triggers a study event: Flow State (+40 XP), a stolen bag (−70 XP, +30 stress), a Pop Quiz you might ace — 35 events, some degree-specific, a few of which even pay coins. They're the variance in an otherwise steady grind.",
       ],
@@ -58,15 +58,15 @@ const education: ModuleDoc = {
     {
       heading: "UNI shop cheat sheet",
       body: [
-        "Every study accelerant, ranked by what it does: Coffee Thermos (80,000) skips one 5-minute cooldown; Textbook Bundle (120,000) 1.35× for 3 sessions; Calculator Pro (150,000) 1.15× + 8% fail rescue ×3; Focus Notes (160,000) +45 next win; Study Laptop (180,000) 1.25× ×5; Cheat Sheet (250,000) the exam gamble; Lab Kit (300,000) 1.15× and −12% fail ×3; Tutor Pass (400,000) 1.6× + 15% rescue ×1; Scholarship Letter (750,000) an instant roll — 45% for 50k–200k coins, 35% for 25–150 XP, 20% nothing.",
+        "Every study accelerant, ranked by what it does: Coffee Thermos (80,000) clears one 30-minute cooldown for +8 stress, once per 4h; Textbook Bundle (120,000) 1.4× for 3 sessions with a 15% wrong-chapter risk each; Calculator Pro (150,000) +30% fail rescue + 1.1× ×3; Focus Notes (160,000) +45 next win and cancels one bad event; Study Laptop (180,000) 1.15× + −6 stress + 10% rescue ×5; Cheat Sheet (250,000) the exam gamble; Lab Kit (300,000) 1.15× + 10% rescue with amplified events ×3; Tutor Pass (400,000) a no-fail 1.6× session with a guaranteed positive event ×1; Scholarship Letter (750,000) an instant roll — 45% for 50k–200k coins, 35% for 25–150 XP, 20% nothing +5 stress.",
       ],
     },
     {
       heading: "Getting better at school",
       body: [
-        "Study between everything. The 5-minute cooldown nests inside every other timer in Fortuna — casino cooldowns, the work hour, hunt timers. A degree is ~12–100 successful sessions depending on tier; the players who finish fast are the ones studying while waiting on something else anyway.",
+        "Study between everything. The 30-minute cooldown nests inside every other timer in Fortuna — casino cooldowns, the work hour, hunt timers. A degree is ~12–100 successful sessions depending on tier; the players who finish fast are the ones studying while waiting on something else anyway.",
         "Enroll on credit, repay with scholarships. Tuition on the Fortuna Card + the 75% milestone paying 1.5× tuition means the degree finances itself mid-way through — just clear the card before Monday's statement bites.",
-        "Stack multipliers on burst days: Study Laptop + Focus Notes + a Duck Feather Quill turns a 50-XP session into 130+. With the 2× multiplier cap, don't run Tutor Pass and Textbook Bundle simultaneously — sequence them.",
+        "Stack multipliers on burst days: Study Laptop + Focus Notes + a Duck Feather Quill turns a 50-XP session into 125+. With the 2× multiplier cap, don't run Tutor Pass and Textbook Bundle simultaneously — sequence them.",
         "Order matters: High School → BS Computer Science is the best early ROI (cheap, unlocks the smooth Tech ladder). LLB → LLM is the cheapest path to career tier 4. MBBS → MD/PhD costs the most and pays the most — endgame, funded by your scholarship refunds along the way.",
       ],
     },

@@ -39,7 +39,7 @@ export async function handleResetEconomy(message: Message, args: string[]) {
       await logToChannel(message.client, {
         guild: message.guild!,
         type: "ADMIN",
-        title: "🔥 ECONOMY RESET 🔥",
+        title: "ECONOMY RESET",
         description: `**Admin:** ${message.author.tag} (${message.author.id})\n\nALL user data, wallets, banks, investments, and items were wiped.`,
         color: 0x000000
       });

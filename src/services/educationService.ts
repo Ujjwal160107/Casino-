@@ -21,6 +21,18 @@ function resolveEventOutcome(event: StudyEvent): boolean {
     return Math.random() * 100 < (event.successChance ?? 50);
 }
 
+function isPositiveEvent(e: StudyEvent): boolean {
+    return e.xpMod > 0 && e.outcome !== "failure";
+}
+
+function getPositiveStudyEvent(degreeType: string): StudyEvent {
+    const eligible = STUDY_EVENTS.filter(
+        e => (e.degreeType === degreeType || e.degreeType === "all") && isPositiveEvent(e)
+    );
+    if (eligible.length === 0) return getStudyEvent(degreeType);
+    return eligible[Math.floor(Math.random() * eligible.length)];
+}
+
 let degreesSeeded = false;
 
 export async function checkAndSeedDegrees(_guildId?: string) {
@@ -232,7 +244,34 @@ function migrateGpaToXp(currentGpa: number, xpRequired: number): number {
     return Math.ceil((currentGpa / 6.0) * xpRequired);
 }
 
-export async function study(userId: string, guildId: string, bonusXp: number = 0) {
+export interface StudyModifiers {
+    /** Buff XP already summed in study.ts (multipliers + focus/craft bonuses). */
+    bonusXp?: number;
+    /** Study Laptop (-6) / Tutor Pass (-10) — applied to this session's stress. */
+    stressDelta?: number;
+    /** Textbook Bundle rolled a wrong-chapter miss → this session earns 0 XP. */
+    wrongChapterHit?: boolean;
+    /** Focus Notes → neutralize a negative study event this session. */
+    eventImmunity?: boolean;
+    /** Lab Kit → 70% chance to re-pick a positive event when one rolls. */
+    eventBiasPositive?: boolean;
+    /** Lab Kit → +50% magnitude on the rolled event (both directions). */
+    eventAmplify?: boolean;
+    /** Tutor Pass → force a positive study event this session. */
+    guaranteedPositiveEvent?: boolean;
+}
+
+export async function study(userId: string, guildId: string, modifiers: StudyModifiers = {}) {
+    const {
+        bonusXp = 0,
+        stressDelta = 0,
+        wrongChapterHit = false,
+        eventImmunity = false,
+        eventBiasPositive = false,
+        eventAmplify = false,
+        guaranteedPositiveEvent = false,
+    } = modifiers;
+
     const user = await prisma.user.findUnique({
         where: { discordId: userId },
         include: { currentEducation: { include: { degree: true } } }
@@ -285,38 +324,57 @@ export async function study(userId: string, guildId: string, bonusXp: number = 0
         }
     }
 
-    const xpGain = Math.floor(50 + extraXp + bonusXp);
+    // Textbook Bundle wrong-chapter miss wastes the whole session's XP (stress still applies).
+    const xpGain = wrongChapterHit ? 0 : Math.floor(50 + extraXp + bonusXp);
     const stressGain = Math.max(5, 20 - (user.discipline * 0.2));
 
     let newXp = edu.educationXp + xpGain;
-    let newStress = Math.min(100, edu.stress + stressGain);
+    let newStress = Math.min(100, Math.max(0, edu.stress + stressGain + stressDelta));
 
-    let msg = `You studied hard! XP: ${edu.educationXp} → **${newXp}** (+${xpGain}). Stress +${stressGain}.`;
-    if (bonusXp > 0) msg += ` (Includes +${bonusXp} from interactive bonus!)`;
-    msg += bookUsedMsg;
+    let msg: string;
+    if (wrongChapterHit) {
+        msg = `**Wrong chapter!** You studied the wrong material — **0 XP** this session. Stress +${stressGain}.`;
+    } else {
+        msg = `You studied hard! XP: ${edu.educationXp} → **${newXp}** (+${xpGain}). Stress +${stressGain}.`;
+        if (bonusXp > 0) msg += ` (Includes +${bonusXp} from buffs!)`;
+        msg += bookUsedMsg;
+    }
 
-    // Study Events (25% chance)
-    if (Math.random() < 0.25) {
-        const event = getStudyEvent(edu.degree.type);
-        const success = resolveEventOutcome(event);
+    // Study Events — 25% normally, forced on by Tutor Pass
+    if (guaranteedPositiveEvent || Math.random() < 0.25) {
+        let event = guaranteedPositiveEvent
+            ? getPositiveStudyEvent(edu.degree.type)
+            : getStudyEvent(edu.degree.type);
+
+        // Lab Kit positive bias: 70% chance to re-pick a positive event
+        if (!guaranteedPositiveEvent && eventBiasPositive && !isPositiveEvent(event) && Math.random() < 0.70) {
+            event = getPositiveStudyEvent(edu.degree.type);
+        }
+
+        const success = guaranteedPositiveEvent ? true : resolveEventOutcome(event);
+        const amp = eventAmplify ? 1.5 : 1.0;
 
         if (success) {
-            newXp = Math.max(0, newXp + event.xpMod);
-            newStress = Math.max(0, Math.min(100, newStress + event.stressMod));
+            const xpMod = Math.round(event.xpMod * amp);
+            const stressMod = Math.round(event.stressMod * amp);
+            newXp = Math.max(0, newXp + xpMod);
+            newStress = Math.max(0, Math.min(100, newStress + stressMod));
             if (event.moneyMod) {
+                const money = Math.round(event.moneyMod * amp);
                 const wallet = await prisma.wallet.findUnique({ where: { userId: user.discordId } });
-                if (wallet) await prisma.wallet.update({ where: { id: wallet.id }, data: { balance: { increment: event.moneyMod } } });
+                if (wallet) await prisma.wallet.update({ where: { id: wallet.id }, data: { balance: { increment: money } } });
+                msg += `\n\n${Mascot.Emotes.Success} **${event.title}**\n${event.description}\n✅ Success! (+${xpMod} XP, ${stressMod >= 0 ? '+' : ''}${stressMod} Stress) +${money.toLocaleString()} coins`;
+            } else {
+                msg += `\n\n${Mascot.Emotes.Success} **${event.title}**\n${event.description}\n✅ Success! (+${xpMod} XP, ${stressMod >= 0 ? '+' : ''}${stressMod} Stress)`;
             }
-
-            let outcomeLabel = event.outcome === "success" ? "Guaranteed" : `Rolled ${event.successChance}%`;
-            msg += `\n\n${Mascot.Emotes.Success} **${event.title}**\n${event.description}\n✅ Success! (+${event.xpMod} XP, ${event.stressMod > 0 ? '+' : ''}${event.stressMod} Stress)${event.moneyMod ? ` +${event.moneyMod.toLocaleString()} coins` : ""}`;
+        } else if (eventImmunity) {
+            msg += `\n\n**Focus Notes saved you.** A **${event.title}** setback was neutralized — no XP or stress lost.`;
         } else {
-            const xpLoss = Math.abs(event.xpMod);
+            const xpLoss = Math.round(Math.abs(event.xpMod) * amp);
+            const stressAdd = Math.round(Math.abs(event.stressMod) * amp);
             newXp = Math.max(0, newXp - xpLoss);
-            newStress = Math.max(0, Math.min(100, newStress + Math.abs(event.stressMod)));
-
-            let outcomeLabel = event.outcome === "failure" ? "Guaranteed" : `Rolled ${event.successChance}%`;
-            msg += `\n\n${Mascot.Emotes.Fail} **${event.title}**\n${event.description}\n❌ Failed! (-${xpLoss} XP, +${Math.abs(event.stressMod)} Stress)`;
+            newStress = Math.max(0, Math.min(100, newStress + stressAdd));
+            msg += `\n\n${Mascot.Emotes.Fail} **${event.title}**\n${event.description}\n❌ Failed! (-${xpLoss} XP, +${stressAdd} Stress)`;
         }
     }
 

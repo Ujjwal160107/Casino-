@@ -50,7 +50,7 @@ export async function handleAsk(message: Message, args: string[]) {
   }
 
   const container = plainContainer(
-    `## 💸 Money Request\n**${message.author.username}** is asking <@${targetUser.id}> for money.`,
+    `## Money Request\n**${message.author.username}** is asking <@${targetUser.id}> for money.`,
     `**Amount:** ${fmtCurrency(amount)}\n**Reason:** ${reason}`,
   );
 

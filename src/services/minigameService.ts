@@ -26,7 +26,7 @@ function generateMemoryGame(): Minigame {
 
     return {
         type: "typing",
-        title: "🧠 Memory Test",
+        title: "Memory Test",
         previewText: `Memorize this pattern:\n\n# ${sequence}`,
         description: "Type the pattern exactly (separated by spaces or just symbols)!",
         answer: sequence,
@@ -104,7 +104,7 @@ function generateTriviaGame(): Minigame {
 
     return {
         type: "button",
-        title: "❓ Trivia Time",
+        title: "Trivia Time",
         description: t.q,
         answer: t.a,
         options: options,
@@ -118,7 +118,7 @@ function generateReverseTypingGame(): Minigame {
 
     return {
         type: "typing",
-        title: "🔄 Reverse Typing",
+        title: "Reverse Typing",
         description: `Type this word **backwards**:\n\nWord: **${word}**\n(Type: \`${reversed}\`)`,
         answer: reversed,
         time: 30
@@ -144,7 +144,7 @@ function generateEmojiMathGame(): Minigame {
 
     return {
         type: "button",
-        title: "🍎 Emoji Math",
+        title: "Emoji Math",
         description: `If ${fruitA} = **${valA}** and ${fruitB} = **${valB}**...\n\nWhat is ${fruitA} + ${fruitB}?`,
         answer: ans.toString(),
         options: Array.from(options).sort(() => Math.random() - 0.5),
@@ -167,7 +167,7 @@ function generateMathGame(): Minigame {
 
     return {
         type: "button",
-        title: "🧮 Quick Math",
+        title: "Quick Math",
         description: `Solve: ${a} + ${b} = ?`,
         answer: ans.toString(),
         options: Array.from(options).sort(() => Math.random() - 0.5),
@@ -188,7 +188,7 @@ function generateScrambleGame(): Minigame {
 
     return {
         type: "button",
-        title: "🧩 Unscramble",
+        title: "Unscramble",
         description: `Unscramble this word: **${scrambled}**`,
         answer: word,
         options: Array.from(options).sort(() => Math.random() - 0.5),
@@ -202,7 +202,7 @@ function generateReactionGame(): Minigame {
 
     return {
         type: "button",
-        title: "⚡ Reaction Test",
+        title: "Reaction Test",
         description: `Quick! Click the **${target}** button!`,
         answer: target,
         options: colors.sort(() => Math.random() - 0.5),
@@ -215,7 +215,7 @@ function generateTypingGame(): Minigame {
 
     return {
         type: "typing",
-        title: "⌨️ Typing Test",
+        title: "Typing Test",
         description: `Type the following sentence exactly:\n\n\`${sentence}\``,
         answer: sentence,
         time: 45

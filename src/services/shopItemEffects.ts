@@ -105,7 +105,7 @@ export async function handleSpecialItemUse(
     case "calculator_pro":
       return handleCalculatorPro(discordId);
     case "coffee_thermos":
-      return handleCoffeeThermos(discordId, guildId);
+      return withBuffCooldown("coffee_thermos", discordId, () => handleCoffeeThermos(discordId, guildId));
     case "focus_notes":
       return handleFocusNotes(discordId);
     case "cheat_sheet":
@@ -522,6 +522,7 @@ const BUFF_ITEM_COOLDOWN_SECONDS: Record<string, number> = {
   bandage: 6 * 3600,             // clears a casino game cooldown
   tax_shield: 6 * 3600,          // bypasses transaction taxes
   blackmarket_resume: 24 * 3600, // skips lifetime-shift career gates
+  coffee_thermos: 4 * 3600,      // clears the 30-min study cooldown — rate-limit the clear
 };
 
 export function isBuffCooldownItem(itemKey: string): boolean {
@@ -1000,50 +1001,51 @@ async function handleCorporateBlessing(discordId: string, guildId: string): Prom
 // ---------------------------------------------------------------------------
 
 async function handleStudyLaptop(discordId: string): Promise<ShopItemUseResult> {
-  await redisService.set(`study_laptop:${discordId}`, { sessionsLeft: 5, xpMult: 1.25 }, 604800);
-  return { success: true, message: `**Study Laptop activated!**\n\n1.25x study XP for your next **5** study sessions (expires in 7 days).` };
+  await redisService.set(`study_laptop:${discordId}`, { sessionsLeft: 5, xpMult: 1.15, stressDelta: -6, failRescue: 0.10 }, 604800);
+  return { success: true, message: `**Study Laptop activated!**\n\nNext **5** study sessions: **1.15x XP**, **-6 stress**, and a **+10% fail-rescue** each (expires in 7 days).` };
 }
 
 async function handleTextbookBundle(discordId: string): Promise<ShopItemUseResult> {
-  await redisService.set(`textbook_bundle:${discordId}`, { sessionsLeft: 3, xpMult: 1.35 }, 172800);
-  return { success: true, message: `**Textbook Bundle activated!**\n\n1.35x study XP for your next **3** study sessions (expires in 48h).` };
+  await redisService.set(`textbook_bundle:${discordId}`, { sessionsLeft: 3, xpMult: 1.4, wrongChapterChance: 0.15 }, 172800);
+  return { success: true, message: `**Textbook Bundle activated!**\n\nNext **3** sessions: **1.4x XP** — but a **15% chance each** you study the wrong chapter and gain **0 XP** that session (stress still applies). Expires in 48h.` };
 }
 
 async function handleLabKit(discordId: string): Promise<ShopItemUseResult> {
-  await redisService.set(`lab_kit:${discordId}`, { sessionsLeft: 3, failReduction: 0.12, xpMult: 1.15 }, 259200);
-  return { success: true, message: `**Lab Kit activated!**\n\n12% failure rescue + 1.15x XP for your next **3** study sessions (expires in 72h).` };
+  await redisService.set(`lab_kit:${discordId}`, { sessionsLeft: 3, xpMult: 1.15, failRescue: 0.10, eventBiasPositive: true, eventAmplify: true }, 259200);
+  return { success: true, message: `**Lab Kit activated!**\n\nNext **3** sessions: **1.15x XP**, **+10% fail-rescue**, and study events skew **positive** with **+50% magnitude** — but a negative event that slips through also hits **50% harder** (expires in 72h).` };
 }
 
 async function handleCalculatorPro(discordId: string): Promise<ShopItemUseResult> {
-  await redisService.set(`calculator_pro:${discordId}`, { sessionsLeft: 3, failRescue: 0.08, xpMult: 1.15 }, 172800);
-  return { success: true, message: `**Calculator Pro activated!**\n\n8% rescue chance on failed challenges + 1.15x XP for **3** sessions (expires in 48h).` };
+  await redisService.set(`calculator_pro:${discordId}`, { sessionsLeft: 3, xpMult: 1.1, failRescue: 0.30 }, 172800);
+  return { success: true, message: `**Calculator Pro activated!**\n\nNext **3** sessions: a strong **+30% fail-rescue** and **1.1x XP** (expires in 48h).` };
 }
 
 async function handleCoffeeThermos(discordId: string, guildId: string): Promise<ShopItemUseResult> {
   const edu = await prisma.userEducation.findUnique({ where: { userId: discordId } });
   if (!edu || !edu.lastStudy) {
-    return { success: true, message: `You drink the coffee... but you didn't have a cooldown. **Wasted!**` };
+    return { success: true, shouldConsume: false, message: `You drink the coffee... but you have no study cooldown to clear. **Saved for later.**` };
   }
 
   const cooldownMs = DEFAULT_STUDY_COOLDOWN_SECONDS * 1000;
   const elapsed = Date.now() - new Date(edu.lastStudy).getTime();
 
   if (elapsed >= cooldownMs) {
-    return { success: true, message: `You drink the coffee... but you didn't have a cooldown. **Wasted!**` };
+    return { success: true, shouldConsume: false, message: `You drink the coffee... but your study cooldown already passed. **Saved for later.**` };
   }
 
   const pastTime = new Date(Date.now() - cooldownMs);
+  const newStress = Math.min(100, edu.stress + 8);
   await prisma.userEducation.update({
     where: { userId: discordId },
-    data: { lastStudy: pastTime },
+    data: { lastStudy: pastTime, stress: newStress },
   });
 
-  return { success: true, message: `**Study cooldown cleared!** You can study again now.` };
+  return { success: true, message: `**Study cooldown cleared!** You can study again now — but the caffeine crash costs you **+8 stress** (now ${newStress}/100).` };
 }
 
 async function handleFocusNotes(discordId: string): Promise<ShopItemUseResult> {
-  await redisService.set(`focus_notes:${discordId}`, { active: true, bonusXp: 45 }, 172800);
-  return { success: true, message: `**Focus Notes activated!**\n\n+45 bonus XP on your next successful study session (expires in 48h).` };
+  await redisService.set(`focus_notes:${discordId}`, { active: true, bonusXp: 45, eventImmunity: true }, 172800);
+  return { success: true, message: `**Focus Notes activated!**\n\nYour next successful session gets **+45 bonus XP** and **cancels one negative study event** if it strikes (expires in 48h).` };
 }
 
 async function handleCheatSheet(discordId: string): Promise<ShopItemUseResult> {
@@ -1052,8 +1054,8 @@ async function handleCheatSheet(discordId: string): Promise<ShopItemUseResult> {
 }
 
 async function handleTutorPass(discordId: string): Promise<ShopItemUseResult> {
-  await redisService.set(`tutor_pass:${discordId}`, { active: true, xpMult: 1.6, failReduction: 0.15 }, 172800);
-  return { success: true, message: `**Tutor Pass activated!**\n\n1.6x XP + 15% failure rescue on your next study session (expires in 48h).` };
+  await redisService.set(`tutor_pass:${discordId}`, { active: true, xpMult: 1.6, guaranteedPass: true, guaranteedPositiveEvent: true, stressDelta: -10 }, 172800);
+  return { success: true, message: `**Tutor Pass activated!**\n\nYour next session **can't fail** the minigame, gives **1.6x XP**, **guarantees a positive study event**, and cuts **10 stress** (expires in 48h).` };
 }
 
 async function handleScholarshipLetter(discordId: string): Promise<ShopItemUseResult> {
@@ -1088,7 +1090,14 @@ async function handleScholarshipLetter(discordId: string): Promise<ShopItemUseRe
       resultMsg = `**Scholarship Approved — General Fund!**\n\nYou're not enrolled, so you received **${reward.toLocaleString()}** coins instead.`;
     }
   } else {
-    resultMsg = `**Scholarship Rejected.**\n\nYour application was not accepted this time. Better luck next time.`;
+    const eduReject = await prisma.userEducation.findUnique({ where: { userId: discordId } });
+    if (eduReject) {
+      await prisma.userEducation.update({
+        where: { userId: discordId },
+        data: { stress: Math.min(100, eduReject.stress + 5) },
+      });
+    }
+    resultMsg = `**Scholarship Rejected.**\n\nYour application was not accepted this time.${eduReject ? " The rejection stings (**+5 stress**)." : ""} Better luck next time.`;
   }
 
   if (!isTester(discordId)) {
