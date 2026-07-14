@@ -12,6 +12,7 @@ import { handleWithdrawBank } from "./commands/economy/withdrawBank";
 import { handleTransfer } from "./commands/economy/transfer";
 import { handleIncome } from "./commands/economy/incomeCommands";
 import { handleRob } from "./commands/economy/rob";
+import { handleHeat } from "./commands/economy/heat";
 import { handleShop } from "./commands/economy/shop";
 import { handleInventory } from "./commands/economy/inventory";
 import {
@@ -354,6 +355,10 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "rob":
     case "steal":
       return handleRob(message, args);
+    case "heat":
+    case "laylow":
+    case "lay-low":
+      return handleHeat(message);
     case "shop":
     case "store":
       return handleShop(message, args);

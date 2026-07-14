@@ -36,8 +36,8 @@ export function initScheduler(client: Client) {
 
   cron.schedule("0 * * * *", async () => {
     try {
-      await decayAllHeat();
       await runRaidScan(client);
+      await decayAllHeat();
     } catch (err) {
       console.error("Tax raid scan failed:", err);
     }

@@ -176,12 +176,21 @@ export const MAX_SAFE_BALANCE = 9_000_000_000_000_000;
 export const TAX_CONFIG = {
   incomeTaxRate: 0.08,          // 8% on weekly, monthly, work shifts
   transferTaxRate: 0.05,        // 5% fee on P2P wallet transfers
-  crimeHeatGain: 20,            // Heat added per successful crime
+  crimeHeatGain: 20,            // Base heat added per successful crime (tier multipliers apply)
+  robSuccessHeatGain: 15,
+  robFailureHeatGain: 10,
   raidHeatThreshold: 100,       // Heat that enables raid rolls in scanner
   autoRaidChancePct: 0.40,      // 40% chance of raid per hourly scan
   raidSeizurePctMin: 0.10,      // Seize 10–25% of wallet
   raidSeizurePctMax: 0.25,
   heatDecayPerHour: 10,         // Heat lost per hour during scan
+  layLowHeatReduction: 15,
+  layLowCooldownSeconds: 6 * 60 * 60,
+  fixerHeatReduction: 35,
+  fixerCooldownSeconds: 12 * 60 * 60,
+  fixerMinimumHeat: 40,
+  fixerMinimumFee: 150_000,
+  fixerFeePerHeat: 4_000,
   heatTtlSeconds: 72 * 3600,    // Redis key expires after 72h of no crime
 } as const;
 

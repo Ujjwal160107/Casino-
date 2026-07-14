@@ -11,7 +11,7 @@ import {
 import { getCrimePrepItem } from "../data/crimePrepWhitelist";
 import { getStageCountForTier } from "../data/crimeMinigameCatalog";
 import { checkCrownOfGreed, checkDevilContract, recordPotentialSoulLedgerLoss } from "./shopBuffs";
-import { addCrimeHeat, getHeatLevel } from "./taxService";
+import { addCrimeHeat } from "./taxService";
 import { addBalance } from "./walletService";
 import { applyEconomyPenalty } from "./penaltyService";
 import { jailUser } from "./jailService";
@@ -235,8 +235,7 @@ export async function resolveCrimeSuccess(
   const amount = Math.floor(randomInt(crime.payoutMin, crime.payoutMax) * payoutMult * crownMult * devilReduction);
   const result = await addBalance(userId, username, amount, "crime_income", { command: "crime", crimeKey }, true);
 
-  await addCrimeHeat(userId);
-  const heat = await getHeatLevel(userId);
+  const heat = await addCrimeHeat(userId, TAX_CONFIG.crimeHeatGain * crime.heatMultiplier);
 
   let msg = randomMessage(crime.winMessages, result.appliedAmount);
   if (result.capped) {
