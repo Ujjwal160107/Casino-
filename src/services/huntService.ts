@@ -80,12 +80,18 @@ export async function hunt(
   const tier = RIFLE_TIERS[rifleName];
   const huntKey = `hunt:${discordId}`;
   const redis = redisService.getInstance();
-  const ttl = await redis.ttl(huntKey);
 
-  if (ttl > 0 && !isTester(discordId)) {
-    const err = new Error("COOLDOWN");
-    (err as any).ttl = ttl;
-    throw err;
+  // Reserve the cooldown atomically BEFORE rolling/creating loot. SET NX keeps the
+  // existing hunt:<id> key so status displays that read its TTL keep working.
+  if (!isTester(discordId)) {
+    const reserved = await redis.set(huntKey, "1", "EX", tier.cooldownSeconds, "NX");
+    if (reserved !== "OK") {
+      const ttl = await redis.ttl(huntKey);
+      const err = new Error("COOLDOWN");
+      (err as any).ttl = Math.max(ttl, 0);
+      throw err;
+    }
+    void enqueueReminder(discordId, "hunt", new Date(Date.now() + tier.cooldownSeconds * 1000));
   }
 
   const weights = { ...tier.weights };
@@ -185,10 +191,7 @@ export async function hunt(
     allNewlyUnlocked.push(...names);
   }
 
-  if (!isTester(discordId)) {
-    await redis.set(huntKey, "1", "EX", tier.cooldownSeconds);
-    void enqueueReminder(discordId, "hunt", new Date(Date.now() + tier.cooldownSeconds * 1000));
-  }
+  // Cooldown + reminder were reserved up-front (SET NX) before loot creation.
   if (rareBoostRow) {
     await redisService.del(`crafted_hunt_rare_boost:${discordId}`);
     await prisma.activeEffect.deleteMany({ where: { userId: discordId, effectType: "hunt_rare_boost" } });
