@@ -870,7 +870,7 @@ export const COMMANDS: Command[] = [
     short: "A quick study minigame that chips away at your current program's XP bar.",
     usage: "!study",
     examples: ["!study"],
-    cooldown: "5 min",
+    cooldown: "30 min",
     interactive: true,
   },
   {
