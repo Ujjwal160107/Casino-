@@ -46,6 +46,9 @@ async function finishCrimeResult(
 
   let body = result.message + extraNote;
   body += `\n\n**Wallet:** ${fmtCurrency(result.newBalance)}`;
+  if (!result.success && result.newBankBalance !== undefined) {
+    body += `\n**Bank:** ${fmtCurrency(result.newBankBalance)}${result.newBankBalance < 0 ? " (Debt)" : ""}`;
+  }
   if (result.success && result.heat !== undefined && result.heat >= TAX_CONFIG.raidHeatThreshold * 0.7) {
     body += `\n**Heat:** ${result.heat} — your activity is drawing attention...`;
   } else if (result.success && result.heat !== undefined) {
