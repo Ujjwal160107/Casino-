@@ -286,7 +286,7 @@ export const COMMANDS: Command[] = [
     name: "!rob",
     aliases: ["steal"],
     module: "economy",
-    short: "Steal from another wallet directly. Fails loud, and the fine hurts.",
+    short: "Steal from another wallet directly. On failure, the fine can push your bank into debt.",
     usage: "!rob <@user | username>",
     args: [
       {

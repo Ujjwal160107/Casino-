@@ -18,6 +18,7 @@ import { nextStepHint } from "../../config/nextSteps";
 import { fmtCurrency } from "../../utils/format";
 import { redisService } from "../../services/redisService";
 import { notifyRobbed, notifyPadlockUsed } from "../../services/victimNotifyService";
+import { applyEconomyPenalty } from "../../services/penaltyService";
 
 function randomInt(min: number, max: number) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -199,29 +200,23 @@ export async function handleRob(message: Message, args: string[]) {
     const basePenalty = Math.max(ROB_CONFIG.failFineMinimum, Math.floor(hypotheticalSteal * ROB_CONFIG.failFineMultiplier));
     const crownLoss = await checkCrownOfGreed(message.author.id);
 
-    const result = await prisma.$transaction(async (tx) => {
-        const robber = await tx.user.findUnique({ where: { discordId: message.author.id }, include: { wallet: true } });
-        if (!robber?.wallet) throw new Error("Wallet not found.");
+    let penalty = Math.floor(basePenalty * crownLoss);
+    // Eclipse mask extra penalty on failure
+    if (eclipseActive) {
+        const extraPenalty = randomInt(300_000, 900_000);
+        penalty += extraPenalty;
+    }
 
-        let penalty = Math.floor(basePenalty * crownLoss);
-        // Eclipse mask extra penalty on failure
-        if (eclipseActive) {
-            const extraPenalty = randomInt(300_000, 900_000);
-            penalty += extraPenalty;
-        }
-        const actualPenalty = Math.min(penalty, robber.wallet.balance);
-        const updatedWallet = actualPenalty > 0
-            ? await tx.wallet.update({ where: { id: robber.wallet.id }, data: { balance: { decrement: actualPenalty } } })
-            : robber.wallet;
+    const result = await applyEconomyPenalty(
+        message.author.id,
+        message.author.username,
+        penalty,
+        "rob_fine",
+        { command: "rob", victim: target.id, basePenalty, eclipseBacklash: eclipseActive },
+        message.guildId ?? undefined,
+    );
 
-        if (actualPenalty > 0) {
-            await tx.transaction.create({ data: { walletId: robber.wallet.id, amount: -actualPenalty, type: "rob_fine", meta: { victim: target.id, requestedPenalty: basePenalty } } });
-        }
-
-        return { actualPenalty, updatedWallet };
-    });
-
-    await recordPotentialSoulLedgerLoss(message.author.id, result.actualPenalty);
+    await recordPotentialSoulLedgerLoss(message.author.id, result.totalPenalty);
     const releaseTime = await jailUser(message.author.id, message.guildId!, DEFAULT_JAIL_TIME_SECONDS);
 
     const eclipseNote = eclipseActive ? "\n\nThe Eclipse Mask's backlash added an extra penalty." : "";
@@ -229,7 +224,7 @@ export async function handleRob(message: Message, args: string[]) {
         v2Reply(
             errorContainer(
                 "Caught!",
-                `The robbery failed and cost you **${fmtCurrency(result.actualPenalty)}**.${eclipseNote}\nYou've been thrown in jail — released ${formatDiscordRelativeTime(releaseTime)}.\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**`,
+                `The robbery failed and cost you **${fmtCurrency(result.totalPenalty)}**.${eclipseNote}\nYou've been thrown in jail — released ${formatDiscordRelativeTime(releaseTime)}.\nWallet: **${fmtCurrency(result.newWalletBalance)}**\nBank: **${fmtCurrency(result.newBankBalance)}${result.newBankBalance < 0 ? " (Debt)" : ""}**`,
             ),
         ),
     );

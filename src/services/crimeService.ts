@@ -12,7 +12,8 @@ import { getCrimePrepItem } from "../data/crimePrepWhitelist";
 import { getStageCountForTier } from "../data/crimeMinigameCatalog";
 import { checkCrownOfGreed, checkDevilContract, recordPotentialSoulLedgerLoss } from "./shopBuffs";
 import { addCrimeHeat, getHeatLevel } from "./taxService";
-import { addBalance, removeBalance } from "./walletService";
+import { addBalance } from "./walletService";
+import { applyEconomyPenalty } from "./penaltyService";
 import { jailUser } from "./jailService";
 import { TAX_CONFIG } from "../utils/economyConfig";
 import { fmtCurrency } from "../utils/format";
@@ -46,6 +47,9 @@ export interface CrimeExecuteResult {
   jailReleaseAt?: Date;
   heat?: number;
   capped?: boolean;
+  newBankBalance?: number;
+  walletPenalty?: number;
+  bankPenalty?: number;
 }
 
 function randomInt(min: number, max: number) {
@@ -281,8 +285,15 @@ export async function resolveCrimeFailure(
     guardNote = `\n\n${Mascot.Emotes.Bandaid} Your Fox Tail Talisman softened the fine by 50%.`;
   }
 
-  const result = await removeBalance(userId, fine, "crime_fine", { command: "crime", crimeKey });
-  await recordPotentialSoulLedgerLoss(userId, result.removedAmount);
+  const result = await applyEconomyPenalty(
+    userId,
+    username,
+    fine,
+    "crime_fine",
+    { command: "crime", crimeKey },
+    guildId,
+  );
+  await recordPotentialSoulLedgerLoss(userId, result.totalPenalty);
 
   let jailed = false;
   let jailReleaseAt: Date | undefined;
@@ -292,12 +303,14 @@ export async function resolveCrimeFailure(
     jailed = true;
   }
 
-  const baseDescription = result.removedAmount > 0
-    ? randomMessage(crime.failMessages, result.removedAmount)
-    : "You found the target, but walked away empty-handed.";
-  let description = result.removedAmount < fine
-    ? `${baseDescription}\n\nYou could not cover the full ${fmtCurrency(fine)} penalty, so your wallet was drained to zero.${guardNote}`
-    : `${baseDescription}${guardNote}`;
+  const baseDescription = randomMessage(crime.failMessages, result.totalPenalty);
+  let description = `${baseDescription}${guardNote}`;
+
+  if (result.bankDebit > 0) {
+    description += result.newBankBalance < 0
+      ? `\n\nYour wallet paid ${fmtCurrency(result.walletDebit)}. The remaining ${fmtCurrency(result.bankDebit)} was charged to your bank, leaving you **${fmtCurrency(Math.abs(result.newBankBalance))} in debt**.`
+      : `\n\nYour wallet paid ${fmtCurrency(result.walletDebit)} and your bank paid the remaining ${fmtCurrency(result.bankDebit)}.`;
+  }
 
   if (jailed && jailReleaseAt) {
     description += `\n\n${Mascot.Emotes.Lock} You were arrested. Use \`,bail\` or wait until <t:${Math.floor(jailReleaseAt.getTime() / 1000)}:R>.`;
@@ -306,7 +319,7 @@ export async function resolveCrimeFailure(
   await clearCrimeSession(userId);
   await redisService.set(
     LAST_RESULT_KEY(userId),
-    { crimeKey, crimeName: crime.name, success: false, amount: result.removedAmount, jailed },
+    { crimeKey, crimeName: crime.name, success: false, amount: result.totalPenalty, jailed },
     86400,
   );
 
@@ -314,8 +327,11 @@ export async function resolveCrimeFailure(
     success: false,
     crime,
     message: description,
-    appliedAmount: result.removedAmount,
-    newBalance: result.newBalance,
+    appliedAmount: result.totalPenalty,
+    newBalance: result.newWalletBalance,
+    newBankBalance: result.newBankBalance,
+    walletPenalty: result.walletDebit,
+    bankPenalty: result.bankDebit,
     jailed,
     jailReleaseAt,
   };

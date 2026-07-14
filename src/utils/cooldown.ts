@@ -1,10 +1,12 @@
-import { TESTER_IDS, BOT_DEVELOPER_ID } from "./developerAccess";
+import { TESTER_IDS, BOT_DEVELOPER_IDS } from "./developerAccess";
 
 const cooldowns = new Map<string, number>();
 const dynamicCooldowns = new Map<string, number>(); // Stores lastUsed timestamp
 
 function testerKeyBypass(key: string) {
-  if (key.includes(BOT_DEVELOPER_ID)) return true;
+  for (const developerId of BOT_DEVELOPER_IDS) {
+    if (key.includes(developerId)) return true;
+  }
   for (const testerId of TESTER_IDS) {
     if (key.includes(testerId)) return true;
   }

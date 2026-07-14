@@ -22,7 +22,7 @@ const bankAndCredit: ModuleDoc = {
       heading: "The bank dashboard",
       body: [
         "!bank is the hub: net worth (wallet + bank + locked investments), balances, credit score, and buttons into Investments and Cards. Money moves in and out with !deposit <amount|all> and !withdraw <amount|all> — both accept smart amounts like 500k, 2m, or all.",
-        "What the bank does for you: everything in it is immune to !rob and to heat raids. What it doesn't do: pay interest on an idle balance. Growth only comes from the two deposit products below.",
+        "What the bank does for you: everything in it is immune to money stolen by !rob and to heat raids. Crime and robbery failure penalties are different: they drain the wallet first, then charge any remainder to the bank, which can become negative debt. Deposits repay that debt before becoming savings. The bank also pays no interest on an idle positive balance; growth only comes from the two deposit products below.",
       ],
     },
     {

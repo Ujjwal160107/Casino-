@@ -519,7 +519,7 @@ export function buildBankMainContainer(
                 `### ${Mascot.Emotes.Money} Net Worth\n${fmtCurrency(summary.netWorth)}`,
             ),
             new TextDisplayBuilder().setContent(
-                `### Wallet / Bank\nWallet: **${fmtCurrency(summary.walletBalance)}**\nBank: **${fmtCurrency(summary.bankBalance)}**`,
+                `### Wallet / Bank\nWallet: **${fmtCurrency(summary.walletBalance)}**\nBank: **${fmtCurrency(summary.bankBalance)}${summary.bankBalance < 0 ? " (Debt)" : ""}**`,
             ),
             new TextDisplayBuilder().setContent(
                 `### ${Mascot.Emotes.Credit} Credit Score\n${summary.creditScore}`,
@@ -535,7 +535,13 @@ export function buildBankMainContainer(
         )
         .addActionRowComponents(buildBankActionRow(ownerId))
         .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false))
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(nextStepHint("bank")!));
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+                summary.bankBalance < 0
+                    ? "-# Deposits repay your bank debt before building savings."
+                    : nextStepHint("bank")!,
+            ),
+        );
 }
 
 export function buildBankInvestmentsContainer(
