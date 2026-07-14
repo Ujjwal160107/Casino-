@@ -19,6 +19,7 @@ import {
 import { isTester } from "../utils/developerAccess";
 import { getCraftEffect, unlockCommonRecipesForAnimal } from "./huntCraftService";
 import { enqueueReminder } from "./cooldownReminderService";
+import { conditionalClaim } from "../anticheat/claim";
 
 export interface CaughtAnimalWithDef {
   id: string;
@@ -497,11 +498,25 @@ export async function claimZooIncome(
 
   const zooBoost = await getCraftEffect(discordId, `crafted_zoo_boost:${discordId}`, "zoo_boost", (v) => ({ multiplier: v }));
   const totalIncome = Math.floor(ratePerHour * cappedHours * (zooBoost?.multiplier ?? 1));
+
+  // Reserve the claim window atomically BEFORE crediting. Advancing lastZooClaim
+  // from the exact value we read is the CAS; concurrent claims lose (count 0).
+  const claimed = await conditionalClaim(() =>
+    prisma.user.updateMany({
+      where: { discordId, lastZooClaim: user?.lastZooClaim ?? null },
+      data: { lastZooClaim: new Date() },
+    })
+  );
+  if (!claimed) {
+    const err = new Error("Already collecting — try again in a moment.");
+    (err as any).code = "TOO_SOON";
+    throw err;
+  }
+
   await addBalance(discordId, username, totalIncome, "zoo_income", {
     hours: cappedHours,
     slotCount: slots.length,
   });
-  await prisma.user.update({ where: { discordId }, data: { lastZooClaim: new Date() } });
 
   return { claimed: totalIncome, hoursSinceLastClaim: cappedHours };
 }
