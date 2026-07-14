@@ -119,17 +119,17 @@ export async function handleStudy(message: Message, _args: string[] = []) {
     let eventImmunity = false;
     let guaranteedPositiveEvent = false;
 
-    if (studyLaptop) { xpMultiplier *= studyLaptop.xpMult; failReduction += studyLaptop.failRescue; stressDelta += studyLaptop.stressDelta; }
+    if (studyLaptop) { xpMultiplier *= studyLaptop.xpMult; failReduction += studyLaptop.failRescue ?? 0; stressDelta += studyLaptop.stressDelta ?? 0; }
     if (textbookBundle) { xpMultiplier *= textbookBundle.xpMult; }
-    if (labKit) { xpMultiplier *= labKit.xpMult; failReduction += labKit.failRescue; eventBiasPositive = eventBiasPositive || !!labKit.eventBiasPositive; eventAmplify = eventAmplify || !!labKit.eventAmplify; }
-    if (calcPro) { xpMultiplier *= calcPro.xpMult; failReduction += calcPro.failRescue; }
-    if (tutorPass) { xpMultiplier *= tutorPass.xpMult; stressDelta += tutorPass.stressDelta; guaranteedPass = true; guaranteedPositiveEvent = true; }
+    if (labKit) { xpMultiplier *= labKit.xpMult; failReduction += labKit.failRescue ?? 0; eventBiasPositive = eventBiasPositive || !!labKit.eventBiasPositive; eventAmplify = eventAmplify || !!labKit.eventAmplify; }
+    if (calcPro) { xpMultiplier *= calcPro.xpMult; failReduction += calcPro.failRescue ?? 0; }
+    if (tutorPass) { xpMultiplier *= tutorPass.xpMult; stressDelta += tutorPass.stressDelta ?? 0; guaranteedPass = true; guaranteedPositiveEvent = true; }
     if (focusNotes) { eventImmunity = true; }
     xpMultiplier = Math.min(xpMultiplier, 2.0);
     failReduction = Math.min(failReduction, 0.90);
 
     // Textbook Bundle "wrong chapter" roll — once per attempt
-    const wrongChapterHit = !!textbookBundle && Math.random() < textbookBundle.wrongChapterChance;
+    const wrongChapterHit = !!textbookBundle && Math.random() < (textbookBundle.wrongChapterChance ?? 0);
 
     // 2. Pick Game
     const game = getStudyGame();
@@ -248,13 +248,14 @@ export async function handleStudy(message: Message, _args: string[] = []) {
         const { questBus } = await import("../../services/questEvents");
         questBus.emit("education:study", { discordId: message.author.id });
 
-        // Apply focus_notes bonus XP
+        // Apply focus_notes bonus XP — but NOT on a wrong-chapter session, where
+        // the bonus was zeroed; carry those one-shot buffs to the next session.
         let focusBonus = "";
-        if (focusNotes) {
+        if (focusNotes && !wrongChapterHit) {
             focusBonus = `\n📝 **Focus Notes:** +${focusNotes.bonusXp} bonus XP applied!`;
             await redisService.del(`focus_notes:${userId}`);
         }
-        if (craftedStudyXp) {
+        if (craftedStudyXp && !wrongChapterHit) {
             focusBonus += `\nDuck Feather Quill: +${craftedStudyXp.bonusXp} education XP applied!`;
             await redisService.del(`crafted_study_xp:${userId}`);
         }
