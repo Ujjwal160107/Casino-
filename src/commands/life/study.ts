@@ -194,7 +194,7 @@ export async function handleStudy(message: Message, _args: string[] = []) {
         const focusNotesBonus = focusNotes?.bonusXp ?? 0;
         const craftedStudyBonus = craftedStudyXp?.bonusXp ?? 0;
         const bonusXp = Math.floor(50 * (xpMultiplier - 1)) + focusNotesBonus + craftedStudyBonus;
-        const res = await study(message.author.id, message.guild!.id, bonusXp);
+        const res = await study(message.author.id, message.guild!.id, { bonusXp });
 
         const { questBus } = await import("../../services/questEvents");
         questBus.emit("education:study", { discordId: message.author.id });
