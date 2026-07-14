@@ -11,7 +11,7 @@ import { getStudyGame, Minigame } from "../../services/minigameService";
 import { redisService } from "../../services/redisService";
 import { isTesterMember } from "../../utils/developerAccess";
 import { getGuildPrefix } from "../../utils/guildContext";
-import { DEFAULT_STUDY_COOLDOWN_SECONDS } from "../../utils/economyConfig";
+import { DEFAULT_STUDY_COOLDOWN_SECONDS, STUDY_DAILY_CAP } from "../../utils/economyConfig";
 
 function studyEducationNote(prefix: string) {
     return `You can view your education progress using \`${prefix}education\``;
@@ -52,7 +52,7 @@ export async function handleStudy(message: Message, _args: string[] = []) {
         return message.reply(v2Reply(errorContainer("Not Enrolled", `You are not enrolled in any degree. Use \`${prefix}education\` to start your education!`)));
     }
 
-    // DB-Based Cooldown (Dynamic)
+    // DB-Based Cooldown (30 min)
     const cooldownSeconds = DEFAULT_STUDY_COOLDOWN_SECONDS;
     const cooldownMs = cooldownSeconds * 1000;
     const lastStudyTime = user.currentEducation.lastStudy ? new Date(user.currentEducation.lastStudy).getTime() : 0;
@@ -72,26 +72,64 @@ export async function handleStudy(message: Message, _args: string[] = []) {
         return message.reply(v2Reply(cooldownContainer));
     }
 
-    // Fetch active Uni Store buffs
     const userId = message.author.id;
+
+    // Daily study cap — anti-exploit backstop (testers bypass)
+    const studyCountKey = `study_count:${userId}`;
+    const dailyCount = (await redisService.get<number>(studyCountKey)) ?? 0;
+    if (dailyCount >= STUDY_DAILY_CAP && !testerBypass) {
+        const capContainer = errorContainer(
+            "Daily Limit Reached",
+            `You've studied **${STUDY_DAILY_CAP}** times today — your brain is full. Come back tomorrow.`,
+            { hint: studyEducationNote(prefix) }
+        );
+        return message.reply(v2Reply(capContainer));
+    }
+
+    // Record the attempt up-front so the 30-min cooldown and the daily count apply
+    // to ANY attempt past the gate — win OR lose — closing the fail-retry bypass.
+    if (!testerBypass) {
+        const midnight = new Date(now);
+        midnight.setHours(24, 0, 0, 0);
+        const secondsUntilMidnight = Math.max(1, Math.floor((midnight.getTime() - now) / 1000));
+        await redisService.set(studyCountKey, dailyCount + 1, secondsUntilMidnight);
+        await prisma.userEducation.update({
+            where: { id: user.currentEducation.id },
+            data: { lastStudy: new Date(now) },
+        });
+    }
+
+    // Fetch active Uni Store buffs
     const [studyLaptop, textbookBundle, labKit, calcPro, focusNotes, tutorPass, craftedStudyXp] = await Promise.all([
-      redisService.get<{ sessionsLeft: number; xpMult: number }>(`study_laptop:${userId}`),
-      redisService.get<{ sessionsLeft: number; xpMult: number }>(`textbook_bundle:${userId}`),
-      redisService.get<{ sessionsLeft: number; failReduction: number; xpMult: number }>(`lab_kit:${userId}`),
-      redisService.get<{ sessionsLeft: number; failRescue: number; xpMult: number }>(`calculator_pro:${userId}`),
-      redisService.get<{ active: boolean; bonusXp: number }>(`focus_notes:${userId}`),
-      redisService.get<{ active: boolean; xpMult: number; failReduction: number }>(`tutor_pass:${userId}`),
+      redisService.get<{ sessionsLeft: number; xpMult: number; stressDelta: number; failRescue: number }>(`study_laptop:${userId}`),
+      redisService.get<{ sessionsLeft: number; xpMult: number; wrongChapterChance: number }>(`textbook_bundle:${userId}`),
+      redisService.get<{ sessionsLeft: number; xpMult: number; failRescue: number; eventBiasPositive: boolean; eventAmplify: boolean }>(`lab_kit:${userId}`),
+      redisService.get<{ sessionsLeft: number; xpMult: number; failRescue: number }>(`calculator_pro:${userId}`),
+      redisService.get<{ active: boolean; bonusXp: number; eventImmunity: boolean }>(`focus_notes:${userId}`),
+      redisService.get<{ active: boolean; xpMult: number; guaranteedPass: boolean; guaranteedPositiveEvent: boolean; stressDelta: number }>(`tutor_pass:${userId}`),
       redisService.get<{ bonusXp: number }>(`crafted_study_xp:${userId}`),
     ]);
 
     let xpMultiplier = 1.0;
     let failReduction = 0;
-    if (studyLaptop) xpMultiplier *= studyLaptop.xpMult;
-    if (textbookBundle) xpMultiplier *= textbookBundle.xpMult;
-    if (labKit) { xpMultiplier *= labKit.xpMult; failReduction += labKit.failReduction; }
+    let stressDelta = 0;
+    let guaranteedPass = false;
+    let eventBiasPositive = false;
+    let eventAmplify = false;
+    let eventImmunity = false;
+    let guaranteedPositiveEvent = false;
+
+    if (studyLaptop) { xpMultiplier *= studyLaptop.xpMult; failReduction += studyLaptop.failRescue; stressDelta += studyLaptop.stressDelta; }
+    if (textbookBundle) { xpMultiplier *= textbookBundle.xpMult; }
+    if (labKit) { xpMultiplier *= labKit.xpMult; failReduction += labKit.failRescue; eventBiasPositive = eventBiasPositive || !!labKit.eventBiasPositive; eventAmplify = eventAmplify || !!labKit.eventAmplify; }
     if (calcPro) { xpMultiplier *= calcPro.xpMult; failReduction += calcPro.failRescue; }
-    if (tutorPass) { xpMultiplier *= tutorPass.xpMult; failReduction += tutorPass.failReduction; }
+    if (tutorPass) { xpMultiplier *= tutorPass.xpMult; stressDelta += tutorPass.stressDelta; guaranteedPass = true; guaranteedPositiveEvent = true; }
+    if (focusNotes) { eventImmunity = true; }
     xpMultiplier = Math.min(xpMultiplier, 2.0);
+    failReduction = Math.min(failReduction, 0.90);
+
+    // Textbook Bundle "wrong chapter" roll — once per attempt
+    const wrongChapterHit = !!textbookBundle && Math.random() < textbookBundle.wrongChapterChance;
 
     // 2. Pick Game
     const game = getStudyGame();
@@ -168,9 +206,12 @@ export async function handleStudy(message: Message, _args: string[] = []) {
     // Disable buttons on game message (re-send text-only frame, no action row)
     if (reply) await reply.edit(v2Reply(buildQuestionContainer(game, prefix))).catch(() => { });
 
-    // Fail rescue: if user failed but has active buffs with failReduction, attempt rescue
+    // Guaranteed pass (Tutor Pass) or a fail-rescue roll from stacked buffs
     let rescued = false;
-    if (!isWin && failReduction > 0 && Math.random() < failReduction) {
+    if (!isWin && guaranteedPass) {
+        isWin = true;
+        rescued = true;
+    } else if (!isWin && failReduction > 0 && Math.random() < failReduction) {
         isWin = true;
         rescued = true;
     }
@@ -194,7 +235,15 @@ export async function handleStudy(message: Message, _args: string[] = []) {
         const focusNotesBonus = focusNotes?.bonusXp ?? 0;
         const craftedStudyBonus = craftedStudyXp?.bonusXp ?? 0;
         const bonusXp = Math.floor(50 * (xpMultiplier - 1)) + focusNotesBonus + craftedStudyBonus;
-        const res = await study(message.author.id, message.guild!.id, { bonusXp });
+        const res = await study(message.author.id, message.guild!.id, {
+            bonusXp,
+            stressDelta,
+            wrongChapterHit,
+            eventImmunity,
+            eventBiasPositive,
+            eventAmplify,
+            guaranteedPositiveEvent,
+        });
 
         const { questBus } = await import("../../services/questEvents");
         questBus.emit("education:study", { discordId: message.author.id });
