@@ -12,7 +12,10 @@
     "prisma:generate": "npx prisma generate",
     "prisma:studio": "npx prisma studio",
     "seed": "ts-node prisma/seed.ts",
-    "postinstall": "npx prisma generate"
+    "postinstall": "npx prisma generate",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run --dir test"
   },
   "repository": {
     "type": "git",
@@ -43,6 +46,7 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
   }
 }
