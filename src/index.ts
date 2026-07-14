@@ -27,6 +27,7 @@ import {
   handleGlobalEconomyReminderInteraction
 } from "./services/globalEconomyReminderService";
 import { initScheduler } from "./scheduler";
+import { backfillStarterChickens } from "./services/starterChickenService";
 
 const slashCommands = new Map<string, any>();
 const slashData: any[] = [];
@@ -76,6 +77,10 @@ client.once("ready", async () => {
 
   await initEmojiRegistry(client);
   console.log("Emoji registry keys:", listEmojiKeys().slice(0, 200));
+
+  void backfillStarterChickens()
+    .then((created) => console.log(`Starter chicken backfill complete: ${created} provisioned.`))
+    .catch((error) => console.error("Starter chicken backfill failed:", error));
 
   const { initQuestListeners } = require("./services/questService");
   initQuestListeners();

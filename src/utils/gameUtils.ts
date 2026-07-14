@@ -1,4 +1,5 @@
 import { GameConfig, EquipmentSlot } from "../config/gameConfig";
+import { getChickenTraitBonus } from "./chickenConfig";
 
 export interface StatBonus {
     str: number;
@@ -83,14 +84,7 @@ export function getEquipmentBonuses(itemName: string | undefined): StatBonus {
 }
 
 export function getTraitBonus(trait: string | undefined): StatBonus {
-    if (!trait) return { str: 0, agi: 0, def: 0 };
-    const t = trait.toLowerCase();
-    if (t === "aggressive") return { str: 2, agi: 0, def: -1 };
-    if (t === "tank") return { str: 0, agi: -1, def: 2 };
-    if (t === "speedster") return { str: -1, agi: 2, def: 0 };
-    if (t === "balanced") return { str: 1, agi: 1, def: 1 };
-    if (t === "fierce") return { str: 3, agi: 0, def: -2 };
-    return { str: 0, agi: 0, def: 0 };
+    return getChickenTraitBonus(trait);
 }
 
 export function calculateTotalStats(baseStats: StatBonus, trait: string | undefined, equipmentNames: string[]): StatBonus {

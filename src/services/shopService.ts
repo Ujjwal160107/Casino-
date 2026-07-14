@@ -12,6 +12,7 @@ import { ensureUserAndWallet } from "./walletService";
 import { GLOBAL_CATALOG_GUILD_ID, globalCatalogGuildFilter } from "../utils/globalCatalog";
 import type { ShopCatalogItem } from "../utils/shopCatalog";
 import { LOADED_DICE_ITEM_KEY } from "../utils/loadedDiceConfig";
+import { STARTER_CHICKEN_ITEM_KEY } from "../utils/chickenConfig";
 
 function getItemEffectSource(item: { catalogKey?: string | null; name: string; emoji?: string | null }): ItemEffectSource {
   const catalog = SHOP_CATALOG.find((entry) => entry.key === item.catalogKey || entry.name.toLowerCase() === item.name.toLowerCase());
@@ -123,6 +124,9 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
   }
 
   if (!item) throw new Error("Item not found.");
+  if (item.catalogKey === STARTER_CHICKEN_ITEM_KEY || item.name.toLowerCase() === "chicken") {
+    throw new Error("Every player receives a chicken automatically. Use `chicken` to view yours.");
+  }
   if (item.stock !== -1 && item.stock <= 0 && !tester) throw new Error("Out of stock.");
 
   const res = await prisma.$transaction(async (tx) => {
@@ -204,29 +208,6 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       metaData = {
         rollCount: 0,
         acquiredAt: new Date().toISOString(),
-      };
-    }
-
-    if (item.name.toLowerCase() === "chicken") {
-      const existingInfo = await tx.inventory.findUnique({
-        where: { userId_shopItemId: { userId: user.discordId, shopItemId: item.id } }
-      });
-      if (existingInfo && existingInfo.amount >= 1) {
-        throw new Error("You can only hold 1 Chicken at a time!");
-      }
-
-      const TRAITS = ["Aggressive", "Tank", "Speedster", "Balanced", "Fierce"];
-      const trait = TRAITS[Math.floor(Math.random() * TRAITS.length)];
-
-      metaData = {
-        name: `${user.username}'s Chicken`,
-        level: 0,
-        xp: 0,
-        wins: 0,
-        strength: 0,
-        agility: 0,
-        defense: 0,
-        trait: trait
       };
     }
 

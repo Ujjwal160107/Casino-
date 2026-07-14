@@ -2,6 +2,7 @@ import prisma from "../utils/prisma";
 import { redisService } from "./redisService";
 import { User, Wallet, Degree, UserDegree, UserEducation } from "@prisma/client";
 import { STARTING_WALLET_BALANCE } from "../utils/economyConfig";
+import { ensureStarterChicken } from "./starterChickenService";
 
 // Define a type that includes commonly used relations
 export type UserWithRelations = User & {
@@ -72,7 +73,7 @@ export async function invalidateUserCache(discordId: string, _guildId: string) {
 }
 
 export async function createUser(discordId: string, _guildId: string, username: string) {
-    return await prisma.user.create({
+    const user = await prisma.user.create({
         data: {
             discordId,
             username,
@@ -84,4 +85,6 @@ export async function createUser(discordId: string, _guildId: string, username: 
         },
         include: { wallet: true }
     });
+    await ensureStarterChicken(discordId, username);
+    return user;
 }

@@ -951,9 +951,9 @@ export const COCK_SYSTEM_ITEMS: ShopCatalogItem[] = [
   {
     key: "chicken",
     name: "Chicken",
-    price: 25_000,
-    description: "Your fighting companion. Each chicken has a unique trait.",
-    shortDescription: "A cockfighting chicken.",
+    price: 0,
+    description: "Your fighting companion. Every player receives a chicken with a random trait automatically.",
+    shortDescription: "Automatically assigned to every player.",
     category: "COCK",
     asset: "cockstore_mascot",
     consumable: false,

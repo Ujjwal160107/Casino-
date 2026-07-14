@@ -9,6 +9,7 @@ import { GameConfig } from "../../config/gameConfig";
 import { Mascot } from "../../config/branding";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { CHICKEN_TRAITS, formatChickenTraitBonus } from "../../utils/chickenConfig";
 
 const EMOJI_CHICKEN = GameConfig.Emojis.Chicken;
 const EMOJI_XP = GameConfig.Emojis.XpFull;
@@ -19,6 +20,9 @@ const EMOJI_RED = GameConfig.Emojis.RedBar;
 
 
 export async function handleChicken(message: Message, args: string[]) {
+    if (!message.guildId) return;
+    await ensureUserAndWallet(message.author.id, message.guildId, message.member?.displayName ?? message.author.username);
+
     const subCommand = args[0]?.toLowerCase();
 
     if (subCommand === "name") {
@@ -151,13 +155,10 @@ async function handleName(message: Message, args: string[]) {
 
 async function handleTraitsInfo(message: Message) {
     // Trait Definitions
-    const traits = [
-        { name: "Aggressive", effect: "**+2** Str, **-1** Def" },
-        { name: "Tank", effect: "**+2** Def, **-1** Agi" },
-        { name: "Speedster", effect: "**+2** Agi, **-1** Str" },
-        { name: "Balanced", effect: "**+1** All Stats" },
-        { name: "Fierce", effect: "**+3** Str, **-2** Def" },
-    ];
+    const traits = CHICKEN_TRAITS.map((trait) => ({
+        name: trait.name,
+        effect: formatChickenTraitBonus(trait.bonus),
+    }));
 
     const description = traits.map(t => `• **${t.name}**: ${t.effect}`).join("\n");
 
@@ -194,8 +195,8 @@ async function handleView(message: Message, args: string[]) {
             where: { userId_shopItemId: { userId: userData.discordId, shopItemId: shopItem.id } }
         });
 
-        if (!inventoryItem) {
-            return message.reply(v2Reply(errorContainer("No Chicken", "You do not own a chicken! Buy one from the shop.")));
+        if (!inventoryItem || inventoryItem.amount < 1) {
+            return message.reply(v2Reply(errorContainer("Chicken Hatching", "Your starter chicken is being prepared. Please try `chicken` again in a moment.")));
         }
 
         const meta = (inventoryItem.meta as any) || {};
@@ -362,7 +363,14 @@ async function handleView(message: Message, args: string[]) {
             if (now >= meta.critical.endTime) {
                 // Timer expired → permadeath
                 await prisma.inventory.delete({ where: { id: inventoryItem.id } });
-                const container = plainContainer("## Your Chicken Has Died\nThe critical window expired. Your chicken could not be saved.\n\nRest in peace. You can buy a new chicken from the Cock Store.");
+                const replacement = await ensureUserAndWallet(user.id, guildId, user.username);
+                const replacementChicken = await prisma.inventory.findUnique({
+                    where: { userId_shopItemId: { userId: replacement.discordId, shopItemId: shopItem.id } },
+                });
+                const replacementTrait = (replacementChicken?.meta as any)?.trait ?? "Unknown";
+                const container = plainContainer(
+                    `## Your Chicken Has Died\nThe critical window expired and your chicken could not be saved.\n\nA new level 0 chicken has hatched with the **${replacementTrait}** trait. Use \`${prefix}chicken\` to meet it.`,
+                );
                 return message.reply(v2Reply(container));
             }
 

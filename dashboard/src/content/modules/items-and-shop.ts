@@ -117,7 +117,7 @@ const itemsAndShop: ModuleDoc = {
     {
       heading: "HUNT, COCK & COSMETICS",
       body: [
-        "The HUNT tab sells the four rifles, the hunt buffs — including the reusable Hunter's Compass, a once-a-day pick between a risky and a safe hunting path — and recipe blueprints; every number is in the Hunting & Animals docs. The COCK tab sells the chicken itself plus feed, medicine, and equipment — covered wall-to-wall in Chickens & Cockfights.",
+        "The HUNT tab sells the four rifles, the hunt buffs — including the reusable Hunter's Compass, a once-a-day pick between a risky and a safe hunting path — and recipe blueprints; every number is in the Hunting & Animals docs. Every player receives a chicken automatically; the COCK tab sells its feed, medicine, and equipment — covered wall-to-wall in Chickens & Cockfights.",
         "COSMETICS is 18 tiers of pure flex, from the Velvet Name Tag at 50,000 to the Reality Crown at 1,000,000,000. They do nothing mechanical — but they set your Flex Rank on !profile, and several add profile luck: Fortuna Bracelet +5, Platinum Crown +8, Celestial Halo +10, Fortune Dragon Cloak +12, Crown of Immortals +15, Fortuna's Signature +20, Reality Crown +25.",
       ],
     },
