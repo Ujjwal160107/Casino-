@@ -22,6 +22,7 @@ PORT="${DEPLOY_PORT:-9000}"
 APP_DIR="${APP_DIR:-/root/app}"
 LOG_FILE="${LOG_FILE:-/var/log/casino-deploy.log}"
 LOCK_FILE="${LOCK_FILE:-/tmp/casino-deploy.lock}"
+PENDING_FILE="${PENDING_FILE:-/tmp/casino-deploy.pending}"
 DEPLOY_SECRET="${DEPLOY_SECRET:?DEPLOY_SECRET environment variable is required}"
 
 log() {
@@ -146,28 +147,46 @@ handle_request() {
 
     # Acknowledge immediately, then deploy in the background. The full build
     # (npm install + tsc + prisma + a memory-heavy Next.js build + pm2
-    # restart) takes several minutes on a small VPS, and the GitHub Actions
+    # restart) takes several minutes on this 2GB VPS, and the GitHub Actions
     # curl holds the connection open until we respond — so we must NOT block
     # on the build, or a slow/stalled build hangs the CI run indefinitely.
     #
-    # The two properties that actually matter are still preserved:
-    #   - flock serializes deploys so overlapping webhook calls (several
-    #     pushes in quick succession) queue and run one at a time instead of
-    #     racing git pull / npm install / pm2 restart on the same directory.
-    #   - all build output goes to $LOG_FILE only (never the socket), so the
-    #     real success/failure of each step is inspectable there.
+    # The ack goes out FIRST, before any deploy work, and the deploy is fully
+    # detached from the socket: socat wires the TCP socket to this process's
+    # stdin (fd 0) and stdout (fd 1). Redirecting 0</dev/null and 1/2→log means
+    # no socket fd leaks into the build, so socat closes the ack connection the
+    # instant handle_request returns.
     echo -ne "HTTP/1.1 200 OK\r\nContent-Length: 14\r\n\r\nDeploy queued!"
 
-    # Detach the background deploy from the socket. socat wires the TCP socket
-    # to this process's stdin (fd 0) as well as stdout; without re-pointing fd 0
-    # away from the socket, the backgrounded subshell keeps the connection's read
-    # end open and socat won't fully close the connection until the multi-minute
-    # build finishes. Redirect 0</dev/null (plus 1/2→log, 200→lock) so no socket
-    # fd leaks into the build and the ack connection closes immediately.
+    # Single-flight, COALESCING deploy runner — the fix for curl-28 "0 bytes
+    # received" ack timeouts. Root cause: a heavy build pegs this small box and
+    # starves the socat listener so it can't ack the *next* webhook. Two guards:
+    #
+    #   1. flock -n (non-blocking): if a deploy is already running, we do NOT
+    #      queue another — we mark work pending and exit. The in-flight runner
+    #      re-runs once more when it finishes (picking up the newest commit via
+    #      git pull). So N rapid webhooks — including the CI's own retries —
+    #      collapse into at most one extra deploy instead of spawning 5 parallel
+    #      builds that compound the peg and guarantee the next ack times out.
+    #
+    #   2. renice + ionice: the deploy (and every npm/tsc/next-build child it
+    #      spawns) yields CPU and disk priority, so the listener always has
+    #      enough scheduling headroom to send its ack within a second.
+    touch "$PENDING_FILE"
     (
-        flock -w 900 200 || { log "❌ Timed out waiting for deploy lock — another deploy is still running"; exit 1; }
-        do_deploy
-    ) >>"$LOG_FILE" 2>&1 0</dev/null 200>"$LOCK_FILE" &
+        exec 200>"$LOCK_FILE"
+        if ! flock -n 200; then
+            log "⏳ Deploy already running — coalescing; the in-flight run will pick up the latest commit."
+            exit 0
+        fi
+        renice -n 15 -p "$BASHPID" >/dev/null 2>&1 || true
+        ionice -c3 -p "$BASHPID" >/dev/null 2>&1 || true
+        # Re-run while new triggers keep arriving, so late pushes aren't dropped.
+        while [ -f "$PENDING_FILE" ]; do
+            rm -f "$PENDING_FILE"
+            do_deploy
+        done
+    ) >>"$LOG_FILE" 2>&1 0</dev/null &
 }
 
 # --- Entrypoint ---

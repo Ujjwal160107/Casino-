@@ -32,7 +32,7 @@ function buildPreviewContainer(game: Minigame, prefix: string) {
 // Real-question frame — mascot "Think" thumbnail via infoContainer default.
 function buildQuestionContainer(game: Minigame, prefix: string) {
     return infoContainer(
-        "🧠 Quick Study Session",
+        "Quick Study Session",
         `${game.description}\n\nYou have **${game.time}** seconds!`,
         { hint: withStudyFooter(prefix, `You have ${game.time} seconds!`) }
     );
@@ -221,7 +221,7 @@ export async function handleStudy(message: Message, _args: string[] = []) {
         if (tutorPass) await redisService.del(`tutor_pass:${userId}`);
 
         const failContainer = errorContainer(
-            "📖 Study Session Failed",
+            "Study Session Failed",
             `${Mascot.Emotes.Confused} You failed the test!\n\n**Correct Answer:** ${game.answer}`,
             { hint: studyEducationNote(prefix) }
         );
@@ -252,7 +252,7 @@ export async function handleStudy(message: Message, _args: string[] = []) {
         // the bonus was zeroed; carry those one-shot buffs to the next session.
         let focusBonus = "";
         if (focusNotes && !wrongChapterHit) {
-            focusBonus = `\n📝 **Focus Notes:** +${focusNotes.bonusXp} bonus XP applied!`;
+            focusBonus = `\n**Focus Notes:** +${focusNotes.bonusXp} bonus XP applied!`;
             await redisService.del(`focus_notes:${userId}`);
         }
         if (craftedStudyXp && !wrongChapterHit) {
@@ -284,11 +284,11 @@ export async function handleStudy(message: Message, _args: string[] = []) {
         if (xpMultiplier > 1.0) footerText += ` (${xpMultiplier.toFixed(2)}x buff)`;
         if (rescued) footerText = bonusXp > 0 ? `Rescued by buff! +${bonusXp} Bonus XP!` : "Rescued by buff!";
 
-        let resultDesc = res.msg + focusBonus + (rescued ? "\n✨ **Your study items rescued the attempt!**" : "");
+        let resultDesc = res.msg + focusBonus + (rescued ? "\n**Your study items rescued the attempt!**" : "");
 
         let claimRow: ActionRowBuilder<ButtonBuilder> | null = null;
         if (res.scholarship) {
-            resultDesc += `\n\n**🎉 Scholarship Unlocked!:** You reached **${res.scholarship.milestone}%** XP!\nReward: **${fmtCurrency(res.scholarship.amount)}**`;
+            resultDesc += `\n\n**Scholarship Unlocked!:** You reached **${res.scholarship.milestone}%** XP!\nReward: **${fmtCurrency(res.scholarship.amount)}**`;
             claimRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`claim_scholarship_${res.scholarship.milestone}`)
@@ -305,7 +305,7 @@ export async function handleStudy(message: Message, _args: string[] = []) {
 
         const teacherUrl = getEmoteUrl(Mascot.Emotes.Teacher);
         const resultContainer = successContainer(
-            "📚 Study Successful!",
+            "Study Successful!",
             resultDesc,
             { hint: hintText, thumbnailUrl: teacherUrl ?? undefined }
         );

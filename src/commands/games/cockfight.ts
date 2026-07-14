@@ -249,7 +249,7 @@ export async function handleCockFight(message: Message, args: string[]) {
             formatChickenStats(targetMeta, targetMeta.level || 0),
             ``,
             `Bet: **${fmtCurrency(betAmount)}**`,
-            `⚠️ Loser's chicken will be injured (2h) with equipment broken. Small permadeath chance.`,
+            `Loser's chicken will be injured (2h) with equipment broken. Small permadeath chance.`,
             `The opponent must accept within 30 seconds.`
         ].join("\n")
     );
@@ -933,20 +933,20 @@ async function runCockFight(
         if (isCritical && !survivedByEffect) {
             deathMessage = [
                 `${EMOJI_RIP} **CRITICAL CONDITION!** ${loser.displayName}'s chicken is dying!`,
-                `⏰ You have **24 hours** to save it with \`${prefix}use phoenix serum\``,
-                `💀 If the timer expires, your chicken is **permanently lost**.`,
-                `💥 Equipment destroyed.`,
+                `You have **24 hours** to save it with \`${prefix}use phoenix serum\``,
+                `If the timer expires, your chicken is **permanently lost**.`,
+                `Equipment destroyed.`,
             ].join("\n");
         } else if (usedDeathSave) {
             deathMessage = [
-                `🛡️ **SAVED!** ${loser.displayName}'s chicken was saved from critical by a **Death Save** effect!`,
+                `**SAVED!** ${loser.displayName}'s chicken was saved from critical by a **Death Save** effect!`,
                 `<:clinic:1456568728883040287> Injured for **${recoveryHours.toFixed(1)}h**. Coin heal: **${fmtCurrency(coinHealCost)}**`,
                 `-# Or use \`${prefix}use feather bandage\` for instant heal`,
             ].join("\n");
         } else {
             const vestNote = equipmentSaved
-                ? "\n🛡️ **Guard Vest protected equipment!**"
-                : "\n💥 Equipment broken!";
+                ? "\n**Guard Vest protected equipment!**"
+                : "\nEquipment broken!";
             deathMessage = [
                 `<:clinic:1456568728883040287> **INJURED!** ${loser.displayName}'s chicken is hospitalized for **${recoveryHours.toFixed(1)}h**.${vestNote}`,
                 `-# Coin heal: **${fmtCurrency(coinHealCost)}** | \`${prefix}use feather bandage\` | \`${prefix}use phoenix serum\``,

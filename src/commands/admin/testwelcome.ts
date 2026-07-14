@@ -25,10 +25,10 @@ export async function handleTestWelcome(message: Message) {
     const me = guild.members.me;
 
     if (!me) {
-        return message.reply("❌ Error: `guild.members.me` is undefined.");
+        return message.reply("Error: `guild.members.me` is undefined.");
     }
 
-    await message.reply("🔍 Starting Welcome Message Simulation...");
+    await message.reply("Starting Welcome Message Simulation...");
 
     // 1. Prepare Welcome Container
     const welcomeContainer = new ContainerBuilder();
@@ -36,7 +36,7 @@ export async function handleTestWelcome(message: Message) {
         new SectionBuilder()
             .addTextDisplayComponents(
                 new TextDisplayBuilder().setContent(
-                    `## 🎉 Thanks for adding ${Mascot.Name}!\n` +
+                    `## Thanks for adding ${Mascot.Name}!\n` +
                     `I'm here to handle your server's **Economy**, **Games**, and **Moderation** needs.\n\n` +
                     `Here are some quick links to help you get started:`
                 )
@@ -47,9 +47,9 @@ export async function handleTestWelcome(message: Message) {
     );
     welcomeContainer.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-            `**🚀 Getting Started:** Use \`/setup\` to configure your server's economy and settings.\n` +
-            `**📚 Documentation:** Read our [Docs](${Mascot.Links.Docs}) for a full command list and guides.\n` +
-            `**🆘 Support:** Need help? Join our [Support Server](${Mascot.Links.Support}).`
+            `**Getting Started:** Use \`/setup\` to configure your server's economy and settings.\n` +
+            `**Documentation:** Read our [Docs](${Mascot.Links.Docs}) for a full command list and guides.\n` +
+            `**Support:** Need help? Join our [Support Server](${Mascot.Links.Support}).`
         )
     );
 
@@ -75,12 +75,12 @@ export async function handleTestWelcome(message: Message) {
         const perms = guild.systemChannel.permissionsFor(me);
         if (perms?.has([PermissionFlagsBits.SendMessages, PermissionFlagsBits.ViewChannel])) {
             targetChannel = guild.systemChannel;
-            log += `✅ Selected System Channel: ${targetChannel.name}\n`;
+            log += `Selected System Channel: ${targetChannel.name}\n`;
         } else {
-            log += `⚠️ System Channel (${guild.systemChannel.name}) is not writable/viewable.\n`;
+            log += `System Channel (${guild.systemChannel.name}) is not writable/viewable.\n`;
         }
     } else {
-        log += `ℹ️ No System Channel configured.\n`;
+        log += `No System Channel configured.\n`;
     }
 
     if (!targetChannel) {
@@ -91,9 +91,9 @@ export async function handleTestWelcome(message: Message) {
         );
         if (channel) {
             targetChannel = channel as TextChannel;
-            log += `✅ Selected Fallback Channel: ${targetChannel.name}\n`;
+            log += `Selected Fallback Channel: ${targetChannel.name}\n`;
         } else {
-            log += `❌ Could not find ANY accessible text/announcement channel.\n`;
+            log += `Could not find ANY accessible text/announcement channel.\n`;
         }
     }
 
@@ -101,9 +101,9 @@ export async function handleTestWelcome(message: Message) {
     if (targetChannel) {
         try {
             await targetChannel.send(v2Reply(welcomeContainer));
-            log += `🎉 Message SENT successfully to ${targetChannel.toString()}.`;
+            log += `Message SENT successfully to ${targetChannel.toString()}.`;
         } catch (err: any) {
-            log += `❌ Error sending message: ${err.message}`;
+            log += `Error sending message: ${err.message}`;
         }
     }
 

@@ -21,7 +21,7 @@ export async function handleDropout(message: Message) {
         }
 
         const container = plainContainer(
-            `## ⚠️ Confirm Dropout\nAre you sure you want to drop out of **${user.currentEducation.degree.name}**?\n\n**Warning:**\n• You will lose all progress in this degree.\n• Tuition fees are non-refundable.\n• You will have to pay again to re-enroll.`
+            `## Confirm Dropout\nAre you sure you want to drop out of **${user.currentEducation.degree.name}**?\n\n**Warning:**\n• You will lose all progress in this degree.\n• Tuition fees are non-refundable.\n• You will have to pay again to re-enroll.`
         );
 
         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

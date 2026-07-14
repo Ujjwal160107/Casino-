@@ -38,7 +38,7 @@ export async function handleTransfer(message: Message, args: string[]) {
       });
 
       const taxLine = taxResult.shielded
-        ? "Tax: 🛡️ Shielded"
+        ? "Tax: Shielded"
         : `Transfer Tax (5%): -${fmtCurrency(taxResult.taxPaid)} | Recipient receives: ${fmtCurrency(taxResult.net)}`;
 
       return message.reply(v2Reply(successContainer("Transfer Successful", `Sent **${fmtAmount(amount)}** to <@${toId}>.\n${taxLine}`)));

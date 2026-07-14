@@ -82,8 +82,6 @@ async function handleTop(message: Message) {
 
     const top10 = sorted.slice(0, 10);
 
-    const EMOJI_TROPHY = "🏆";
-
     const description = top10.map((inv, index) => {
         const meta = (inv.meta as any) || {};
         const level = meta.level || 0;
@@ -98,7 +96,7 @@ async function handleTop(message: Message) {
         return `${rankEmoji} **${inv.user.username}** — ${name} (Lvl ${level} | ${wins} Wins)`;
     }).join("\n");
 
-    const container = plainContainer(`## ${EMOJI_TROPHY} Chicken Leaderboard\n${description || "No active chickens."}`);
+    const container = plainContainer(`## Chicken Leaderboard\n${description || "No active chickens."}`);
 
     return message.reply(v2Reply(container));
 }
@@ -163,7 +161,7 @@ async function handleTraitsInfo(message: Message) {
 
     const description = traits.map(t => `• **${t.name}**: ${t.effect}`).join("\n");
 
-    const container = plainContainer(`## 🧬 Chicken Traits\nChickens are born with a random trait that affects their combat stats.\n\n${description}`);
+    const container = plainContainer(`## Chicken Traits\nChickens are born with a random trait that affects their combat stats.\n\n${description}`);
 
     return message.reply(v2Reply(container));
 }
@@ -228,7 +226,7 @@ async function handleView(message: Message, args: string[]) {
                 const originalCost = activeTraining.cost || 0;
                 const speedUpCost = Math.floor(originalCost * 0.5);
 
-                const container = plainContainer(`## <:cock:1451281426329768172> Training Room\nYour chicken is currently training **${activeTraining.stat.toUpperCase()}**.\n\n⏳ Completes <t:${endTimeUnix}:R>`);
+                const container = plainContainer(`## <:cock:1451281426329768172> Training Room\nYour chicken is currently training **${activeTraining.stat.toUpperCase()}**.\n\nCompletes <t:${endTimeUnix}:R>`);
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder().setCustomId("train_wakeup").setLabel("Wake Up (Cancel)").setStyle(ButtonStyle.Danger)
@@ -269,7 +267,7 @@ async function handleView(message: Message, args: string[]) {
                             });
 
                             // 3. Edit Container
-                            const completeContainer = plainContainer(`## 🎓 Training Complete!\nYour chicken has finished training!\n\n**${stat.toUpperCase()}** +1`);
+                            const completeContainer = plainContainer(`## Training Complete!\nYour chicken has finished training!\n\n**${stat.toUpperCase()}** +1`);
 
                             await reply.edit({ components: [completeContainer], flags: MessageFlags.IsComponentsV2 });
 
@@ -337,7 +335,7 @@ async function handleView(message: Message, args: string[]) {
                                 });
                             });
 
-                            await i.update({ components: [plainContainer("⚡ Training Speed Up! Time remaining halved.")], flags: MessageFlags.IsComponentsV2 });
+                            await i.update({ components: [plainContainer("Training Speed Up! Time remaining halved.")], flags: MessageFlags.IsComponentsV2 });
                             // Note: The original setTimeout will still fire but find nothing or update harmlessly? 
                             // Ideally we should clear it but we can't.
                             // However, our auto-complete logic checks DB state (checkMeta.training).
@@ -364,15 +362,15 @@ async function handleView(message: Message, args: string[]) {
             if (now >= meta.critical.endTime) {
                 // Timer expired → permadeath
                 await prisma.inventory.delete({ where: { id: inventoryItem.id } });
-                const container = plainContainer("## 💀 Your Chicken Has Died\nThe critical window expired. Your chicken could not be saved.\n\nRest in peace. You can buy a new chicken from the Cock Store.");
+                const container = plainContainer("## Your Chicken Has Died\nThe critical window expired. Your chicken could not be saved.\n\nRest in peace. You can buy a new chicken from the Cock Store.");
                 return message.reply(v2Reply(container));
             }
 
             const endTimeUnix = Math.floor(meta.critical.endTime / 1000);
             const container = plainContainer(
-                `## 💀 CRITICAL CONDITION\n` +
+                `## CRITICAL CONDITION\n` +
                 `Your chicken is **dying** and will be lost permanently if not saved!\n\n` +
-                `⏰ **Death in:** <t:${endTimeUnix}:R>\n\n` +
+                `**Death in:** <t:${endTimeUnix}:R>\n\n` +
                 `**Only a Phoenix Serum can save it.**\n` +
                 `\`${prefix}use phoenix serum\`\n\n` +
                 `-# No coin heal available. No other items work. Act fast.`
@@ -396,9 +394,9 @@ async function handleView(message: Message, args: string[]) {
                     `## <:clinic:1456568728883040287> Veterinary Clinic\n` +
                     `Your chicken is **Injured** and cannot fight or train.\n\n` +
                     `<a:bandaid:1456568701737500753> Recovers <t:${endTimeUnix}:R> (${recoveryHours.toFixed(1)}h total)\n\n` +
-                    `**💰 Coin Heal**\n` +
+                    `**Coin Heal**\n` +
                     `Pay **${healCost.toLocaleString()}** coins to heal instantly.\n` +
-                    `**🏪 Cock Store**\n` +
+                    `**Cock Store**\n` +
                     `\`${prefix}use feather bandage\` — Instant heal\n\`${prefix}use phoenix serum\` — Full recovery`
                 );
 
@@ -690,7 +688,7 @@ async function handleTrain(message: Message, args: string[]) {
                             });
 
                             // 3. Edit Container
-                            const completeContainer = plainContainer(`## 🎓 Training Complete!\nYour chicken has finished training!\n\n**${stat.toUpperCase()}** +1`);
+                            const completeContainer = plainContainer(`## Training Complete!\nYour chicken has finished training!\n\n**${stat.toUpperCase()}** +1`);
 
                             await reply.edit({ components: [completeContainer], flags: MessageFlags.IsComponentsV2 });
 

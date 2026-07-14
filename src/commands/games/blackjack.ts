@@ -208,7 +208,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
             result = "Push (Both have BJ)";
             payout = currentBet;
         } else {
-            result = `Blackjack! You win!${hasLuckyCoin ? " 🪙 Lucky Coin active!" : ""}`;
+            result = `Blackjack! You win!${hasLuckyCoin ? " Lucky Coin active!" : ""}`;
             payout = Math.ceil(currentBet * 2.5 * luckyCoinMultiplier);
         }
     }
@@ -233,7 +233,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
 
         } else {
             body += `\n\n**Hit** - Take another card\n**Stand** - End the game\n**Double Down** - Double your bet, hit once, then stand`;
-            if (hasLuckyCoin) body += `\n\n🪙 **Lucky Coin active!** Wins pay **${(luckyCoinMultiplier * 100).toFixed(0)}%** more.`;
+            if (hasLuckyCoin) body += `\n\n**Lucky Coin active!** Wins pay **${(luckyCoinMultiplier * 100).toFixed(0)}%** more.`;
         }
 
         const container = new ContainerBuilder();
@@ -336,13 +336,13 @@ export async function handleBlackjack(message: Message, args: string[]) {
                     dealerScore = calculateScore(dealerHand);
                 }
                 if (dealerScore > 21) {
-                    result = `Dealer Busts! You Win!${hasLuckyCoin ? " 🪙 Lucky Coin!" : ""}`;
+                    result = `Dealer Busts! You Win!${hasLuckyCoin ? " Lucky Coin!" : ""}`;
                     payout = Math.floor(currentBet * 2 * luckyCoinMultiplier);
                 } else if (dealerScore > playerScore) {
                     result = "Dealer Wins.";
                     payout = 0;
                 } else if (dealerScore < playerScore) {
-                    result = `You Win!${hasLuckyCoin ? " 🪙 Lucky Coin!" : ""}`;
+                    result = `You Win!${hasLuckyCoin ? " Lucky Coin!" : ""}`;
                     payout = Math.floor(currentBet * 2 * luckyCoinMultiplier);
                 } else {
                     result = "Push.";

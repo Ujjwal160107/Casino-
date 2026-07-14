@@ -8,7 +8,7 @@ export async function handleFeed(message: Message, args: string[]) {
     const prefix = await getGuildPrefix(message.guildId);
 
     const container = successContainer(
-        "🐔 Feed Command Moved!",
+        "Feed Command Moved!",
         `Feeding is now done through the unified \`${prefix}use\` command.\n\n` +
         `**Examples:**\n` +
         `\`${prefix}use basic feed\` — +10 XP\n` +

@@ -331,7 +331,7 @@ export async function study(userId: string, guildId: string, modifiers: StudyMod
 
     let msg: string;
     if (wrongChapterHit) {
-        msg = `📕 **Wrong chapter!** You studied the wrong material — **0 XP** this session. Stress +${stressGain}.`;
+        msg = `**Wrong chapter!** You studied the wrong material — **0 XP** this session. Stress +${stressGain}.`;
     } else {
         msg = `You studied hard! XP: ${edu.educationXp} → **${newXp}** (+${xpGain}). Stress +${stressGain}.`;
         if (bonusXp > 0) msg += ` (Includes +${bonusXp} from buffs!)`;
@@ -366,7 +366,7 @@ export async function study(userId: string, guildId: string, modifiers: StudyMod
                 msg += `\n\n${Mascot.Emotes.Success} **${event.title}**\n${event.description}\n✅ Success! (+${xpMod} XP, ${stressMod >= 0 ? '+' : ''}${stressMod} Stress)`;
             }
         } else if (eventImmunity) {
-            msg += `\n\n📝 **Focus Notes saved you.** A **${event.title}** setback was neutralized — no XP or stress lost.`;
+            msg += `\n\n**Focus Notes saved you.** A **${event.title}** setback was neutralized — no XP or stress lost.`;
         } else {
             const xpLoss = Math.round(Math.abs(event.xpMod) * amp);
             const stressAdd = Math.round(Math.abs(event.stressMod) * amp);

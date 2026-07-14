@@ -400,7 +400,7 @@ async function handleButton(interaction: ButtonInteraction) {
             earnings = Math.floor(earnings * eventRepData.tier.payBonus); // Apply rep pay bonus
             if (MAX_SAFE_BALANCE && userData.wallet && userData.wallet.balance + earnings > MAX_SAFE_BALANCE) {
                 earnings = 0;
-                eventNotes.push("⚠️ Wallet Limit Reached! Earned 0 coins.");
+                eventNotes.push("Wallet Limit Reached! Earned 0 coins.");
             }
 
             stressGain = pagerSaved ? 2 : (stress || 0);
@@ -506,7 +506,7 @@ async function handleButton(interaction: ButtonInteraction) {
             if (promoCheck.eligible && promoCheck.nextJob) {
                 // Determine if we show celebration or just footer
                 // Let's just note it for now, implementation plan says Celebration later
-                footerText = `🎉 Promotion Available: ${promoCheck.nextJob.title}`;
+                footerText = `Promotion Available: ${promoCheck.nextJob.title}`;
             } else if (promoCheck.nextJob) {
                 footerText = `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingShifts} shifts to go)`;
             }
@@ -519,11 +519,11 @@ async function handleButton(interaction: ButtonInteraction) {
             const demoCheck = await checkDemotion(userData);
             if (demoCheck.demoted) {
                 eventDemoField = {
-                    name: "🚨 Demoted",
+                    name: "Demoted",
                     value: `**${prevJobTitle}** → **${demoCheck.prevJob?.title ?? "previous role"}**\n${demoCheck.msg}`,
                 };
             } else if (demoCheck.msg) {
-                eventDemoField = { name: "⚠️ Warning", value: demoCheck.msg };
+                eventDemoField = { name: "Warning", value: demoCheck.msg };
             }
         }
 
@@ -607,7 +607,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
             // DO NOT AUTO PROMOTE. Tell user to apply.
             const container = successContainer(
-                `🎉 Promotion Eligibility Confirmed!`,
+                `Promotion Eligibility Confirmed!`,
                 `You have met the requirements for **${nextJob.title}**!\n\n` +
                 `**Next Step:** To officially secure this position, you must pass the application process.\n\nType the following command:\n` +
                 `**Command:** \`${prefix}apply ${nextJob.id}\``
@@ -1020,7 +1020,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
             let earningsText = `${fmtCurrency(amount)}\n(Base Pay + ${streakBonusPct}% Streak Bonus)`;
             if (walletFull) {
-                earningsText = `~~${fmtCurrency(amount)}~~ 0\n(⚠️ Wallet Limit Reached)`;
+                earningsText = `~~${fmtCurrency(amount)}~~ 0\n(Wallet Limit Reached)`;
             }
             // --- Gear durability wear ---
             if (gearInvRow && gearCatalogName) {
@@ -1085,7 +1085,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
             if (!walletFull) {
                 winBody += workTax.shielded
-                    ? `\n\n**Tax:** 🛡️ Shielded`
+                    ? `\n\n**Tax:** Shielded`
                     : `\n\n**Tax (8%):** -${fmtCurrency(workTax.taxPaid)}`;
             }
 
@@ -1172,9 +1172,9 @@ async function handleButton(interaction: ButtonInteraction) {
             let failBody = `## ${Mascot.Emotes.Fail} Shift Failed\n${desc}`;
 
             if (demoCheck.demoted) {
-                failBody += `\n\n**🚨 Demoted**\n**${prevJobTitleFail}** → **${demoCheck.prevJob?.title ?? "previous role"}**\n${demoCheck.msg}`;
+                failBody += `\n\n**Demoted**\n**${prevJobTitleFail}** → **${demoCheck.prevJob?.title ?? "previous role"}**\n${demoCheck.msg}`;
             } else if (demoCheck.msg) {
-                failBody += `\n\n**⚠️ Warning**\n${demoCheck.msg}`;
+                failBody += `\n\n**Warning**\n${demoCheck.msg}`;
             }
 
             // Disable buttons on the original game embed

@@ -19,7 +19,7 @@ export async function logToChannel(client: Client, options: LogOptions) {
         const channel = await client.channels.fetch(logChannelId);
         if (!channel || !channel.isTextBased()) return;
 
-        const heading = `## 📜 ${options.type}: ${options.title}`;
+        const heading = `## ${options.type}: ${options.title}`;
         let body = options.description;
         if (options.fields && options.fields.length) {
             body += "\n" + options.fields.map((f) => `**${f.name}:** ${f.value}`).join("\n");

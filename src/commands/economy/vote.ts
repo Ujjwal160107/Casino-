@@ -114,11 +114,11 @@ export async function handleVote(message: Message, args: string[]) {
     } else {
         // Show Vote Links (Default State)
         const configWarning = (!topggToken && process.env.NODE_ENV !== "development")
-            ? `\n\n**⚠️ Config Warning:** Top.gg Token not configured. Automatic verification unavailable.`
+            ? `\n\n**Config Warning:** Top.gg Token not configured. Automatic verification unavailable.`
             : "";
 
         const container = infoContainer(
-            `🗳️ Vote for ${message.client.user?.username || "Us"}`,
+            `Vote for ${message.client.user?.username || "Us"}`,
             `Support the bot and earn **${voteReward.toLocaleString()} ${GLOBAL_CURRENCY_EMOJI}** every 12 hours!\n\n` +
             `**[Click Here to Vote](${VOTE_LINK})**\n` +
             `If you're enjoying Fortuna, please consider leaving a review!\n` +
