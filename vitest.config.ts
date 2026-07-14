@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    // Starts one native Mongo replica set (memory-server) for the whole run.
+    globalSetup: ["./test/globalSetup.ts"],
     setupFiles: ["./test/setupEnv.ts"],
     testTimeout: 20000,
     hookTimeout: 20000,

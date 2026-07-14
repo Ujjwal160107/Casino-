@@ -3,6 +3,9 @@ node_modules
 .env
 .env.test
 
+# Runtime URI of the test Mongo memory-server (written by test/globalSetup.ts)
+test/.mongo-uri
+
 /src/generated/prisma
 dist/
 build/
