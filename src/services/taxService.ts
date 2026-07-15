@@ -116,7 +116,7 @@ export async function applyTransferTax(
 }
 
 // Crime Heat
-export async function addCrimeHeat(discordId: string, amount = TAX_CONFIG.crimeHeatGain): Promise<number> {
+export async function addCrimeHeat(discordId: string, amount: number = TAX_CONFIG.crimeHeatGain): Promise<number> {
   await migrateLegacyHeatForUser(discordId);
   const heatGain = Math.max(0, Math.round(amount));
   if (heatGain === 0) return getHeatLevel(discordId);

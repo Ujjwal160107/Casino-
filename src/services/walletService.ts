@@ -198,8 +198,6 @@ export async function addBalance(discordId: string, username: string, amount: nu
     };
   }));
 
-  await ensureStarterChicken(discordId, username);
-
   // Garnishment: deduct 25% of earned income toward delinquent/locked card debt
   if (earned && result.appliedAmount > 0) {
     try {
