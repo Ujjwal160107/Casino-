@@ -2,7 +2,7 @@ import { Message } from "discord.js";
 import prisma from "../../utils/prisma";
 import { ensureBankingUser } from "../../services/bankService";
 import { checkCooldown, formatDiscordRelativeTime, setCooldown } from "../../services/cooldownService";
-import { ROB_CONFIG, MAX_SAFE_BALANCE, DEFAULT_JAIL_TIME_SECONDS } from "../../utils/economyConfig";
+import { ROB_CONFIG, MAX_SAFE_BALANCE, DEFAULT_JAIL_TIME_SECONDS, TAX_CONFIG } from "../../utils/economyConfig";
 import { checkJailStatus, jailUser } from "../../services/jailService";
 import {
     checkThiefGloves,
@@ -19,6 +19,7 @@ import { fmtCurrency } from "../../utils/format";
 import { redisService } from "../../services/redisService";
 import { notifyRobbed, notifyPadlockUsed } from "../../services/victimNotifyService";
 import { applyEconomyPenalty } from "../../services/penaltyService";
+import { addCrimeHeat } from "../../services/taxService";
 
 function randomInt(min: number, max: number) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -181,11 +182,13 @@ export async function handleRob(message: Message, args: string[]) {
             message.guild?.name ?? null,
         );
 
+        const heat = await addCrimeHeat(message.author.id, TAX_CONFIG.robSuccessHeatGain);
+
         return message.reply(
             v2Reply(
                 successContainer(
                     "Robbery Successful!",
-                    `Stole **${fmtCurrency(result.robAmount)}** from **${target.name}**!\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**${craftedRobBoost ? "\n\nWolf Fang Dagger boosted the loot." : ""}`,
+                    `Stole **${fmtCurrency(result.robAmount)}** from **${target.name}**!\nWallet: **${fmtCurrency(result.updatedWallet.balance)}**\nHeat: **${heat}**${craftedRobBoost ? "\n\nWolf Fang Dagger boosted the loot." : ""}`,
                     { hint: nextStepHint("rob_success") },
                 ),
             ),
@@ -218,13 +221,14 @@ export async function handleRob(message: Message, args: string[]) {
 
     await recordPotentialSoulLedgerLoss(message.author.id, result.totalPenalty);
     const releaseTime = await jailUser(message.author.id, message.guildId!, DEFAULT_JAIL_TIME_SECONDS);
+    const heat = await addCrimeHeat(message.author.id, TAX_CONFIG.robFailureHeatGain);
 
     const eclipseNote = eclipseActive ? "\n\nThe Eclipse Mask's backlash added an extra penalty." : "";
     return message.reply(
         v2Reply(
             errorContainer(
                 "Caught!",
-                `The robbery failed and cost you **${fmtCurrency(result.totalPenalty)}**.${eclipseNote}\nYou've been thrown in jail — released ${formatDiscordRelativeTime(releaseTime)}.\nWallet: **${fmtCurrency(result.newWalletBalance)}**\nBank: **${fmtCurrency(result.newBankBalance)}${result.newBankBalance < 0 ? " (Debt)" : ""}**`,
+                `The robbery failed and cost you **${fmtCurrency(result.totalPenalty)}**.${eclipseNote}\nYou've been thrown in jail — released ${formatDiscordRelativeTime(releaseTime)}.\nWallet: **${fmtCurrency(result.newWalletBalance)}**\nBank: **${fmtCurrency(result.newBankBalance)}${result.newBankBalance < 0 ? " (Debt)" : ""}**\nHeat: **${heat}**`,
             ),
         ),
     );

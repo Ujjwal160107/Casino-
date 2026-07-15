@@ -218,6 +218,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
       return await handleCrimeInteraction(interaction);
     }
 
+    if (id.startsWith("heat:")) {
+      const { handleHeatInteraction } = require("./handlers/heatInteractionHandler");
+      return await handleHeatInteraction(interaction);
+    }
+
     if (id === "pay_bail") {
       const { handleJailInteraction } = require("./handlers/jailInteractionHandler");
       return await handleJailInteraction(interaction);

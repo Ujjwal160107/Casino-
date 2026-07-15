@@ -11,6 +11,7 @@
     "test:profile-effects": "ts-node src/scripts/activeItemEffectTests.ts",
     "test:loaded-dice": "ts-node src/scripts/loadedDiceTests.ts",
     "test:starter-chicken": "ts-node src/scripts/starterChickenTests.ts",
+    "test:heat": "ts-node src/scripts/heatConfigTests.ts",
     "sync:shop-emojis": "ts-node src/scripts/syncShopApplicationEmojis.ts",
     "validate:shop-emojis": "ts-node src/scripts/syncShopApplicationEmojis.ts --dry-run",
     "start": "node dist/index.js",

@@ -111,6 +111,7 @@ const CATEGORIES: CategoryData[] = [
       { name: "crime", aliases: [], description: "Attempt a crime minigame for a cash payout (risk of jail).", example: "{p}crime" },
       { name: "beg", aliases: ["slut"], description: "Low-risk ways to earn small amounts of money.", example: "{p}beg" },
       { name: "rob", aliases: ["steal"], description: "Attempt to rob another player.", usage: "{p}rob <@user>", example: "{p}rob @Bob" },
+      { name: "heat", aliases: ["laylow", "lay-low"], description: "Check criminal heat and use Lay Low or Call a Fixer.", example: "{p}heat" },
       { name: "jail", aliases: ["status"], description: "Check your jail status and sentence.", example: "{p}jail" },
       { name: "bail", aliases: ["release", "paybail"], description: "Pay bail to get out of jail early.", example: "{p}bail" }
     ]

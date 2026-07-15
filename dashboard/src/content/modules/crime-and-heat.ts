@@ -3,16 +3,16 @@ import type { ModuleDoc } from "../types";
 const crimeAndHeat: ModuleDoc = {
   slug: "crime-and-heat",
   title: "Crime & Heat",
-  tagline: "Fifty-eight crimes, zero dice — every job is a skill check, and the taxman is watching.",
+  tagline: "Skill-based heists, PvP robbery, and the attention that follows both.",
   icon: "Siren",
   forBeginners: {
-    what: "Crime in Fortuna isn't a slot machine — it's a heist minigame. !crime deals you a board of five jobs, each needing specific gear from the shop or crafting bench. Commit to one and you play timed multiple-choice stages; answer every stage right and the payout is yours. Get one wrong and you eat the fine — and maybe a cell.",
-    firstCommands: ["!crime", "!jail", "!rob @user"],
-    tip: "Success is 100% skill. There is no hidden success percentage — read the scenario, pick the answer that a professional would pick, and don't let the timer beat you.",
+    what: "Crime in Fortuna is a timed heist minigame. Pick a job from !crime, bring its required gear, and clear every stage for the payout. A bad answer costs a fine and may put you in jail. Successful crimes and robbery attempts build Heat, so watch it with !heat.",
+    firstCommands: ["!crime", "!heat", "!rob @user"],
+    tip: "Heat is manageable when you plan it. Check !heat before another high-risk job, use passive decay, and save the active reductions for when attention starts to build.",
   },
   screenshot: {
     src: "/cards/card_crime.png",
-    alt: "Lady Fortuna in cuffs — the crime module",
+    alt: "Lady Fortuna in cuffs - the crime module",
     caption: "The Crime card",
     aspect: "aspect-[572/863]",
     maxWidth: "max-w-xs",
@@ -21,76 +21,57 @@ const crimeAndHeat: ModuleDoc = {
     {
       heading: "The crime board",
       body: [
-        "!crime opens a board of five crimes drawn from a 58-crime catalog themed around every corner of Fortuna — pickpocketing and ATM skims, office payroll fraud, university transcript rings, wildlife smuggling, cockfight fixing, and full legendary heists. The board holds for 10 minutes, and each roll has a 5% chance of surfacing a legendary job.",
-        "Every crime requires gear: standard crimes need one specific item, legendaries need three. A Bank Vault Heist wants an Eclipse Mask, a Corporate Blessing, and a Sniper Rifle in your inventory before you can even attempt it. The board shows you what's missing — that's your shopping list.",
+        "!crime opens a board of five jobs from a 58-crime catalog. Each job requires particular gear and uses timed multiple-choice stages. Clear every stage and the payout is yours; a wrong answer or timeout fails the whole job.",
+        "Standard crimes require one prep item and legendary jobs require three. The board clearly shows what is missing, so it doubles as a shopping list.",
       ],
     },
     {
-      heading: "Tiers, payouts & fines",
+      heading: "Tiers, payouts, and fines",
       body: [
-        "Tier decides everything about a crime: how many minigame stages you play, how tight the timer runs, what a win pays, and what a loss costs. Committing to a crime starts your 1-hour crime cooldown whether you win or lose.",
+        "Tier determines stages, time pressure, payout, fine, and jail risk. Starting a crime spends its one-hour cooldown whether you win or lose.",
       ],
       table: {
         title: "Crime tiers",
-        columns: ["Tier", "Stages", "Timer/stage", "Payout", "Fine on fail", "Jail risk on fail"],
+        columns: ["Tier", "Stages", "Timer/stage", "Payout", "Fine on fail", "Jail risk"],
         rows: [
-          ["Petty", "1", "15s", "50,000 – 120,000", "25,000 – 60,000", "None"],
-          ["Medium", "2", "15s", "100,000 – 220,000", "60,000 – 140,000", "None"],
-          ["High", "2", "18s", "180,000 – 350,000", "120,000 – 240,000", "10% → 20 min"],
-          ["Elite", "3", "18s", "300,000 – 550,000", "200,000 – 400,000", "20% → 45 min"],
-          ["Legendary", "3", "20s", "500,000 – 1,200,000", "350,000 – 700,000", "35% → 60 min"],
+          ["Petty", "1", "15s", "50,000 - 120,000", "25,000 - 60,000", "None"],
+          ["Medium", "2", "15s", "100,000 - 220,000", "60,000 - 140,000", "None"],
+          ["High", "2", "18s", "180,000 - 350,000", "120,000 - 240,000", "10%"],
+          ["Elite", "3", "18s", "300,000 - 550,000", "200,000 - 400,000", "20%"],
+          ["Legendary", "3", "20s", "500,000 - 1,200,000", "350,000 - 700,000", "35%"],
         ],
       },
-      note: "Each stage offers 3–4 options with exactly one correct answer. A wrong pick or a timeout fails the whole crime instantly — there are no partial payouts.",
     },
     {
-      heading: "Prep items: paid in payout, not luck",
+      heading: "Heat and laying low",
       body: [
-        "The gear a crime requires isn't just a key — it's a bonus. Every prep item carries a payout bonus that fattens the take when you succeed. The best in class: Corporate Blessing +10%, Eclipse Mask +12%, Wolf Fang Dagger +10%, Cheat Sheet +5% with the highest-tier UNI jobs. Crafted hunt gear slots in too: Python Skin Cloak +7%, Arctic Wolf Spirit Charm +8%, Komodo Venom Flask +9%.",
-        "One item does something rarer: the crafted Fox Tail Talisman gives a 20% chance that a failed crime's fine is cut in half. Crown of Greed also touches crime from the sidelines — +25% on crime income, but +25% on crime fines too.",
+        "Successful crimes add heat by tier: petty +16, medium +20, high +26, elite +32, and legendary +40. Robbery adds +15 on success or +10 when you are caught. Heat naturally falls by 10 every hour.",
+        "!heat is your Heat & Lay Low dashboard. It shows your current level, the next passive decay, and raid danger. Lay Low is free, removes up to 15 heat, and is available every 6 hours. At 40 heat, Call a Fixer removes up to 35 heat every 12 hours; the wallet fee scales with the heat you have built.",
+        "At 100 heat you are Wanted. Every hourly scan then has a 40% chance to trigger a tax raid that seizes 10-25% of your wallet and resets heat to zero.",
       ],
-    },
-    {
-      heading: "Heat: the meter behind the crimes",
-      body: [
-        "Every successful crime adds a flat +20 heat. Heat decays 10 per hour on its own and clears completely if you stay clean for 72 hours. The number to respect is 100: once you cross it, every hourly police scan has a 40% chance of triggering a TAX RAID that seizes 10–25% of your wallet and resets your heat to zero.",
-        "Fortuna warns you inside the crime results once you pass 70 heat. Five successful crimes back-to-back puts you at 100 — at one crime per hour with 10/hour decay, you gain a net +10 per crime, so a long session will walk you into raid territory.",
-      ],
-      note: "Raids only touch your wallet. Money in the bank is untouchable — bank your crime money the moment it lands.",
+      note: "Raids only touch wallet money. Banking protects cash from raids, but it does not protect it from crime or robbery fines.",
     },
     {
       heading: "Robbery: PvP crime",
       body: [
-        "!rob @user takes a shot at another player's wallet on a 5-minute cooldown. Base success is 45%, shifted by Luck (roughly ±5% at the extremes), +12% if you're wearing an Eclipse Mask, and +5% if your target is cursed with Demonic Harp vulnerability — all clamped between 5% and 85%. You don't even need them in the room: !rob works by exact username or user ID, across every server Fortuna is in.",
-        "A successful rob steals 8–20% of the target's wallet, hard-capped at 250,000. Thieves Gloves multiply the take ×1.25 (6 robs or 6 hours), Eclipse Mask adds +15%, a crafted Wolf Fang Dagger +10%. Failure costs a 60,000–120,000 fine — and if you failed wearing the Eclipse Mask, an extra 300,000–900,000 backlash on top. Fines drain your wallet first, then charge the rest to your bank; if the bank cannot cover it, its balance goes negative as debt.",
-        "Defense is real: a Padlock (175,000) blocks one robbery outright, and the crafted Crocodile Hide Armor blocks one attempt for 24 hours. Both are consumed when they trigger.",
-        "Victims aren't left guessing: Fortuna DMs you who robbed you and for exactly how much — and when your Padlock takes the hit for you. These security alerts are always on.",
+        "!rob @user attempts to steal 8-20% of another player's wallet. Luck, Thief Gloves, Eclipse Mask, and certain crafted gear can influence the result. A failed robbery costs a fine, can send you to jail, and still creates heat.",
+        "Padlocks and Crocodile Hide Armor can block a robbery attempt. Victims receive a direct message when they are robbed or when their Padlock is used.",
       ],
     },
     {
-      heading: "Jail & bail",
+      heading: "Jail and bail",
       body: [
-        "Only failed high/elite/legendary crimes can jail you, at the odds in the tier table. While jailed, most of the game is locked — work, crime, shop, casino, claims, bank, cards — until the sentence runs out or you pay.",
-        "!jail shows your remaining sentence with a Pay Bail button, and !bail pays it directly: a flat 1,000 Fortunes, regardless of sentence. Release is automatic when time expires.",
-      ],
-    },
-    {
-      heading: "Getting better at crime",
-      body: [
-        "Learn the scenarios, not the odds. The minigames repeat from a fixed catalog — every stage you've seen before is a stage you can't fail. Petty and medium crimes are free practice: no jail risk, cheap fines, same scenario style as the big jobs.",
-        "Buy the gear once, profit forever. Prep items aren't consumed by crimes — a Business Briefcase or Cheat Sheet you already own for its day job doubles as a permanent crime key with a payout bonus attached.",
-        "Bank between jobs to protect earnings from robbery and heat raids, but do not mistake the bank for fine insurance. A failed crime drains the wallet first and charges the remainder to the bank, creating a negative bank balance when necessary. Future deposits repay that debt before becoming savings.",
-        "Respect the clock more than the police. The 1-hour crime cooldown means heat decays 10 while you gain 20 — every crime is net +10 heat. Take a break every 4–5 successes, or accept that the raid is a matter of when, not if.",
+        "Failed high, elite, and legendary crimes can jail you. While jailed, most earning, banking, shopping, and casino actions are unavailable until release or bail.",
+        "!jail shows your remaining sentence and !bail lets you leave early for the standard 1,000 Fortunes bail.",
       ],
     },
   ],
-  commandIds: ["crime", "rob", "jail", "bail", "use", "iteminfo"],
+  commandIds: ["crime", "heat", "rob", "jail", "bail", "use", "iteminfo"],
   proTips: [
-    "Petty crimes have no jail risk and a 1-stage minigame — they're the highest success-per-effort in the module while you learn the scenario pool.",
-    "Legendary crimes need all three items in inventory before they're even playable. Assemble the kit during the week; commit when the board offers one.",
-    "Crown of Greed cuts both ways in crime: +25% payouts, +25% fines. Run it only on crimes you're confident reading.",
-    "Rob right after someone wins big at the casino — winnings sit in the wallet, and the 250,000 cap means a fat wallet loses the same as a modest one. Bank yours before you gloat.",
-    "Fox Tail Talisman is 150,000 coins of cheap insurance for elite/legendary attempts — a 20% shot at halving a 700,000 fine.",
+    "Use !heat before another crime when you are already Noticed or Watched.",
+    "Bank crime money between jobs to keep it outside the reach of a raid.",
+    "Lay Low is free, so use it before paying a fixer whenever its cooldown is ready.",
+    "A robbery adds Heat even when it fails, so account for the fine, jail, and attention together.",
   ],
 };
 

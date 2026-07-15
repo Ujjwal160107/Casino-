@@ -36,6 +36,10 @@ model User {
   
     lastDaily   DateTime?
     lastLoadedDiceRoll DateTime?
+    crimeHeat Int @default(0)
+    lastHeatDecayAt DateTime?
+    lastLayLowAt DateTime?
+    lastHeatFixerAt DateTime?
     lastWeekly  DateTime?
     lastMonthly DateTime?
     lastVote    DateTime?
