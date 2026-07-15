@@ -26,6 +26,7 @@ import { COSMETICS_SHOP_CATALOG } from "../../utils/shopCatalog";
 import { getAffectionTier, getMarriage, MAX_AFFECTION } from "../../services/life/marriageService";
 import { getGuildPrefix } from "../../utils/guildContext";
 import { redisService } from "../../services/redisService";
+import { formatActiveItemEffectList, getActiveItemEffects } from "../../services/activeItemEffectService";
 
 const PROFILE_ACCENT_COLOR = 0x9B59B6;
 
@@ -336,7 +337,13 @@ export async function getProfilePayload(
   const invValue = userDb.inventory.reduce((sum, item) => sum + ((item.shopItem?.price ?? 0) * item.amount), 0);
   const netWorth = walletBal + bankBal + stockValue + invValue - cardDebt;
   const cosmeticSummary = getCosmeticSummary(userDb.inventory);
-  const ranks = page === "overview" ? await getGlobalLeaderboardRanks(targetUser.id) : null;
+  const [ranks, activeItemEffects] = page === "overview"
+    ? await Promise.all([
+      getGlobalLeaderboardRanks(targetUser.id),
+      getActiveItemEffects(targetUser.id),
+    ])
+    : [null, []];
+  const activeItemEffectText = formatActiveItemEffectList(activeItemEffects);
   const rankText = ranks
     ? [
       `**Net:** ${ranks.netRank ? `#${ranks.netRank}` : "Unranked"} / ${ranks.total}`,
@@ -413,7 +420,8 @@ export async function getProfilePayload(
         `**Flex Rank:** ${cosmeticSummary.rank}\n` +
         `**Profile Luck:** ${combinedLuck}/100\n` +
         `**Credit Score:** ${userDb.creditScore}\n\n` +
-        `### ${Mascot.Emotes.MedalGold} Ranks\n${rankText}`,
+        `### ${Mascot.Emotes.MedalGold} Ranks\n${rankText}\n\n` +
+        `### ${Mascot.Emotes.Sparks} Active Item Effects\n${activeItemEffectText}`,
     },
     wealth: {
       title: `${Mascot.Emotes.MoneyBag} Wealth`,

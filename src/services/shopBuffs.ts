@@ -89,7 +89,7 @@ export async function checkDevilContract(discordId: string): Promise<number> {
   } else {
     await prisma.activeEffect.update({
       where: { id: effect.id },
-      data: { meta: { usesLeft: usesLeft - 1 } },
+      data: { meta: { ...(meta ?? {}), usesLeft: usesLeft - 1 } },
     });
   }
 
@@ -152,7 +152,7 @@ export async function recordPotentialSoulLedgerLoss(discordId: string, amount: n
     where: { id: watcher.id },
     data: {
       value: amount,
-      meta: { readyAt: readyAt.toISOString() },
+      meta: { ...((watcher.meta as Record<string, unknown> | null) ?? {}), readyAt: readyAt.toISOString() },
       expiresAt: new Date(Date.now() + 7 * 24 * 3600 * 1000),
     },
   });
