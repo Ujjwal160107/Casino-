@@ -48,6 +48,7 @@ import { handleCrime } from "./commands/economy/crime";
 import { handleJail, handleBail } from "./commands/economy/jail";
 import { handleHunt } from "./commands/games/hunt";
 import { handleZoo } from "./commands/games/zoo";
+import { ensureUserAndWallet } from "./services/walletService";
 import {
   DEVELOPER_ONLY_COMMAND_MESSAGE,
   isBotDeveloper,
@@ -210,6 +211,14 @@ export async function routeMessage(client: Client, message: Message, prefix: str
 
   const user = await getUserRecord(message);
   if (user === "blocked") return;
+
+  // Account provisioning is idempotent and ensures every command user has the
+  // standard wallet and starter chicken before command-specific work begins.
+  await ensureUserAndWallet(
+    message.author.id,
+    message.guildId!,
+    message.member?.displayName ?? message.author.username,
+  );
 
   const developerOnlyCommand = isDeveloperOnlyCommand(normalized);
   const botDeveloper = isBotDeveloper(message.author.id) || isTester(message.author.id);

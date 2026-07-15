@@ -1,5 +1,6 @@
 import prisma from "../utils/prisma";
 import { applyTransferTax } from "./taxService";
+import { ensureStarterChicken } from "./starterChickenService";
 
 export async function transferAnyFunds(
   fromWalletId: string,
@@ -42,5 +43,6 @@ export async function transferAnyFunds(
   }
 
   await prisma.$transaction(ops);
+  await ensureStarterChicken(toDiscordId, (recipient as any).username ?? "Unknown");
   return { net, taxPaid, shielded };
 }

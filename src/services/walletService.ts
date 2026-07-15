@@ -2,6 +2,7 @@ import prisma from "../utils/prisma";
 import { MAX_SAFE_BALANCE, STARTING_WALLET_BALANCE } from "../utils/economyConfig";
 import { questBus } from "./questEvents";
 import { invalidateUserCache } from "./userService";
+import { ensureStarterChicken } from "./starterChickenService";
 
 function isTransientWriteConflict(error: any) {
   const message = `${error?.message ?? ""} ${error?.code ?? ""}`.toLowerCase();
@@ -43,10 +44,11 @@ export async function ensureUserAndWallet(discordId: string, _guildId: string, u
       });
       await invalidateUserCache(discordId, "");
     }
+    await ensureStarterChicken(discordId, user.username || username);
     return user;
   }
 
-  return prisma.user.create({
+  const created = await prisma.user.create({
     data: {
       discordId,
       username,
@@ -54,6 +56,8 @@ export async function ensureUserAndWallet(discordId: string, _guildId: string, u
     },
     include: { wallet: true }
   });
+  await ensureStarterChicken(discordId, created.username || username);
+  return created;
 }
 
 export async function getWalletByDiscord(discordId: string, _guildId: string) {
@@ -193,6 +197,8 @@ export async function addBalance(discordId: string, username: string, amount: nu
       capped
     };
   }));
+
+  await ensureStarterChicken(discordId, username);
 
   // Garnishment: deduct 25% of earned income toward delinquent/locked card debt
   if (earned && result.appliedAmount > 0) {

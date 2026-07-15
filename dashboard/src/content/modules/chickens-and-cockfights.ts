@@ -6,19 +6,19 @@ const chickensAndCockfights: ModuleDoc = {
   tagline: "One bird, three stats, winner takes the whole pot — and losing can be fatal.",
   icon: "Swords",
   forBeginners: {
-    what: "Buy a 25,000-coin chicken with a random trait, raise its Strength, Agility, and Defense through training and feed, arm it with equipment, then challenge other players' birds. The winner's owner takes both entry bets plus every side bet in the room. The loser's bird gets injured — or dies.",
+    what: "Every player starts with a chicken and a random trait. Raise its Strength, Agility, and Defense through training and feed, arm it with equipment, then challenge other players' birds. The winner's owner takes both entry bets plus every side bet in the room. The loser's bird gets injured — or dies.",
     firstCommands: ["!shop cock", "!chicken", "!cockfight @user 10000"],
-    tip: "You can only ever hold one chicken, and it can't be sold or traded. Its trait is rolled at purchase and permanent — a bad roll is worth knowing about early.",
+    tip: "You can only ever hold one chicken, and it can't be sold or traded. Its trait is assigned when it hatches and remains permanent for that chicken.",
   },
   sections: [
     {
       heading: "Your chicken",
       body: [
-        "The Chicken sells in the shop's COCK tab for 25,000 — limit one per player, non-sellable, non-tradable. It starts at level 0 with 0 in every stat and a random permanent trait. !chicken is the dashboard: level, XP bar, win count, stats with trait and equipment bonuses, and an estimated win chance against level 0, 5, and 10 opponents.",
+        "Every account receives a Chicken automatically — limit one per player, non-sellable, non-tradable. It starts at level 0 with 0 in every stat and a random permanent trait. !chicken is the dashboard: level, XP bar, win count, stats with trait and equipment bonuses, and an estimated win chance against level 0, 5, and 10 opponents.",
         "!chicken name <name> renames it (30 characters max), and !chicken top shows the global leaderboard by level. XP to reach the next level is (level + 1) × 100, and every cockfight win pays +50 XP on top of what you feed it.",
       ],
       table: {
-        title: "Traits (rolled at purchase, permanent)",
+        title: "Traits (assigned when a chicken hatches, permanent)",
         columns: ["Trait", "Strength", "Agility", "Defense"],
         rows: [
           ["Aggressive", "+2", "0", "−1"],
@@ -70,7 +70,7 @@ const chickensAndCockfights: ModuleDoc = {
       heading: "Losing: injury, critical, and death",
       body: [
         "The losing bird always pays a price. Normally it's an injury — recovery takes 2 hours plus 20 minutes per level the winner had, plus 5 minutes per point of the winner's total stats, capped at 12 hours. Injured birds can't fight or train until healed: pay the clinic (50,000 per 2 hours of remaining recovery, via the !chicken Heal button) or use a Feather Bandage. All equipped items are destroyed on a loss unless a Guard Vest saves them (50%).",
-        "It can be worse. There's a death roll on every loss: 5% base + 2% per level the winner is above you, capped at 50%. Losing to a bird whose total stats triple yours is an automatic critical. A critical chicken has 24 hours to live — only a Phoenix Serum (900,000) can save it. If the timer runs out, the chicken dies permanently and you start over from the shop.",
+        "It can be worse. There's a death roll on every loss: 5% base + 2% per level the winner is above you, capped at 50%. Losing to a bird whose total stats triple yours is an automatic critical. A critical chicken has 24 hours to live — only a Phoenix Serum (900,000) can save it. If the timer runs out, the chicken dies and a fresh level-0 chicken hatches for you.",
       ],
       note: "Never fight far above your weight class. The death chance and the recovery time both scale with the gap — an underdog win pays the same pot, but an underdog loss can cost you the bird.",
     },
