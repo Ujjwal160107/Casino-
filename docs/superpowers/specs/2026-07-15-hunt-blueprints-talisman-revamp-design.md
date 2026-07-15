@@ -1,7 +1,12 @@
 # Hunt Blueprint Interface + Talisman Revamp — Design
 
 **Date:** 2026-07-15
-**Status:** Approved (design), ready for implementation plan
+**Status:** SUPERSEDED (2026-07-15) — the talisman design here (fixed permanent
+luck set) was replaced by a gacha model in
+`2026-07-15-talisman-gacha-system-design.md`, which is the active spec and the
+one being built. The **blueprint pick-to-unlock interface** (Part A below) and
+**talisman black-market trading** are deferred to future phases; this document is
+retained only as reference for that deferred work.
 
 ## Goal
 
