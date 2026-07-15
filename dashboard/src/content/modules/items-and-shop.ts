@@ -50,7 +50,7 @@ const itemsAndShop: ModuleDoc = {
         title: "General store — power items",
         columns: ["Item", "Price", "Real effect"],
         rows: [
-          ["Loaded Dice of Ruin", "350,000", "Daily: 45% win 700k–1.6M / 55% lose 150k–600k (collected from wallet, then bank)"],
+          ["Loaded Dice of Ruin", "2,500,000", "Reusable daily relic: every surviving !roll improves its prize odds and raises its shatter risk. Rewards are secured before shattering; a replacement resets to roll 0"],
           ["Celestial Harp", "450,000", "+25 Luck for 6 hours"],
           ["Demonic Harp", "600,000", "Target: −25 Luck for 6h + easier to rob (+5% success, +5% loot against them)"],
           ["Pandora Box", "750,000", "Daily chaos roll: 25% money 300k–1.5M · 20% +15 Luck 2h · 20% rare item · 20% −15 Luck 2h · 15% lose 200k–900k (wallet, then bank)"],

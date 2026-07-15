@@ -610,6 +610,23 @@ export const COMMANDS: Command[] = [
     jailBlocked: true,
   },
   {
+    id: "roll",
+    name: "!roll",
+    aliases: [],
+    module: "casino",
+    short: "Push the Loaded Dice of Ruin through richer daily rolls before it finally shatters.",
+    usage: "!roll",
+    examples: ["!roll"],
+    cooldown: "24 hours per player",
+    keyNumbers: [
+      { label: "Item price", value: "2,500,000" },
+      { label: "Average lifespan", value: "about 5 rolls" },
+      { label: "Final roll", value: "11 (guaranteed shatter after reward)" },
+    ],
+    interactive: true,
+    jailBlocked: true,
+  },
+  {
     id: "blackjack",
     name: "!blackjack",
     aliases: ["bj"],

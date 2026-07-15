@@ -54,8 +54,6 @@ export async function handleSpecialItemUse(
     case "treasure_map":
       return handleTreasureMap(discordId, guildId);
     // New page 2 items
-    case "loaded_dice_of_ruin":
-      return handleLoadedDice(discordId);
     case "celestial_harp":
       return handleCelestialHarp(discordId);
     case "demonic_harp":
@@ -555,37 +553,6 @@ async function withBuffCooldown(
     await releaseItemCooldown(itemKey, discordId);
     throw err;
   }
-}
-
-async function handleLoadedDice(discordId: string): Promise<ShopItemUseResult> {
-  return withClaimedCooldown("loaded_dice_of_ruin", discordId, async () => {
-    // 45% win 700k-1.6M / 55% lose 150k-600k (wallet then bank). EV ~= -39k.
-    const win = Math.random() < 0.45;
-
-    if (win) {
-      const reward = randomInt(700_000, 1_600_000);
-      const result = await addBalance(discordId, discordId, reward, "loaded_dice_win", { item: "loaded_dice_of_ruin" }, true);
-      return {
-        success: true,
-        message: `**Loaded Dice — Win!**\n\nThe dice rolled in your favor.\n${Mascot.Emotes.Currency} **+${result.appliedAmount.toLocaleString("en-US")}** added to your wallet!`,
-      };
-    }
-
-    const baseLoss = randomInt(150_000, 600_000);
-    const crownMult = await checkCrownOfGreed(discordId);
-    const lossAmount = Math.floor(baseLoss * crownMult);
-
-    const collected = await applyItemFine(discordId, lossAmount, "loaded_dice_of_ruin");
-
-    // Record potential soul ledger loss
-    const { recordPotentialSoulLedgerLoss } = await import("./shopBuffs");
-    await recordPotentialSoulLedgerLoss(discordId, collected);
-
-    return {
-      success: true,
-      message: `**Loaded Dice — Loss!**\n\nThe dice betrayed you.\n${Mascot.Emotes.Currency} **-${collected.toLocaleString("en-US")}** lost (collected from your wallet, then bank).`,
-    };
-  });
 }
 
 async function handleCelestialHarp(discordId: string): Promise<ShopItemUseResult> {
