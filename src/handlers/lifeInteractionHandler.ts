@@ -730,6 +730,18 @@ async function handleButton(interaction: ButtonInteraction) {
             return safeFollowUp(interaction, { content: `${Mascot.Emotes.Angry} You are tired! You can work again <t:${canWorkAt}:R>.`, flags: MessageFlags.Ephemeral });
         }
 
+        // Active-shift lock: reserve atomically so spamming "Start Shift" cannot run
+        // parallel shifts. TTL (300s) is far under the 1h lastShift gate, so it auto-
+        // expires and never blocks a legitimate next shift. Testers bypass.
+        const { cooldownClaim } = require("../anticheat/claim");
+        if (!_isTesterWork(user.id, interaction.member)) {
+            const shiftLock = await cooldownClaim("work_active", user.id, 300);
+            if (!shiftLock.ok) {
+                await interaction.deleteReply().catch(() => { });
+                return safeFollowUp(interaction, { content: `${Mascot.Emotes.Angry} You're already on a shift — finish it first!`, flags: MessageFlags.Ephemeral });
+            }
+        }
+
         // --- STRESS CHECK ---
         const isBurnoutImmune = userData.jobId === "med_chief";
         if (userData.jobStress > 80 && !isBurnoutImmune) {

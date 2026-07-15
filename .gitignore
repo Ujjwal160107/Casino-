@@ -1,6 +1,10 @@
 node_modules
 # Keep environment variables out of version control
 .env
+.env.test
+
+# Runtime URI of the test Mongo memory-server (written by test/globalSetup.ts)
+test/.mongo-uri
 
 /src/generated/prisma
 dist/

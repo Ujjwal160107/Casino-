@@ -4,6 +4,7 @@ import { ZOO_PROPERTY_DEFS, ZOO_CAPACITY, RARITY_INCOME, getAnimal } from "../ut
 import { isTester } from "../utils/developerAccess";
 import { GLOBAL_CATALOG_GUILD_ID } from "../utils/globalCatalog";
 import { redisService } from "./redisService";
+import { conditionalClaim } from "../anticheat/claim";
 
 const ALL_PROPERTIES_CACHE_KEY = "properties:all_public";
 const ALL_PROPERTIES_CACHE_TTL = 20; // seconds — price only moves on buy/sell, which invalidate explicitly
@@ -283,10 +284,18 @@ export async function collectIncome(discordId: string, _guildId: string): Promis
   }
 
   for (const op of collectable) {
+    // Reserve each property's cycle atomically BEFORE counting its income: only
+    // the collect that advances lastCollected from the value we read may pay it.
+    const claimed = await conditionalClaim(() =>
+      prisma.ownedProperty.updateMany({
+        where: { id: op.id, lastCollected: op.lastCollected },
+        data: { lastCollected: now },
+      })
+    );
+    if (!claimed) continue; // a concurrent collect already took this property's cycle
     const income = op.property.incomePerCycle;
     result.propertyBreakdown.push({ name: op.property.name, income });
     result.propertyTotal += income;
-    await prisma.ownedProperty.update({ where: { id: op.id }, data: { lastCollected: now } });
   }
 
   const user = await prisma.user.findUnique({ where: { discordId } });
@@ -313,7 +322,18 @@ export async function collectIncome(discordId: string, _guildId: string): Promis
       }
 
       if (result.zooTotal > 0) {
-        await prisma.user.update({ where: { discordId }, data: { lastZooClaim: now } });
+        // Reserve the zoo window (shared with claimZooIncome) atomically; if a
+        // concurrent zoo/property collect already took it, drop the zoo income.
+        const zooClaimed = await conditionalClaim(() =>
+          prisma.user.updateMany({
+            where: { discordId, lastZooClaim: lastClaim },
+            data: { lastZooClaim: now },
+          })
+        );
+        if (!zooClaimed) {
+          result.zooTotal = 0;
+          result.zooBreakdown = [];
+        }
       }
     }
   }

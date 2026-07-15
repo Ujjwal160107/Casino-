@@ -5,7 +5,11 @@ import { infoContainer, v2Reply } from "../../utils/componentsV2";
 
 export async function handlePing(message: Message) {
     const start = Date.now();
-    const msg = await message.reply("Calculating latency...");
+    // Reply with a Components-V2 placeholder so the final msg.edit() below (also
+    // V2) is a V2->V2 edit. Discord rejects toggling the IsComponentsV2 flag on an
+    // existing message, so a plain-text placeholder here makes the edit throw and
+    // the "Calculating latency..." message stick.
+    const msg = await message.reply(v2Reply(infoContainer("System Status Dashboard", "Calculating latency...")));
 
     const apiLatency = msg.createdTimestamp - message.createdTimestamp;
     let wsLatency: number | string = message.client.ws.ping;

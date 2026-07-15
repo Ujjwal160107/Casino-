@@ -7,6 +7,8 @@ import { chargeCardPurchaseTx } from "./creditCardService";
 import { applyRelaxOption } from "./relaxService";
 import { redisService } from "./redisService";
 import { STUDY_EVENTS, type StudyEvent } from "../data/studyEvents";
+import { addBalance } from "./walletService";
+import { conditionalClaim } from "../anticheat/claim";
 
 function getStudyEvent(degreeType: string): StudyEvent {
     const eligible = STUDY_EVENTS.filter(e => e.degreeType === degreeType || e.degreeType === "all");
@@ -524,16 +526,17 @@ export async function claimScholarship(userId: string, guildId: string, mileston
 
     const amount = edu.degree.tuitionPerSem * edu.currentSemester * multiplier;
 
-    await prisma.$transaction([
-        prisma.wallet.update({
-            where: { id: user.wallet!.id },
-            data: { balance: { increment: amount } }
-        }),
-        prisma.userEducation.update({
-            where: { id: edu.id },
-            data: { scholarshipsClaimed: { push: milestone } }
+    // Reserve the milestone atomically BEFORE crediting. The CAS pushes the
+    // milestone only if it is still absent; concurrent claims see count 0.
+    const claimed = await conditionalClaim(() =>
+        prisma.userEducation.updateMany({
+            where: { id: edu.id, NOT: { scholarshipsClaimed: { has: milestone } } },
+            data: { scholarshipsClaimed: { push: milestone } },
         })
-    ]);
+    );
+    if (!claimed) throw new Error("Scholarship already claimed.");
+
+    await addBalance(userId, user.username, amount, "scholarship", { milestone }, true);
 
     await invalidateUserCache(userId, guildId);
 

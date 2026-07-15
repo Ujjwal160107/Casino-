@@ -1,6 +1,7 @@
 import prisma from "../utils/prisma";
 import { questBus } from "./questEvents";
 import { addBalance } from "./walletService";
+import { conditionalClaim } from "../anticheat/claim";
 
 export type QuestDifficulty = "EASY" | "MEDIUM" | "HARD";
 
@@ -239,14 +240,19 @@ export async function claimQuestReward(discordId: string): Promise<{ totalReward
   const streakBonus = Math.floor(baseReward * bonusPct);
   const totalReward = baseReward + streakBonus;
 
+  // Reserve the reward atomically BEFORE crediting: only the CAS that flips
+  // rewardClaimed false->true may credit. Concurrent claims see count 0.
+  const claimed = await conditionalClaim(() =>
+    prisma.dailyQuest.updateMany({
+      where: { id: quest.id, rewardClaimed: false },
+      data: { rewardClaimed: true, totalReward, streakBonus },
+    })
+  );
+  if (!claimed) throw new Error("Reward already claimed.");
+
   await prisma.user.update({
     where: { discordId },
     data: { questStreak: newStreak, lastQuestComplete: new Date() },
-  });
-
-  await prisma.dailyQuest.update({
-    where: { id: quest.id },
-    data: { rewardClaimed: true, totalReward, streakBonus },
   });
 
   await addBalance(discordId, user?.username ?? "Unknown", totalReward, "quest_reward", { streak: newStreak, bonus: streakBonus }, true);
