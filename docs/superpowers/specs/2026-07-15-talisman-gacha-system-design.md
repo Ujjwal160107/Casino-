@@ -71,51 +71,122 @@ Each buff is a fixed catalog entry; only its magnitude rolls within a range.
 
 ```ts
 type TalismanEffectType =
+  // --- Stat modifiers (plug into existing hooks) ---
   | "luck"            // flat luck points -> luck_modifier
-  | "income_mult"     // % -> applyIncomeModifiers
+  | "income_mult"     // % -> applyIncomeModifiers (all income)
   | "loss_reduce"     // % reduction -> applyLossModifiers (100 = immune)
   | "crime_success"   // flat % added to crime success chance
+  | "crime_payout"    // % -> crime reward multiplier
   | "rob_loot"        // % -> rob payout multiplier
   | "hunt_rare"       // fraction added to Rare hunt weight
   | "hunt_legendary"  // fraction added to Legendary hunt weight
-  | "zoo_income";     // % -> zoo income multiplier
+  | "sell_bonus"      // % -> hunted-animal sell value
+  | "zoo_income"      // % -> zoo income multiplier
+  | "reward_mult"     // % -> daily/weekly/monthly rewards
+  | "interest_mult"   // % -> bank/investment interest
+  | "game_winchance"  // flat % added to game/coinflip win probability
+  | "gamble_insurance"// % of gambling losses refunded
+  | "passive_income"  // coins/hour trickle while equipped
+  // --- New mechanics (see Integration Points) ---
+  | "double_catch"    // % chance to double the whole hunt catch
+  | "guaranteed_rare" // flag: guarantees >=1 Rare+ per hunt
+  | "fine_negate"     // % chance a crime fine is fully negated
+  | "no_heat"         // % crime-heat reduction (100 = no heat)
+  | "daily_crime_win" // flag: one guaranteed crime success per day
+  | "garnish_immune"  // flag: immune to credit-card garnishment
+  | "rob_reversal"    // % chance to rob the robber when robbed
+  | "cooldown_reduce" // % reduction to hunt/crime/work/daily cooldowns
+  | "jackpot"         // % chance to 10x a single gambling win
+  | "chaos_double";   // flag: double luck AND double losses (high-risk Mythic)
 
 interface TalismanBuff {
   key: string;
   name: string;
   rarity: "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary" | "Mythic";
   effectType: TalismanEffectType;
-  range: [number, number]; // inclusive; integers unless noted
-  module: string;          // label for UI ("Crime", "Hunt", ...)
+  range: [number, number]; // inclusive; integers unless noted. Flag buffs use [1,1].
+  module: string;          // label for UI ("Crime", "Hunt", "Games", ...)
 }
 ```
 
 ### Catalog contents (initial values — tunable)
 
-| Buff | Rarity | Effect | Range |
+**Common** (small stat nudges)
+
+| Buff | Effect | Range | Module |
 |---|---|---|---|
-| Lucky Trinket | Common | luck | +2 … +4 |
-| Steady Aim | Common | hunt_rare | +3% … +6% |
-| Light Fingers | Common | rob_loot | +5% … +10% |
-| Padded Ledger | Common | loss_reduce | −4% … −8% |
-| Fortune's Nudge | Uncommon | luck | +5 … +8 |
-| Silver Tongue | Uncommon | crime_success | +4% … +7% |
-| Zoo Whisperer | Uncommon | zoo_income | +6% … +10% |
-| Cat Burglar | Uncommon | rob_loot | +12% … +18% |
-| Golden Horseshoe | Rare | luck | +10 … +14 |
-| Profiteer | Rare | income_mult | +8% … +12% |
-| Tax Evader | Rare | loss_reduce | −15% … −25% |
-| Kingpin | Rare | crime_success | +9% … +14% |
-| High Roller | Epic | luck | +14 … +18 |
-| Midas Touch | Epic | income_mult | +16% … +24% |
-| Untouchable | Epic | loss_reduce | −30% … −40% |
-| Apex Hunter | Epic | hunt_legendary | +4% … +7% |
-| Fortune's Favor | Legendary | luck | +22 … +28 |
-| Golden Goose | Legendary | income_mult | +30% … +40% |
-| Crime Lord | Legendary | crime_success | +20% … +28% |
-| Golden Idol | Mythic | income_mult | +45% … +55% |
-| Untaxable | Mythic | loss_reduce | −100% (immune) |
-| God of Fortune | Mythic | luck | +30 … +40 |
+| Lucky Trinket | luck | +2 … +4 | Luck |
+| Steady Aim | hunt_rare | +3% … +6% | Hunt |
+| Light Fingers | rob_loot | +5% … +10% | Rob |
+| Padded Ledger | loss_reduce | −4% … −8% | Economy |
+| Trophy Hunter | sell_bonus | +5% … +10% | Hunt |
+
+**Uncommon**
+
+| Buff | Effect | Range | Module |
+|---|---|---|---|
+| Fortune's Nudge | luck | +5 … +8 | Luck |
+| Silver Tongue | crime_success | +4% … +7% | Crime |
+| Zoo Whisperer | zoo_income | +6% … +10% | Zoo |
+| Cat Burglar | rob_loot | +12% … +18% | Rob |
+| Fence | crime_payout | +10% … +18% | Crime |
+| Golden Hour | reward_mult | +15% … +25% | Economy |
+| Side Hustle | passive_income | +5,000 … +15,000 /hr | Economy |
+
+**Rare**
+
+| Buff | Effect | Range | Module |
+|---|---|---|---|
+| Golden Horseshoe | luck | +10 … +14 | Luck |
+| Profiteer | income_mult | +8% … +12% | Economy |
+| Tax Evader | loss_reduce | −15% … −25% | Economy |
+| Kingpin | crime_success | +9% … +14% | Crime |
+| House Edge | game_winchance | +3% … +6% | Games |
+| Compound Soul | interest_mult | +20% … +35% | Economy |
+| Get Out of Jail | fine_negate | 15% … 30% chance | Crime |
+| Insurance | gamble_insurance | 10% … 25% refund | Games |
+| Poacher's Luck | guaranteed_rare | flag | Hunt |
+
+**Epic**
+
+| Buff | Effect | Range | Module |
+|---|---|---|---|
+| High Roller | luck | +14 … +18 | Luck |
+| Midas Touch | income_mult | +16% … +24% | Economy |
+| Untouchable | loss_reduce | −30% … −40% | Economy |
+| Apex Hunter | hunt_legendary | +4% … +7% | Hunt |
+| Twin Kill | double_catch | 8% … 15% chance | Hunt |
+| Ghost | no_heat | 50% … 100% heat cut | Crime |
+| Tax Haven | garnish_immune | flag | Economy |
+
+**Legendary**
+
+| Buff | Effect | Range | Module |
+|---|---|---|---|
+| Fortune's Favor | luck | +22 … +28 | Luck |
+| Golden Goose | income_mult | +30% … +40% | Economy |
+| Crime Lord | crime_success | +20% … +28% | Crime |
+| Reversal | rob_reversal | 20% … 35% chance | Rob |
+| Time Lord | cooldown_reduce | 25% … 50% cut | Meta |
+| Inside Job | daily_crime_win | flag | Crime |
+
+**Mythic** (Legendary-tali-only, 1% — deliberately broken)
+
+| Buff | Effect | Range | Module |
+|---|---|---|---|
+| Golden Idol | income_mult | +45% … +55% | Economy |
+| Untaxable | loss_reduce | −100% (immune) | Economy |
+| God of Fortune | luck | +30 … +40 | Luck |
+| Jackpot Soul | jackpot | 3% … 5% chance to 10× a win | Games |
+| Gambler's Pact | chaos_double | flag (double luck & losses) | Chaos |
+
+### Intentionally excluded (too economy-warping / deferred)
+
+- **Padlock Aura** (permanent rob immunity) and **Cleanout** (robbing a victim's
+  *bank*) — distort PvP/economy too hard; `loss_reduce`/`Reversal` cover the
+  theme within bounds.
+- **Vampire** (PvP luck-siphon) and **Philosopher's Stone** (net-worth-scaled
+  passive income) — interesting but heavy new mechanics; parked for a later pass.
 
 ### Per-tier rarity weights (roll distribution)
 
@@ -178,7 +249,7 @@ talismans.
   Recompute **replaces** the prior aggregate each time (delete-and-rewrite the
   `talisman`-sourced records), so equip/unequip is always consistent.
 
-### Effect hook wiring (cross-module)
+### Stat-modifier wiring (plug into existing hooks)
 
 Each module reads its permanent talisman aggregate (read-only, never consumed):
 
@@ -188,12 +259,45 @@ Each module reads its permanent talisman aggregate (read-only, never consumed):
 | income_mult | `applyIncomeModifiers` (`shopBuffs.ts`) | multiply by `1 + total%/100` |
 | loss_reduce | `applyLossModifiers` (`shopBuffs.ts`) | multiply by `max(0, 1 − total%/100)` (100 ⇒ ×0) |
 | crime_success | crime resolution (`crimeService.ts`) | add total% to success chance (alongside existing `crime_boost`) |
-| rob_loot | rob payout (`rob.ts`) | multiply payout by `1 + total%/100` |
-| hunt_rare / hunt_legendary | hunt weights (`huntService.ts`) | add to Rare/Legendary weight, keeping the existing `min(0.40)`/`min(0.20)` clamps; NOT deleted after the hunt |
-| zoo_income | zoo income claim (`huntService.ts`) | multiply by `1 + total%/100` (alongside existing `zoo_boost`) |
+| crime_payout | crime reward (`crimeService.ts`) | multiply crime reward by `1 + total%/100` |
+| rob_loot | rob payout (`rob.ts` steal txn) | multiply `robMult` by `1 + total%/100` |
+| hunt_rare / hunt_legendary | hunt weights (`huntService.ts:98-106`) | add to Rare/Legendary weight, keeping the existing `min(0.40)`/`min(0.20)` clamps; NOT deleted after the hunt |
+| sell_bonus | animal sale (`huntService` sell paths) | multiply sell value by `1 + total%/100` |
+| zoo_income | zoo income claim (`huntService.ts`) | multiply by `1 + total%/100` (alongside `zoo_boost`) |
+| reward_mult | `applyIncomeModifiers` for `daily`/`weekly`/`monthly` sources | multiply by `1 + total%/100` |
+| interest_mult | bank/investment interest calc (`investmentService`/bank) | multiply accrued interest by `1 + total%/100` |
+| game_winchance | coinflip win prob (`coinflip.ts:128`) + game resolvers | add total% to win probability (capped so it can't reach 100%) |
+| gamble_insurance | game-loss path (`applyLossModifiers` `game_loss` source) | refund total% of the loss |
+| passive_income | new lightweight accrual (see below) | credits coins/hour while equipped |
 
 `loss_reduce` totals are **clamped to 100** so multiple reducers can't overshoot
-into negative losses. Other totals inherit each module's existing safety clamp.
+into negative losses. `game_winchance` is capped (e.g. final win prob ≤ 95%) so a
+coinflip can never be a guaranteed win. Other totals inherit each module's
+existing safety clamp.
+
+### New-mechanic integration points (verified to exist)
+
+Each needs a small, isolated change at a confirmed call site; every check reads
+the equipped-talisman aggregate and is **cheap when the player has none**.
+
+| Effect | Integration point | Behaviour |
+|---|---|---|
+| double_catch | `huntService.ts` after the catch is rolled | with `magnitude%` chance, duplicate every caught group's count |
+| guaranteed_rare | `huntService.ts` weight/rolling | if the catch has no Rare+, upgrade the lowest result to Rare |
+| fine_negate | `crimeService.ts` failure branch | with `magnitude%` chance, set the fine to 0 (logged) |
+| no_heat | `addCrimeHeat` call in `crimeService.ts` | scale added heat by `1 − magnitude%/100` (100 ⇒ 0 heat) |
+| daily_crime_win | `crimeService.ts` success roll, gated by a per-day Redis key | first crime each day auto-succeeds; sets `talisman_daily_crime:{userId}` (24h TTL) |
+| garnish_immune | `applyGarnishment` (`creditCardService.ts`, called in `marketService`/income) | if flagged, skip garnishment |
+| rob_reversal | `rob.ts` around `checkPadlock` (line ~102) | with `magnitude%` chance, the robber is robbed instead (reuse the steal txn with roles swapped); notify via `victimNotifyService` |
+| cooldown_reduce | before each cooldown `SET`/reserve (hunt `tier.cooldownSeconds` at `huntService.ts:87`; crime/work/daily equivalents) | multiply the cooldown seconds by `1 − magnitude%/100` |
+| jackpot | coinflip/game payout (`coinflip.ts` ~line 151) | on a win, with `magnitude%` chance multiply the payout by 10 |
+| chaos_double | luck aggregation + `applyLossModifiers` | while equipped: double the player's luck contribution AND double all losses |
+
+A shared helper `getEquippedTalismanBuffs(userId)` returns the aggregated
+per-effect totals/flags (from the write-through cache), so each hook is a single
+map lookup. `passive_income` accrues lazily: on any economy read, credit
+`ratePerHour × hoursSinceLastAccrual` and stamp `lastAccruedAt` (no scheduler
+needed).
 
 ## UI
 
@@ -208,6 +312,25 @@ into negative losses. Other totals inherit each module's existing safety clamp.
 - **Craft reveal:** the craft result message names the rolled buff, its rarity,
   and magnitude (e.g. "🎲 You rolled **Crime Lord** (Legendary) — +24% crime
   success!").
+
+## Build Order (implementation waves)
+
+The catalog is large, so the implementation plan wires buffs in waves — each wave
+ships a usable subset without the roll pool ever referencing an unwired effect
+(the catalog is enabled effect-by-effect):
+
+1. **Core** — `Talisman` model, buff catalog scaffold, roll function, 4 recipes,
+   craft-to-instance, 3-slot equip, aggregation, talisman UI. Enable **stat
+   buffs that use existing hooks** (luck, income_mult, loss_reduce,
+   crime_success, rob_loot, hunt_rare/legendary, zoo_income).
+2. **Extended stats** — sell_bonus, crime_payout, reward_mult, interest_mult,
+   game_winchance, gamble_insurance, passive_income.
+3. **New mechanics** — double_catch, guaranteed_rare, fine_negate, no_heat,
+   daily_crime_win, garnish_immune, rob_reversal, cooldown_reduce, jackpot,
+   chaos_double (the Mythics).
+
+A buff is only added to the roll tables once its effect is wired, so a partial
+build never rolls a dead buff.
 
 ## Testing
 
@@ -226,6 +349,14 @@ Unit tests (Mongo via in-memory server, matching existing setup):
 - **Effect application:** an equipped `income_mult` talisman raises
   `applyIncomeModifiers` output; unequipping restores baseline. Same shape for
   `loss_reduce`.
+- **New mechanics:** `double_catch` at 100% (test override) doubles the catch;
+  `fine_negate` at 100% zeroes a fine; `no_heat` at 100% adds zero heat;
+  `daily_crime_win` auto-succeeds once then respects the 24h Redis gate;
+  `cooldown_reduce` shortens the reserved cooldown seconds; `jackpot` at 100%
+  10×'s a win; `rob_reversal` at 100% swaps the steal to the robber;
+  `game_winchance` is capped below a guaranteed win; `garnish_immune` skips
+  garnishment. Each is tested with the aggregate mocked to a deterministic value
+  so the probability branch is exercised without flakiness.
 
 ## Migration / Compatibility
 
