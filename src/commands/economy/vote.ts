@@ -7,7 +7,7 @@ import { ensureUserAndWallet, addBalance } from "../../services/walletService";
 import fetch from "node-fetch";
 import { getGuildPrefix } from "../../utils/guildContext";
 import { enqueueReminder, setReminderTypeEnabled, getReminderPrefs } from "../../services/cooldownReminderService";
-import { conditionalClaim } from "../../anticheat/claim";
+import { conditionalClaim, userDateUnchanged } from "../../anticheat/claim";
 
 const TOPGG_BOT_ID = "1371816936857669702";
 const VOTE_LINK = `https://top.gg/bot/${TOPGG_BOT_ID}?s=0825a328ae527`;
@@ -85,7 +85,10 @@ export async function handleVote(message: Message, args: string[]) {
         // calls all read the same stale lastVote; only one CAS can flip it.
         const claimed = await conditionalClaim(() =>
             prisma.user.updateMany({
-                where: { discordId: user.discordId, lastVote: user.lastVote ?? null },
+                // userDateUnchanged matches an absent lastVote too — a plain
+                // `{ lastVote: null }` filter would not, blocking first-time voters
+                // from ever claiming (Prisma/Mongo null vs. missing field).
+                where: { discordId: user.discordId, ...userDateUnchanged("lastVote", user.lastVote ?? null) },
                 data: { lastVote: now },
             })
         );

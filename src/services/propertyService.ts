@@ -4,7 +4,7 @@ import { ZOO_PROPERTY_DEFS, ZOO_CAPACITY, RARITY_INCOME, getAnimal } from "../ut
 import { isTester } from "../utils/developerAccess";
 import { GLOBAL_CATALOG_GUILD_ID } from "../utils/globalCatalog";
 import { redisService } from "./redisService";
-import { conditionalClaim } from "../anticheat/claim";
+import { conditionalClaim, userDateUnchanged } from "../anticheat/claim";
 
 const ALL_PROPERTIES_CACHE_KEY = "properties:all_public";
 const ALL_PROPERTIES_CACHE_TTL = 20; // seconds — price only moves on buy/sell, which invalidate explicitly
@@ -326,7 +326,7 @@ export async function collectIncome(discordId: string, _guildId: string): Promis
         // concurrent zoo/property collect already took it, drop the zoo income.
         const zooClaimed = await conditionalClaim(() =>
           prisma.user.updateMany({
-            where: { discordId, lastZooClaim: lastClaim },
+            where: { discordId, ...userDateUnchanged("lastZooClaim", lastClaim) },
             data: { lastZooClaim: now },
           })
         );

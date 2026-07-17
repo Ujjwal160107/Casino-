@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { redisService } from "../services/redisService";
 
 export type CooldownClaim = {
@@ -50,4 +51,34 @@ export async function conditionalClaim(
 ): Promise<boolean> {
   const { count } = await run();
   return count === 1;
+}
+
+/** Nullable `DateTime?` User columns used as compare-and-swap window guards. */
+export type NullableUserDateField = "lastZooClaim" | "lastVote" | "lastLoadedDiceRoll";
+
+/**
+ * Build the compare-and-swap `where` fragment that matches a User row only while
+ * a nullable timestamp column (`prior`, the value we just read) is unchanged.
+ * Pair with `conditionalClaim` (or a direct `count === 1` check) for faucet CAS.
+ *
+ * Why this exists: Prisma's MongoDB connector filters a *missing* field and an
+ * explicit `null` differently. `{ field: null }` matches ONLY documents where
+ * the field is an explicit BSON null — NOT documents where the field was never
+ * written — even though `findUnique` reads both back as `null`. A never-claimed
+ * user's timestamp column is absent (`user.create` never sets it and the column
+ * has no default), so a CAS that read `null` and then filtered `{ field: null }`
+ * matched zero rows and could never win: the user's FIRST claim was permanently
+ * blocked (zoo income stuck on "Already collecting…", first vote reward denied,
+ * first loaded-dice roll rejected). Covering the absent case with an
+ * `isSet: false` OR-branch makes the CAS match the row we actually read. See the
+ * Prisma MongoDB docs: filtering `null` excludes missing fields since 3.11.1.
+ */
+export function userDateUnchanged(
+  field: NullableUserDateField,
+  prior: Date | null,
+): Prisma.UserWhereInput {
+  if (prior !== null) return { [field]: prior } as Prisma.UserWhereInput;
+  return {
+    OR: [{ [field]: null }, { [field]: { isSet: false } }],
+  } as Prisma.UserWhereInput;
 }

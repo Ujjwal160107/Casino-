@@ -19,7 +19,7 @@ import {
 import { isTester } from "../utils/developerAccess";
 import { getCraftEffect, unlockCommonRecipesForAnimal } from "./huntCraftService";
 import { enqueueReminder } from "./cooldownReminderService";
-import { conditionalClaim } from "../anticheat/claim";
+import { conditionalClaim, userDateUnchanged } from "../anticheat/claim";
 
 export interface CaughtAnimalWithDef {
   id: string;
@@ -504,9 +504,12 @@ export async function claimZooIncome(
 
   // Reserve the claim window atomically BEFORE crediting. Advancing lastZooClaim
   // from the exact value we read is the CAS; concurrent claims lose (count 0).
+  // userDateUnchanged also matches a never-written (absent) lastZooClaim — a
+  // plain `{ lastZooClaim: null }` filter would not, permanently blocking any
+  // user who has never claimed before (Prisma/Mongo null vs. missing).
   const claimed = await conditionalClaim(() =>
     prisma.user.updateMany({
-      where: { discordId, lastZooClaim: user?.lastZooClaim ?? null },
+      where: { discordId, ...userDateUnchanged("lastZooClaim", user?.lastZooClaim ?? null) },
       data: { lastZooClaim: new Date() },
     })
   );

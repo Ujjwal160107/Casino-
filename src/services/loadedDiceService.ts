@@ -16,6 +16,7 @@ import { SHOP_CATALOG } from "../utils/shopCatalog";
 import { invalidateUserCache } from "./userService";
 import { questBus } from "./questEvents";
 import { withTransactionRetry } from "./walletService";
+import { userDateUnchanged } from "../anticheat/claim";
 import {
   seedCockShop,
   seedCosmeticsShop,
@@ -295,9 +296,12 @@ export async function rollLoadedDice(
     }
 
     const claim = await tx.user.updateMany({
+      // userDateUnchanged matches an absent lastLoadedDiceRoll too — a plain
+      // `{ lastLoadedDiceRoll: null }` filter would not, so a player's first-ever
+      // roll always failed with "already claimed" (Prisma/Mongo null vs. missing).
       where: {
         discordId,
-        lastLoadedDiceRoll: previousRollAt,
+        ...userDateUnchanged("lastLoadedDiceRoll", previousRollAt),
       },
       data: { lastLoadedDiceRoll: now },
     });
