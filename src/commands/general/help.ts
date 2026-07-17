@@ -204,7 +204,8 @@ const CATEGORIES: CategoryData[] = [
           "buy <symbol> <qty> — buy shares",
           "sell <symbol> <qty> — sell shares",
           "portfolio (port) — your holdings & P/L",
-          "news — market rumors & recent events"
+          "news — market rumors & recent events",
+          "help — how stocks work, risks & strategy"
         ],
         example: "{p}stock buy CHIP 5"
       },
