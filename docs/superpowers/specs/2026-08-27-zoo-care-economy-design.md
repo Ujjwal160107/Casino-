@@ -179,7 +179,10 @@ Existing owners are not charged the difference and not refunded it.
 
 No deploy-time cull and no wipe.
 
-**Backfill** (`src/scripts/backfillFedUntil.ts`, run at release like `collapseMultiZoos.ts`): set `fedUntil = deployTime + 24h` on every `CaughtAnimal` where it is null. Everyone starts with one fed day.
+**Backfill** (`src/scripts/zooCareMigration.ts`, run at release like `collapseMultiZoos.ts`) does two things:
+
+1. Set `fedUntil = deployTime + 24h` on every `CaughtAnimal` where it is null. Everyone starts with one fed day.
+2. Recompute the live zoo prices. `seedGlobalProperties` only writes `basePrice` in its `update` branch, and `buyProperty` charges the stored `Property.price`, so a catalog price change alone would never reach existing rows. The script sets `price = calculateDynamicPrice(basePrice, totalSold)` for the three zoo keys.
 
 **Legal-set enforcement** runs on every zoo read and before every claim, as a pure function:
 
@@ -213,8 +216,7 @@ The same function is what makes the housing rules enforceable in one place inste
 | `src/services/propertyService.ts` | zoo branch of `collectIncome` uses the shared fed-only daily rule; `sellPropertySystem` evicts housed animals (the upgrade path keeps them, as it does today) |
 | `src/utils/shopCatalog.ts` | four feed items; Bait Box description |
 | `src/commands/games/zoo.ts` | daily view instead of hourly; fed/hungry markers; Feed All button; `!zoo feed <species>` |
-| `src/commandRouter.ts` | route `!zoo feed` |
-| `src/scripts/backfillFedUntil.ts` (new) | one-time `fedUntil` backfill |
+| `src/scripts/zooCareMigration.ts` (new) | one-time `fedUntil` backfill + zoo price recompute |
 
 ### Constraints to respect
 
@@ -234,7 +236,7 @@ Unit (`vitest`, no DB):
 
 Integration (`test/`, mongodb-memory-server):
 
-- `test/anticheat/zoo.race.test.ts` **already exists and will break** — it asserts the 1h window. Update it for 24h and keep the double-claim assertion.
+- `test/anticheat/zoo.race.test.ts` already covers the claim CAS, including the absent-field regression. It exercises `conditionalClaim` directly rather than `claimZooIncome`, so widening the window to 24h does not touch it — keep it as is.
 - Concurrent `!zoo` Collect and `!collect-rent` still pay exactly once.
 - Claiming with no zoo owned fails.
 - A dead animal is purged and never pays.
