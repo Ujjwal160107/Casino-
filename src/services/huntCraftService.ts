@@ -98,7 +98,7 @@ export const HUNT_CRAFT_RECIPES: HuntCraftRecipe[] = [
     description: "Next hunt has +8% Rare chance.",
     coinCost: 650_000,
     parts: { eagle_talons: 3, eagle_feathers: 4 },
-    effect: { type: "hunt_rare_boost", rareBonus: 0.08 },
+    effect: { type: "hunt_rare_boost", rareBonus: 0.06 },
   },
   {
     key: "black_bear_war_vest",
@@ -161,7 +161,7 @@ export const HUNT_CRAFT_RECIPES: HuntCraftRecipe[] = [
     description: "Next hunt gets +7% Legendary chance, safely capped.",
     coinCost: 8_000_000,
     parts: { komodo_dragon_scales: 3, golden_eagle_talons: 2 },
-    effect: { type: "hunt_legendary_boost", legendaryBonus: 0.07 },
+    effect: { type: "hunt_legendary_boost", legendaryBonus: 0.02 },
   },
   {
     key: "arctic_wolf_spirit_charm",

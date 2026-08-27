@@ -14,15 +14,57 @@ export interface AnimalDefinition {
 
 export const RIFLE_TIERS: Record<string, {
   cooldownSeconds: number;
-  minAnimals: number;
-  maxAnimals: number;
+  /** Rarity rolls per hunt. Each roll yields exactly one animal. */
+  minRolls: number;
+  maxRolls: number;
   weights: Record<AnimalRarity, number>;
 }> = {
-  "wooden rifle":   { cooldownSeconds: 8 * 3600, minAnimals: 1, maxAnimals: 1, weights: { Common: 1.00, Uncommon: 0,    Rare: 0,    Legendary: 0    } },
-  "iron rifle":     { cooldownSeconds: 6 * 3600, minAnimals: 1, maxAnimals: 2, weights: { Common: 0.70, Uncommon: 0.30, Rare: 0,    Legendary: 0    } },
-  "sniper rifle":   { cooldownSeconds: 4 * 3600, minAnimals: 1, maxAnimals: 3, weights: { Common: 0.50, Uncommon: 0.35, Rare: 0.15, Legendary: 0    } },
-  "legendary rifle":{ cooldownSeconds: 2 * 3600, minAnimals: 2, maxAnimals: 4, weights: { Common: 0.30, Uncommon: 0.35, Rare: 0.25, Legendary: 0.10 } },
+  "wooden rifle":    { cooldownSeconds: 8 * 3600, minRolls: 1, maxRolls: 1, weights: { Common: 1.00, Uncommon: 0,    Rare: 0,    Legendary: 0    } },
+  "iron rifle":      { cooldownSeconds: 6 * 3600, minRolls: 1, maxRolls: 1, weights: { Common: 0.70, Uncommon: 0.30, Rare: 0,    Legendary: 0    } },
+  "sniper rifle":    { cooldownSeconds: 4 * 3600, minRolls: 1, maxRolls: 2, weights: { Common: 0.55, Uncommon: 0.32, Rare: 0.13, Legendary: 0    } },
+  "legendary rifle": { cooldownSeconds: 2 * 3600, minRolls: 1, maxRolls: 2, weights: { Common: 0.55, Uncommon: 0.32, Rare: 0.11, Legendary: 0.02 } },
 };
+
+/** Ceilings applied after every buff. A hunt can never beat these. */
+export const MAX_RARE_WEIGHT = 0.20;
+export const MAX_LEGENDARY_WEIGHT = 0.05;
+
+export interface HuntBuffs {
+  camouflage?: boolean;
+  compass?: "safe" | "risky";
+  rareBonus?: number;
+  legendaryBonus?: number;
+}
+
+/**
+ * Pure weight math so the ceilings are testable without a hunt. Every bonus is
+ * taken out of Common, and Common floors at 0.
+ */
+export function applyHuntBuffs(
+  base: Record<AnimalRarity, number>,
+  buffs: HuntBuffs,
+): Record<AnimalRarity, number> {
+  const w = { ...base };
+
+  let rareAdd = 0;
+  let legendaryAdd = 0;
+  let uncommonAdd = 0;
+
+  if (buffs.camouflage) { rareAdd += 0.08; legendaryAdd += 0.02; }
+  if (buffs.compass === "risky") { rareAdd += 0.06; legendaryAdd += 0.01; }
+  if (buffs.compass === "safe") { uncommonAdd += 0.15; }
+  if (buffs.rareBonus) rareAdd += buffs.rareBonus;
+  if (buffs.legendaryBonus) legendaryAdd += buffs.legendaryBonus;
+
+  w.Rare = Math.min(MAX_RARE_WEIGHT, w.Rare + rareAdd);
+  w.Legendary = Math.min(MAX_LEGENDARY_WEIGHT, w.Legendary + legendaryAdd);
+  w.Uncommon = w.Uncommon + uncommonAdd;
+
+  const spent = (w.Rare - base.Rare) + (w.Legendary - base.Legendary) + uncommonAdd;
+  w.Common = Math.max(0, base.Common - spent);
+
+  return w;
+}
 
 export const RIFLE_PRIORITY = ["legendary rifle", "sniper rifle", "iron rifle", "wooden rifle"] as const;
 
@@ -31,15 +73,6 @@ export const RARITY_INCOME: Record<AnimalRarity, number> = {
   Uncommon:  2_000,
   Rare:      8_000,
   Legendary: 25_000,
-};
-
-// OWO-style: how many units of each rarity drop per hunt (min/max)
-// Common drops more units; Legendary always drops 1
-export const RARITY_QUANTITIES: Record<AnimalRarity, { min: number; max: number }> = {
-  Common:    { min: 3, max: 6 },
-  Uncommon:  { min: 1, max: 3 },
-  Rare:      { min: 1, max: 2 },
-  Legendary: { min: 1, max: 1 },
 };
 
 export const RARITY_COLOR: Record<AnimalRarity, string> = {

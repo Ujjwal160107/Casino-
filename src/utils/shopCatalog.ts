@@ -350,8 +350,8 @@ export const HUNT_SHOP_CATALOG: ShopCatalogItem[] = [
     key: "bait_box",
     name: "Bait Box",
     price: 750_000,
-    description: "A box of premium bait with a smell best left undescribed. Guarantees at least 2 animals on your next hunt. One use only.",
-    shortDescription: "Guarantees at least 2 animals.",
+    description: "A box of premium bait with a smell best left undescribed. Guarantees at least 2 catch rolls on your next hunt. One use only.",
+    shortDescription: "Guarantees at least 2 rolls.",
     category: "HUNT",
     asset: "bait box",
     consumable: true,
@@ -359,7 +359,7 @@ export const HUNT_SHOP_CATALOG: ShopCatalogItem[] = [
     itemType: "CONSUMABLE",
     maxStack: 1,
     effects: [
-      { type: "CUSTOM_MESSAGE", message: "Bait Box set! Your next hunt will attract at least 2 animals.", trigger: "USE" },
+      { type: "CUSTOM_MESSAGE", message: "Bait Box set! Your next hunt will roll at least twice.", trigger: "USE" },
     ],
   },
   {

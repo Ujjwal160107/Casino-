@@ -7,7 +7,6 @@ import {
   RIFLE_TIERS,
   RIFLE_PRIORITY,
   RARITY_INCOME,
-  RARITY_QUANTITIES,
   ZOO_CAPACITY,
   AnimalDefinition,
   AnimalRarity,
@@ -15,6 +14,7 @@ import {
   getAnimal,
   rollRarity,
   getAnimalsByRarity,
+  applyHuntBuffs,
 } from "../utils/animalCatalog";
 import { isTester } from "../utils/developerAccess";
 import { getCraftEffect, unlockCommonRecipesForAnimal } from "./huntCraftService";
@@ -94,77 +94,53 @@ export async function hunt(
     void enqueueReminder(discordId, "hunt", new Date(Date.now() + tier.cooldownSeconds * 1000));
   }
 
-  const weights = { ...tier.weights };
+  let weights = { ...tier.weights };
   const rareBoostRow = await getCraftEffect(discordId, `crafted_hunt_rare_boost:${discordId}`, "hunt_rare_boost", (v) => ({ rareBonus: v }));
   const legendaryBoostRow = await getCraftEffect(discordId, `crafted_hunt_legendary_boost:${discordId}`, "hunt_legendary_boost", (v) => ({ legendaryBonus: v }));
-  if (rareBoostRow?.rareBonus) {
-    weights.Rare = Math.min(0.40, weights.Rare + rareBoostRow.rareBonus);
-    weights.Common = Math.max(0, weights.Common - rareBoostRow.rareBonus);
-  }
-  if (legendaryBoostRow?.legendaryBonus) {
-    weights.Legendary = Math.min(0.20, weights.Legendary + legendaryBoostRow.legendaryBonus);
-    weights.Common = Math.max(0, weights.Common - legendaryBoostRow.legendaryBonus);
-  }
 
   const camouflageActive = await redisService.get<{ active: boolean }>(`hunt_camouflage:${discordId}`);
-  if (camouflageActive?.active) {
-    weights.Rare = Math.min(0.40, weights.Rare + 0.10);
-    weights.Legendary = Math.min(0.20, weights.Legendary + 0.05);
-    weights.Common = Math.max(0, weights.Common - 0.15);
-  }
-
   const compassActive = await redisService.get<{ mode: "safe" | "risky" }>(`hunt_compass:${discordId}`);
-  if (compassActive?.mode === "risky") {
-    weights.Rare = Math.min(0.40, weights.Rare + 0.08);
-    weights.Legendary = Math.min(0.20, weights.Legendary + 0.04);
-    weights.Common = Math.max(0, weights.Common - 0.12);
-  } else if (compassActive?.mode === "safe") {
-    weights.Uncommon = weights.Uncommon + 0.15;
-    weights.Common = Math.max(0, weights.Common - 0.15);
-  }
+
+  weights = applyHuntBuffs(weights, {
+    camouflage: camouflageActive?.active === true,
+    compass: compassActive?.mode,
+    rareBonus: rareBoostRow?.rareBonus,
+    legendaryBonus: legendaryBoostRow?.legendaryBonus,
+  });
 
   const baitActive = await redisService.get<{ active: boolean }>(`hunt_bait_box:${discordId}`);
   const echoActive = await redisService.get<{ active: boolean }>(`hunt_echo_whistle:${discordId}`);
 
-  // Roll a number of distinct rarity outcomes based on rifle tier
-  // Each rarity outcome produces a random species + OWO-style quantity
-  let rarityCount = randomInt(tier.minAnimals, tier.maxAnimals);
+  // One animal per rarity roll. The rifle decides how many rolls you get.
+  let rollCount = randomInt(tier.minRolls, tier.maxRolls);
   if (baitActive?.active) {
-    rarityCount = Math.max(2, rarityCount);
+    rollCount = Math.max(2, rollCount);
   }
   const grouped: Map<string, { def: AnimalDefinition; count: number; ids: string[] }> = new Map();
 
-  for (let i = 0; i < rarityCount; i++) {
+  let bestDef: AnimalDefinition | null = null;
+  const rarityOrder: AnimalRarity[] = ["Common", "Uncommon", "Rare", "Legendary"];
+
+  for (let i = 0; i < rollCount; i++) {
     const rarity = rollRarity(weights);
     const pool = getAnimalsByRarity(rarity);
     const def = pool[Math.floor(Math.random() * pool.length)];
-    const qty = randomInt(RARITY_QUANTITIES[rarity].min, RARITY_QUANTITIES[rarity].max);
+
+    if (!bestDef || rarityOrder.indexOf(def.rarity) > rarityOrder.indexOf(bestDef.rarity)) {
+      bestDef = def;
+    }
 
     const existing = grouped.get(def.key);
-    if (existing) {
-      existing.count += qty;
-    } else {
-      grouped.set(def.key, { def, count: qty, ids: [] });
-    }
+    if (existing) existing.count += 1;
+    else grouped.set(def.key, { def, count: 1, ids: [] });
   }
 
-  if (echoActive?.active && grouped.size > 0 && Math.random() < 0.35) {
-    const rarityOrder: AnimalRarity[] = ["Common", "Uncommon", "Rare", "Legendary"];
-    let bestRarity: AnimalRarity = "Common";
-    for (const entry of grouped.values()) {
-      if (rarityOrder.indexOf(entry.def.rarity) > rarityOrder.indexOf(bestRarity)) {
-        bestRarity = entry.def.rarity;
-      }
-    }
-    const pool = getAnimalsByRarity(bestRarity);
-    const def = pool[Math.floor(Math.random() * pool.length)];
-    const qty = randomInt(RARITY_QUANTITIES[bestRarity].min, RARITY_QUANTITIES[bestRarity].max);
-    const existing = grouped.get(def.key);
-    if (existing) {
-      existing.count += qty;
-    } else {
-      grouped.set(def.key, { def, count: qty, ids: [] });
-    }
+  // Echo repeats your best catch's exact species — echoing a Legendary into a
+  // *different* Legendary was a second legendary roll in disguise.
+  if (echoActive?.active && bestDef && Math.random() < 0.35) {
+    const existing = grouped.get(bestDef.key);
+    if (existing) existing.count += 1;
+    else grouped.set(bestDef.key, { def: bestDef, count: 1, ids: [] });
   }
 
   // Create DB records for all caught animals
