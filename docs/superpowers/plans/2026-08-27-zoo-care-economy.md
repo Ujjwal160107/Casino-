@@ -2166,12 +2166,9 @@ Create `src/scripts/zooCareMigration.ts`:
  */
 import { PrismaClient } from "@prisma/client";
 import { FED_WINDOW_MS, ZOO_CAPACITY, ZOO_PROPERTY_DEFS } from "../utils/animalCatalog";
+import { PropertyService } from "../services/propertyService";
 
 const prisma = new PrismaClient();
-
-function calculateDynamicPrice(basePrice: number, totalSold: number): number {
-  return Math.floor(basePrice * (1 + totalSold * 0.05));
-}
 
 async function main() {
   const fedUntil = new Date(Date.now() + FED_WINDOW_MS);
@@ -2188,7 +2185,7 @@ async function main() {
       console.log(`${def.key}: no Property row yet, seeding will create it at the new price.`);
       continue;
     }
-    const price = calculateDynamicPrice(def.price, property.totalSold);
+    const price = PropertyService.calculateDynamicPrice(def.price, property.totalSold);
     await prisma.property.update({
       where: { id: property.id },
       data: { basePrice: def.price, price },
@@ -2209,7 +2206,7 @@ main()
   });
 ```
 
-`calculateDynamicPrice` is duplicated from `PropertyService` rather than imported, matching how `collapseMultiZoos.ts` stays standalone — importing the service would drag Redis and the Discord client into a migration script.
+The pricing curve is imported from `PropertyService`, not copied, so it cannot drift between the service and the migration. If that import pulls in something that fails to initialise outside the bot process (Redis, the Discord client), the script will fail loudly at startup — fix the import chain rather than reintroducing a copy of the formula.
 
 - [ ] **Step 3: Add the npm script**
 
