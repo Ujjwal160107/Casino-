@@ -233,25 +233,31 @@ export async function houseAnimals(
   // stale count and each house up to stackRoom units, overshooting the stack
   // limit. Re-count after the write and evict the newest excess — oldest
   // survives, matching resolveLegalHousing's own tiebreak — so the limit
-  // holds even under the race, and report what actually stuck rather than
-  // what this call attempted.
+  // holds even under the race.
   const nowHoused = await prisma.caughtAnimal.findMany({
     where: { discordId, animalKey, inZoo: true },
     orderBy: { caughtAt: "desc" },
   });
   const overLimit = nowHoused.length - RARITY_STACK_LIMIT[def.rarity];
-  let excessIds = new Set<string>();
   if (overLimit > 0) {
     const excess = nowHoused.slice(0, overLimit);
-    excessIds = new Set(excess.map((a) => a.id));
     await prisma.caughtAnimal.updateMany({
       where: { id: { in: excess.map((a) => a.id) } },
       data: { inZoo: false },
     });
   }
 
-  const housedCount = available.filter((a) => !excessIds.has(a.id)).length;
-  return { housed: housedCount, reason: null };
+  // The count is re-read rather than derived from the self-heal above,
+  // because a concurrent call's own self-heal can run between this call's
+  // self-heal and this return and evict some of the rows this call just
+  // housed (or vice versa) — a locally computed excess set is a snapshot
+  // that a concurrent call can invalidate. Ask the database the actual
+  // question — of the ids this call housed, how many are inZoo: true right
+  // now — so the answer is true regardless of interleaving.
+  const stillHoused = await prisma.caughtAnimal.count({
+    where: { id: { in: available.map((a) => a.id) }, inZoo: true },
+  });
+  return { housed: stillHoused, reason: null };
 }
 
 /** Remove every unit of a species from the zoo, freeing its slot. */
