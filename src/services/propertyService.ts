@@ -1,10 +1,12 @@
 import prisma from "../utils/prisma";
 import { Property, OwnedProperty } from "@prisma/client";
-import { ZOO_PROPERTY_DEFS, ZOO_CAPACITY, RARITY_INCOME, getAnimal } from "../utils/animalCatalog";
+import { ZOO_PROPERTY_DEFS, ZOO_CAPACITY, RARITY_INCOME_PER_DAY, getAnimal } from "../utils/animalCatalog";
+import { animalState } from "../utils/zooRules";
 import { isTester } from "../utils/developerAccess";
 import { GLOBAL_CATALOG_GUILD_ID } from "../utils/globalCatalog";
 import { redisService } from "./redisService";
 import { conditionalClaim, userDateUnchanged } from "../anticheat/claim";
+import { getActiveZooKey, purgeDead, enforceHousing, ZOO_CLAIM_WINDOW_MS } from "./zooService";
 
 const ALL_PROPERTIES_CACHE_KEY = "properties:all_public";
 const ALL_PROPERTIES_CACHE_TTL = 20; // seconds — price only moves on buy/sell, which invalidate explicitly
@@ -143,6 +145,14 @@ export class PropertyService {
 
     const result = await prisma.$transaction(async (tx) => {
       await tx.ownedProperty.delete({ where: { id: owned.id } });
+
+      // Selling your zoo turns every housed animal out. They keep their hunger
+      // clock and cannot be fed in inventory, so they die within three days
+      // unless sold or parted — you can no longer sell the zoo and keep the rent.
+      if (ZOO_KEYS.has(key)) {
+        await tx.caughtAnimal.updateMany({ where: { discordId, inZoo: true }, data: { inZoo: false } });
+      }
+
       await tx.wallet.update({ where: { userId: discordId }, data: { balance: { increment: sellPrice } } });
       const updated = await tx.property.update({ where: { id: property.id }, data: { totalSold: { decrement: 1 } } });
       const newPrice = this.calculateDynamicPrice(updated.basePrice, updated.totalSold);
@@ -300,40 +310,36 @@ export async function collectIncome(discordId: string, _guildId: string): Promis
 
   const user = await prisma.user.findUnique({ where: { discordId } });
   const lastClaim = user?.lastZooClaim ?? null;
-  const ZOO_COOLDOWN_MS = 24 * 3_600_000;
 
-  if (lastClaim && now.getTime() - lastClaim.getTime() < ZOO_COOLDOWN_MS && !isTester(discordId)) {
-    result.nextZooCollect = new Date(lastClaim.getTime() + ZOO_COOLDOWN_MS);
-  } else {
+  if (lastClaim && now.getTime() - lastClaim.getTime() < ZOO_CLAIM_WINDOW_MS && !isTester(discordId)) {
+    result.nextZooCollect = new Date(lastClaim.getTime() + ZOO_CLAIM_WINDOW_MS);
+  } else if (await getActiveZooKey(discordId)) {
+    // Same rule as !zoo Collect: fed, housed animals only, at the daily rate.
+    await purgeDead(discordId);
+    await enforceHousing(discordId);
+
     const zooAnimals = await prisma.caughtAnimal.findMany({ where: { discordId, inZoo: true } });
-    if (zooAnimals.length > 0) {
-      const hoursSinceLastClaim = isTester(discordId)
-        ? 24
-        : lastClaim
-          ? Math.min(24, Math.floor((now.getTime() - lastClaim.getTime()) / 3_600_000))
-          : 24;
+    for (const animal of zooAnimals) {
+      const def = getAnimal(animal.animalKey);
+      if (!def) continue;
+      if (animalState(animal, now) !== "fed") continue;
+      const income = RARITY_INCOME_PER_DAY[def.rarity];
+      result.zooBreakdown.push({ name: def.name, rarity: def.rarity, income });
+      result.zooTotal += income;
+    }
 
-      for (const animal of zooAnimals) {
-        const def = getAnimal(animal.animalKey);
-        if (!def) continue;
-        const income = Math.floor(RARITY_INCOME[def.rarity] * hoursSinceLastClaim);
-        result.zooBreakdown.push({ name: def.name, rarity: def.rarity, income });
-        result.zooTotal += income;
-      }
-
-      if (result.zooTotal > 0) {
-        // Reserve the zoo window (shared with claimZooIncome) atomically; if a
-        // concurrent zoo/property collect already took it, drop the zoo income.
-        const zooClaimed = await conditionalClaim(() =>
-          prisma.user.updateMany({
-            where: { discordId, ...userDateUnchanged("lastZooClaim", lastClaim) },
-            data: { lastZooClaim: now },
-          })
-        );
-        if (!zooClaimed) {
-          result.zooTotal = 0;
-          result.zooBreakdown = [];
-        }
+    if (result.zooTotal > 0) {
+      // Reserve the zoo window (shared with claimZooIncome) atomically; if a
+      // concurrent zoo/property collect already took it, drop the zoo income.
+      const zooClaimed = await conditionalClaim(() =>
+        prisma.user.updateMany({
+          where: { discordId, ...userDateUnchanged("lastZooClaim", lastClaim) },
+          data: { lastZooClaim: now },
+        })
+      );
+      if (!zooClaimed) {
+        result.zooTotal = 0;
+        result.zooBreakdown = [];
       }
     }
   }
