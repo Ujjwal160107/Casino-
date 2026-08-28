@@ -47,7 +47,11 @@ function toRuleAnimal(row: { id: string; animalKey: string; caughtAt: Date }): R
 export async function purgeDead(discordId: string): Promise<{ animalKey: string; count: number }[]> {
   const now = new Date();
   const rows = await prisma.caughtAnimal.findMany({ where: { discordId } });
-  const dead = rows.filter((r) => animalState(r, now) === "dead");
+  // A row whose animalKey no longer resolves (renamed/retired in the catalog)
+  // must be left alone, never deleted by accident — mirrors the same guard in
+  // enforceHousing (unknown keys drop out of `rules`) and getZooStatus
+  // (`if (!def) continue`).
+  const dead = rows.filter((r) => getAnimal(r.animalKey) && animalState(r, now) === "dead");
   if (dead.length === 0) return [];
 
   await prisma.caughtAnimal.deleteMany({ where: { id: { in: dead.map((d) => d.id) } } });
@@ -222,7 +226,32 @@ export async function houseAnimals(
     where: { id: { in: available.map((a) => a.id) } },
     data: { inZoo: true },
   });
-  return { housed: available.length, reason: null };
+
+  // Self-heal: the stackRoom check above reads then writes with nothing in
+  // between, so two concurrent calls for the same species (e.g. a
+  // double-clicked "Send to zoo" button) can both pass it against the same
+  // stale count and each house up to stackRoom units, overshooting the stack
+  // limit. Re-count after the write and evict the newest excess — oldest
+  // survives, matching resolveLegalHousing's own tiebreak — so the limit
+  // holds even under the race, and report what actually stuck rather than
+  // what this call attempted.
+  const nowHoused = await prisma.caughtAnimal.findMany({
+    where: { discordId, animalKey, inZoo: true },
+    orderBy: { caughtAt: "desc" },
+  });
+  const overLimit = nowHoused.length - RARITY_STACK_LIMIT[def.rarity];
+  let excessIds = new Set<string>();
+  if (overLimit > 0) {
+    const excess = nowHoused.slice(0, overLimit);
+    excessIds = new Set(excess.map((a) => a.id));
+    await prisma.caughtAnimal.updateMany({
+      where: { id: { in: excess.map((a) => a.id) } },
+      data: { inZoo: false },
+    });
+  }
+
+  const housedCount = available.filter((a) => !excessIds.has(a.id)).length;
+  return { housed: housedCount, reason: null };
 }
 
 /** Remove every unit of a species from the zoo, freeing its slot. */

@@ -80,7 +80,11 @@ export function buildZooPayload(
   const { slots, tier, incomePerDay, zooName, zooKey, nextTier } = view;
   const maxSlots = tier?.types ?? 0;
 
-  const collectDisabled = incomePerDay < 1;
+  // Unconditionally disabled: claimZooIncome moved out of huntService with
+  // this task's zooService split and isn't rebuilt until Task 6 (Task 8 wires
+  // this button back up). Leaving it enabled would promise a payout the
+  // zoo_collect: handler cannot deliver right now.
+  const collectDisabled = true;
 
   const files: AttachmentBuilder[] = [];
   const container = new ContainerBuilder();
