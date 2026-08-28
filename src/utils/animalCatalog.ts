@@ -143,9 +143,9 @@ export const ZOO_CAPACITY: Record<string, number> = Object.fromEntries(
 );
 
 export const ZOO_PROPERTY_DEFS: { key: string; name: string; description: string; price: number }[] = [
-  { key: "mini_zoo",  name: "Mini Zoo",  description: "A small zoo that can house up to 5 animal types.",   price: 1_800_000  },
-  { key: "city_zoo",  name: "City Zoo",  description: "A city zoo that can house up to 10 animal types.",   price: 15_000_000 },
-  { key: "world_zoo", name: "World Zoo", description: "A world-class zoo that can house up to 16 animal types.", price: 75_000_000 },
+  { key: "mini_zoo",  name: "Mini Zoo",  description: "A small zoo: 3 common and 2 uncommon species, up to 18 animals.",                     price: 800_000    },
+  { key: "city_zoo",  name: "City Zoo",  description: "A city zoo: 4 common, 4 uncommon and 2 rare species, up to 34 animals.",              price: 5_000_000  },
+  { key: "world_zoo", name: "World Zoo", description: "A world-class zoo: 4 common, 4 uncommon, 3 rare and 1 legendary species, up to 38 animals. The only zoo that can house a Legendary.", price: 18_000_000 },
 ];
 
 export const PART_VALUES: Record<string, number> = {
