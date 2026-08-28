@@ -15,19 +15,75 @@
  *
  * Usage: npx ts-node src/scripts/zooCareMigration.ts
  */
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { FED_WINDOW_MS, ZOO_CAPACITY, ZOO_PROPERTY_DEFS } from "../utils/animalCatalog";
 import { PropertyService } from "../services/propertyService";
 
 const prisma = new PrismaClient();
 
-async function main() {
-  const fedUntil = new Date(Date.now() + FED_WINDOW_MS);
-  const backfilled = await prisma.caughtAnimal.updateMany({
-    where: { fedUntil: null },
+/**
+ * `fedUntil` was introduced in this same branch (b756703): no code before it
+ * ever wrote the field, and MongoDB has no schema migrations — `prisma db
+ * push` does not retroactively add the key to existing documents. Every
+ * pre-deploy CaughtAnimal document therefore has fedUntil physically ABSENT
+ * from its BSON, not explicitly set to null.
+ *
+ * Prisma's MongoDB connector filters `{ fedUntil: null }` as "explicit BSON
+ * null only" — it does NOT match a document where the field was never
+ * written, even though `findUnique` reads both back as `null`. This codebase
+ * already hit and fixed the identical failure mode in
+ * src/anticheat/claim.ts's `userDateUnchanged` (see its doc comment). The
+ * `isSet: false` branch is what covers the absent-field case.
+ *
+ * Exported (not inlined in the query below) so the migration's own test
+ * asserts against this exact filter, never a copy of it.
+ */
+export const LEGACY_FED_UNTIL_WHERE: Prisma.CaughtAnimalWhereInput = {
+  OR: [{ fedUntil: null }, { fedUntil: { isSet: false } }],
+};
+
+export interface BackfillResult {
+  /** Rows the updateMany actually changed this run. */
+  matched: number;
+  /** Total CaughtAnimal rows that exist, matched or not. */
+  totalAnimals: number;
+  /**
+   * Rows still matching LEGACY_FED_UNTIL_WHERE after the write. Should always
+   * be 0 — a nonzero value here (not `matched === 0`) is the signal that the
+   * filter failed to reach legacy rows, as opposed to there being nothing
+   * left to backfill.
+   */
+  stillUnfed: number;
+}
+
+/**
+ * Give every legacy CaughtAnimal row one fed day. Idempotent: once every row
+ * has an explicit fedUntil, LEGACY_FED_UNTIL_WHERE matches nothing and a
+ * second run's `matched` is 0.
+ */
+export async function backfillFedUntil(client: PrismaClient, now: Date = new Date()): Promise<BackfillResult> {
+  const fedUntil = new Date(now.getTime() + FED_WINDOW_MS);
+  const { count: matched } = await client.caughtAnimal.updateMany({
+    where: LEGACY_FED_UNTIL_WHERE,
     data: { fedUntil },
   });
-  console.log(`Backfilled fedUntil on ${backfilled.count} animal(s); everyone has one fed day.`);
+  const totalAnimals = await client.caughtAnimal.count();
+  const stillUnfed = await client.caughtAnimal.count({ where: LEGACY_FED_UNTIL_WHERE });
+  return { matched, totalAnimals, stillUnfed };
+}
+
+async function main() {
+  const { matched, totalAnimals, stillUnfed } = await backfillFedUntil(prisma);
+  console.log(`Backfilled fedUntil on ${matched} of ${totalAnimals} total animal(s).`);
+  if (stillUnfed > 0) {
+    console.error(
+      `WARNING: ${stillUnfed} animal(s) still lack a usable fedUntil after this run. ` +
+        `"matched 0" does NOT mean "already backfilled" here — the filter is not reaching ` +
+        `legacy rows. Investigate before deploying further; do not assume success.`
+    );
+  } else {
+    console.log("Every animal now has a usable fedUntil (explicit or backfilled). Safe to re-run.");
+  }
 
   for (const def of ZOO_PROPERTY_DEFS) {
     if (!(def.key in ZOO_CAPACITY)) continue;
@@ -47,11 +103,16 @@ async function main() {
   console.log("\nDone. No animals culled — over-cap zoos are trimmed lazily on the owner's next !zoo.");
 }
 
-main()
-  .catch((err) => {
-    console.error("zooCareMigration failed:", err);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Only run when this file is the process entrypoint (`npx ts-node
+// src/scripts/zooCareMigration.ts`) — never on import, so the exports above
+// can be asserted against directly from a test without triggering a real run.
+if (require.main === module) {
+  main()
+    .catch((err) => {
+      console.error("zooCareMigration failed:", err);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}
