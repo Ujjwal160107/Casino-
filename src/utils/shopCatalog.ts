@@ -395,7 +395,7 @@ export const HUNT_SHOP_CATALOG: ShopCatalogItem[] = [
     key: "hunters_compass",
     name: "Hunter's Compass",
     price: 2_250_000,
-    description: "A compass that points toward opportunity instead of north. Once per day, choose a path for your next hunt: `use hunters compass risky` (+8% Rare, +4% Legendary) or `use hunters compass safe` (+15% Uncommon). Never consumed.",
+    description: "A compass that points toward opportunity instead of north. Once per day, choose a path for your next hunt: `use hunters compass risky` (+6% Rare, +1% Legendary) or `use hunters compass safe` (+15% Uncommon). Never consumed.",
     shortDescription: "Daily: choose a safe or risky hunt path.",
     category: "HUNT",
     asset: "hunters_compass",
