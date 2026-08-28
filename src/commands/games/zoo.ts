@@ -14,10 +14,10 @@ import {
 } from "discord.js";
 import fs from "fs";
 import path from "path";
-import { getZooStatus, getZooSlots, removeAnimalsByKey, ZooSlot } from "../../services/huntService";
+import { getZooStatus, removeAnimalsByKey, ZooSlot } from "../../services/zooService";
 import { errorContainer, successContainer, v2Reply } from "../../utils/componentsV2";
 import { seedZooProperties } from "../../services/propertyService";
-import { ZOO_CAPACITY, RARITY_INCOME, ZOO_PROPERTY_DEFS } from "../../utils/animalCatalog";
+import { ZOO_CAPACITY, RARITY_INCOME, ZOO_PROPERTY_DEFS, ZooTier } from "../../utils/animalCatalog";
 import { fmtCurrency, fmtAmount } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import prisma from "../../utils/prisma";
@@ -55,9 +55,8 @@ function resolveAsset(assetName: string, prefix = ""): { filePath: string; attac
 
 export interface ZooView {
   slots: ZooSlot[];
-  maxSlots: number;
-  ratePerHour: number;
-  hoursPending: number;
+  tier: ZooTier | null;
+  incomePerDay: number;
   zooName: string | null;
   zooKey: string | null;
   nextTier: { key: string; name: string; price: number } | null;
@@ -78,10 +77,10 @@ export function buildZooPayload(
   view: ZooView,
   guild: import("discord.js").Guild | null,
 ): { components: ContainerBuilder[]; files: AttachmentBuilder[] } {
-  const { slots, maxSlots, ratePerHour, hoursPending, zooName, zooKey, nextTier } = view;
+  const { slots, tier, incomePerDay, zooName, zooKey, nextTier } = view;
+  const maxSlots = tier?.types ?? 0;
 
-  const pendingIncome = Math.floor(ratePerHour * hoursPending);
-  const collectDisabled = hoursPending < 1;
+  const collectDisabled = incomePerDay < 1;
 
   const files: AttachmentBuilder[] = [];
   const container = new ContainerBuilder();
@@ -89,14 +88,14 @@ export function buildZooPayload(
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `## ${Mascot.Emotes.Sparks} Your ${zooName ?? "Zoo"}\n` +
-      `**${slots.length}/${maxSlots}** animal types | **+${fmtCurrency(ratePerHour)}/hr** | **~${fmtCurrency(ratePerHour * 24)}/day** max`
+      `**${slots.length}/${maxSlots}** animal types | **+${fmtCurrency(incomePerDay)}/day**`
     )
   );
 
   // Plain number, not fmtCurrency — button labels don't render <:fortunes:…>.
   const collectLabel = collectDisabled
     ? "Nothing to collect yet"
-    : `Collect ${fmtAmount(pendingIncome)} (${hoursPending}h accumulated)`;
+    : `Collect ${fmtAmount(incomePerDay)}`;
 
   const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
@@ -134,7 +133,7 @@ export function buildZooPayload(
 
   // Most valuable animals get a detailed section + Remove button; the rest are
   // summarised as text so the message stays under Discord's limits.
-  const sorted = [...slots].sort((a, b) => b.incomePerHour - a.incomePerHour);
+  const sorted = [...slots].sort((a, b) => b.incomePerDay - a.incomePerDay);
   const detailed = sorted.slice(0, MAX_DETAILED_ZOO_SLOTS);
   const overflow = sorted.slice(MAX_DETAILED_ZOO_SLOTS);
 
@@ -152,7 +151,7 @@ export function buildZooPayload(
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
           `**${slot.count}x** ${emojiDisplay} **${slot.def.name}** — ${slot.def.rarity}\n` +
-          `${Mascot.Emotes.Currency} +${fmtCurrency(slot.incomePerHour)}/hr (${slot.count}x ${fmtCurrency(RARITY_INCOME[slot.def.rarity])})`
+          `${Mascot.Emotes.Currency} +${fmtCurrency(slot.incomePerDay)}/hr (${slot.count}x ${fmtCurrency(RARITY_INCOME[slot.def.rarity])})`
         ),
       )
       .setButtonAccessory(
@@ -183,7 +182,7 @@ export function buildZooPayload(
     );
     const overflowLines = overflow.map((slot) => {
       const emojiDisplay = emojiInline(slot.def.emojiKey, guild) ?? AnimalEmojis[slot.def.key] ?? "";
-      return `**${slot.count}x** ${emojiDisplay} **${slot.def.name}** — ${slot.def.rarity} · +${fmtCurrency(slot.incomePerHour)}/hr`;
+      return `**${slot.count}x** ${emojiDisplay} **${slot.def.name}** — ${slot.def.rarity} · +${fmtCurrency(slot.incomePerDay)}/hr`;
     });
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
@@ -202,7 +201,7 @@ export async function buildZooContainer(
   guildId: string,
   guild: import("discord.js").Guild | null
 ): Promise<ContainerBuilder> {
-  const status = await getZooStatus(discordId, guildId);
+  const status = await getZooStatus(discordId);
 
   let nextTier: ZooView["nextTier"] = null;
   if (status.zooKey) {
@@ -231,7 +230,7 @@ export async function handleZoo(message: Message, args: string[]) {
     if (!query) {
       return message.reply(v2Reply(errorContainer("Zoo Remove", "Usage: `!zoo remove <animal name>`")));
     }
-    const slots = await getZooSlots(discordId);
+    const slots = (await getZooStatus(discordId)).slots;
     const match =
       slots.find((s) => s.def.name.toLowerCase() === query || s.animalKey.toLowerCase() === query) ??
       slots.find((s) => s.def.name.toLowerCase().includes(query));
@@ -321,17 +320,16 @@ export async function handleZoo(message: Message, args: string[]) {
     // Never leave the player staring at nothing — fall back to a plain-text
     // summary if the rich view can't be sent for any reason.
     console.error("handleZoo: zoo view reply failed, sending fallback:", err);
-    const { slots, maxSlots, ratePerHour, hoursPending, zooName } = await getZooStatus(discordId, guildId);
-    const pending = Math.floor(ratePerHour * hoursPending);
+    const { slots, tier, incomePerDay, zooName } = await getZooStatus(discordId);
+    const maxSlots = tier?.types ?? 0;
     const lines = slots
       .slice()
-      .sort((a, b) => b.incomePerHour - a.incomePerHour)
+      .sort((a, b) => b.incomePerDay - a.incomePerDay)
       .map((s) => `${s.count}x ${s.def.name} (${s.def.rarity})`)
       .join(", ");
     return message.reply(v2Reply(successContainer(
       `Your ${zooName ?? "Zoo"}`,
-      `**${slots.length}/${maxSlots}** animal types | **+${fmtCurrency(ratePerHour)}/hr**\n` +
-        (pending > 0 ? `Pending income: **${fmtCurrency(pending)}** (${hoursPending}h) — collect with the button on \`!zoo\`.\n` : "") +
+      `**${slots.length}/${maxSlots}** animal types | **+${fmtCurrency(incomePerDay)}/day**\n` +
         (lines ? `\n${lines}` : "Your zoo is empty."),
     )));
   }

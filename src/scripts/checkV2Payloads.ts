@@ -7,8 +7,9 @@
  */
 import { buildHuntResultPayload } from "../commands/games/hunt";
 import { buildZooPayload } from "../commands/games/zoo";
-import { ANIMAL_CATALOG, RARITY_INCOME } from "../utils/animalCatalog";
-import type { HuntGroup, ZooSlot } from "../services/huntService";
+import { ANIMAL_CATALOG, RARITY_INCOME, ZOO_TIERS } from "../utils/animalCatalog";
+import type { HuntGroup } from "../services/huntService";
+import type { ZooSlot } from "../services/zooService";
 import { statusContainer, plainContainer } from "../utils/componentsV2";
 import { nextStepHint } from "../config/nextSteps";
 
@@ -59,9 +60,13 @@ check(
 const zooDefs = ANIMAL_CATALOG.slice(0, 16);
 const zooSlots: ZooSlot[] = zooDefs.map((def) => ({
     animalKey: def.key,
-    count: 3,
     def,
-    incomePerHour: RARITY_INCOME[def.rarity] * 3,
+    count: 3,
+    fedCount: 3,
+    hungryCount: 0,
+    incomePerDay: RARITY_INCOME[def.rarity] * 3,
+    feedCostPerDay: 0,
+    soonestDeathMs: null,
 }));
 check(
     "zoo worst case (16 types)",
@@ -69,9 +74,8 @@ check(
         "123456789012345678",
         {
             slots: zooSlots,
-            maxSlots: 16,
-            ratePerHour: zooSlots.reduce((s, z) => s + z.incomePerHour, 0),
-            hoursPending: 24,
+            tier: ZOO_TIERS.city_zoo,
+            incomePerDay: zooSlots.reduce((s, z) => s + z.incomePerDay, 0),
             zooName: "City Zoo",
             zooKey: "city_zoo",
             nextTier: { key: "world_zoo", name: "World Zoo", price: 75_000_000 },

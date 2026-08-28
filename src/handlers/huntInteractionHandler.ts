@@ -12,12 +12,10 @@ import {
   TextInputStyle,
 } from "discord.js";
 import {
-  addAnimalsByKeyToZoo,
-  claimZooIncome,
-  removeAnimalsByKey,
   sellAllInventoryAnimals,
   sellAnimalsByKey,
 } from "../services/huntService";
+import { houseAnimals, removeAnimalsByKey } from "../services/zooService";
 import { buildZooContainer } from "../commands/games/zoo";
 import { successContainer, v2Reply } from "../utils/componentsV2";
 import { fmtCurrency } from "../utils/format";
@@ -286,7 +284,12 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
     if (!await ensureDeferredUpdate(interaction)) return;
     try {
       const def = getAnimal(animalKey);
-      const { count } = await addAnimalsByKeyToZoo(ownerId, animalKey, interaction.guildId ?? "");
+      const { housed, reason } = await houseAnimals(ownerId, animalKey);
+      if (housed === 0) {
+        await safeFollowUp(interaction, { content: reason ?? "Couldn't house that animal.", flags: MessageFlags.Ephemeral });
+        return;
+      }
+      const { count } = { count: housed };
       await safeFollowUp(interaction, {
         content: `Sent **${count}x ${def?.name ?? animalKey}** to your zoo!`,
         flags: MessageFlags.Ephemeral,
@@ -324,22 +327,14 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
     if (interaction.user.id !== ownerId) return replyEphemeral(interaction, "This isn't your zoo.");
 
     if (!await ensureDeferredUpdate(interaction)) return;
-    try {
-      const { claimed, hoursSinceLastClaim } = await claimZooIncome(ownerId, interaction.user.username);
-      await safeFollowUp(interaction, v2Reply(
-        successContainer(
-          "Zoo Income Collected",
-          `Collected **${fmtCurrency(claimed)}** for **${hoursSinceLastClaim}h** of zoo income.`,
-        ),
-        undefined,
-        MessageFlags.Ephemeral,
-      ));
-      const container = await buildZooContainer(ownerId, interaction.user.username, interaction.guildId ?? "", interaction.guild);
-      const files = (container as any).__files ?? [];
-      await safeEditReply(interaction, { components: [container], files, flags: MessageFlags.IsComponentsV2 });
-    } catch (err: any) {
-      await safeFollowUp(interaction, { content: err.message, flags: MessageFlags.Ephemeral });
-    }
+    // claimZooIncome moved out of huntService in this task and is not replaced
+    // until Task 6 rebuilds it in zooService around fed/hungry animals (Task 8
+    // then repoints this branch). Fail closed with an honest message instead
+    // of crediting the old hourly-accrual amount, which this task removed.
+    await safeFollowUp(interaction, {
+      content: "Zoo income collection is being reworked for the new feeding system — check back soon.",
+      flags: MessageFlags.Ephemeral,
+    });
   }
 }
 

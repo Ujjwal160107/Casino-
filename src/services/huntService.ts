@@ -6,8 +6,6 @@ import {
   ANIMAL_CATALOG,
   RIFLE_TIERS,
   RIFLE_PRIORITY,
-  RARITY_INCOME,
-  ZOO_CAPACITY,
   AnimalDefinition,
   AnimalRarity,
   PART_VALUES,
@@ -20,7 +18,6 @@ import {
 import { isTester } from "../utils/developerAccess";
 import { getCraftEffect, unlockCommonRecipesForAnimal } from "./huntCraftService";
 import { enqueueReminder } from "./cooldownReminderService";
-import { conditionalClaim, userDateUnchanged } from "../anticheat/claim";
 
 export interface CaughtAnimalWithDef {
   id: string;
@@ -314,133 +311,9 @@ export async function sellAllParts(
   return { totalEarned, parts };
 }
 
-/**
- * Send ALL non-zoo units of a species to the zoo.
- * Zoo capacity = max distinct animal types (not total units).
- */
-export async function addAnimalsByKeyToZoo(
-  discordId: string,
-  animalKey: string,
-  guildId: string
-): Promise<{ count: number }> {
-  const animals = await prisma.caughtAnimal.findMany({
-    where: { discordId, animalKey, inZoo: false },
-  });
-  if (animals.length === 0) throw new Error("No animals of that type in your inventory.");
-
-  const ownedZoos = await prisma.ownedProperty.findMany({
-    where: { userId: discordId },
-    include: { property: true },
-  });
-  const zooProps = ownedZoos.filter((op) => Object.keys(ZOO_CAPACITY).includes(op.property.key));
-  if (zooProps.length === 0) throw new Error("You need to own a zoo property to house animals.");
-
-  // Zoos are a single-slot upgrade ladder — capacity is the biggest zoo owned,
-  // not the sum. (max, so legacy multi-owners are handled before migration.)
-  const maxSlots = zooProps.reduce((max, op) => Math.max(max, ZOO_CAPACITY[op.property.key] ?? 0), 0);
-
-  // Count distinct animal types already in zoo
-  const existingTypes = await prisma.caughtAnimal.groupBy({
-    by: ["animalKey"],
-    where: { discordId, inZoo: true },
-  });
-  const distinctTypesInZoo = new Set(existingTypes.map((r) => r.animalKey));
-
-  // If this species is already in the zoo, we can add more units without consuming a slot
-  const isNewType = !distinctTypesInZoo.has(animalKey);
-  if (isNewType && distinctTypesInZoo.size >= maxSlots) {
-    throw new Error(
-      `Your zoo is full! It can hold **${maxSlots}** different animal types. Remove a type to make room.`
-    );
-  }
-
-  await prisma.caughtAnimal.updateMany({
-    where: { discordId, animalKey, inZoo: false },
-    data: { inZoo: true },
-  });
-
-  return { count: animals.length };
-}
-
-// Legacy single-id zoo add
-export async function addAnimalToZoo(discordId: string, animalId: string, guildId: string): Promise<void> {
-  const animal = await prisma.caughtAnimal.findFirst({ where: { id: animalId, discordId, inZoo: false } });
-  if (!animal) throw new Error("Animal not found in your inventory.");
-
-  const ownedZoos = await prisma.ownedProperty.findMany({
-    where: { userId: discordId },
-    include: { property: true },
-  });
-  const zooProps = ownedZoos.filter((op) => Object.keys(ZOO_CAPACITY).includes(op.property.key));
-  if (zooProps.length === 0) throw new Error("You need to own a zoo property to house animals.");
-
-  const maxSlots = zooProps.reduce((max, op) => Math.max(max, ZOO_CAPACITY[op.property.key] ?? 0), 0);
-  const existingTypes = await prisma.caughtAnimal.groupBy({
-    by: ["animalKey"],
-    where: { discordId, inZoo: true },
-  });
-  const distinctTypesInZoo = new Set(existingTypes.map((r) => r.animalKey));
-
-  const isNewType = !distinctTypesInZoo.has(animal.animalKey);
-  if (isNewType && distinctTypesInZoo.size >= maxSlots) {
-    throw new Error(`Your zoo is full! It can hold ${maxSlots} different animal types.`);
-  }
-
-  await prisma.caughtAnimal.update({ where: { id: animalId }, data: { inZoo: true } });
-}
-
-// Remove ALL units of a species from the zoo (frees the slot)
-export async function removeAnimalsByKey(discordId: string, animalKey: string): Promise<{ count: number }> {
-  const animals = await prisma.caughtAnimal.findMany({
-    where: { discordId, animalKey, inZoo: true },
-  });
-  if (animals.length === 0) throw new Error("That animal type is not in your zoo.");
-  await prisma.caughtAnimal.updateMany({
-    where: { discordId, animalKey, inZoo: true },
-    data: { inZoo: false },
-  });
-  return { count: animals.length };
-}
-
-// Legacy single-id remove
-export async function removeAnimalFromZoo(discordId: string, animalId: string): Promise<void> {
-  const animal = await prisma.caughtAnimal.findFirst({ where: { id: animalId, discordId, inZoo: true } });
-  if (!animal) throw new Error("Animal not found in your zoo.");
-  await prisma.caughtAnimal.update({ where: { id: animalId }, data: { inZoo: false } });
-}
-
-export interface ZooSlot {
-  animalKey: string;
-  count: number;
-  def: AnimalDefinition;
-  incomePerHour: number; // per-unit rate × count
-}
-
 export async function getZooAnimals(discordId: string): Promise<CaughtAnimalWithDef[]> {
   const raw = await prisma.caughtAnimal.findMany({ where: { discordId, inZoo: true } });
   return raw.map(mergeWithDef).filter((a): a is CaughtAnimalWithDef => a !== null);
-}
-
-export async function getZooSlots(discordId: string): Promise<ZooSlot[]> {
-  const grouped = await prisma.caughtAnimal.groupBy({
-    by: ["animalKey"],
-    where: { discordId, inZoo: true },
-    _count: { animalKey: true },
-  });
-
-  return grouped
-    .map((row) => {
-      const def = getAnimal(row.animalKey);
-      if (!def) return null;
-      const count = row._count.animalKey;
-      return {
-        animalKey: row.animalKey,
-        count,
-        def,
-        incomePerHour: RARITY_INCOME[def.rarity] * count,
-      };
-    })
-    .filter((s): s is ZooSlot => s !== null);
 }
 
 export async function getInventoryAnimals(discordId: string): Promise<CaughtAnimalWithDef[]> {
@@ -449,118 +322,4 @@ export async function getInventoryAnimals(discordId: string): Promise<CaughtAnim
     orderBy: { caughtAt: "desc" },
   });
   return raw.map(mergeWithDef).filter((a): a is CaughtAnimalWithDef => a !== null);
-}
-
-export async function claimZooIncome(
-  discordId: string,
-  username: string
-): Promise<{ claimed: number; hoursSinceLastClaim: number }> {
-  const slots = await getZooSlots(discordId);
-  if (slots.length === 0) throw new Error("No animals in your zoo to generate income.");
-
-  const ratePerHour = slots.reduce((sum, s) => sum + s.incomePerHour, 0);
-
-  const user = await prisma.user.findUnique({ where: { discordId } });
-  const resolvedClaim: Date =
-    user?.lastZooClaim ??
-    (await prisma.caughtAnimal
-      .findFirst({ where: { discordId, inZoo: true }, orderBy: { caughtAt: "asc" } })
-      .then((a) => a?.caughtAt ?? new Date()));
-
-  const hoursSinceLastClaim = Math.floor((Date.now() - resolvedClaim.getTime()) / 3_600_000);
-  const cappedHours = isTester(discordId) ? 24 : Math.min(hoursSinceLastClaim, 24);
-
-  if (cappedHours < 1 && !isTester(discordId)) {
-    const nextMs = resolvedClaim.getTime() + 3_600_000;
-    const minutesLeft = Math.ceil((nextMs - Date.now()) / 60_000);
-    const err = new Error(`Come back in **${minutesLeft} minute${minutesLeft !== 1 ? "s" : ""}** to collect income.`);
-    (err as any).code = "TOO_SOON";
-    throw err;
-  }
-
-  const zooBoost = await getCraftEffect(discordId, `crafted_zoo_boost:${discordId}`, "zoo_boost", (v) => ({ multiplier: v }));
-  const totalIncome = Math.floor(ratePerHour * cappedHours * (zooBoost?.multiplier ?? 1));
-
-  // Reserve the claim window atomically BEFORE crediting. Advancing lastZooClaim
-  // from the exact value we read is the CAS; concurrent claims lose (count 0).
-  // userDateUnchanged also matches a never-written (absent) lastZooClaim — a
-  // plain `{ lastZooClaim: null }` filter would not, permanently blocking any
-  // user who has never claimed before (Prisma/Mongo null vs. missing).
-  const claimed = await conditionalClaim(() =>
-    prisma.user.updateMany({
-      where: { discordId, ...userDateUnchanged("lastZooClaim", user?.lastZooClaim ?? null) },
-      data: { lastZooClaim: new Date() },
-    })
-  );
-  if (!claimed) {
-    const err = new Error("Already collecting — try again in a moment.");
-    (err as any).code = "TOO_SOON";
-    throw err;
-  }
-
-  await addBalance(discordId, username, totalIncome, "zoo_income", {
-    hours: cappedHours,
-    slotCount: slots.length,
-  });
-
-  return { claimed: totalIncome, hoursSinceLastClaim: cappedHours };
-}
-
-export async function getZooStatus(
-  discordId: string,
-  guildId: string
-): Promise<{
-  slots: ZooSlot[];
-  maxSlots: number;
-  ratePerHour: number;
-  hoursPending: number;
-  lastClaim: Date | null;
-  zooName: string | null;
-  zooKey: string | null;
-}> {
-  const slots = await getZooSlots(discordId);
-
-  const ownedZoos = await prisma.ownedProperty.findMany({
-    where: { userId: discordId },
-    include: { property: true },
-  });
-  const zooProps = ownedZoos.filter((op) => Object.keys(ZOO_CAPACITY).includes(op.property.key));
-  // Single-slot upgrade ladder: the active zoo is the biggest one owned.
-  const activeZoo = zooProps.reduce<typeof zooProps[number] | null>(
-    (best, op) =>
-      (ZOO_CAPACITY[op.property.key] ?? 0) > (best ? ZOO_CAPACITY[best.property.key] ?? 0 : -1) ? op : best,
-    null,
-  );
-  const maxSlots = activeZoo ? ZOO_CAPACITY[activeZoo.property.key] ?? 0 : 0;
-
-  const zooBoost = await getCraftEffect(discordId, `crafted_zoo_boost:${discordId}`, "zoo_boost", (v) => ({ multiplier: v }));
-  const ratePerHour = Math.floor(slots.reduce((sum, s) => sum + s.incomePerHour, 0) * (zooBoost?.multiplier ?? 1));
-
-  const user = await prisma.user.findUnique({ where: { discordId } });
-  const lastClaim = user?.lastZooClaim ?? null;
-
-  let hoursPending = 0;
-  if (slots.length > 0) {
-    if (lastClaim) {
-      hoursPending = Math.min(24, Math.floor((Date.now() - lastClaim.getTime()) / 3_600_000));
-    } else {
-      const oldest = await prisma.caughtAnimal.findFirst({
-        where: { discordId, inZoo: true },
-        orderBy: { caughtAt: "asc" },
-      });
-      if (oldest) {
-        hoursPending = Math.min(24, Math.floor((Date.now() - oldest.caughtAt.getTime()) / 3_600_000));
-      }
-    }
-  }
-
-  return {
-    slots,
-    maxSlots,
-    ratePerHour,
-    hoursPending,
-    lastClaim,
-    zooName: activeZoo?.property.name ?? null,
-    zooKey: activeZoo?.property.key ?? null,
-  };
 }
