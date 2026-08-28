@@ -1,12 +1,11 @@
 import prisma from "../utils/prisma";
 import { Property, OwnedProperty } from "@prisma/client";
-import { ZOO_PROPERTY_DEFS, ZOO_CAPACITY, RARITY_INCOME_PER_DAY, getAnimal } from "../utils/animalCatalog";
-import { animalState } from "../utils/zooRules";
+import { ZOO_PROPERTY_DEFS, ZOO_CAPACITY } from "../utils/animalCatalog";
 import { isTester } from "../utils/developerAccess";
 import { GLOBAL_CATALOG_GUILD_ID } from "../utils/globalCatalog";
 import { redisService } from "./redisService";
 import { conditionalClaim, userDateUnchanged } from "../anticheat/claim";
-import { getActiveZooKey, purgeDead, enforceHousing, ZOO_CLAIM_WINDOW_MS } from "./zooService";
+import { getActiveZooKey, computeZooPayout, ZOO_CLAIM_WINDOW_MS } from "./zooService";
 
 const ALL_PROPERTIES_CACHE_KEY = "properties:all_public";
 const ALL_PROPERTIES_CACHE_TTL = 20; // seconds — price only moves on buy/sell, which invalidate explicitly
@@ -314,19 +313,12 @@ export async function collectIncome(discordId: string, _guildId: string): Promis
   if (lastClaim && now.getTime() - lastClaim.getTime() < ZOO_CLAIM_WINDOW_MS && !isTester(discordId)) {
     result.nextZooCollect = new Date(lastClaim.getTime() + ZOO_CLAIM_WINDOW_MS);
   } else if (await getActiveZooKey(discordId)) {
-    // Same rule as !zoo Collect: fed, housed animals only, at the daily rate.
-    await purgeDead(discordId);
-    await enforceHousing(discordId);
-
-    const zooAnimals = await prisma.caughtAnimal.findMany({ where: { discordId, inZoo: true } });
-    for (const animal of zooAnimals) {
-      const def = getAnimal(animal.animalKey);
-      if (!def) continue;
-      if (animalState(animal, now) !== "fed") continue;
-      const income = RARITY_INCOME_PER_DAY[def.rarity];
-      result.zooBreakdown.push({ name: def.name, rarity: def.rarity, income });
-      result.zooTotal += income;
-    }
+    // Same payout derivation !zoo Collect uses — purge, enforce housing,
+    // fed-only, daily rate, zoo_boost multiplier. Neither claim path computes
+    // a rate itself, so the two can no longer drift on it.
+    const payout = await computeZooPayout(discordId, now);
+    result.zooBreakdown = payout.breakdown;
+    result.zooTotal = payout.total;
 
     if (result.zooTotal > 0) {
       // Reserve the zoo window (shared with claimZooIncome) atomically; if a

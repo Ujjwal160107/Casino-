@@ -7,7 +7,7 @@
  */
 import { buildHuntResultPayload } from "../commands/games/hunt";
 import { buildZooPayload } from "../commands/games/zoo";
-import { ANIMAL_CATALOG, RARITY_INCOME, ZOO_TIERS } from "../utils/animalCatalog";
+import { ANIMAL_CATALOG, RARITY_INCOME_PER_DAY, ZOO_TIERS } from "../utils/animalCatalog";
 import type { HuntGroup } from "../services/huntService";
 import type { ZooSlot } from "../services/zooService";
 import { statusContainer, plainContainer } from "../utils/componentsV2";
@@ -68,8 +68,8 @@ const zooSlots: ZooSlot[] = zooDefs.map((def) => ({
     count: 3,
     fedCount: 0,
     hungryCount: 3,
-    incomePerDay: RARITY_INCOME[def.rarity] * 3,
-    feedCostPerDay: RARITY_INCOME[def.rarity],
+    incomePerDay: RARITY_INCOME_PER_DAY[def.rarity] * 3,
+    feedCostPerDay: RARITY_INCOME_PER_DAY[def.rarity],
     soonestDeathMs: 12 * 3_600_000,
 }));
 check(

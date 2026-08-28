@@ -16,7 +16,7 @@ import fs from "fs";
 import path from "path";
 import { hunt, HuntGroup } from "../../services/huntService";
 import { seedHuntShop } from "../../services/shopService";
-import { ZOO_CAPACITY, RIFLE_TIERS, RARITY_INCOME } from "../../utils/animalCatalog";
+import { ZOO_CAPACITY, RIFLE_TIERS, RARITY_INCOME_PER_DAY } from "../../utils/animalCatalog";
 import { fmtCurrency } from "../../utils/format";
 import { errorContainer, v2Reply } from "../../utils/componentsV2";
 import { AnimalEmojis } from "../../config/branding";
@@ -125,7 +125,7 @@ export function buildHuntResultPayload(
   for (let i = 0; i < detailed.length; i++) {
     const group = detailed[i];
     const emojiDisplay = AnimalEmojis[group.def.key] ?? "";
-    const zooPerDay = RARITY_INCOME[group.def.rarity] * group.count * 24;
+    const zooPerDay = RARITY_INCOME_PER_DAY[group.def.rarity] * group.count;
     const totalSell = group.def.sellValue * group.count;
 
     if (i > 0) {
@@ -163,7 +163,7 @@ export function buildHuntResultPayload(
     );
     const overflowLines = overflow.map((group) => {
       const emojiDisplay = AnimalEmojis[group.def.key] ?? "";
-      const zooPerDay = RARITY_INCOME[group.def.rarity] * group.count * 24;
+      const zooPerDay = RARITY_INCOME_PER_DAY[group.def.rarity] * group.count;
       const totalSell = group.def.sellValue * group.count;
       return `${emojiDisplay} **${group.count}×** **${group.def.name}** — ${group.def.rarity} · Sell: **${fmtCurrency(totalSell)}** | Zoo: **+${fmtCurrency(zooPerDay)}/day**`;
     });

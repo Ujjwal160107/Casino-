@@ -5,6 +5,7 @@ import {
   FED_WINDOW_MS,
   RARITY_FEED_COST,
   RARITY_FEED_KEY,
+  RARITY_INCOME_PER_DAY,
   RARITY_STACK_LIMIT,
   ZOO_TIERS,
   ZooTier,
@@ -451,6 +452,45 @@ export async function feedAll(discordId: string): Promise<FeedResult> {
   return feedRows(discordId, rows);
 }
 
+export interface ZooPayout {
+  /** Math.floor(gross * zoo_boost multiplier) — the one number either caller may credit. */
+  total: number;
+  fedAnimals: number;
+  hungryAnimals: number;
+  /** One entry per fed, housed animal (not per species) — what collectIncome's zooBreakdown renders. */
+  breakdown: { name: string; rarity: AnimalRarity; income: number }[];
+}
+
+/**
+ * The one place the daily zoo payout is derived. Purges the dead, enforces
+ * housing, prices every fed housed animal at RARITY_INCOME_PER_DAY, and
+ * applies the player's zoo_boost multiplier — the same incomeBill and the
+ * same multiplier getZooStatus previews with. `!zoo Collect` (claimZooIncome)
+ * and `!collect-rent` (propertyService.collectIncome) both call this and
+ * neither computes a rate afterwards, so the two paths cannot drift again the
+ * way collectIncome's own hourly re-derivation once did.
+ */
+export async function computeZooPayout(discordId: string, now: Date): Promise<ZooPayout> {
+  await purgeDead(discordId);
+  await enforceHousing(discordId);
+
+  const housed = await prisma.caughtAnimal.findMany({ where: { discordId, inZoo: true } });
+  const income = incomeBill(housed.map(toIncomeAnimal).filter((a): a is IncomeAnimal => a !== null), now);
+  const multiplier = await zooBoostMultiplier(discordId);
+  const total = Math.floor(income.total * multiplier);
+
+  const breakdown: ZooPayout["breakdown"] = [];
+  for (const animal of housed) {
+    const def = getAnimal(animal.animalKey);
+    if (!def) continue;
+    if (animalState(animal, now) !== "fed") continue;
+    breakdown.push({ name: def.name, rarity: def.rarity, income: Math.floor(RARITY_INCOME_PER_DAY[def.rarity] * multiplier) });
+  }
+
+  const fedAnimals = breakdown.length;
+  return { total, breakdown, fedAnimals, hungryAnimals: housed.length - fedAnimals };
+}
+
 export async function claimZooIncome(
   discordId: string,
   username: string,
@@ -461,9 +501,6 @@ export async function claimZooIncome(
     (err as any).code = "NO_ZOO";
     throw err;
   }
-
-  await purgeDead(discordId);
-  await enforceHousing(discordId);
 
   const now = new Date();
   const user = await prisma.user.findUnique({ where: { discordId } });
@@ -476,25 +513,18 @@ export async function claimZooIncome(
     throw err;
   }
 
-  const housed = await prisma.caughtAnimal.findMany({ where: { discordId, inZoo: true } });
-  // Same incomeBill (and the same zoo_boost multiplier) getZooStatus previews
-  // with, so a `!zoo` preview never shows an income the claim doesn't pay.
-  const income = incomeBill(housed.map(toIncomeAnimal).filter((a): a is IncomeAnimal => a !== null), now);
-  const gross = income.total;
-  const fedAnimals = income.lines.reduce((s, l) => s + l.fedCount, 0);
+  const payout = await computeZooPayout(discordId, now);
+  const housedCount = payout.fedAnimals + payout.hungryAnimals;
 
-  if (gross === 0) {
+  if (payout.total === 0) {
     const err = new Error(
-      housed.length === 0
+      housedCount === 0
         ? "Your zoo is empty. Catch animals with `!hunt` and house them first."
         : "Every animal in your zoo is hungry — they earn nothing. Feed them with `!zoo feed <animal>`.",
     );
     (err as any).code = "NOTHING_TO_CLAIM";
     throw err;
   }
-
-  const multiplier = await zooBoostMultiplier(discordId);
-  const total = Math.floor(gross * multiplier);
 
   // Reserve the 24h window atomically BEFORE crediting. userDateUnchanged also
   // matches a never-written lastZooClaim; a plain `{ lastZooClaim: null }`
@@ -511,6 +541,6 @@ export async function claimZooIncome(
     throw err;
   }
 
-  await addBalance(discordId, username, total, "zoo_income", { fedAnimals });
-  return { claimed: total, fedAnimals, hungryAnimals: housed.length - fedAnimals };
+  await addBalance(discordId, username, payout.total, "zoo_income", { fedAnimals: payout.fedAnimals });
+  return { claimed: payout.total, fedAnimals: payout.fedAnimals, hungryAnimals: payout.hungryAnimals };
 }
