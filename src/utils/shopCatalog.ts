@@ -304,6 +304,57 @@ export const GENERAL_SHOP_CATALOG: ShopCatalogItem[] = [
 ];
 
 export const HUNT_SHOP_CATALOG: ShopCatalogItem[] = [
+  // Zoo upkeep. One unit feeds one animal for one day; a fed animal earns its
+  // daily income, a hungry one earns nothing and dies after 72h. Not `usable`
+  // — `!zoo feed` spends these, which keeps them out of the buff cooldowns.
+  {
+    key: "common_feed",
+    name: "Feed Sack",
+    price: 1_500,
+    description: "A coarse sack of grain and pellets. Feeds one Common animal in your zoo for a day. Spend it with `!zoo feed <animal>` — a hungry animal earns nothing and dies after three days.",
+    shortDescription: "Feeds one Common animal for a day.",
+    category: "HUNT",
+    consumable: true,
+    usable: false,
+    itemType: "CONSUMABLE",
+    effects: [],
+  },
+  {
+    key: "uncommon_feed",
+    name: "Game Feed",
+    price: 6_000,
+    description: "Enriched feed for animals with opinions about grain. Feeds one Uncommon animal in your zoo for a day. Spend it with `!zoo feed <animal>`.",
+    shortDescription: "Feeds one Uncommon animal for a day.",
+    category: "HUNT",
+    consumable: true,
+    usable: false,
+    itemType: "CONSUMABLE",
+    effects: [],
+  },
+  {
+    key: "rare_feed",
+    name: "Prime Cuts",
+    price: 22_000,
+    description: "Butcher-grade meat for predators that notice the difference. Feeds one Rare animal in your zoo for a day. Spend it with `!zoo feed <animal>`.",
+    shortDescription: "Feeds one Rare animal for a day.",
+    category: "HUNT",
+    consumable: true,
+    usable: false,
+    itemType: "CONSUMABLE",
+    effects: [],
+  },
+  {
+    key: "legendary_feed",
+    name: "Exotic Ration",
+    price: 75_000,
+    description: "A specialist ration flown in for animals that should not exist in a zoo. Feeds one Legendary animal for a day. Spend it with `!zoo feed <animal>`.",
+    shortDescription: "Feeds one Legendary animal for a day.",
+    category: "HUNT",
+    consumable: true,
+    usable: false,
+    itemType: "CONSUMABLE",
+    effects: [],
+  },
   {
     key: "hunting_permit",
     name: "Hunting Permit",
