@@ -3,6 +3,7 @@ import {
   FED_WINDOW_MS,
   HUNGER_GRACE_MS,
   RARITY_FEED_COST,
+  RARITY_INCOME_PER_DAY,
   RARITY_STACK_LIMIT,
   ZOO_TIERS,
   ZooTierKey,
@@ -123,6 +124,57 @@ export function feedBill(hungry: { rarity: AnimalRarity }[]): { lines: FeedLine[
     const cost = units * RARITY_FEED_COST[rarity];
     lines.push({ rarity, units, cost });
     total += cost;
+  }
+  return { lines, total };
+}
+
+export interface IncomeAnimal extends HungerInput {
+  animalKey: string;
+  rarity: AnimalRarity;
+}
+
+export interface IncomeLine {
+  animalKey: string;
+  rarity: AnimalRarity;
+  fedCount: number;
+  hungryCount: number;
+  incomePerDay: number;
+}
+
+/**
+ * Per-species income for one daily claim, shaped like feedBill ({ lines, total })
+ * so the pairing between "what a day of care costs" and "what a day of care
+ * pays" is obvious. Only fed animals earn RARITY_INCOME_PER_DAY; hungry ones
+ * earn nothing — the one rule both getZooStatus (a preview) and
+ * claimZooIncome (the payout) must agree on.
+ *
+ * Lines are keyed by species, not just rarity, because getZooStatus renders one
+ * line per zoo slot and a rarity can hold several species at once (a City Zoo
+ * houses up to 2 Rare species side by side). claimZooIncome only needs the
+ * total plus a fed count, both summed from these same lines, so neither caller
+ * re-derives the income rule itself.
+ */
+export function incomeBill(housed: IncomeAnimal[], now: Date): { lines: IncomeLine[]; total: number } {
+  const bySpecies = new Map<string, { rarity: AnimalRarity; fed: number; hungry: number }>();
+  for (const a of housed) {
+    const entry = bySpecies.get(a.animalKey) ?? { rarity: a.rarity, fed: 0, hungry: 0 };
+    const state = animalState(a, now);
+    if (state === "fed") entry.fed++;
+    else if (state === "hungry") entry.hungry++;
+    bySpecies.set(a.animalKey, entry);
+  }
+
+  const lines: IncomeLine[] = [];
+  let total = 0;
+  for (const rarity of RARITY_ORDER) {
+    const species = [...bySpecies]
+      .filter(([, v]) => v.rarity === rarity)
+      .sort(([a], [b]) => a.localeCompare(b));
+    for (const [animalKey, v] of species) {
+      const incomePerDay = v.fed * RARITY_INCOME_PER_DAY[rarity];
+      lines.push({ animalKey, rarity, fedCount: v.fed, hungryCount: v.hungry, incomePerDay });
+      total += incomePerDay;
+    }
   }
   return { lines, total };
 }

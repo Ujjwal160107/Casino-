@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { testPrisma, seedUser, resetUser } from "../helpers";
-import { feedSpecies, claimZooIncome } from "../../src/services/zooService";
+import { feedSpecies, feedAll, claimZooIncome } from "../../src/services/zooService";
 import { FED_WINDOW_MS, RARITY_FEED_KEY } from "../../src/utils/animalCatalog";
 
 const id = "zoo-feed-1";
@@ -36,11 +36,11 @@ async function giveWorldZoo() {
   });
 }
 
-async function houseHungryRabbits(n: number) {
+async function houseHungry(animalKey: string, n: number) {
   const longAgo = new Date(Date.now() - 40 * 3_600_000);
   for (let i = 0; i < n; i++) {
     await testPrisma.caughtAnimal.create({
-      data: { discordId: id, animalKey: "rabbit", partsAvailable: [], inZoo: true, caughtAt: longAgo, fedUntil: longAgo },
+      data: { discordId: id, animalKey, partsAvailable: [], inZoo: true, caughtAt: longAgo, fedUntil: longAgo },
     });
   }
 }
@@ -53,7 +53,7 @@ describe("feedSpecies", () => {
   afterAll(() => resetUser(id));
 
   it("spends one feed unit per hungry animal", async () => {
-    await houseHungryRabbits(3);
+    await houseHungry("rabbit", 3);
     await giveFeed(RARITY_FEED_KEY.Common, 10);
 
     const result = await feedSpecies(id, "rabbit");
@@ -87,12 +87,35 @@ describe("feedSpecies", () => {
   });
 
   it("feeds what it can afford and reports the shortfall", async () => {
-    await houseHungryRabbits(4);
+    await houseHungry("rabbit", 4);
     await giveFeed(RARITY_FEED_KEY.Common, 2);
 
     const result = await feedSpecies(id, "rabbit");
     expect(result.fed).toBe(2);
     expect(result.missing).toEqual([{ rarity: "Common", units: 2 }]);
+  });
+});
+
+describe("feedAll", () => {
+  beforeEach(async () => {
+    await seedUser(id);
+    await giveWorldZoo();
+  });
+  afterAll(() => resetUser(id));
+
+  it("feeds every rarity in one call, cheapest first, and reports a per-rarity shortfall", async () => {
+    await houseHungry("rabbit", 2);       // Common
+    await houseHungry("black_bear", 2);   // Rare
+    await giveFeed(RARITY_FEED_KEY.Common, 2);
+    await giveFeed(RARITY_FEED_KEY.Rare, 1);
+
+    const result = await feedAll(id);
+    expect(result.fed).toBe(3);
+    expect(result.spent).toEqual([
+      { rarity: "Common", units: 2 },
+      { rarity: "Rare", units: 1 },
+    ]);
+    expect(result.missing).toEqual([{ rarity: "Rare", units: 1 }]);
   });
 });
 
@@ -129,6 +152,9 @@ describe("claimZooIncome", () => {
     expect(result.claimed).toBe(4_000);
     expect(result.fedAnimals).toBe(1);
     expect(result.hungryAnimals).toBe(1);
+
+    const wallet = await testPrisma.wallet.findUnique({ where: { userId: id } });
+    expect(wallet!.balance).toBe(4_000);
   });
 
   it("cannot be claimed twice inside 24h", async () => {

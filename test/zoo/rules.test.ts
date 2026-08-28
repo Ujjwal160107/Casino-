@@ -5,7 +5,9 @@ import {
   msUntilDeath,
   resolveLegalHousing,
   feedBill,
+  incomeBill,
   RuleAnimal,
+  IncomeAnimal,
 } from "../../src/utils/zooRules";
 
 const T0 = new Date("2026-08-27T00:00:00.000Z");
@@ -156,5 +158,50 @@ describe("feedBill", () => {
 
   it("is empty when nothing is hungry", () => {
     expect(feedBill([])).toEqual({ lines: [], total: 0 });
+  });
+});
+
+function income(
+  animalKey: string,
+  rarity: IncomeAnimal["rarity"],
+  fedUntilHours: number,
+): IncomeAnimal {
+  return { animalKey, rarity, fedUntil: hours(fedUntilHours), caughtAt: T0 };
+}
+
+describe("incomeBill", () => {
+  const now = hours(100);
+
+  it("pays per-day income for fed animals only, grouped by species", () => {
+    const housed: IncomeAnimal[] = [
+      income("rabbit", "Common", 200),
+      income("rabbit", "Common", 150),
+      income("fox", "Common", 50), // hungry: fedUntil is in the past but within the 72h grace
+      income("deer", "Uncommon", 300),
+    ];
+    const bill = incomeBill(housed, now);
+    expect(bill.total).toBe(2 * 4_000 + 16_000);
+    expect(bill.lines).toEqual([
+      { animalKey: "fox", rarity: "Common", fedCount: 0, hungryCount: 1, incomePerDay: 0 },
+      { animalKey: "rabbit", rarity: "Common", fedCount: 2, hungryCount: 0, incomePerDay: 8_000 },
+      { animalKey: "deer", rarity: "Uncommon", fedCount: 1, hungryCount: 0, incomePerDay: 16_000 },
+    ]);
+  });
+
+  it("splits fed and hungry counts within the same species", () => {
+    const housed: IncomeAnimal[] = [
+      income("rabbit", "Common", 200),
+      income("rabbit", "Common", 200),
+      income("rabbit", "Common", 50),
+    ];
+    const bill = incomeBill(housed, now);
+    expect(bill.lines).toEqual([
+      { animalKey: "rabbit", rarity: "Common", fedCount: 2, hungryCount: 1, incomePerDay: 8_000 },
+    ]);
+    expect(bill.total).toBe(8_000);
+  });
+
+  it("is empty when there are no housed animals", () => {
+    expect(incomeBill([], now)).toEqual({ lines: [], total: 0 });
   });
 });

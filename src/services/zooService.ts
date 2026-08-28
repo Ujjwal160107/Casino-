@@ -5,14 +5,21 @@ import {
   FED_WINDOW_MS,
   RARITY_FEED_COST,
   RARITY_FEED_KEY,
-  RARITY_INCOME_PER_DAY,
   RARITY_STACK_LIMIT,
   ZOO_TIERS,
   ZooTier,
   ZooTierKey,
   getAnimal,
 } from "../utils/animalCatalog";
-import { RuleAnimal, animalState, feedBill, msUntilDeath, resolveLegalHousing } from "../utils/zooRules";
+import {
+  IncomeAnimal,
+  RuleAnimal,
+  animalState,
+  feedBill,
+  incomeBill,
+  msUntilDeath,
+  resolveLegalHousing,
+} from "../utils/zooRules";
 import { addBalance } from "./walletService";
 import { getCraftEffect } from "./huntCraftService";
 import { conditionalClaim, userDateUnchanged } from "../anticheat/claim";
@@ -43,6 +50,18 @@ function toRuleAnimal(row: { id: string; animalKey: string; caughtAt: Date }): R
   const def = getAnimal(row.animalKey);
   if (!def) return null;
   return { id: row.id, animalKey: row.animalKey, rarity: def.rarity, caughtAt: row.caughtAt };
+}
+
+/**
+ * Rows with an unrecognized animalKey (renamed/retired in the catalog) drop out
+ * here rather than resolving a rarity — the same guard as toRuleAnimal, purgeDead
+ * and enforceHousing. Shared by getZooStatus and claimZooIncome so both feed the
+ * same set of rows into incomeBill.
+ */
+function toIncomeAnimal(row: { animalKey: string; fedUntil: Date | null; caughtAt: Date }): IncomeAnimal | null {
+  const def = getAnimal(row.animalKey);
+  if (!def) return null;
+  return { animalKey: row.animalKey, rarity: def.rarity, fedUntil: row.fedUntil, caughtAt: row.caughtAt };
 }
 
 /**
@@ -134,19 +153,24 @@ export async function getZooStatus(discordId: string): Promise<ZooStatus> {
     bySpecies.set(a.animalKey, list);
   }
 
+  // Same income rule claimZooIncome pays out, so a preview here can never
+  // promise more (or less) than the claim actually delivers.
+  const income = incomeBill(housed.map(toIncomeAnimal).filter((a): a is IncomeAnimal => a !== null), now);
+  const incomeByKey = new Map(income.lines.map((l) => [l.animalKey, l]));
+
   const slots: ZooSlot[] = [];
   for (const [animalKey, list] of bySpecies) {
     const def = getAnimal(animalKey);
     if (!def) continue;
-    const fed = list.filter((a) => animalState(a, now) === "fed");
     const hungry = list.filter((a) => animalState(a, now) === "hungry");
+    const line = incomeByKey.get(animalKey);
     slots.push({
       animalKey,
       def,
       count: list.length,
-      fedCount: fed.length,
-      hungryCount: hungry.length,
-      incomePerDay: fed.length * RARITY_INCOME_PER_DAY[def.rarity],
+      fedCount: line?.fedCount ?? 0,
+      hungryCount: line?.hungryCount ?? 0,
+      incomePerDay: line?.incomePerDay ?? 0,
       feedCostPerDay: list.length * RARITY_FEED_COST[def.rarity],
       soonestDeathMs: hungry.length
         ? Math.min(...hungry.map((a) => msUntilDeath(a, now)))
@@ -311,6 +335,18 @@ async function spendFeed(discordId: string, rarity: AnimalRarity, units: number)
   return affordable;
 }
 
+/** Undo a spendFeed that turned out to have paid for a row a concurrent call already fed (see feedRows). */
+async function refundFeed(discordId: string, rarity: AnimalRarity, units: number): Promise<void> {
+  if (units <= 0) return;
+  const item = await prisma.shopItem.findUnique({ where: { catalogKey: RARITY_FEED_KEY[rarity] } });
+  if (!item) return; // cannot happen: spendFeed just found this same catalogKey
+  await prisma.inventory.upsert({
+    where: { userId_shopItemId: { userId: discordId, shopItemId: item.id } },
+    create: { userId: discordId, shopItemId: item.id, amount: units },
+    update: { amount: { increment: units } },
+  });
+}
+
 async function feedRows(
   discordId: string,
   rows: { id: string; animalKey: string; fedUntil: Date | null; caughtAt: Date }[],
@@ -329,8 +365,11 @@ async function feedRows(
   const fedUntil = new Date(now.getTime() + FED_WINDOW_MS);
   let fed = 0;
 
-  // bill.lines is cheapest-first, so a player who can't cover everything keeps
-  // the most animals alive.
+  // Each rarity has its own feed item, so a Common spend never touches Rare
+  // inventory (or any other rarity's) — the lines below are independent and
+  // their processing order cannot change the outcome. feedBill still returns
+  // them cheapest-first for presentation (and so a caller iterating for
+  // display sees the same order every time).
   for (const line of bill.lines) {
     const got = await spendFeed(discordId, line.rarity, line.units);
     if (got > 0) {
@@ -338,9 +377,22 @@ async function feedRows(
         .filter((h) => h.def.rarity === line.rarity)
         .slice(0, got)
         .map((h) => h.row.id);
-      await prisma.caughtAnimal.updateMany({ where: { id: { in: ids } }, data: { fedUntil } });
-      spent.push({ rarity: line.rarity, units: got });
-      fed += got;
+
+      // Idempotency guard: a second feed racing on the same rows (double-click,
+      // command spam) can reach this point having already paid `got` units
+      // above. Only rows still hungry get claimed by this write, so it cannot
+      // re-mark — and the caller must not have been charged for — animals the
+      // other call already fed. Refund whatever this call paid for rows it
+      // lost that race on.
+      const claim = await prisma.caughtAnimal.updateMany({
+        where: { id: { in: ids }, OR: [{ fedUntil: null }, { fedUntil: { lt: now } }] },
+        data: { fedUntil },
+      });
+      if (claim.count < got) await refundFeed(discordId, line.rarity, got - claim.count);
+      if (claim.count > 0) {
+        spent.push({ rarity: line.rarity, units: claim.count });
+        fed += claim.count;
+      }
     }
     if (got < line.units) missing.push({ rarity: line.rarity, units: line.units - got });
   }
@@ -388,15 +440,11 @@ export async function claimZooIncome(
   }
 
   const housed = await prisma.caughtAnimal.findMany({ where: { discordId, inZoo: true } });
-  let gross = 0;
-  let fedAnimals = 0;
-  for (const a of housed) {
-    const def = getAnimal(a.animalKey);
-    if (!def) continue;
-    if (animalState(a, now) !== "fed") continue;
-    gross += RARITY_INCOME_PER_DAY[def.rarity];
-    fedAnimals++;
-  }
+  // Same incomeBill getZooStatus previews with, so a `!zoo` preview never
+  // shows an income the claim doesn't actually pay.
+  const income = incomeBill(housed.map(toIncomeAnimal).filter((a): a is IncomeAnimal => a !== null), now);
+  const gross = income.total;
+  const fedAnimals = income.lines.reduce((s, l) => s + l.fedCount, 0);
 
   if (gross === 0) {
     const err = new Error(
