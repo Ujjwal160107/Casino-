@@ -64,6 +64,17 @@ function toIncomeAnimal(row: { animalKey: string; fedUntil: Date | null; caughtA
   return { animalKey: row.animalKey, rarity: def.rarity, fedUntil: row.fedUntil, caughtAt: row.caughtAt };
 }
 
+/** Shared by getZooStatus and claimZooIncome so a preview and the payout apply the identical crafted boost. */
+async function zooBoostMultiplier(discordId: string): Promise<number> {
+  const zooBoost = await getCraftEffect(
+    discordId,
+    `crafted_zoo_boost:${discordId}`,
+    "zoo_boost",
+    (v) => ({ multiplier: v }),
+  );
+  return zooBoost?.multiplier ?? 1;
+}
+
 /**
  * Delete animals past the 72h starve grace, housed or not. No parts, no sell
  * value — death-as-loot would turn neglect into a parts printer.
@@ -153,9 +164,11 @@ export async function getZooStatus(discordId: string): Promise<ZooStatus> {
     bySpecies.set(a.animalKey, list);
   }
 
-  // Same income rule claimZooIncome pays out, so a preview here can never
-  // promise more (or less) than the claim actually delivers.
+  // Same income rule AND the same zoo_boost multiplier claimZooIncome pays
+  // out with, so a preview here can never promise a different number than
+  // the claim actually delivers.
   const income = incomeBill(housed.map(toIncomeAnimal).filter((a): a is IncomeAnimal => a !== null), now);
+  const multiplier = await zooBoostMultiplier(discordId);
   const incomeByKey = new Map(income.lines.map((l) => [l.animalKey, l]));
 
   const slots: ZooSlot[] = [];
@@ -170,7 +183,7 @@ export async function getZooStatus(discordId: string): Promise<ZooStatus> {
       count: list.length,
       fedCount: line?.fedCount ?? 0,
       hungryCount: line?.hungryCount ?? 0,
-      incomePerDay: line?.incomePerDay ?? 0,
+      incomePerDay: Math.floor((line?.incomePerDay ?? 0) * multiplier),
       feedCostPerDay: list.length * RARITY_FEED_COST[def.rarity],
       soonestDeathMs: hungry.length
         ? Math.min(...hungry.map((a) => msUntilDeath(a, now)))
@@ -187,7 +200,10 @@ export async function getZooStatus(discordId: string): Promise<ZooStatus> {
     tier: zooKey ? ZOO_TIERS[zooKey] : null,
     zooKey,
     zooName: zooKey ? ZOO_NAMES[zooKey] : null,
-    incomePerDay: slots.reduce((s, x) => s + x.incomePerDay, 0),
+    // Computed directly from income.total (not summed from the per-slot
+    // values above) so this matches claimZooIncome's Math.floor(gross *
+    // multiplier) exactly, with no per-slot rounding remainder.
+    incomePerDay: Math.floor(income.total * multiplier),
     feedBillPerDay: slots.reduce((s, x) => s + x.feedCostPerDay, 0),
     lastClaim,
     nextClaim,
@@ -335,16 +351,14 @@ async function spendFeed(discordId: string, rarity: AnimalRarity, units: number)
   return affordable;
 }
 
-/** Undo a spendFeed that turned out to have paid for a row a concurrent call already fed (see feedRows). */
-async function refundFeed(discordId: string, rarity: AnimalRarity, units: number): Promise<void> {
-  if (units <= 0) return;
+/** How many feed units of one rarity the player currently holds. 0 if the shop item or inventory row is missing. */
+async function feedAvailable(discordId: string, rarity: AnimalRarity): Promise<number> {
   const item = await prisma.shopItem.findUnique({ where: { catalogKey: RARITY_FEED_KEY[rarity] } });
-  if (!item) return; // cannot happen: spendFeed just found this same catalogKey
-  await prisma.inventory.upsert({
+  if (!item) return 0;
+  const row = await prisma.inventory.findUnique({
     where: { userId_shopItemId: { userId: discordId, shopItemId: item.id } },
-    create: { userId: discordId, shopItemId: item.id, amount: units },
-    update: { amount: { increment: units } },
   });
+  return row?.amount ?? 0;
 }
 
 async function feedRows(
@@ -363,7 +377,6 @@ async function feedRows(
   const spent: FeedResult["spent"] = [];
   const missing: FeedResult["missing"] = [];
   const fedUntil = new Date(now.getTime() + FED_WINDOW_MS);
-  let fed = 0;
 
   // Each rarity has its own feed item, so a Common spend never touches Rare
   // inventory (or any other rarity's) — the lines below are independent and
@@ -371,32 +384,56 @@ async function feedRows(
   // them cheapest-first for presentation (and so a caller iterating for
   // display sees the same order every time).
   for (const line of bill.lines) {
-    const got = await spendFeed(discordId, line.rarity, line.units);
-    if (got > 0) {
-      const ids = hungry
-        .filter((h) => h.def.rarity === line.rarity)
-        .slice(0, got)
-        .map((h) => h.row.id);
+    const candidates = hungry.filter((h) => h.def.rarity === line.rarity);
 
+    // Claim first, spend second: never claim more than this call can currently
+    // afford, so an underfunded claim never happens in the common case. The
+    // affordability read here is only a cap on the attempt — spendFeed below
+    // re-checks atomically, because a concurrent feed on a DIFFERENT species
+    // of the same rarity can still drain the shared feed item in between.
+    const available = await feedAvailable(discordId, line.rarity);
+    const attemptIds = candidates.slice(0, Math.min(line.units, available)).map((h) => h.row.id);
+
+    let paid = 0;
+    if (attemptIds.length > 0) {
       // Idempotency guard: a second feed racing on the same rows (double-click,
-      // command spam) can reach this point having already paid `got` units
-      // above. Only rows still hungry get claimed by this write, so it cannot
-      // re-mark — and the caller must not have been charged for — animals the
-      // other call already fed. Refund whatever this call paid for rows it
-      // lost that race on.
+      // command spam) claims only rows still hungry, so two calls can never
+      // both claim — and later pay for — the same animal.
       const claim = await prisma.caughtAnimal.updateMany({
-        where: { id: { in: ids }, OR: [{ fedUntil: null }, { fedUntil: { lt: now } }] },
+        where: { id: { in: attemptIds }, OR: [{ fedUntil: null }, { fedUntil: { lt: now } }] },
         data: { fedUntil },
       });
-      if (claim.count < got) await refundFeed(discordId, line.rarity, got - claim.count);
+
       if (claim.count > 0) {
-        spent.push({ rarity: line.rarity, units: claim.count });
-        fed += claim.count;
+        paid = await spendFeed(discordId, line.rarity, claim.count);
+        if (paid < claim.count) {
+          // The affordability check above was stale by the time we spent — a
+          // concurrent feed drained this rarity's feed item in between. Rows
+          // this call claimed but cannot pay for must not be fed for free:
+          // un-claim exactly those, restoring each to its own pre-claim value
+          // (never a blanket "hungry") since different rows can have had
+          // different fedUntil before this call touched them.
+          const claimedIds = (
+            await prisma.caughtAnimal.findMany({
+              where: { id: { in: attemptIds }, fedUntil },
+              select: { id: true },
+            })
+          ).map((r) => r.id);
+          const unpaidIds = claimedIds.slice(paid);
+          const priorById = new Map(candidates.map((h) => [h.row.id, h.row.fedUntil]));
+          await Promise.all(
+            unpaidIds.map((uid) =>
+              prisma.caughtAnimal.update({ where: { id: uid }, data: { fedUntil: priorById.get(uid) ?? null } }),
+            ),
+          );
+        }
+        if (paid > 0) spent.push({ rarity: line.rarity, units: paid });
       }
     }
-    if (got < line.units) missing.push({ rarity: line.rarity, units: line.units - got });
+    if (paid < line.units) missing.push({ rarity: line.rarity, units: line.units - paid });
   }
 
+  const fed = spent.reduce((s, x) => s + x.units, 0);
   return { fed, spent, missing };
 }
 
@@ -440,8 +477,8 @@ export async function claimZooIncome(
   }
 
   const housed = await prisma.caughtAnimal.findMany({ where: { discordId, inZoo: true } });
-  // Same incomeBill getZooStatus previews with, so a `!zoo` preview never
-  // shows an income the claim doesn't actually pay.
+  // Same incomeBill (and the same zoo_boost multiplier) getZooStatus previews
+  // with, so a `!zoo` preview never shows an income the claim doesn't pay.
   const income = incomeBill(housed.map(toIncomeAnimal).filter((a): a is IncomeAnimal => a !== null), now);
   const gross = income.total;
   const fedAnimals = income.lines.reduce((s, l) => s + l.fedCount, 0);
@@ -456,13 +493,8 @@ export async function claimZooIncome(
     throw err;
   }
 
-  const zooBoost = await getCraftEffect(
-    discordId,
-    `crafted_zoo_boost:${discordId}`,
-    "zoo_boost",
-    (v) => ({ multiplier: v }),
-  );
-  const total = Math.floor(gross * (zooBoost?.multiplier ?? 1));
+  const multiplier = await zooBoostMultiplier(discordId);
+  const total = Math.floor(gross * multiplier);
 
   // Reserve the 24h window atomically BEFORE crediting. userDateUnchanged also
   // matches a never-written lastZooClaim; a plain `{ lastZooClaim: null }`

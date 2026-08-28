@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { testPrisma, seedUser, resetUser } from "../helpers";
-import { feedSpecies, feedAll, claimZooIncome } from "../../src/services/zooService";
+import { testPrisma, seedUser, resetUser, flushTestKeys } from "../helpers";
+import { feedSpecies, feedAll, claimZooIncome, getZooStatus } from "../../src/services/zooService";
 import { FED_WINDOW_MS, RARITY_FEED_KEY } from "../../src/utils/animalCatalog";
 
 const id = "zoo-feed-1";
@@ -122,6 +122,11 @@ describe("feedAll", () => {
 describe("claimZooIncome", () => {
   beforeEach(async () => {
     await seedUser(id);
+    // getCraftEffect caches zoo_boost in Redis by discordId, which outlives a
+    // single `vitest run` (Redis is a real Docker container, not reset per
+    // run like the memory-server Mongo) — flush it so the boost-parity test
+    // below cannot leak a multiplier into an unrelated claim.
+    await flushTestKeys(`crafted_zoo_boost:${id}`);
   });
   afterAll(() => resetUser(id));
 
@@ -167,5 +172,27 @@ describe("claimZooIncome", () => {
     });
     await claimZooIncome(id, "TestUser");
     await expect(claimZooIncome(id, "TestUser")).rejects.toThrow();
+  });
+
+  it("previews the same boosted number the claim actually pays", async () => {
+    await giveWorldZoo();
+    await testPrisma.caughtAnimal.create({
+      data: {
+        discordId: id, animalKey: "rabbit", partsAvailable: [], inZoo: true,
+        fedUntil: new Date(Date.now() + FED_WINDOW_MS),
+      },
+    });
+    await testPrisma.activeEffect.create({
+      data: {
+        userId: id, effectType: "zoo_boost", value: 1.5,
+        expiresAt: new Date(Date.now() + 24 * 3_600_000),
+      },
+    });
+
+    const status = await getZooStatus(id);
+    const result = await claimZooIncome(id, "TestUser");
+
+    expect(result.claimed).toBe(6_000); // floor(4_000 * 1.5)
+    expect(status.incomePerDay).toBe(result.claimed);
   });
 });
