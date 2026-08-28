@@ -2232,10 +2232,19 @@ git commit -m "feat(zoo): reprice the zoo ladder and add the care-economy migrat
 
 ## Deploy checklist
 
+The ordering below replaces the naive push → migrate → restart sequence this plan originally carried. The whole-branch review found that version unsafe: it restarts into new code while the backfill may not have completed, and it reprices the zoos while the old uncapped payout is still live.
+
 Run in this order on release:
 
-1. `npm run prisma:push` — adds `fedUntil`
-2. `npm run migrate:zoo-care` — backfill + reprice
-3. Restart the worker
+1. **Verify `collapseMultiZoos.ts` has already been run in production.** If any player still owns two zoos, selling the smaller one evicts the animals from the zoo they keep.
+2. **Announce.** Over-cap animals start a 72h death clock on their owner's first `!zoo` after release. Tell players to sell or part out overflow, and that feed is bought with `!buy <n> <feed name>`.
+3. **Stop the bot.** Do not migrate against a live worker: the script reprices the World Zoo from 75M to 18M while the old code is still paying 25,000/hr per animal uncapped — a window where the money printer is on sale at 24% off.
+4. `npm run prisma:push` — adds `fedUntil`.
+5. **Dump the `CaughtAnimal` collection.** `purgeDead` is a hard delete. It now logs what it removes, but a dump is the only thing that can restore it.
+6. `npx ts-node src/scripts/zooCareMigration.ts` — backfill, then reprice. Note `ts-node` is a devDependency and production runs `node dist/index.js`, so confirm it is installed on the host. There is deliberately no npm script (see Task 10).
+7. **Read the output.** The script exits non-zero if the backfill leaves any animal without a usable `fedUntil`, and aborts before repricing. Confirm the "every animal now has a usable `fedUntil`" line. If it half-ran, re-run it — it is idempotent, and rows backfilled on the first pass keep their earlier timestamp.
+8. **Only then start the new code.** Restarting before the backfill completes deletes every collection older than 96h.
 
-Announce before deploying. Existing over-cap zoos are not wiped, but their overflow starts a three-day death clock from first `!zoo` after the release, and players should know to sell or part it out.
+The feed `ShopItem` rows are created by the normal catalog seeding on first use; nothing to do. The `properties:all_public` cache has a 20s TTL and self-heals after the reprice.
+
+**Expect one support question:** `!leaderboard passive` now reports 0 for a player whose zoo is entirely hungry, because passive income counts only fed animals. That is correct behaviour, not a bug.
