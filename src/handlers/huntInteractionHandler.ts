@@ -15,8 +15,8 @@ import {
   sellAllInventoryAnimals,
   sellAnimalsByKey,
 } from "../services/huntService";
-import { claimZooIncome, feedAll, houseAnimals, removeAnimalsByKey } from "../services/zooService";
-import { buildZooContainer } from "../commands/games/zoo";
+import { claimZooIncome, feedAll, getZooStatus, houseAnimals, removeAnimalsByKey } from "../services/zooService";
+import { buildZooContainer, formatCareNote } from "../commands/games/zoo";
 import { successContainer, v2Reply } from "../utils/componentsV2";
 import { fmtCurrency } from "../utils/format";
 import { getAnimal } from "../utils/animalCatalog";
@@ -328,14 +328,20 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
 
     if (!await ensureDeferredUpdate(interaction)) return;
     try {
+      // Captured before feedAll mutates anything below: feedAll runs its own
+      // purgeDead/enforceHousing pass and discards the result, and by the time
+      // buildZooContainer re-reads status afterward there's nothing left to
+      // report. This read is the only place that death/eviction is visible.
+      const { died, evicted } = await getZooStatus(ownerId);
+      const careNote = formatCareNote(died, evicted);
       const result = await feedAll(ownerId);
       const shortfall = result.missing.length
         ? ` **${result.missing.reduce((s, m) => s + m.units, 0)}** still hungry — buy more feed in the Hunt Store.`
         : "";
       await safeFollowUp(interaction, {
-        content: result.fed > 0
+        content: (result.fed > 0
           ? `Fed **${result.fed}** animal${result.fed !== 1 ? "s" : ""}.${shortfall}`
-          : `You have no feed for the hungry animals in your zoo.${shortfall}`,
+          : `You have no feed for the hungry animals in your zoo.${shortfall}`) + careNote,
         flags: MessageFlags.Ephemeral,
       });
       const container = await buildZooContainer(ownerId, interaction.user.username, interaction.guildId ?? "", interaction.guild);
@@ -353,12 +359,18 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
 
     if (!await ensureDeferredUpdate(interaction)) return;
     try {
+      // Same reasoning as zoo_feed_all: claimZooIncome runs its own
+      // purgeDead/enforceHousing internally, so this has to be read before the
+      // claim or the death/eviction event is gone by the time we look.
+      const { died, evicted } = await getZooStatus(ownerId);
+      const careNote = formatCareNote(died, evicted);
       const { claimed, fedAnimals, hungryAnimals } = await claimZooIncome(ownerId, interaction.user.username);
       await safeFollowUp(interaction, v2Reply(
         successContainer(
           "Zoo Income Collected",
           `Collected **${fmtCurrency(claimed)}** from **${fedAnimals}** fed animal${fedAnimals !== 1 ? "s" : ""}.` +
-          (hungryAnimals > 0 ? `\n${hungryAnimals} hungry animal${hungryAnimals !== 1 ? "s" : ""} earned nothing.` : ""),
+          (hungryAnimals > 0 ? `\n${hungryAnimals} hungry animal${hungryAnimals !== 1 ? "s" : ""} earned nothing.` : "") +
+          careNote,
         ),
         undefined,
         MessageFlags.Ephemeral,

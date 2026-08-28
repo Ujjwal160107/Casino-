@@ -78,6 +78,22 @@ export interface ZooView {
 // `!zoo remove <name>`.
 const MAX_DETAILED_ZOO_SLOTS = 6;
 
+/**
+ * Factual, short note about animals a player just lost to starvation or
+ * eviction — same wording wherever it's shown (the persistent view and the
+ * ephemeral feed/collect replies) so the register never drifts between them.
+ * Returns "" when there's nothing to report.
+ */
+export function formatCareNote(died: { animalKey: string; count: number }[], evicted: number): string {
+  const deathPart = died.length > 0
+    ? `${Mascot.Emotes.Decline} Starved and lost: ${died.map((d) => `${d.count}x ${getAnimal(d.animalKey)?.name ?? d.animalKey}`).join(", ")}`
+    : "";
+  const evictedPart = evicted > 0
+    ? `${evicted} animal${evicted !== 1 ? "s" : ""} over capacity — sent back to inventory. Use \`!zoo remove\` before housing more, or upgrade your zoo.`
+    : "";
+  return [deathPart, evictedPart].filter(Boolean).map((line) => `\n${line}`).join("");
+}
+
 /** Pure renderer — no DB access, so it can be unit-checked (see checkV2Payloads). */
 export function buildZooPayload(
   discordId: string,
@@ -89,28 +105,22 @@ export function buildZooPayload(
   const files: AttachmentBuilder[] = [];
   const container = new ContainerBuilder();
 
-  const deathLine = died.length > 0
-    ? `\n${Mascot.Emotes.Decline} Starved and lost: ${died.map((d) => `${d.count}x ${getAnimal(d.animalKey)?.name ?? d.animalKey}`).join(", ")}`
-    : "";
-  const evictedLine = evicted > 0
-    ? `\n${evicted} animal${evicted !== 1 ? "s" : ""} over capacity — sent back to inventory. Use \`!zoo remove\` before housing more, or upgrade your zoo.`
-    : "";
-
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `## ${Mascot.Emotes.Sparks} Your ${zooName ?? "Zoo"}\n` +
       `**${slots.length}/${maxSlots}** animal types | **+${fmtCurrency(incomePerDay)}/day** | feed **${fmtCurrency(feedBillPerDay)}/day**` +
       (hungryCount > 0 ? `\n${hungryCount} hungry animal${hungryCount !== 1 ? "s" : ""} earning nothing — \`!zoo feed <animal>\`` : "") +
-      deathLine +
-      evictedLine
+      formatCareNote(died, evicted)
     )
   );
 
   const hoursLeft = nextClaim ? Math.ceil((nextClaim.getTime() - Date.now()) / 3_600_000) : 0;
   // Plain number, not fmtCurrency — button labels don't render <:fortunes:…>.
-  const collectLabel = claimable
-    ? `Collect ${fmtAmount(incomePerDay)}`
-    : `Next collect in ${hoursLeft}h`;
+  const collectLabel = !claimable
+    ? `Next collect in ${hoursLeft}h`
+    : incomePerDay <= 0
+      ? "Nothing to collect yet"
+      : `Collect ${fmtAmount(incomePerDay)}`;
 
   const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
@@ -275,23 +285,34 @@ export async function handleZoo(message: Message, args: string[]) {
       return message.reply(v2Reply(errorContainer("Zoo Feed", "Usage: `!zoo feed <animal name>` — or use the **Feed All** button on `!zoo`.")));
     }
     const query = raw.toLowerCase();
+    // Captured before feedSpecies mutates anything below, so this reflects the
+    // same purge/eviction pass feedSpecies would otherwise run and discard —
+    // the only way to surface it to the player at all.
     const status = await getZooStatus(discordId);
+    const careNote = formatCareNote(status.died, status.evicted);
     const match =
       status.slots.find((s) => s.def.name.toLowerCase() === query || s.animalKey.toLowerCase() === query) ??
       status.slots.find((s) => s.def.name.toLowerCase().includes(query));
     if (!match) {
-      return message.reply(v2Reply(errorContainer("Zoo Feed", `You have no **${raw}** in your zoo.`)));
+      return message.reply(v2Reply(errorContainer("Zoo Feed", `You have no **${raw}** in your zoo.${careNote}`)));
     }
     const result = await feedSpecies(discordId, match.animalKey);
     if (result.fed === 0 && result.missing.length === 0) {
-      return message.reply(v2Reply(successContainer("Zoo Feed", `Your **${match.def.name}** are already fed. Nothing spent.`)));
+      return message.reply(v2Reply(successContainer("Zoo Feed", `Your **${match.def.name}** are already fed. Nothing spent.${careNote}`)));
+    }
+    if (result.fed === 0) {
+      const need = result.missing.reduce((s, m) => s + m.units, 0);
+      return message.reply(v2Reply(errorContainer(
+        "Zoo Feed",
+        `You have no feed for your **${match.def.name}** — need **${need}** more. Buy feed in the Hunt Store.${careNote}`,
+      )));
     }
     const shortfall = result.missing.length
       ? `\nStill hungry: **${result.missing.reduce((s, m) => s + m.units, 0)}** — buy more feed in the Hunt Store.`
       : "";
     return message.reply(v2Reply(successContainer(
       "Zoo Feed",
-      `Fed **${result.fed}x ${match.def.name}**. They earn again on your next collect.${shortfall}`,
+      `Fed **${result.fed}x ${match.def.name}**. They earn again on your next collect.${shortfall}${careNote}`,
     )));
   }
 
