@@ -1,0 +1,8 @@
+# These files are authored on Windows but execute on the Linux VPS or on a CI
+# runner. A CRLF checkout puts \r on the shebang line, which fails as
+# "bad interpreter: /usr/bin/env bash^M" -- so pin them to LF regardless of
+# anyone's core.autocrlf setting.
+*.sh            text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+.nvmrc          text eol=lf

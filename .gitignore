@@ -3,6 +3,13 @@ node_modules
 .env
 .env.test
 
+# SSH keys never belong in the repo. ssh_key_ujjwal was committed in ab984c6
+# and is retired, not recovered -- anything in history has to be rotated.
+ssh_key*
+*.pem
+id_ed25519*
+id_rsa*
+
 # Runtime URI of the test Mongo memory-server (written by test/globalSetup.ts)
 test/.mongo-uri
 

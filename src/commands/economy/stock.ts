@@ -10,6 +10,7 @@ import {
 import { fmtCurrency } from "../../utils/format";
 import { Mascot } from "../../config/branding";
 import { getGuildPrefix } from "../../utils/guildContext";
+import path from "path";
 import { nextStepHint } from "../../config/nextSteps";
 
 const STOCK_ACCENT_COLOR = 0x9b59b6;
@@ -348,6 +349,8 @@ export async function handleStock(message: Message, args: string[]) {
     return message.reply({ components: [buildHelpContainer(prefix)], flags: MessageFlags.IsComponentsV2 });
   }
 
-  const file = new AttachmentBuilder("./src/assets/stock_market.jpg", { name: STOCK_BANNER_NAME });
+  // __dirname, not cwd — matches imageUtils/profileStyles and resolves to
+  // dist/assets, so deploys don't have to ship src/ alongside the build.
+  const file = new AttachmentBuilder(path.join(__dirname, "../../assets/stock_market.jpg"), { name: STOCK_BANNER_NAME });
   return message.reply({ components: [await buildMarketContainer(prefix)], files: [file], flags: MessageFlags.IsComponentsV2 });
 }
