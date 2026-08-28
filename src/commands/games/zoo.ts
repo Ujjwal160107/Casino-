@@ -14,10 +14,11 @@ import {
 } from "discord.js";
 import fs from "fs";
 import path from "path";
-import { feedSpecies, getZooStatus, removeAnimalsByKey, ZooSlot } from "../../services/zooService";
+import { feedSpecies, getZooStatus, houseAnimals, removeAnimalsByKey, ZooSlot } from "../../services/zooService";
 import { errorContainer, successContainer, v2Reply } from "../../utils/componentsV2";
 import { seedZooProperties } from "../../services/propertyService";
-import { getAnimal, ZOO_CAPACITY, ZOO_PROPERTY_DEFS } from "../../utils/animalCatalog";
+import { ANIMAL_CATALOG, AnimalRarity, getAnimal, RARITY_FEED_KEY, ZOO_CAPACITY, ZOO_PROPERTY_DEFS } from "../../utils/animalCatalog";
+import { HUNT_SHOP_CATALOG } from "../../utils/shopCatalog";
 import { fmtCurrency, fmtAmount } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import prisma from "../../utils/prisma";
@@ -92,6 +93,24 @@ export function formatCareNote(died: { animalKey: string; count: number }[], evi
     ? `${evicted} animal${evicted !== 1 ? "s" : ""} over capacity — sent back to inventory. Use \`!zoo remove\` before housing more, or upgrade your zoo.`
     : "";
   return [deathPart, evictedPart].filter(Boolean).map((line) => `\n${line}`).join("");
+}
+
+/**
+ * Turns a FeedResult's `missing` lines into an instruction a player can act on:
+ * the real shop item name and the exact command that buys that many of it.
+ * "Buy feed in the Hunt Store" named a store that did not list feed at all, and
+ * even now feed is sold by name rather than by numbered slot — so the command
+ * is the useful thing to print. One helper, shared by `!zoo feed` and the Feed
+ * All button, so the two can't drift.
+ */
+export function formatFeedShortfall(missing: { rarity: AnimalRarity; units: number }[]): string {
+  if (missing.length === 0) return "";
+  const total = missing.reduce((s, m) => s + m.units, 0);
+  const buys = missing.map((m) => {
+    const name = HUNT_SHOP_CATALOG.find((i) => i.key === RARITY_FEED_KEY[m.rarity])?.name ?? `${m.rarity} feed`;
+    return `\`!buy ${m.units} ${name}\``;
+  });
+  return `**${total}** still hungry — buy feed with ${buys.join(" and ")} (browse it under \`!shop hunt\`).`;
 }
 
 /** Pure renderer — no DB access, so it can be unit-checked (see checkV2Payloads). */
@@ -278,6 +297,38 @@ export async function handleZoo(message: Message, args: string[]) {
 
   await seedZooProperties(guildId);
 
+  // !zoo add <name> — house animals from inventory. The "Send to zoo" button on
+  // a hunt result is the only other route into houseAnimals, and it dies with
+  // the message it was posted on; eviction (over-cap trims, zoo sales) is
+  // routine, so re-housing has to be reachable from a command too.
+  if ((args[0] ?? "").toLowerCase() === "add") {
+    const raw = args.slice(1).join(" ").trim();
+    if (!raw) {
+      return message.reply(v2Reply(errorContainer("Zoo Add", "Usage: `!zoo add <animal name>` — houses animals of that species from your inventory.")));
+    }
+    const query = raw.toLowerCase();
+    // Matched against the catalog, not the zoo's current slots: the animal
+    // being added is in inventory, so by definition it is not in a slot yet.
+    const def =
+      ANIMAL_CATALOG.find((a) => a.name.toLowerCase() === query || a.key.toLowerCase() === query) ??
+      ANIMAL_CATALOG.find((a) => a.name.toLowerCase().includes(query));
+    if (!def) {
+      return message.reply(v2Reply(errorContainer("Zoo Add", `There's no animal called **${raw}**.`)));
+    }
+    // Captured before houseAnimals, which runs its own purge/eviction pass and
+    // discards the result — same reason as the feed branch below.
+    const status = await getZooStatus(discordId);
+    const careNote = formatCareNote(status.died, status.evicted);
+    const { housed, reason } = await houseAnimals(discordId, def.key);
+    if (housed === 0) {
+      return message.reply(v2Reply(errorContainer("Zoo Add", `${reason ?? "Couldn't house that animal."}${careNote}`)));
+    }
+    return message.reply(v2Reply(successContainer(
+      "Zoo Updated",
+      `Housed **${housed}x ${def.name}**. Feed them with \`!zoo feed ${def.name}\` so they earn on your next collect.${careNote}`,
+    )));
+  }
+
   // !zoo feed <name> — spend one feed of the right rarity per hungry animal.
   if ((args[0] ?? "").toLowerCase() === "feed") {
     const raw = args.slice(1).join(" ").trim();
@@ -301,15 +352,12 @@ export async function handleZoo(message: Message, args: string[]) {
       return message.reply(v2Reply(successContainer("Zoo Feed", `Your **${match.def.name}** are already fed. Nothing spent.${careNote}`)));
     }
     if (result.fed === 0) {
-      const need = result.missing.reduce((s, m) => s + m.units, 0);
       return message.reply(v2Reply(errorContainer(
         "Zoo Feed",
-        `You have no feed for your **${match.def.name}** — need **${need}** more. Buy feed in the Hunt Store.${careNote}`,
+        `You have no feed for your **${match.def.name}**.\n${formatFeedShortfall(result.missing)}${careNote}`,
       )));
     }
-    const shortfall = result.missing.length
-      ? `\nStill hungry: **${result.missing.reduce((s, m) => s + m.units, 0)}** — buy more feed in the Hunt Store.`
-      : "";
+    const shortfall = result.missing.length ? `\n${formatFeedShortfall(result.missing)}` : "";
     return message.reply(v2Reply(successContainer(
       "Zoo Feed",
       `Fed **${result.fed}x ${match.def.name}**. They earn again on your next collect.${shortfall}${careNote}`,

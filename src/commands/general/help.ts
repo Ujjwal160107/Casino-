@@ -156,7 +156,16 @@ const CATEGORIES: CategoryData[] = [
         subcommands: ["craft — craft gear from your hunt loot"],
         example: "{p}hunt"
       },
-      { name: "zoo", aliases: ["myzoo"], description: "View the animals you've captured.", example: "{p}zoo" }
+      {
+        name: "zoo", aliases: ["myzoo"], description: "View your zoo: daily income, feed bill and hunger.",
+        usage: "{p}zoo [subcommand]",
+        subcommands: [
+          "add <animal> — house animals from your inventory",
+          "feed <animal> — spend feed on every hungry animal of that species",
+          "remove <animal> — send a species back to your inventory",
+        ],
+        example: "{p}zoo add rabbit"
+      }
     ]
   },
   {
@@ -169,6 +178,7 @@ const CATEGORIES: CategoryData[] = [
         usage: "{p}shop [category|subcommand]",
         subcommands: [
           "buy <item> — buy with your wallet",
+          "buy <qty> <item> — buy several at once (e.g. buy 10 Feed Sack)",
           "buy card <item> — buy on credit",
           "sell <item> — sell an item back",
           "inv (inventory) — view your items",
@@ -176,7 +186,7 @@ const CATEGORIES: CategoryData[] = [
         ],
         example: "{p}shop buy rifle"
       },
-      { name: "buy", aliases: [], description: "Quick shortcut for {p}shop buy.", usage: "{p}buy <item>", example: "{p}buy rifle" },
+      { name: "buy", aliases: [], description: "Quick shortcut for {p}shop buy. Add a number to buy in bulk.", usage: "{p}buy [qty] <item>", example: "{p}buy 10 Feed Sack" },
       { name: "cockstore", aliases: ["cs"], description: "Shortcut to the cockfight store ({p}shop cock).", example: "{p}cockstore" },
       { name: "inventory", aliases: ["inv", "bag", "items"], description: "View your items (ALL / HUNT / JOB / UNI / COCK).", usage: "{p}inventory [category]", example: "{p}inventory hunt" },
       { name: "use", aliases: [], description: "Use a consumable item.", usage: "{p}use <item>", example: "{p}use energy drink" },

@@ -6,6 +6,7 @@
  * Run: npx ts-node --transpile-only src/scripts/checkV2Payloads.ts
  */
 import { buildHuntResultPayload } from "../commands/games/hunt";
+import { buildHuntStoreMessage } from "../commands/economy/shop";
 import { buildZooPayload } from "../commands/games/zoo";
 import { ANIMAL_CATALOG, RARITY_INCOME_PER_DAY, ZOO_TIERS } from "../utils/animalCatalog";
 import type { HuntGroup } from "../services/huntService";
@@ -96,6 +97,12 @@ check(
         null,
     ),
 );
+
+// --- Hunt Store: nine numbered slots + the zoo feed shelf. The shelf is text
+// inside the existing container rather than four more buttons precisely
+// because of this budget — pin it so a later slot/button addition can't push
+// the panel over 40 silently. ---
+check("hunt store (9 slots + zoo feed shelf)", buildHuntStoreMessage("123456789012345678"));
 
 if (failures > 0) {
     console.log(`\n${failures} payload(s) exceed Discord limits`);

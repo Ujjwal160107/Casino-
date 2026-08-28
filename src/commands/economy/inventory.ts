@@ -319,7 +319,11 @@ function buildInventoryPayload(
       : "No animal parts owned yet. Use the Hunt Black Market or buy parts from players.";
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `### Hunted Animals\n${animalPreview}${huntAnimalCounts.size > 8 ? ` | +${huntAnimalCounts.size - 8} more` : ""}\n\n` +
+        `### Hunted Animals\n${animalPreview}${huntAnimalCounts.size > 8 ? ` | +${huntAnimalCounts.size - 8} more` : ""}\n` +
+        // Inventory animals carry a fedUntil, cannot be fed, and die within
+        // three days — so the way back into the zoo has to be visible here.
+        (huntAnimalCounts.size > 0 ? "-# House them with `!zoo add <animal>`. Animals left here can't be fed and die in three days.\n" : "") +
+        `\n` +
         `### Hunt Materials\n${partPreview}${huntParts.length > 8 ? ` | +${huntParts.length - 8} more` : ""}`,
       ),
     );

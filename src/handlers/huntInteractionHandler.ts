@@ -16,7 +16,7 @@ import {
   sellAnimalsByKey,
 } from "../services/huntService";
 import { claimZooIncome, feedAll, getZooStatus, houseAnimals, removeAnimalsByKey } from "../services/zooService";
-import { buildZooContainer, formatCareNote } from "../commands/games/zoo";
+import { buildZooContainer, formatCareNote, formatFeedShortfall } from "../commands/games/zoo";
 import { successContainer, v2Reply } from "../utils/componentsV2";
 import { fmtCurrency } from "../utils/format";
 import { getAnimal } from "../utils/animalCatalog";
@@ -335,9 +335,7 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
       const { died, evicted } = await getZooStatus(ownerId);
       const careNote = formatCareNote(died, evicted);
       const result = await feedAll(ownerId);
-      const shortfall = result.missing.length
-        ? ` **${result.missing.reduce((s, m) => s + m.units, 0)}** still hungry — buy more feed in the Hunt Store.`
-        : "";
+      const shortfall = result.missing.length ? ` ${formatFeedShortfall(result.missing)}` : "";
       await safeFollowUp(interaction, {
         content: (result.fed > 0
           ? `Fed **${result.fed}** animal${result.fed !== 1 ? "s" : ""}.${shortfall}`

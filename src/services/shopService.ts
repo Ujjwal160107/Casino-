@@ -102,8 +102,32 @@ export async function deleteShopItem(itemId: string) {
   return prisma.shopItem.delete({ where: { id: itemId } });
 }
 
-export async function buyItem(guildId: string, userId: string, identifier: string, member?: GuildMember, byId: boolean = false, paymentSource: "wallet" | "card" = "wallet") {
+/** Hard ceiling on one bulk purchase, so a fat-fingered `!buy 99999999 x` can't drain a wallet. */
+export const MAX_BULK_QUANTITY = 100;
+
+/**
+ * Which items may be bought more than one at a time.
+ *
+ * Deliberately narrow: plain stackable consumables with nothing that fires on
+ * purchase. A zoo needs up to 38 feed units a day, so buying feed one command
+ * at a time is not a usable upkeep economy — but bulk must not silently
+ * multiply a BUY effect (which is applied once per purchase, not once per
+ * unit) or blow past a catalog `maxStack`. Anything the catalog doesn't know
+ * about (an admin-created ShopItem) stays one-at-a-time by default.
+ */
+export function isBulkBuyable(catalogKey: string | null | undefined): boolean {
+  const catalog = SHOP_CATALOG.find((c) => c.key === catalogKey);
+  if (!catalog) return false;
+  if (!catalog.consumable) return false;
+  if (catalog.maxStack !== undefined) return false;
+  return !(catalog.effects ?? []).some((e) => e.trigger === "BUY");
+}
+
+export async function buyItem(guildId: string, userId: string, identifier: string, member?: GuildMember, byId: boolean = false, paymentSource: "wallet" | "card" = "wallet", quantity: number = 1) {
   const tester = isTester(userId, member);
+  const qty = Math.floor(quantity);
+  if (!Number.isFinite(qty) || qty < 1) throw new Error("Quantity must be a whole number of at least 1.");
+  if (qty > MAX_BULK_QUANTITY) throw new Error(`You can buy at most **${MAX_BULK_QUANTITY}** of an item in one command.`);
   if (tester) {
     await ensureUserAndWallet(userId, guildId, member?.user.username ?? "Tester");
   }
@@ -127,7 +151,14 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
   if (item.catalogKey === STARTER_CHICKEN_ITEM_KEY || item.name.toLowerCase() === "chicken") {
     throw new Error("Every player receives a chicken automatically. Use `chicken` to view yours.");
   }
-  if (item.stock !== -1 && item.stock <= 0 && !tester) throw new Error("Out of stock.");
+  if (qty > 1 && !isBulkBuyable(item.catalogKey)) {
+    throw new Error(`**${item.name}** can only be bought one at a time.`);
+  }
+  if (item.stock !== -1 && item.stock < qty && !tester) {
+    throw new Error(item.stock <= 0 ? "Out of stock." : `Only **${item.stock}** left in stock.`);
+  }
+
+  const totalPrice = item.price * qty;
 
   const res = await prisma.$transaction(async (tx) => {
     const user = await (tx.user.findUnique as any)({
@@ -145,8 +176,12 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       if (catalogEntry?.creditBlocked) {
         throw new Error(`**${item.name}** cannot be purchased with a credit card.`);
       }
-    } else if (user.wallet.balance < item.price && !tester) {
-      throw new Error(`You need ${item.price.toLocaleString("en-US")} coins to buy this.`);
+    } else if (user.wallet.balance < totalPrice && !tester) {
+      throw new Error(
+        qty > 1
+          ? `You need ${totalPrice.toLocaleString("en-US")} coins to buy ${qty}x ${item.name}.`
+          : `You need ${totalPrice.toLocaleString("en-US")} coins to buy this.`,
+      );
     }
 
     const reqs = (item.requirements as any) || {};
@@ -217,23 +252,24 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       cardInfo = null;
     } else if (paymentSource === "card") {
       const { chargeCardPurchaseTx } = await import("./creditCardService");
-      const result = await chargeCardPurchaseTx(tx, userId, item.price, {
+      const result = await chargeCardPurchaseTx(tx, userId, totalPrice, {
         type: "shop_purchase",
         itemName: item.name,
+        quantity: qty,
         guildId,
       });
       cardInfo = result.card;
     } else {
       await tx.wallet.update({
         where: { id: user.wallet.id },
-        data: { balance: { decrement: item.price } }
+        data: { balance: { decrement: totalPrice } }
       });
       await tx.transaction.create({
         data: {
           walletId: user.wallet.id,
-          amount: -item.price,
+          amount: -totalPrice,
           type: "shop_buy",
-          meta: { itemName: item.name },
+          meta: { itemName: item.name, quantity: qty },
           isEarned: false
         }
       });
@@ -242,7 +278,7 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
     if (item.stock !== -1 && !tester) {
       await tx.shopItem.update({
         where: { id: item.id },
-        data: { stock: { decrement: 1 } }
+        data: { stock: { decrement: qty } }
       });
     }
 
@@ -251,19 +287,24 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       create: {
         userId: user.discordId,
         shopItemId: item.id,
-        amount: 1,
+        amount: qty,
         meta: metaData
       },
-      update: { amount: { increment: 1 } }
+      update: { amount: { increment: qty } }
     });
 
+    // Applied once per purchase, not once per unit — which is exactly why
+    // isBulkBuyable refuses bulk on any item that has one.
     const buyEffects = ((item.effects as any) || []).filter((e: any) => e.trigger === "BUY");
 
     return { item, buyEffects, paymentSource, cardInfo };
   });
 
-  // Quest progress
-  const { questBus } = require("./questEvents");
+  // Quest progress. Dynamic `import`, not `require`: the same deferred-load
+  // trick the creditCardService import below uses, and the only form that
+  // resolves under both ts-node (CJS) and the vitest/vite ESM loader — a bare
+  // `require` here made buyItem untestable.
+  const { questBus } = await import("./questEvents");
   questBus.emit("economy:shop_buy", { discordId: userId, paymentSource: res.paymentSource });
 
   // If user just bought a rifle upgrade, clear the hunt cooldown so the new tier takes effect immediately
@@ -284,7 +325,7 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
         .flatMap((i) => {
           const idx = RIFLE_PRIORITY.indexOf(i.shopItem.name.toLowerCase() as any);
           if (idx === -1) return [];
-          const countBefore = i.shopItemId === res.item.id ? i.amount - 1 : i.amount;
+          const countBefore = i.shopItemId === res.item.id ? i.amount - qty : i.amount;
           return countBefore > 0 ? [idx] : [];
         });
       const bestBeforeIndex = ownedBeforeIndices.length > 0 ? Math.min(...ownedBeforeIndices) : Infinity;
@@ -333,6 +374,8 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
     cardInfo: res.cardInfo ?? null,
     paymentSource: res.paymentSource,
     rifle,
+    quantity: qty,
+    totalPrice,
   };
 }
 

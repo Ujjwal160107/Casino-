@@ -37,6 +37,7 @@ import {
   ShopCategory,
   ShopCatalogItem,
 } from "../../utils/shopCatalog";
+import { RARITY_FEED_KEY } from "../../utils/animalCatalog";
 import { isTester } from "../../utils/developerAccess";
 import { ItemEffectResult } from "../../services/effectService";
 import { ensureDeferredEphemeralReply, ensureDeferredUpdate, isInteractionExpiredError, safeEditReply, safeReply, shouldEarlyAcknowledgeInIndex, shouldIgnoreInteractionError, tryEarlyAcknowledge } from "../../utils/interactionHelpers";
@@ -141,6 +142,27 @@ const CS_PAGE1_PATH   = path.join(ASSETS_DIR, "cockstore.png");
 const CS_MASCOT_PATH  = path.join(ASSETS_DIR, "cockstore_mascot.png");
 const COS_PAGE1_PATH  = path.join(ASSETS_DIR, "cosmetics_pg1.png");
 const COS_PAGE2_PATH  = path.join(ASSETS_DIR, "cosmetics_pg2.png");
+
+// Zoo feed lives in the Hunt Store catalog but not on the nine-slot store
+// image, which is a fixed asset. Rather than repaint the art (or fork a second
+// paged store), the four feed items get a text shelf under the image: read off
+// HUNT_SHOP_CATALOG and RARITY_FEED_KEY so the names and prices can never drift
+// from what `!buy` actually charges.
+function buildFeedShelfText(): string {
+  const lines = (Object.keys(RARITY_FEED_KEY) as (keyof typeof RARITY_FEED_KEY)[])
+    .map((rarity) => {
+      const entry = HUNT_SHOP_CATALOG.find((i) => i.key === RARITY_FEED_KEY[rarity]);
+      return entry ? `**${entry.name}** — ${fmtCurrency(entry.price)} · feeds one ${rarity} for a day` : null;
+    })
+    .filter((l): l is string => l !== null);
+
+  return [
+    "### Zoo Feed",
+    "-# Not pictured above — buy these by name, in bulk.",
+    ...lines,
+    "-# One unit feeds one animal for one day. Buy a stack: `!buy 10 Feed Sack`. Spend it with `!zoo feed <animal>` or the **Feed All** button on `!zoo`.",
+  ].join("\n");
+}
 
 // Hunt Store: 9 items on a single image page
 const HS_ITEMS: string[] = [
@@ -288,6 +310,24 @@ function resolveShopAsset(assetName: string) {
   return null;
 }
 
+/**
+ * `!buy 10 Feed Sack` and `!buy Feed Sack 10` both mean ten sacks; `!buy Feed
+ * Sack` means one. A bare leading or trailing integer is unambiguous here — no
+ * shop item's name starts or ends with a number — and a full World Zoo eats 38
+ * feed units a day, so one-per-command was never a usable upkeep economy.
+ */
+export function parseBuyQuantity(tokens: string[]): { quantity: number; name: string } {
+  const words = tokens.filter((t) => t.length > 0);
+  const isCount = (t: string) => /^\d+$/.test(t);
+  if (words.length >= 2 && isCount(words[0])) {
+    return { quantity: parseInt(words[0], 10), name: words.slice(1).join(" ") };
+  }
+  if (words.length >= 2 && isCount(words[words.length - 1])) {
+    return { quantity: parseInt(words[words.length - 1], 10), name: words.slice(0, -1).join(" ") };
+  }
+  return { quantity: 1, name: words.join(" ") };
+}
+
 function getCatalogForCategory(category: ShopCategory): ShopCatalogItem[] {
   switch (category) {
     case "GENERAL": return GENERAL_SHOP_CATALOG;
@@ -423,7 +463,7 @@ function buildGeneralStoreMessage(page: number, ownerId: string, disabled = fals
 // Hunt Store — image layout with numbered info buttons
 // ---------------------------------------------------------------------------
 
-function buildHuntStoreMessage(ownerId: string, disabled = false) {
+export function buildHuntStoreMessage(ownerId: string, disabled = false) {
   const attachmentName = "hunt_store1.png";
   const mascotName = "huntstore_mascot.png";
   const files: AttachmentBuilder[] = [
@@ -436,7 +476,7 @@ function buildHuntStoreMessage(ownerId: string, disabled = false) {
       new SectionBuilder()
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
-            `## ${Mascot.Emotes.Gun} Hunt Store\n-# Press a number to view item details`,
+            `## ${Mascot.Emotes.Gun} Hunt Store\n-# Press a number to view item details — zoo feed is listed below the picture`,
           ),
         )
         .setThumbnailAccessory(
@@ -451,7 +491,15 @@ function buildHuntStoreMessage(ownerId: string, disabled = false) {
           .setURL(`attachment://${attachmentName}`)
           .setDescription("Hunt Store"),
       ),
-    );
+    )
+    // One TextDisplay, not four more numbered buttons: the image has nine
+    // slots and ComponentsV2 caps a message at 40 components (this payload is
+    // 24 with the shelf — see checkV2Payloads). Feed is bought by name, so it
+    // needs copy, not a slot.
+    .addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true),
+    )
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(buildFeedShelfText()));
 
   // Numbered info buttons: 1–9 in two rows (5 + 4)
   const infoRow1 = new ActionRowBuilder<ButtonBuilder>();
@@ -1204,21 +1252,23 @@ export async function handleShop(message: Message, args: string[]) {
     await seedGeneralShop(message.guildId!);
     const sub = args[0]?.toLowerCase();
 
-    // ---- !shop buy [card] <name> ----
+    // ---- !shop buy [card] [qty] <name> [qty] ----
     if (sub === "buy") {
       let paymentSource: "wallet" | "card" = "wallet";
-      let itemName: string;
+      let rest: string[];
 
       if (args[1]?.toLowerCase() === "card") {
         paymentSource = "card";
-        itemName = args.slice(2).join(" ");
+        rest = args.slice(2);
       } else {
-        itemName = args.slice(1).join(" ");
+        rest = args.slice(1);
       }
+
+      const { quantity, name: itemName } = parseBuyQuantity(rest);
 
       if (!itemName) {
         return message.reply({
-          components: [v2Container("Shop Purchase", "Usage: `shop buy <item name>` or `shop buy card <item name>`")],
+          components: [v2Container("Shop Purchase", "Usage: `shop buy <item name>`, `shop buy 10 <item name>` or `shop buy card <item name>`")],
           flags: MessageFlags.IsComponentsV2,
         });
       }
@@ -1251,8 +1301,10 @@ export async function handleShop(message: Message, args: string[]) {
         }
         await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
         if (!message.member) return;
-        const purchase = await buyItem(message.guildId!, message.author.id, itemName, message.member, false, paymentSource) as any;
+        const purchase = await buyItem(message.guildId!, message.author.id, itemName, message.member, false, paymentSource, quantity) as any;
         const { item, results, cardInfo } = purchase;
+        const boughtQty: number = purchase.quantity ?? 1;
+        const boughtTotal: number = purchase.totalPrice ?? item.price;
         if (item.roleId && message.guild) {
           const role = message.guild.roles.cache.get(item.roleId);
           if (role) try { await message.member?.roles.add(role); } catch { }
@@ -1261,10 +1313,12 @@ export async function handleShop(message: Message, args: string[]) {
           guild: message.guild!,
           type: "MARKET",
           title: "Shop Purchase",
-          description: `**User:** ${message.author.tag}\n**Item:** ${item.name}\n**Price:** ${fmtCurrency(item.price)}\n**Payment:** ${paymentSource === "card" ? "Credit Card" : "Wallet"}`,
+          description: `**User:** ${message.author.tag}\n**Item:** ${item.name} x${boughtQty}\n**Price:** ${fmtCurrency(boughtTotal)}\n**Payment:** ${paymentSource === "card" ? "Credit Card" : "Wallet"}`,
           color: 0x00FF00,
         });
-        let confirmMsg = `You bought **${item.name}** for **${fmtCurrency(item.price)}**!`;
+        let confirmMsg = boughtQty > 1
+          ? `You bought **${boughtQty}x ${item.name}** for **${fmtCurrency(boughtTotal)}**!`
+          : `You bought **${item.name}** for **${fmtCurrency(boughtTotal)}**!`;
         if (purchase.rifle) {
           confirmMsg += `\n\n${buildRifleHint(item.name, purchase.rifle)}`;
         }
