@@ -334,7 +334,7 @@ export const HUNT_SHOP_CATALOG: ShopCatalogItem[] = [
     key: "echo_whistle",
     name: "Echo Whistle",
     price: 600_000,
-    description: "A silver whistle that calls back whatever the forest almost let escape. After your next hunt, it has a 35% chance to attract one extra animal matching the rarity of your best catch. One use only.",
+    description: "A silver whistle that calls back whatever the forest almost let escape. After your next hunt, it has a 35% chance to catch one extra of the exact same species as your best catch. One use only.",
     shortDescription: "Chance to echo your best catch.",
     category: "HUNT",
     asset: "echo_whistle",
