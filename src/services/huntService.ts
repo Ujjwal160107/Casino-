@@ -11,6 +11,7 @@ import {
   AnimalDefinition,
   AnimalRarity,
   PART_VALUES,
+  FED_WINDOW_MS,
   getAnimal,
   rollRarity,
   getAnimalsByRarity,
@@ -153,6 +154,8 @@ export async function hunt(
             animalKey,
             partsAvailable: [...entry.def.parts],
             inZoo: false,
+            // One free fed day, so a fresh catch is never hungry on arrival.
+            fedUntil: new Date(Date.now() + FED_WINDOW_MS),
           },
         })
       )

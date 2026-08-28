@@ -663,6 +663,7 @@ model CaughtAnimal {
   animalKey      String
   partsAvailable Json     // string[] of remaining part keys
   inZoo          Boolean  @default(false)
+  fedUntil       DateTime?
   caughtAt       DateTime @default(now())
   user           User     @relation(fields: [discordId], references: [discordId])
 
