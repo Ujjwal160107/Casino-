@@ -31,6 +31,7 @@ export async function resetUser(discordId: string): Promise<void> {
   await testPrisma.dailyQuest.deleteMany({ where: { userId: discordId } }).catch(() => {});
   await testPrisma.caughtAnimal.deleteMany({ where: { discordId } }).catch(() => {});
   await testPrisma.ownedProperty.deleteMany({ where: { userId: discordId } }).catch(() => {});
+  await testPrisma.inventory.deleteMany({ where: { userId: discordId } }).catch(() => {});
   const wallet = await testPrisma.wallet.findUnique({ where: { userId: discordId } }).catch(() => null);
   if (wallet) await testPrisma.transaction.deleteMany({ where: { walletId: wallet.id } }).catch(() => {});
   await testPrisma.wallet.deleteMany({ where: { userId: discordId } }).catch(() => {});

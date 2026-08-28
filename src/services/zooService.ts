@@ -4,6 +4,7 @@ import {
   AnimalRarity,
   FED_WINDOW_MS,
   RARITY_FEED_COST,
+  RARITY_FEED_KEY,
   RARITY_INCOME_PER_DAY,
   RARITY_STACK_LIMIT,
   ZOO_TIERS,
@@ -11,7 +12,11 @@ import {
   ZooTierKey,
   getAnimal,
 } from "../utils/animalCatalog";
-import { RuleAnimal, animalState, msUntilDeath, resolveLegalHousing } from "../utils/zooRules";
+import { RuleAnimal, animalState, feedBill, msUntilDeath, resolveLegalHousing } from "../utils/zooRules";
+import { addBalance } from "./walletService";
+import { getCraftEffect } from "./huntCraftService";
+import { conditionalClaim, userDateUnchanged } from "../anticheat/claim";
+import { isTester } from "../utils/developerAccess";
 
 export const ZOO_CLAIM_WINDOW_MS = 24 * 3_600_000;
 
@@ -272,4 +277,160 @@ export async function removeAnimalsByKey(
     data: { inZoo: false },
   });
   return { count: animals.length };
+}
+
+export interface FeedResult {
+  fed: number;
+  spent: { rarity: AnimalRarity; units: number }[];
+  missing: { rarity: AnimalRarity; units: number }[];
+}
+
+/**
+ * Spend up to `units` of a rarity's feed. The `amount: { gte: units }` filter
+ * makes this a compare-and-set: two concurrent feeds cannot both spend the
+ * same last unit.
+ */
+async function spendFeed(discordId: string, rarity: AnimalRarity, units: number): Promise<number> {
+  if (units <= 0) return 0;
+  const item = await prisma.shopItem.findUnique({ where: { catalogKey: RARITY_FEED_KEY[rarity] } });
+  if (!item) return 0;
+
+  const row = await prisma.inventory.findUnique({
+    where: { userId_shopItemId: { userId: discordId, shopItemId: item.id } },
+  });
+  const affordable = Math.min(units, row?.amount ?? 0);
+  if (affordable <= 0) return 0;
+
+  const taken = await prisma.inventory.updateMany({
+    where: { userId: discordId, shopItemId: item.id, amount: { gte: affordable } },
+    data: { amount: { decrement: affordable } },
+  });
+  if (taken.count === 0) return 0;
+
+  await prisma.inventory.deleteMany({ where: { userId: discordId, shopItemId: item.id, amount: { lte: 0 } } });
+  return affordable;
+}
+
+async function feedRows(
+  discordId: string,
+  rows: { id: string; animalKey: string; fedUntil: Date | null; caughtAt: Date }[],
+): Promise<FeedResult> {
+  const now = new Date();
+  const hungry = rows
+    .filter((r) => animalState(r, now) === "hungry")
+    .map((r) => ({ row: r, def: getAnimal(r.animalKey) }))
+    .filter((x): x is { row: typeof rows[number]; def: AnimalDefinition } => x.def !== undefined);
+
+  if (hungry.length === 0) return { fed: 0, spent: [], missing: [] };
+
+  const bill = feedBill(hungry.map((h) => ({ rarity: h.def.rarity })));
+  const spent: FeedResult["spent"] = [];
+  const missing: FeedResult["missing"] = [];
+  const fedUntil = new Date(now.getTime() + FED_WINDOW_MS);
+  let fed = 0;
+
+  // bill.lines is cheapest-first, so a player who can't cover everything keeps
+  // the most animals alive.
+  for (const line of bill.lines) {
+    const got = await spendFeed(discordId, line.rarity, line.units);
+    if (got > 0) {
+      const ids = hungry
+        .filter((h) => h.def.rarity === line.rarity)
+        .slice(0, got)
+        .map((h) => h.row.id);
+      await prisma.caughtAnimal.updateMany({ where: { id: { in: ids } }, data: { fedUntil } });
+      spent.push({ rarity: line.rarity, units: got });
+      fed += got;
+    }
+    if (got < line.units) missing.push({ rarity: line.rarity, units: line.units - got });
+  }
+
+  return { fed, spent, missing };
+}
+
+/** Feed every hungry animal of one species. Housed animals only. */
+export async function feedSpecies(discordId: string, animalKey: string): Promise<FeedResult> {
+  await purgeDead(discordId);
+  const rows = await prisma.caughtAnimal.findMany({ where: { discordId, animalKey, inZoo: true } });
+  return feedRows(discordId, rows);
+}
+
+/** Feed every hungry housed animal. Same per-animal cost as feeding one by one. */
+export async function feedAll(discordId: string): Promise<FeedResult> {
+  await purgeDead(discordId);
+  const rows = await prisma.caughtAnimal.findMany({ where: { discordId, inZoo: true } });
+  return feedRows(discordId, rows);
+}
+
+export async function claimZooIncome(
+  discordId: string,
+  username: string,
+): Promise<{ claimed: number; fedAnimals: number; hungryAnimals: number }> {
+  const zooKey = await getActiveZooKey(discordId);
+  if (!zooKey) {
+    const err = new Error("You need to own a zoo to collect zoo income.");
+    (err as any).code = "NO_ZOO";
+    throw err;
+  }
+
+  await purgeDead(discordId);
+  await enforceHousing(discordId);
+
+  const now = new Date();
+  const user = await prisma.user.findUnique({ where: { discordId } });
+  const lastClaim = user?.lastZooClaim ?? null;
+
+  if (lastClaim && now.getTime() - lastClaim.getTime() < ZOO_CLAIM_WINDOW_MS && !isTester(discordId)) {
+    const hoursLeft = Math.ceil((lastClaim.getTime() + ZOO_CLAIM_WINDOW_MS - now.getTime()) / 3_600_000);
+    const err = new Error(`Come back in **${hoursLeft} hour${hoursLeft !== 1 ? "s" : ""}** to collect zoo income.`);
+    (err as any).code = "TOO_SOON";
+    throw err;
+  }
+
+  const housed = await prisma.caughtAnimal.findMany({ where: { discordId, inZoo: true } });
+  let gross = 0;
+  let fedAnimals = 0;
+  for (const a of housed) {
+    const def = getAnimal(a.animalKey);
+    if (!def) continue;
+    if (animalState(a, now) !== "fed") continue;
+    gross += RARITY_INCOME_PER_DAY[def.rarity];
+    fedAnimals++;
+  }
+
+  if (gross === 0) {
+    const err = new Error(
+      housed.length === 0
+        ? "Your zoo is empty. Catch animals with `!hunt` and house them first."
+        : "Every animal in your zoo is hungry — they earn nothing. Feed them with `!zoo feed <animal>`.",
+    );
+    (err as any).code = "NOTHING_TO_CLAIM";
+    throw err;
+  }
+
+  const zooBoost = await getCraftEffect(
+    discordId,
+    `crafted_zoo_boost:${discordId}`,
+    "zoo_boost",
+    (v) => ({ multiplier: v }),
+  );
+  const total = Math.floor(gross * (zooBoost?.multiplier ?? 1));
+
+  // Reserve the 24h window atomically BEFORE crediting. userDateUnchanged also
+  // matches a never-written lastZooClaim; a plain `{ lastZooClaim: null }`
+  // filter would not, permanently blocking first-ever claims.
+  const claimed = await conditionalClaim(() =>
+    prisma.user.updateMany({
+      where: { discordId, ...userDateUnchanged("lastZooClaim", lastClaim) },
+      data: { lastZooClaim: now },
+    }),
+  );
+  if (!claimed) {
+    const err = new Error("Already collecting — try again in a moment.");
+    (err as any).code = "TOO_SOON";
+    throw err;
+  }
+
+  await addBalance(discordId, username, total, "zoo_income", { fedAnimals });
+  return { claimed: total, fedAnimals, hungryAnimals: housed.length - fedAnimals };
 }
