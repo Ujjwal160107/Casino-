@@ -68,7 +68,14 @@ jobs:
 
       - name: Test
         env:
-          REDIS_URL: redis://127.0.0.1:6379
+          # test/setupEnv.ts wants TEST_REDIS_URL specifically, and copies it into
+          # REDIS_URL itself — setting REDIS_URL here does nothing. db 15 matches
+          # the convention in .env.test.example.
+          # Mongo needs no variable: test/globalSetup.ts starts a memory-server
+          # replica set from the Linux mongod that mongodb-memory-server's own
+          # postinstall fetched during `npm ci`. MONGOMS_SYSTEM_BINARY is only
+          # needed on Windows, where that download is unreliable.
+          TEST_REDIS_URL: redis://127.0.0.1:6379/15
         run: npm test
 
       - name: Build bot
