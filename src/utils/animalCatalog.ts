@@ -5,7 +5,6 @@ export interface AnimalDefinition {
   name: string;
   rarity: AnimalRarity;
   sellValue: number;
-  zooIncomePerHour: number;
   parts: string[];
   emojiKey: string;
   emoji: string;
@@ -67,13 +66,6 @@ export function applyHuntBuffs(
 }
 
 export const RIFLE_PRIORITY = ["legendary rifle", "sniper rifle", "iron rifle", "wooden rifle"] as const;
-
-export const RARITY_INCOME: Record<AnimalRarity, number> = {
-  Common:    500,
-  Uncommon:  2_000,
-  Rare:      8_000,
-  Legendary: 25_000,
-};
 
 export const RARITY_COLOR: Record<AnimalRarity, string> = {
   Common: "⬜",
@@ -173,26 +165,26 @@ export const PART_VALUES: Record<string, number> = {
 };
 
 export const ANIMAL_CATALOG: AnimalDefinition[] = [
-  // Common — zoo: 500/hr = 12,000/day. Sell < 1 day of zoo income.
-  { key: "rabbit",       name: "Rabbit",       rarity: "Common",    sellValue: 8_000,      zooIncomePerHour: 500,    parts: ["meat", "fur"],               emojiKey: "rabbit",       emoji: "🐰", asset: "rabbit" },
-  { key: "squirrel",     name: "Squirrel",     rarity: "Common",    sellValue: 6_000,      zooIncomePerHour: 500,    parts: ["fur"],                       emojiKey: "squirrel",     emoji: "🐿️", asset: "squirel" },
-  { key: "fox",          name: "Fox",          rarity: "Common",    sellValue: 10_000,     zooIncomePerHour: 500,    parts: ["fur", "tail"],               emojiKey: "fox",          emoji: "🦊", asset: "fox" },
-  { key: "duck",         name: "Duck",         rarity: "Common",    sellValue: 7_000,      zooIncomePerHour: 500,    parts: ["feathers", "meat"],          emojiKey: "duck",         emoji: "🦆", asset: "duck" },
-  // Uncommon — zoo: 2,000/hr = 48,000/day. Sell < 2 days.
-  { key: "deer",         name: "Deer",         rarity: "Uncommon",  sellValue: 60_000,     zooIncomePerHour: 2_000,  parts: ["venison", "antlers", "hide"], emojiKey: "deer",         emoji: "🦌", asset: "deer" },
-  { key: "boar",         name: "Boar",         rarity: "Uncommon",  sellValue: 65_000,     zooIncomePerHour: 2_000,  parts: ["tusk", "meat"],              emojiKey: "boar",         emoji: "🐗", asset: "boar" },
-  { key: "wolf",         name: "Wolf",         rarity: "Uncommon",  sellValue: 70_000,     zooIncomePerHour: 2_000,  parts: ["pelt", "fang"],              emojiKey: "wolf",         emoji: "🐺", asset: "wolf" },
-  { key: "eagle",        name: "Eagle",        rarity: "Uncommon",  sellValue: 75_000,     zooIncomePerHour: 2_000,  parts: ["feathers", "talons"],        emojiKey: "eagle",        emoji: "🦅", asset: "eagle" },
-  // Rare — zoo: 8,000/hr = 192,000/day. Sell < 2 days.
-  { key: "black_bear",   name: "Black Bear",   rarity: "Rare",      sellValue: 280_000,    zooIncomePerHour: 8_000,  parts: ["pelt", "claws"],             emojiKey: "black_bear",   emoji: "🐻", asset: "bear" },
-  { key: "snow_leopard", name: "Snow Leopard", rarity: "Rare",      sellValue: 320_000,    zooIncomePerHour: 8_000,  parts: ["pelt"],                      emojiKey: "snow_leopard", emoji: "🐆", asset: "snow leopard" },
-  { key: "crocodile",    name: "Crocodile",    rarity: "Rare",      sellValue: 260_000,    zooIncomePerHour: 8_000,  parts: ["hide", "teeth"],             emojiKey: "crocodile",    emoji: "🐊", asset: "crocodile" },
-  { key: "python",       name: "Python",       rarity: "Rare",      sellValue: 240_000,    zooIncomePerHour: 8_000,  parts: ["skin"],                      emojiKey: "python",       emoji: "🐍", asset: "python" },
-  // Legendary — zoo: 25,000/hr = 600,000/day. Sell < 2 days.
-  { key: "white_tiger",   name: "White Tiger",   rarity: "Legendary", sellValue: 900_000,   zooIncomePerHour: 25_000, parts: ["pelt", "fangs"],             emojiKey: "white_tiger",   emoji: "🐯", asset: "white tiger" },
-  { key: "komodo_dragon", name: "Komodo Dragon", rarity: "Legendary", sellValue: 1_000_000, zooIncomePerHour: 25_000, parts: ["scales", "venom"],           emojiKey: "komodo_dragon", emoji: "🦎", asset: "komodo dragonm" },
-  { key: "arctic_wolf",   name: "Arctic Wolf",   rarity: "Legendary", sellValue: 950_000,   zooIncomePerHour: 25_000, parts: ["fur", "fangs"],              emojiKey: "arctic_wolf",   emoji: "🐺", asset: "artic wolf" },
-  { key: "golden_eagle",  name: "Golden Eagle",  rarity: "Legendary", sellValue: 850_000,   zooIncomePerHour: 25_000, parts: ["feathers", "talons"],        emojiKey: "golden_eagle",  emoji: "🦅", asset: "golden eagle" },
+  // Common — zoo: 4,000/day fed (RARITY_INCOME_PER_DAY). Sell value is ~2 days of income.
+  { key: "rabbit",       name: "Rabbit",       rarity: "Common",    sellValue: 8_000,    parts: ["meat", "fur"],               emojiKey: "rabbit",       emoji: "🐰", asset: "rabbit" },
+  { key: "squirrel",     name: "Squirrel",     rarity: "Common",    sellValue: 6_000,    parts: ["fur"],                       emojiKey: "squirrel",     emoji: "🐿️", asset: "squirel" },
+  { key: "fox",          name: "Fox",          rarity: "Common",    sellValue: 10_000,    parts: ["fur", "tail"],               emojiKey: "fox",          emoji: "🦊", asset: "fox" },
+  { key: "duck",         name: "Duck",         rarity: "Common",    sellValue: 7_000,    parts: ["feathers", "meat"],          emojiKey: "duck",         emoji: "🦆", asset: "duck" },
+  // Uncommon — zoo: 16,000/day fed. Sell value is ~4 days of income.
+  { key: "deer",         name: "Deer",         rarity: "Uncommon",  sellValue: 60_000,  parts: ["venison", "antlers", "hide"], emojiKey: "deer",         emoji: "🦌", asset: "deer" },
+  { key: "boar",         name: "Boar",         rarity: "Uncommon",  sellValue: 65_000,  parts: ["tusk", "meat"],              emojiKey: "boar",         emoji: "🐗", asset: "boar" },
+  { key: "wolf",         name: "Wolf",         rarity: "Uncommon",  sellValue: 70_000,  parts: ["pelt", "fang"],              emojiKey: "wolf",         emoji: "🐺", asset: "wolf" },
+  { key: "eagle",        name: "Eagle",        rarity: "Uncommon",  sellValue: 75_000,  parts: ["feathers", "talons"],        emojiKey: "eagle",        emoji: "🦅", asset: "eagle" },
+  // Rare — zoo: 60,000/day fed. Sell value is ~5 days of income.
+  { key: "black_bear",   name: "Black Bear",   rarity: "Rare",      sellValue: 280_000,  parts: ["pelt", "claws"],             emojiKey: "black_bear",   emoji: "🐻", asset: "bear" },
+  { key: "snow_leopard", name: "Snow Leopard", rarity: "Rare",      sellValue: 320_000,  parts: ["pelt"],                      emojiKey: "snow_leopard", emoji: "🐆", asset: "snow leopard" },
+  { key: "crocodile",    name: "Crocodile",    rarity: "Rare",      sellValue: 260_000,  parts: ["hide", "teeth"],             emojiKey: "crocodile",    emoji: "🐊", asset: "crocodile" },
+  { key: "python",       name: "Python",       rarity: "Rare",      sellValue: 240_000,  parts: ["skin"],                      emojiKey: "python",       emoji: "🐍", asset: "python" },
+  // Legendary — zoo: 200,000/day fed, World Zoo only. Sell value is ~5 days of income.
+  { key: "white_tiger",   name: "White Tiger",   rarity: "Legendary", sellValue: 900_000, parts: ["pelt", "fangs"],             emojiKey: "white_tiger",   emoji: "🐯", asset: "white tiger" },
+  { key: "komodo_dragon", name: "Komodo Dragon", rarity: "Legendary", sellValue: 1_000_000, parts: ["scales", "venom"],           emojiKey: "komodo_dragon", emoji: "🦎", asset: "komodo dragonm" },
+  { key: "arctic_wolf",   name: "Arctic Wolf",   rarity: "Legendary", sellValue: 950_000, parts: ["fur", "fangs"],              emojiKey: "arctic_wolf",   emoji: "🐺", asset: "artic wolf" },
+  { key: "golden_eagle",  name: "Golden Eagle",  rarity: "Legendary", sellValue: 850_000, parts: ["feathers", "talons"],        emojiKey: "golden_eagle",  emoji: "🦅", asset: "golden eagle" },
 ];
 
 export function getAnimal(key: string): AnimalDefinition | undefined {

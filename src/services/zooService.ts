@@ -90,6 +90,21 @@ export async function purgeDead(discordId: string): Promise<{ animalKey: string;
   const dead = rows.filter((r) => getAnimal(r.animalKey) && animalState(r, now) === "dead");
   if (dead.length === 0) return [];
 
+  // Audit trail. This delete is irreversible and can take rows worth up to
+  // 1,000,000 coins each, so the ids and keys go to the log BEFORE the write —
+  // if a bad backfill ever makes this fire wrongly, this line is the only
+  // record of what was lost and whose it was.
+  console.log(
+    "[zoo.purgeDead]",
+    JSON.stringify({
+      discordId,
+      at: now.toISOString(),
+      count: dead.length,
+      animalKeys: dead.map((d) => d.animalKey),
+      ids: dead.map((d) => d.id),
+    }),
+  );
+
   await prisma.caughtAnimal.deleteMany({ where: { id: { in: dead.map((d) => d.id) } } });
 
   const counts = new Map<string, number>();
@@ -400,8 +415,19 @@ async function feedRows(
       // Idempotency guard: a second feed racing on the same rows (double-click,
       // command spam) claims only rows still hungry, so two calls can never
       // both claim — and later pay for — the same animal.
+      // `isSet: false` is load-bearing, not belt-and-braces: fedUntil was added
+      // in this branch and MongoDB has no schema migration, so every pre-deploy
+      // row has the field physically ABSENT from its BSON. Prisma's Mongo
+      // connector matches `{ fedUntil: null }` against explicit BSON null only,
+      // so without this disjunct a legacy row claims nothing, `paid` stays 0,
+      // and the player is told "you have no feed" while holding feed — and the
+      // animal starves. Same trap LEGACY_FED_UNTIL_WHERE and
+      // anticheat/claim.ts's userDateUnchanged exist to cover.
       const claim = await prisma.caughtAnimal.updateMany({
-        where: { id: { in: attemptIds }, OR: [{ fedUntil: null }, { fedUntil: { lt: now } }] },
+        where: {
+          id: { in: attemptIds },
+          OR: [{ fedUntil: null }, { fedUntil: { isSet: false } }, { fedUntil: { lt: now } }],
+        },
         data: { fedUntil },
       });
 

@@ -1,6 +1,7 @@
 import prisma from "../utils/prisma";
 import { redisService } from "./redisService";
-import { getAnimal } from "../utils/animalCatalog";
+import { getAnimal, RARITY_INCOME_PER_DAY } from "../utils/animalCatalog";
+import { animalState } from "../utils/zooRules";
 
 export interface NetWorthBreakdown {
   wallet: number;
@@ -66,12 +67,19 @@ async function computeNetWorth(discordId: string): Promise<NetWorthBreakdown> {
       }, 0);
     }),
     safely("animals", async () => {
+      const now = new Date();
       const caught = await prisma.caughtAnimal.findMany({ where: { discordId } });
       for (const c of caught) {
         const def = getAnimal(c.animalKey);
         if (!def) continue;
         breakdown.animals += def.sellValue ?? 0;
-        if (c.inZoo) breakdown.passiveIncomePerDay += (def.zooIncomePerHour ?? 0) * 24;
+        // Exactly what computeZooPayout pays: RARITY_INCOME_PER_DAY per HOUSED
+        // and FED animal, nothing for a hungry one. The old
+        // `zooIncomePerHour * 24` reported 3x the real rate and counted hungry
+        // animals as earning, which fed a wrong `!leaderboard passive` sort.
+        if (c.inZoo && animalState(c, now) === "fed") {
+          breakdown.passiveIncomePerDay += RARITY_INCOME_PER_DAY[def.rarity];
+        }
       }
     }),
     safely("items", async () => {

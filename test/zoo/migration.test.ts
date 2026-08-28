@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { MongoClient, ObjectId, Collection, Document } from "mongodb";
 import { testPrisma, resetUser } from "../helpers";
-import { LEGACY_FED_UNTIL_WHERE, backfillFedUntil } from "../../src/scripts/zooCareMigration";
+import { LEGACY_FED_UNTIL_WHERE, backfillFedUntil, backfillOk } from "../../src/scripts/zooCareMigration";
 
 // Regression test for a Critical review finding on the zoo care migration:
 // fedUntil was introduced in this same branch, and MongoDB has no schema
@@ -80,6 +80,19 @@ describe("zooCareMigration backfill", () => {
     const after = await testPrisma.caughtAnimal.findUnique({ where: { id: insertedId } });
     expect(after?.fedUntil).not.toBeNull();
     expect(after!.fedUntil!.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  // The script is chained as `npx ts-node src/scripts/zooCareMigration.ts &&
+  // pm2 restart`. It used to print a WARNING and still exit 0 when its own
+  // integrity check failed, so an operator would restart the bot on a failed
+  // backfill and every collection older than 96h would then be deleted.
+  // backfillOk is the single rule main()'s exit code reads.
+  it("backfillOk fails the run when rows are still unfed, and passes a clean re-run", () => {
+    expect(backfillOk({ matched: 0, totalAnimals: 500, stillUnfed: 500 })).toBe(false);
+    expect(backfillOk({ matched: 12, totalAnimals: 500, stillUnfed: 1 })).toBe(false);
+    // `matched: 0` alone is NOT a failure — a second run legitimately matches
+    // nothing, which is the case the old code conflated with success.
+    expect(backfillOk({ matched: 0, totalAnimals: 500, stillUnfed: 0 })).toBe(true);
   });
 
   it("is idempotent: a second run matches nothing new and leaves nothing still-unfed", async () => {

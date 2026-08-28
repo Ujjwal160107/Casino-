@@ -57,6 +57,15 @@ export interface BackfillResult {
 }
 
 /**
+ * The integrity verdict on a backfill run, in one place so `main`'s exit code
+ * and the test that pins it read the identical rule. `matched === 0` is NOT a
+ * failure (a re-run legitimately matches nothing); `stillUnfed > 0` is.
+ */
+export function backfillOk(result: BackfillResult): boolean {
+  return result.stillUnfed === 0;
+}
+
+/**
  * Give every legacy CaughtAnimal row one fed day. Idempotent: once every row
  * has an explicit fedUntil, LEGACY_FED_UNTIL_WHERE matches nothing and a
  * second run's `matched` is 0.
@@ -73,17 +82,24 @@ export async function backfillFedUntil(client: PrismaClient, now: Date = new Dat
 }
 
 async function main() {
-  const { matched, totalAnimals, stillUnfed } = await backfillFedUntil(prisma);
+  const result = await backfillFedUntil(prisma);
+  const { matched, totalAnimals, stillUnfed } = result;
   console.log(`Backfilled fedUntil on ${matched} of ${totalAnimals} total animal(s).`);
-  if (stillUnfed > 0) {
+  if (!backfillOk(result)) {
+    // Exit non-zero, not just loudly: operators chain this as
+    // `npx ts-node src/scripts/zooCareMigration.ts && pm2 restart`, and a
+    // zero exit on a failed backfill deploys a bot that starves and deletes
+    // every collection older than 96h.
+    process.exitCode = 1;
     console.error(
       `WARNING: ${stillUnfed} animal(s) still lack a usable fedUntil after this run. ` +
         `"matched 0" does NOT mean "already backfilled" here — the filter is not reaching ` +
         `legacy rows. Investigate before deploying further; do not assume success.`
     );
-  } else {
-    console.log("Every animal now has a usable fedUntil (explicit or backfilled). Safe to re-run.");
+    console.error("Aborting before the zoo price recompute — exiting 1.");
+    return;
   }
+  console.log("Every animal now has a usable fedUntil (explicit or backfilled). Safe to re-run.");
 
   for (const def of ZOO_PROPERTY_DEFS) {
     if (!(def.key in ZOO_CAPACITY)) continue;
