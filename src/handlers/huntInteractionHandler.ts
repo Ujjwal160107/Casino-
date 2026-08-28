@@ -15,7 +15,7 @@ import {
   sellAllInventoryAnimals,
   sellAnimalsByKey,
 } from "../services/huntService";
-import { houseAnimals, removeAnimalsByKey } from "../services/zooService";
+import { claimZooIncome, feedAll, houseAnimals, removeAnimalsByKey } from "../services/zooService";
 import { buildZooContainer } from "../commands/games/zoo";
 import { successContainer, v2Reply } from "../utils/componentsV2";
 import { fmtCurrency } from "../utils/format";
@@ -322,19 +322,54 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
     return;
   }
 
+  if (customId.startsWith("zoo_feed_all:") && interaction.isButton()) {
+    const ownerId = parts[1];
+    if (interaction.user.id !== ownerId) return replyEphemeral(interaction, "This isn't your zoo.");
+
+    if (!await ensureDeferredUpdate(interaction)) return;
+    try {
+      const result = await feedAll(ownerId);
+      const shortfall = result.missing.length
+        ? ` **${result.missing.reduce((s, m) => s + m.units, 0)}** still hungry — buy more feed in the Hunt Store.`
+        : "";
+      await safeFollowUp(interaction, {
+        content: result.fed > 0
+          ? `Fed **${result.fed}** animal${result.fed !== 1 ? "s" : ""}.${shortfall}`
+          : `You have no feed for the hungry animals in your zoo.${shortfall}`,
+        flags: MessageFlags.Ephemeral,
+      });
+      const container = await buildZooContainer(ownerId, interaction.user.username, interaction.guildId ?? "", interaction.guild);
+      const files = (container as any).__files ?? [];
+      await safeEditReply(interaction, { components: [container], files, flags: MessageFlags.IsComponentsV2 });
+    } catch (err: any) {
+      await safeFollowUp(interaction, { content: err.message, flags: MessageFlags.Ephemeral });
+    }
+    return;
+  }
+
   if (customId.startsWith("zoo_collect:") && interaction.isButton()) {
     const ownerId = parts[1];
     if (interaction.user.id !== ownerId) return replyEphemeral(interaction, "This isn't your zoo.");
 
     if (!await ensureDeferredUpdate(interaction)) return;
-    // claimZooIncome moved out of huntService in this task and is not replaced
-    // until Task 6 rebuilds it in zooService around fed/hungry animals (Task 8
-    // then repoints this branch). Fail closed with an honest message instead
-    // of crediting the old hourly-accrual amount, which this task removed.
-    await safeFollowUp(interaction, {
-      content: "Zoo income collection is being reworked for the new feeding system — check back soon.",
-      flags: MessageFlags.Ephemeral,
-    });
+    try {
+      const { claimed, fedAnimals, hungryAnimals } = await claimZooIncome(ownerId, interaction.user.username);
+      await safeFollowUp(interaction, v2Reply(
+        successContainer(
+          "Zoo Income Collected",
+          `Collected **${fmtCurrency(claimed)}** from **${fedAnimals}** fed animal${fedAnimals !== 1 ? "s" : ""}.` +
+          (hungryAnimals > 0 ? `\n${hungryAnimals} hungry animal${hungryAnimals !== 1 ? "s" : ""} earned nothing.` : ""),
+        ),
+        undefined,
+        MessageFlags.Ephemeral,
+      ));
+      const container = await buildZooContainer(ownerId, interaction.user.username, interaction.guildId ?? "", interaction.guild);
+      const files = (container as any).__files ?? [];
+      await safeEditReply(interaction, { components: [container], files, flags: MessageFlags.IsComponentsV2 });
+    } catch (err: any) {
+      await safeFollowUp(interaction, { content: err.message, flags: MessageFlags.Ephemeral });
+    }
+    return;
   }
 }
 

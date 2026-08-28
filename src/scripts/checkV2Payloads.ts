@@ -56,29 +56,42 @@ check(
     buildHuntResultPayload("123456789012345678", groups, "legendary rifle", ["Fox Fur Cloak"], true),
 );
 
-// --- Zoo worst case: a full World Zoo (16 distinct types) with an upgrade offer ---
+// --- Zoo worst case: a full World Zoo (16 distinct types), all hungry, plus
+// died/evicted lines and the Feed All button — every optional line/button at
+// once, since that's the actual worst case for both the component and char
+// budgets (hunger/death/eviction text lands inside existing components, but
+// Feed All is a real extra component in the action row). ---
 const zooDefs = ANIMAL_CATALOG.slice(0, 16);
 const zooSlots: ZooSlot[] = zooDefs.map((def) => ({
     animalKey: def.key,
     def,
     count: 3,
-    fedCount: 3,
-    hungryCount: 0,
+    fedCount: 0,
+    hungryCount: 3,
     incomePerDay: RARITY_INCOME[def.rarity] * 3,
-    feedCostPerDay: 0,
-    soonestDeathMs: null,
+    feedCostPerDay: RARITY_INCOME[def.rarity],
+    soonestDeathMs: 12 * 3_600_000,
 }));
 check(
-    "zoo worst case (16 types)",
+    "zoo worst case (16 types, all hungry, died + evicted)",
     buildZooPayload(
         "123456789012345678",
         {
             slots: zooSlots,
-            tier: ZOO_TIERS.city_zoo,
-            incomePerDay: zooSlots.reduce((s, z) => s + z.incomePerDay, 0),
+            maxSlots: ZOO_TIERS.city_zoo.types,
+            incomePerDay: 0,
+            feedBillPerDay: zooSlots.reduce((s, z) => s + z.feedCostPerDay, 0),
+            claimable: false,
+            nextClaim: new Date(Date.now() + 12 * 3_600_000),
+            hungryCount: zooSlots.reduce((s, z) => s + z.hungryCount, 0),
             zooName: "City Zoo",
             zooKey: "city_zoo",
             nextTier: { key: "world_zoo", name: "World Zoo", price: 75_000_000 },
+            died: [
+                { animalKey: zooDefs[0].key, count: 2 },
+                { animalKey: zooDefs[1].key, count: 1 },
+            ],
+            evicted: 4,
         },
         null,
     ),

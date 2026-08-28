@@ -14,10 +14,10 @@ import {
 } from "discord.js";
 import fs from "fs";
 import path from "path";
-import { getZooStatus, removeAnimalsByKey, ZooSlot } from "../../services/zooService";
+import { feedSpecies, getZooStatus, removeAnimalsByKey, ZooSlot } from "../../services/zooService";
 import { errorContainer, successContainer, v2Reply } from "../../utils/componentsV2";
 import { seedZooProperties } from "../../services/propertyService";
-import { ZOO_CAPACITY, RARITY_INCOME, ZOO_PROPERTY_DEFS, ZooTier } from "../../utils/animalCatalog";
+import { getAnimal, ZOO_CAPACITY, ZOO_PROPERTY_DEFS } from "../../utils/animalCatalog";
 import { fmtCurrency, fmtAmount } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import prisma from "../../utils/prisma";
@@ -55,11 +55,18 @@ function resolveAsset(assetName: string, prefix = ""): { filePath: string; attac
 
 export interface ZooView {
   slots: ZooSlot[];
-  tier: ZooTier | null;
+  maxSlots: number;
   incomePerDay: number;
+  feedBillPerDay: number;
+  claimable: boolean;
+  nextClaim: Date | null;
+  hungryCount: number;
   zooName: string | null;
   zooKey: string | null;
   nextTier: { key: string; name: string; price: number } | null;
+  /** Non-zero only right after a status refresh purges starved animals or evicts over-capacity ones. */
+  died: { animalKey: string; count: number }[];
+  evicted: number;
 }
 
 // Discord rejects ComponentsV2 messages with more than 40 total components or
@@ -77,37 +84,52 @@ export function buildZooPayload(
   view: ZooView,
   guild: import("discord.js").Guild | null,
 ): { components: ContainerBuilder[]; files: AttachmentBuilder[] } {
-  const { slots, tier, incomePerDay, zooName, zooKey, nextTier } = view;
-  const maxSlots = tier?.types ?? 0;
-
-  // Unconditionally disabled: claimZooIncome moved out of huntService with
-  // this task's zooService split and isn't rebuilt until Task 6 (Task 8 wires
-  // this button back up). Leaving it enabled would promise a payout the
-  // zoo_collect: handler cannot deliver right now.
-  const collectDisabled = true;
+  const { slots, maxSlots, incomePerDay, feedBillPerDay, claimable, nextClaim, hungryCount, zooName, zooKey, nextTier, died, evicted } = view;
 
   const files: AttachmentBuilder[] = [];
   const container = new ContainerBuilder();
 
+  const deathLine = died.length > 0
+    ? `\n${Mascot.Emotes.Decline} Starved and lost: ${died.map((d) => `${d.count}x ${getAnimal(d.animalKey)?.name ?? d.animalKey}`).join(", ")}`
+    : "";
+  const evictedLine = evicted > 0
+    ? `\n${evicted} animal${evicted !== 1 ? "s" : ""} over capacity — sent back to inventory. Use \`!zoo remove\` before housing more, or upgrade your zoo.`
+    : "";
+
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `## ${Mascot.Emotes.Sparks} Your ${zooName ?? "Zoo"}\n` +
-      `**${slots.length}/${maxSlots}** animal types | **+${fmtCurrency(incomePerDay)}/day**`
+      `**${slots.length}/${maxSlots}** animal types | **+${fmtCurrency(incomePerDay)}/day** | feed **${fmtCurrency(feedBillPerDay)}/day**` +
+      (hungryCount > 0 ? `\n${hungryCount} hungry animal${hungryCount !== 1 ? "s" : ""} earning nothing — \`!zoo feed <animal>\`` : "") +
+      deathLine +
+      evictedLine
     )
   );
 
+  const hoursLeft = nextClaim ? Math.ceil((nextClaim.getTime() - Date.now()) / 3_600_000) : 0;
   // Plain number, not fmtCurrency — button labels don't render <:fortunes:…>.
-  const collectLabel = collectDisabled
-    ? "Nothing to collect yet"
-    : `Collect ${fmtAmount(incomePerDay)}`;
+  const collectLabel = claimable
+    ? `Collect ${fmtAmount(incomePerDay)}`
+    : `Next collect in ${hoursLeft}h`;
 
   const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`zoo_collect:${discordId}`)
       .setLabel(collectLabel)
       .setStyle(ButtonStyle.Success)
-      .setDisabled(collectDisabled)
+      .setDisabled(!claimable || incomePerDay <= 0)
   );
+
+  // One Feed All button, never one per species — ComponentsV2 caps at 40
+  // components and a full zoo already spends most of them on slot sections.
+  if (hungryCount > 0) {
+    actionRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`zoo_feed_all:${discordId}`)
+        .setLabel(`Feed All (${hungryCount})`)
+        .setStyle(ButtonStyle.Primary)
+    );
+  }
 
   // Single-slot upgrade ladder: offer the next-bigger zoo if one exists.
   if (nextTier) {
@@ -151,11 +173,16 @@ export function buildZooPayload(
       );
     }
 
+    const hungerLine = slot.hungryCount > 0
+      ? `\n⚠️ **${slot.hungryCount} hungry** — dies in ${Math.max(0, Math.floor((slot.soonestDeathMs ?? 0) / 3_600_000))}h`
+      : "";
+
     const section = new SectionBuilder()
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
           `**${slot.count}x** ${emojiDisplay} **${slot.def.name}** — ${slot.def.rarity}\n` +
-          `${Mascot.Emotes.Currency} +${fmtCurrency(slot.incomePerDay)}/hr (${slot.count}x ${fmtCurrency(RARITY_INCOME[slot.def.rarity])})`
+          `${Mascot.Emotes.Currency} +${fmtCurrency(slot.incomePerDay)}/day · feed ${fmtCurrency(slot.feedCostPerDay)}/day` +
+          hungerLine
         ),
       )
       .setButtonAccessory(
@@ -186,7 +213,7 @@ export function buildZooPayload(
     );
     const overflowLines = overflow.map((slot) => {
       const emojiDisplay = emojiInline(slot.def.emojiKey, guild) ?? AnimalEmojis[slot.def.key] ?? "";
-      return `**${slot.count}x** ${emojiDisplay} **${slot.def.name}** — ${slot.def.rarity} · +${fmtCurrency(slot.incomePerDay)}/hr`;
+      return `**${slot.count}x** ${emojiDisplay} **${slot.def.name}** — ${slot.def.rarity} · +${fmtCurrency(slot.incomePerDay)}/day${slot.hungryCount > 0 ? ` · ⚠️ ${slot.hungryCount} hungry` : ""}`;
     });
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
@@ -216,7 +243,22 @@ export async function buildZooContainer(
     }
   }
 
-  const { components } = buildZooPayload(discordId, { ...status, nextTier }, guild);
+  const view: ZooView = {
+    slots: status.slots,
+    maxSlots: status.tier?.types ?? 0,
+    incomePerDay: status.incomePerDay,
+    feedBillPerDay: status.feedBillPerDay,
+    claimable: status.claimable,
+    nextClaim: status.nextClaim,
+    hungryCount: status.slots.reduce((s, x) => s + x.hungryCount, 0),
+    zooName: status.zooName,
+    zooKey: status.zooKey,
+    nextTier,
+    died: status.died,
+    evicted: status.evicted,
+  };
+
+  const { components } = buildZooPayload(discordId, view, guild);
   return components[0];
 }
 
@@ -225,6 +267,33 @@ export async function handleZoo(message: Message, args: string[]) {
   const discordId = message.author.id;
 
   await seedZooProperties(guildId);
+
+  // !zoo feed <name> — spend one feed of the right rarity per hungry animal.
+  if ((args[0] ?? "").toLowerCase() === "feed") {
+    const raw = args.slice(1).join(" ").trim();
+    if (!raw) {
+      return message.reply(v2Reply(errorContainer("Zoo Feed", "Usage: `!zoo feed <animal name>` — or use the **Feed All** button on `!zoo`.")));
+    }
+    const query = raw.toLowerCase();
+    const status = await getZooStatus(discordId);
+    const match =
+      status.slots.find((s) => s.def.name.toLowerCase() === query || s.animalKey.toLowerCase() === query) ??
+      status.slots.find((s) => s.def.name.toLowerCase().includes(query));
+    if (!match) {
+      return message.reply(v2Reply(errorContainer("Zoo Feed", `You have no **${raw}** in your zoo.`)));
+    }
+    const result = await feedSpecies(discordId, match.animalKey);
+    if (result.fed === 0 && result.missing.length === 0) {
+      return message.reply(v2Reply(successContainer("Zoo Feed", `Your **${match.def.name}** are already fed. Nothing spent.`)));
+    }
+    const shortfall = result.missing.length
+      ? `\nStill hungry: **${result.missing.reduce((s, m) => s + m.units, 0)}** — buy more feed in the Hunt Store.`
+      : "";
+    return message.reply(v2Reply(successContainer(
+      "Zoo Feed",
+      `Fed **${result.fed}x ${match.def.name}**. They earn again on your next collect.${shortfall}`,
+    )));
+  }
 
   // !zoo remove <name> — remove a species from the zoo. Overflow types in a big
   // zoo don't get their own Remove button, so this keeps them manageable.
@@ -272,7 +341,7 @@ export async function handleZoo(message: Message, args: string[]) {
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(`### ${def.name}`),
           new TextDisplayBuilder().setContent(
-            `Price: **${fmtCurrency(def.price)}**\nCapacity: **${capacity} animal types**\n-# ${def.description}`
+            `Price: **${fmtCurrency(def.price)}**\nCapacity: **${capacity} animal types**${def.key === "world_zoo" ? " · the only zoo that can house a Legendary" : ""}\n-# ${def.description}`
           ),
         )
         .setButtonAccessory(
@@ -324,16 +393,16 @@ export async function handleZoo(message: Message, args: string[]) {
     // Never leave the player staring at nothing — fall back to a plain-text
     // summary if the rich view can't be sent for any reason.
     console.error("handleZoo: zoo view reply failed, sending fallback:", err);
-    const { slots, tier, incomePerDay, zooName } = await getZooStatus(discordId);
-    const maxSlots = tier?.types ?? 0;
-    const lines = slots
+    const status = await getZooStatus(discordId);
+    const lines = status.slots
       .slice()
       .sort((a, b) => b.incomePerDay - a.incomePerDay)
-      .map((s) => `${s.count}x ${s.def.name} (${s.def.rarity})`)
+      .map((s) => `${s.count}x ${s.def.name} (${s.def.rarity})${s.hungryCount > 0 ? ` — ${s.hungryCount} hungry` : ""}`)
       .join(", ");
     return message.reply(v2Reply(successContainer(
-      `Your ${zooName ?? "Zoo"}`,
-      `**${slots.length}/${maxSlots}** animal types | **+${fmtCurrency(incomePerDay)}/day**\n` +
+      `Your ${status.zooName ?? "Zoo"}`,
+      `**${status.slots.length}/${status.tier?.types ?? 0}** animal types | **+${fmtCurrency(status.incomePerDay)}/day**\n` +
+        (status.claimable ? "Ready to collect — use the button on `!zoo`.\n" : "") +
         (lines ? `\n${lines}` : "Your zoo is empty."),
     )));
   }
