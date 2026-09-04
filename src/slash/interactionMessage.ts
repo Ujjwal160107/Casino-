@@ -39,18 +39,30 @@ export function createInteractionMessage(
         if (member) members.set(user.id, member);
     }
 
-    // The interaction is deferred before we get here, so the first reply edits
-    // the placeholder and later ones become follow-ups. Both return a real
-    // Message, which is what the 18 handlers that attach component collectors
-    // to their reply depend on.
+    // Every reply is sent as a follow-up, and the deferred placeholder is
+    // deleted once the first one lands.
+    //
+    // Not editReply, which is the obvious choice and is wrong: most handlers
+    // answer with v2Reply(), which sets MessageFlags.IsComponentsV2. That flag
+    // has to be set when the message is CREATED. A deferred reply is created
+    // without it, and editing cannot add it -- Discord accepts the edit, throws
+    // nothing, and silently drops the containers, so the command appears to
+    // work while rendering nothing. A follow-up is a new message and carries
+    // its own flags.
+    //
+    // The follow-up is sent before the placeholder is removed so the user never
+    // sees a gap.
     let hasReplied = false;
+    let sent: Message | null = null;
     const reply = async (options: any): Promise<Message> => {
         const payload = typeof options === "string" ? { content: options } : options;
+        const message = (await interaction.followUp(payload)) as Message;
         if (!hasReplied) {
             hasReplied = true;
-            return (await interaction.editReply(payload)) as Message;
+            sent = message;
+            await interaction.deleteReply().catch(() => { });
         }
-        return (await interaction.followUp(payload)) as Message;
+        return message;
     };
 
     const adapter = {
@@ -80,10 +92,13 @@ export function createInteractionMessage(
         // is nothing to remove.
         delete: async () => adapter as unknown as Message,
 
-        edit: async (options: any) =>
-            (await interaction.editReply(
-                typeof options === "string" ? { content: options } : options,
-            )) as Message,
+        // Edits the message we actually sent. Not editReply -- the deferred
+        // placeholder it refers to has been deleted by then.
+        edit: async (options: any) => {
+            const payload = typeof options === "string" ? { content: options } : options;
+            if (!sent) return reply(payload);
+            return (await sent.edit(payload)) as Message;
+        },
     };
 
     // `replied` lets the caller notice a handler that returned without saying

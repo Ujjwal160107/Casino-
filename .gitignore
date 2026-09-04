@@ -21,3 +21,7 @@ coverage/
 
 # Superpowers SDD working artifacts (local process scratch)
 .superpowers/
+
+# Economy backups written by src/scripts/economyBackup.ts. Contain player
+# balances and holdings -- never commit them.
+backups/
