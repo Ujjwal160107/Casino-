@@ -14,6 +14,7 @@
     "test:heat": "ts-node src/scripts/heatConfigTests.ts",
     "sync:shop-emojis": "ts-node src/scripts/syncShopApplicationEmojis.ts",
     "validate:shop-emojis": "ts-node src/scripts/syncShopApplicationEmojis.ts --dry-run",
+    "validate:slash": "ts-node --transpile-only src/scripts/validateSlashCommands.ts",
     "start": "node dist/index.js",
     "prisma:push": "npx prisma db push",
     "prisma:generate": "npx prisma generate",

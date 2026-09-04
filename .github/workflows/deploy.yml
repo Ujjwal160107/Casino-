@@ -66,6 +66,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Validate slash commands
+        # A spec that names a command the router doesn't handle registers fine
+        # and then answers "Unknown Command" in production. Catch it here.
+        run: npm run validate:slash
+
       - name: Test
         env:
           # test/setupEnv.ts wants TEST_REDIS_URL specifically, and copies it into
