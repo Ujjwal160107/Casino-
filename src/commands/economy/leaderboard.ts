@@ -207,11 +207,19 @@ export async function handleLeaderboard(message: Message, args: string[]) {
     const allUsers = await loadUsers();
     let serverMemberIds: Set<string> | null = null;
 
+    // Server scope needs the whole member list, which requires the privileged
+    // GuildMembers intent we no longer hold. Fall back to global rather than
+    // throwing, so the leaderboard still renders.
     const scopedUsers = async (): Promise<LbUser[]> => {
         if (currentScope === "global") return allUsers;
         if (!serverMemberIds) {
-            const members = await message.guild!.members.fetch();
-            serverMemberIds = new Set(members.keys());
+            try {
+                const members = await message.guild!.members.fetch();
+                serverMemberIds = new Set(members.keys());
+            } catch {
+                currentScope = "global";
+                return allUsers;
+            }
         }
         return allUsers.filter((u) => serverMemberIds!.has(u.discordId));
     };

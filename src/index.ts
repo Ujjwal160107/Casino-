@@ -54,11 +54,15 @@ if (!token) {
 }
 
 const client = new Client({
+  // No privileged intents. Discord denied MessageContent for this use case
+  // (their position: a command bot should use slash commands) and the grant
+  // lapsed on 2026-08-19. Commands still work via @mention and DM, which
+  // Discord delivers content for without the intent -- see the mention branch
+  // below. Restore MessageContent/GuildMembers here only if a future
+  // application is approved.
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers
+    GatewayIntentBits.GuildMessages
   ],
   partials: [Partials.Channel]
 });

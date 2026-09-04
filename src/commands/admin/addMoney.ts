@@ -51,9 +51,18 @@ export async function handleAddMoney(message: Message, args: string[]) {
       return message.reply(v2Reply(errorContainer("Role Not Found", "Could not find that role.")));
     }
 
-    // Ensure members are fetched
+    // Paying a role needs the whole member list, which requires the privileged
+    // GuildMembers intent we no longer hold. Fail loudly -- silently paying an
+    // empty role would look like success.
     console.log("[AddMoney] Fetching guild members...");
-    await message.guild!.members.fetch();
+    try {
+      await message.guild!.members.fetch();
+    } catch {
+      return message.reply(v2Reply(errorContainer(
+        "Members Unavailable",
+        "Paying a whole role needs the Server Members intent, which this app does not currently have. Pay users individually instead.",
+      )));
+    }
     console.log(`[AddMoney] Role Members Size: ${role.members.size}`);
 
     const statusMsg = await message.reply(`${Mascot.Emotes.Refresh} Processing payment to **${role.members.size}** members...`);
