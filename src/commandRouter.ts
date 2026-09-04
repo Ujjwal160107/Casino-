@@ -278,6 +278,12 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "setprefix":
     case "set-prefix":
       return handleSetPrefix(message, args);
+    case "setrob":
+    case "set-rob":
+    case "togglerob": {
+      const { handleSetRob } = require("./commands/admin/setRob");
+      return handleSetRob(message, args);
+    }
     case "start": {
       const { handleStart } = require("./commands/general/start");
       return handleStart(message);

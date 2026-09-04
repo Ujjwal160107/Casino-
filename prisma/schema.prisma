@@ -342,6 +342,15 @@ model GuildSettings {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   guildId   String   @unique
   prefix    String   @default("!")
+
+  // Whether !rob is allowed in this server. Optional rather than
+  // `Boolean @default(true)` on purpose: `db push` does not backfill existing
+  // documents, and Prisma's Mongo connector throws reading a required field
+  // that is absent from a document. Every existing guild would break on the
+  // deploy. Callers read it as `robEnabled ?? true`, so a missing field means
+  // enabled and no backfill is needed.
+  robEnabled Boolean?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

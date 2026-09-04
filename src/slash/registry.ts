@@ -52,6 +52,15 @@ export const SPECS: Spec[] = [
         name: "setprefix", desc: "Set the text-command prefix for this server",
         opts: [{ kind: "str", name: "prefix", desc: "The new prefix", required: true }],
     },
+    {
+        // Server-admin setting, so it belongs here alongside setprefix rather
+        // than with the developer-only commands the registry excludes.
+        name: "setrob", desc: "Allow or block robbing in this server (Manage Server)",
+        opts: [{
+            kind: "str", name: "state", desc: "Leave blank to see the current setting",
+            required: false, choices: ["on", "off"],
+        }],
+    },
     { name: "start", desc: "Create your account and claim your starter kit" },
     { name: "vote", desc: "Vote for the bot and claim your reward" },
     { name: "quests", desc: "View your daily quests" },

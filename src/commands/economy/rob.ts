@@ -1,3 +1,4 @@
+import { getGuildSettings } from "../../services/guildSettingsService";
 import { Message } from "discord.js";
 import prisma from "../../utils/prisma";
 import { ensureBankingUser } from "../../services/bankService";
@@ -68,12 +69,41 @@ async function resolveRobTarget(
 }
 
 export async function handleRob(message: Message, args: string[]) {
+    if (!message.guild) {
+        return message.reply(v2Reply(errorContainer("Server Only", "Robbing only works inside a server.")));
+    }
+
+    // The economy is global, so without these two gates a player could rob
+    // anyone who has ever used the bot -- by user ID, from a server the victim
+    // has never joined. Robbing is now confined to people you actually share
+    // this server with, and only where the server allows it at all.
+    const settings = await getGuildSettings(message.guild.id);
+    const prefix = settings.prefix || "!";
+    if (!settings.robEnabled) {
+        return message.reply(v2Reply(errorContainer(
+            "Robbing Disabled",
+            `Robbing is turned off in this server. An admin can allow it with \`${prefix}setrob on\`.`,
+        )));
+    }
+
     const resolved = await resolveRobTarget(message, args);
     if ("error" in resolved) {
         return message.reply(v2Reply(errorContainer("Error", resolved.error)));
     }
     const target = resolved;
     if (target.id === message.author.id) return message.reply(v2Reply(errorContainer("Error", "You cannot rob yourself.")));
+
+    // A single-member REST fetch, which works without the privileged
+    // GuildMembers intent -- only the bulk member list needs that. Also gives
+    // the server nickname, which members.cache cannot supply any more.
+    const targetMember = await message.guild.members.fetch(target.id).catch(() => null);
+    if (!targetMember) {
+        return message.reply(v2Reply(errorContainer(
+            "Not In This Server",
+            `**${target.name}** isn't in this server. You can only rob people you share a server with.`,
+        )));
+    }
+    target.name = targetMember.displayName;
 
     const jail = await checkJailStatus(message.author.id);
     if (jail.isJailed) {
