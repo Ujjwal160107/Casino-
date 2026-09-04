@@ -68,13 +68,14 @@ export interface ZooView {
 }
 
 // Discord rejects ComponentsV2 messages with more than 40 total components or
-// more than 10 file attachments (50035 Invalid Form Body). Each detailed slot
-// costs a section + text + accessory (+ a thumbnail attachment), so only the
-// top slots get their own section; the rest render as compact text lines. This
-// keeps a full zoo (up to 16 types) safely under both limits — without it, big
-// zoos silently failed to render. Overflow types are removable with
-// `!zoo remove <name>`.
-const MAX_DETAILED_ZOO_SLOTS = 6;
+// more than 10 file attachments (50035 Invalid Form Body). Each slot costs a
+// section + text + accessory + a thumbnail attachment, so six is what fits
+// alongside the header, action row and navigation.
+//
+// Species beyond this used to be crammed into a compact text list at the
+// bottom, which made them second-class: no thumbnail, no hunger bar, no Remove
+// button. They now go on their own page instead, rendered identically.
+const ZOO_SLOTS_PER_PAGE = 6;
 
 /**
  * Factual, short note about animals a player just lost to starvation or
@@ -154,6 +155,7 @@ export function buildZooPayload(
   discordId: string,
   view: ZooView,
   guild: import("discord.js").Guild | null,
+  page = 1,
 ): { components: ContainerBuilder[]; files: AttachmentBuilder[] } {
   const { slots, maxSlots, incomePerDay, feedBillPerDay, claimable, nextClaim, hungryCount, zooName, zooKey, nextTier, died, evicted } = view;
 
@@ -222,11 +224,12 @@ export function buildZooPayload(
     return { components: [container], files };
   }
 
-  // Most valuable animals get a detailed section + Remove button; the rest are
-  // summarised as text so the message stays under Discord's limits.
+  // Sorted by income so the most valuable species lead, then paged. Every slot
+  // renders the same way whichever page it lands on.
   const sorted = [...slots].sort((a, b) => b.incomePerDay - a.incomePerDay);
-  const detailed = sorted.slice(0, MAX_DETAILED_ZOO_SLOTS);
-  const overflow = sorted.slice(MAX_DETAILED_ZOO_SLOTS);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ZOO_SLOTS_PER_PAGE));
+  const safePage = Math.min(Math.max(page, 1), totalPages);
+  const detailed = sorted.slice((safePage - 1) * ZOO_SLOTS_PER_PAGE, safePage * ZOO_SLOTS_PER_PAGE);
 
   for (let i = 0; i < detailed.length; i++) {
     const slot = detailed[i];
@@ -276,17 +279,29 @@ export function buildZooPayload(
     container.addSectionComponents(section);
   }
 
-  if (overflow.length > 0) {
+  if (totalPages > 1) {
     container.addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
     );
-    const overflowLines = overflow.map((slot) => {
-      const emojiDisplay = emojiInline(slot.def.emojiKey, guild) ?? AnimalEmojis[slot.def.key] ?? "";
-      return `**${slot.count}x** ${emojiDisplay} **${slot.def.name}** — ${slot.def.rarity} · +${fmtCurrency(slot.incomePerDay)}/day${slot.hungryCount > 0 ? ` · ⚠️ ${slot.hungryCount} hungry` : ""}`;
-    });
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        overflowLines.join("\n") + "\n-# Remove any of these with `!zoo remove <name>`."
+    container.addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`zoo_page:${safePage - 1}:${discordId}`)
+          .setLabel("Prev")
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(safePage <= 1),
+        // A disabled button is the page indicator: a text component would cost
+        // one of the 40 either way, and this keeps the row self-contained.
+        new ButtonBuilder()
+          .setCustomId("zoo_page_indicator")
+          .setLabel(`Page ${safePage}/${totalPages}`)
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(true),
+        new ButtonBuilder()
+          .setCustomId(`zoo_page:${safePage + 1}:${discordId}`)
+          .setLabel("Next")
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(safePage >= totalPages),
       )
     );
   }
@@ -299,7 +314,8 @@ export async function buildZooContainer(
   discordId: string,
   username: string,
   guildId: string,
-  guild: import("discord.js").Guild | null
+  guild: import("discord.js").Guild | null,
+  page = 1,
 ): Promise<ContainerBuilder> {
   const status = await getZooStatus(discordId);
 
@@ -327,7 +343,7 @@ export async function buildZooContainer(
     evicted: status.evicted,
   };
 
-  const { components } = buildZooPayload(discordId, view, guild);
+  const { components } = buildZooPayload(discordId, view, guild, page);
   return components[0];
 }
 

@@ -351,6 +351,27 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
     return;
   }
 
+  // Pure navigation: re-renders the same zoo at a different page. No state
+  // changes, so it edits in place with no follow-up.
+  if (customId.startsWith("zoo_page:") && interaction.isButton()) {
+    const page = Number(parts[1]);
+    const ownerId = parts[2];
+    if (interaction.user.id !== ownerId) return replyEphemeral(interaction, "This isn't your zoo.");
+    if (!Number.isFinite(page)) return;
+
+    if (!await ensureDeferredUpdate(interaction)) return;
+    try {
+      const container = await buildZooContainer(
+        ownerId, interaction.user.username, interaction.guildId ?? "", interaction.guild, page,
+      );
+      const files = (container as any).__files ?? [];
+      await safeEditReply(interaction, { components: [container], files, flags: MessageFlags.IsComponentsV2 });
+    } catch (err: any) {
+      await safeFollowUp(interaction, { content: err.message, flags: MessageFlags.Ephemeral });
+    }
+    return;
+  }
+
   if (customId.startsWith("zoo_collect:") && interaction.isButton()) {
     const ownerId = parts[1];
     if (interaction.user.id !== ownerId) return replyEphemeral(interaction, "This isn't your zoo.");

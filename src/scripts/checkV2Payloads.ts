@@ -90,30 +90,33 @@ const zooSlots: ZooSlot[] = zooDefs.map((def) => ({
     feedCostPerDay: RARITY_INCOME_PER_DAY[def.rarity],
     soonestDeathMs: 12 * 3_600_000,
 }));
-check(
-    "zoo worst case (16 types, all hungry, died + evicted)",
-    buildZooPayload(
-        "123456789012345678",
-        {
-            slots: zooSlots,
-            maxSlots: ZOO_TIERS.city_zoo.types,
-            incomePerDay: 0,
-            feedBillPerDay: zooSlots.reduce((s, z) => s + z.feedCostPerDay, 0),
-            claimable: false,
-            nextClaim: new Date(Date.now() + 12 * 3_600_000),
-            hungryCount: zooSlots.reduce((s, z) => s + z.hungryCount, 0),
-            zooName: "City Zoo",
-            zooKey: "city_zoo",
-            nextTier: { key: "world_zoo", name: "World Zoo", price: 75_000_000 },
-            died: [
-                { animalKey: zooDefs[0].key, count: 2 },
-                { animalKey: zooDefs[1].key, count: 1 },
-            ],
-            evicted: 4,
-        },
-        null,
-    ),
-);
+const zooView = {
+    slots: zooSlots,
+    maxSlots: ZOO_TIERS.city_zoo.types,
+    incomePerDay: 0,
+    feedBillPerDay: zooSlots.reduce((s, z) => s + z.feedCostPerDay, 0),
+    claimable: false,
+    nextClaim: new Date(Date.now() + 12 * 3_600_000),
+    hungryCount: zooSlots.reduce((s, z) => s + z.hungryCount, 0),
+    zooName: "City Zoo",
+    zooKey: "city_zoo" as const,
+    nextTier: { key: "world_zoo", name: "World Zoo", price: 75_000_000 },
+    died: [
+        { animalKey: zooDefs[0].key, count: 2 },
+        { animalKey: zooDefs[1].key, count: 1 },
+    ],
+    evicted: 4,
+};
+
+// 16 types at 6 a page is 3 pages. Every page carries the header, action row
+// and navigation, so each needs its own budget check -- not just the first.
+const zooPages = Math.ceil(zooSlots.length / 6);
+for (let page = 1; page <= zooPages; page++) {
+    check(
+        `zoo worst case (16 types, all hungry, died + evicted) — page ${page}/${zooPages}`,
+        buildZooPayload("123456789012345678", zooView, null, page),
+    );
+}
 
 // --- Hunt Store: nine numbered slots + the zoo feed shelf. The shelf is text
 // inside the existing container rather than four more buttons precisely
