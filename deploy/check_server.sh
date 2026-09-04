@@ -87,7 +87,9 @@ sec "System"
 tz="$(timedatectl show -p Timezone --value 2>/dev/null)"
 [ "$tz" = "UTC" ] && ok "timezone $tz" || no "timezone is $tz, should be UTC (node-cron dailies key off wall clock)"
 if swapon --show 2>/dev/null | grep -q .; then
-    ok "swap  $(swapon --show=SIZE --noheadings | tr -d ' \n')"
+    # Multiple swap areas are normal (Linode ships one, setup_server.sh adds
+    # another), so list them separated rather than run together.
+    ok "swap  $(swapon --show=NAME,SIZE --noheadings | awk '{printf "%s(%s) ", $1, $2}')"
 else
     no "swap not active"
 fi
