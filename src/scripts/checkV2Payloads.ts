@@ -13,6 +13,23 @@ import type { HuntGroup } from "../services/huntService";
 import type { ZooSlot } from "../services/zooService";
 import { statusContainer, plainContainer } from "../utils/componentsV2";
 import { nextStepHint } from "../config/nextSteps";
+import { setPersistedEmoji } from "../utils/emojiRegistry";
+
+// Seed the emoji registry before building anything.
+//
+// Without this the registry is empty, every emojiInline() falls back to a
+// one-character glyph, and the audit understates the real payload by hundreds
+// of characters -- a custom emoji serialises as <:name:19-digit-id>, roughly
+// 30 characters each. A zoo full of animals plus hunger bars is the exact case
+// where that gap decides whether Discord accepts the message, so the numbers
+// printed below have to reflect what production actually sends.
+const FAKE_EMOJI_ID = "1456569047758929931"; // a real id, for a realistic length
+for (const def of ANIMAL_CATALOG) {
+    setPersistedEmoji(def.emojiKey, { id: FAKE_EMOJI_ID, name: def.emojiKey });
+}
+for (const key of ["xp_full", "xp_empty"]) {
+    setPersistedEmoji(key, { id: FAKE_EMOJI_ID, name: key });
+}
 
 let failures = 0;
 

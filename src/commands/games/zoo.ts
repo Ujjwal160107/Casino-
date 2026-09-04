@@ -110,6 +110,45 @@ export function formatFeedShortfall(missing: { rarity: AnimalRarity; units: numb
   return `**${total}** still hungry — buy feed with ${buys.join(" and ")} (browse it under \`!shop hunt\`).`;
 }
 
+/**
+ * Widest a hunger bar may get. RARITY_STACK_LIMIT tops out at 4 (Common), so
+ * within the rules one block per animal never exceeds this. The cap exists for
+ * legacy rows that predate the limit -- the zoo exploit left accounts holding
+ * hundreds of one species, and a block each would be thousands of characters.
+ *
+ * Payload cost drives this. Each block serialises as
+ * `<:xp_full:1456569047758929931>`, about 30 characters, and a full zoo spends
+ * nearly all of Discord's 4000-character ComponentsV2 budget before any bars.
+ * See checkV2Payloads, which seeds the emoji registry so that number is real.
+ */
+const HUNGER_BAR_MAX = 4;
+
+/**
+ * Fed-to-total bar for one species.
+ *
+ * One block per animal while the stack fits in HUNGER_BAR_MAX, so the bar is
+ * exact rather than a rounded proportion: three fed of four reads ▰▰▰▱ and
+ * means precisely that.
+ *
+ * Over-sized legacy stacks fall back to a proportion, clamped at both ends so
+ * the bar cannot lie -- any fed animal never shows fully empty, and any hungry
+ * animal never shows fully full.
+ */
+function buildHungerBar(slot: ZooSlot, guild: import("discord.js").Guild | null): string {
+  const full = emojiInline("xp_full", guild) ?? "▰";
+  const empty = emojiInline("xp_empty", guild) ?? "▱";
+  if (slot.count <= 0) return "";
+
+  if (slot.count <= HUNGER_BAR_MAX) {
+    return full.repeat(slot.fedCount) + empty.repeat(slot.count - slot.fedCount);
+  }
+
+  let filled = Math.round((slot.fedCount / slot.count) * HUNGER_BAR_MAX);
+  if (slot.fedCount > 0 && filled === 0) filled = 1;
+  if (slot.hungryCount > 0 && filled === HUNGER_BAR_MAX) filled = HUNGER_BAR_MAX - 1;
+  return full.repeat(filled) + empty.repeat(HUNGER_BAR_MAX - filled);
+}
+
 /** Pure renderer — no DB access, so it can be unit-checked (see checkV2Payloads). */
 export function buildZooPayload(
   discordId: string,
@@ -199,9 +238,13 @@ export function buildZooPayload(
       );
     }
 
+    // Hunger is tracked per animal, not per species, so a slot can hold both
+    // fed and hungry animals -- the bar shows that split rather than a single
+    // fed/hungry verdict for the whole row.
+    const bar = buildHungerBar(slot, guild);
     const hungerLine = slot.hungryCount > 0
-      ? `\n⚠️ **${slot.hungryCount} hungry** — dies in ${Math.max(0, Math.floor((slot.soonestDeathMs ?? 0) / 3_600_000))}h`
-      : "";
+      ? `\n${bar} ${slot.fedCount}/${slot.count} fed — ⚠️ **${slot.hungryCount} hungry**, dies in ${Math.max(0, Math.floor((slot.soonestDeathMs ?? 0) / 3_600_000))}h`
+      : `\n${bar} ${slot.count}/${slot.count} fed`;
 
     const section = new SectionBuilder()
       .addTextDisplayComponents(
