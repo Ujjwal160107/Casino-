@@ -134,26 +134,33 @@ export function buildHuntResultPayload(
       );
     }
 
-    const section = new SectionBuilder().addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `${emojiDisplay} **${group.count}×** **${group.def.name}** — ${group.def.rarity}\n` +
-        `Sell: **${fmtCurrency(totalSell)}** | Zoo: **+${fmtCurrency(zooPerDay)}/day**`,
-      ),
+    const text = new TextDisplayBuilder().setContent(
+      `${emojiDisplay} **${group.count}×** **${group.def.name}** — ${group.def.rarity}\n` +
+      `Sell: **${fmtCurrency(totalSell)}** | Zoo: **+${fmtCurrency(zooPerDay)}/day**`,
     );
 
+    let thumbnail: ThumbnailBuilder | null = null;
     if (group.def.asset) {
       const asset = resolveAnimalAsset(group.def.asset, `hunt_${group.def.key}_`);
       if (asset && !files.some((f) => f.name === asset.attachmentName)) {
-        section.setThumbnailAccessory(
-          new ThumbnailBuilder()
-            .setURL(`attachment://${asset.attachmentName}`)
-            .setDescription(group.def.name),
-        );
+        thumbnail = new ThumbnailBuilder()
+          .setURL(`attachment://${asset.attachmentName}`)
+          .setDescription(group.def.name);
         files.push(new AttachmentBuilder(asset.filePath, { name: asset.attachmentName }));
       }
     }
 
-    container.addSectionComponents(section);
+    // A Section is only valid with an accessory. Building one and then failing
+    // to attach a thumbnail -- a missing asset file, or a duplicate attachment
+    // name that trips the guard above -- throws at toJSON and takes the entire
+    // reply down, so the row renders without art instead.
+    if (thumbnail) {
+      container.addSectionComponents(
+        new SectionBuilder().addTextDisplayComponents(text).setThumbnailAccessory(thumbnail),
+      );
+    } else {
+      container.addTextDisplayComponents(text);
+    }
     container.addActionRowComponents(buildGroupRow(group, ownerId, hasZoo));
   }
 

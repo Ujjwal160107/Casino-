@@ -136,11 +136,18 @@ jobs:
       - name: Stage release
         run: |
           set -euo pipefail
-          mkdir -p stage/dashboard
-          # Every image path resolves from __dirname into dist/assets, which
-          # `npm run build` populates via copyAssets.js, so src/ never ships.
+          mkdir -p stage/dashboard stage/src
           cp -r package.json package-lock.json ecosystem.config.js \
                 node_modules dist prisma deploy assets stage/
+          # 17 call sites across shop, hunt, zoo, properties, roulette,
+          # tutorial and branding resolve art from `process.cwd()/src/assets`,
+          # so the source asset directory has to ship even though dist/assets
+          # holds the same files. Dropping it silently broke every one of them:
+          # a missing image left a ComponentsV2 Section with no accessory,
+          # which throws at toJSON and takes the whole reply down.
+          # The real fix is a shared __dirname-based resolver -- until then,
+          # this stays.
+          cp -r src/assets stage/src/
           cd dashboard
           cp -r package.json package-lock.json next.config.ts \
                 .next public node_modules ../stage/dashboard/

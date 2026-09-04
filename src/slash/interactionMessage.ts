@@ -39,30 +39,25 @@ export function createInteractionMessage(
         if (member) members.set(user.id, member);
     }
 
-    // Every reply is sent as a follow-up, and the deferred placeholder is
-    // deleted once the first one lands.
+    // The interaction is deferred before we get here, so the first reply edits
+    // the placeholder and later ones become follow-ups. Both return a real
+    // Message, which is what the handlers that attach component collectors to
+    // their reply depend on.
     //
-    // Not editReply, which is the obvious choice and is wrong: most handlers
-    // answer with v2Reply(), which sets MessageFlags.IsComponentsV2. That flag
-    // has to be set when the message is CREATED. A deferred reply is created
-    // without it, and editing cannot add it -- Discord accepts the edit, throws
-    // nothing, and silently drops the containers, so the command appears to
-    // work while rendering nothing. A follow-up is a new message and carries
-    // its own flags.
-    //
-    // The follow-up is sent before the placeholder is removed so the user never
-    // sees a gap.
+    // editReply carries MessageFlags.IsComponentsV2 fine -- MessageEditOptions
+    // explicitly permits that flag. An earlier version of this file sent the
+    // first reply as a follow-up and then deleted the placeholder, on the false
+    // assumption that it could not; that deleted the visible response instead.
     let hasReplied = false;
     let sent: Message | null = null;
     const reply = async (options: any): Promise<Message> => {
         const payload = typeof options === "string" ? { content: options } : options;
-        const message = (await interaction.followUp(payload)) as Message;
         if (!hasReplied) {
             hasReplied = true;
-            sent = message;
-            await interaction.deleteReply().catch(() => { });
+            sent = (await interaction.editReply(payload)) as Message;
+            return sent;
         }
-        return message;
+        return (await interaction.followUp(payload)) as Message;
     };
 
     const adapter = {
