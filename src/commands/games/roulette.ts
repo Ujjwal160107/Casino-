@@ -25,6 +25,7 @@ import { questBus } from "../../services/questEvents";
 import { checkLuckyCoin } from "../../services/shopBuffs";
 import { getGuildPrefix } from "../../utils/guildContext";
 import { GAME_UI_TIMINGS } from "../../utils/economyConfig";
+import { assetPath } from "../../utils/assetPaths";
 
 export async function handleRouletteMenu(message: Message) {
   const prefix = await getGuildPrefix(message.guildId!);
@@ -36,7 +37,7 @@ export async function handleRouletteMenu(message: Message) {
   const eDiceSpecific = "<a:dice:1446217848551899300>";
   const parseEmojiId = (str: string) => str.match(/:(\d+)>/)?.[1] ?? (str.match(/^\d+$/) ? str : str);
 
-  const bannerPath = path.join(process.cwd(), "src", "assets", "roulette_banner.png");
+  const bannerPath = assetPath("roulette_banner.png");
   const attachment = new AttachmentBuilder(bannerPath, { name: "roulette_banner.png" });
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -74,7 +75,7 @@ export async function handleRouletteMenu(message: Message) {
       return;
     }
     if (i.customId === "roul_guide") {
-      const bannerPath = path.join(process.cwd(), "src", "assets", "roulette_guide.png");
+      const bannerPath = assetPath("roulette_guide.png");
       const guideAttachment = new AttachmentBuilder(bannerPath, { name: "roulette_guide.png" });
 
       const guideContainer = plainContainer(

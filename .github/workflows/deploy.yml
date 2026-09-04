@@ -54,12 +54,59 @@ jobs:
             package-lock.json
             dashboard/package-lock.json
 
+      # --- what actually changed? --------------------------------------------
+
+      - name: Detect changes
+        id: changed
+        run: |
+          set -uo pipefail
+          # With no baseline -- a manual run, or the first commit -- assume
+          # everything changed rather than skip work on an unknown starting point.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || ! git rev-parse HEAD~1 >/dev/null 2>&1; then
+            { echo "bot=true"; echo "dashboard=true"; echo "prisma=true"; } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed() { ! git diff --quiet HEAD~1 HEAD -- "$@"; }
+          # The dashboard imports the shared Prisma schema, so a schema change
+          # invalidates its build too.
+          changed dashboard prisma \
+            && echo "dashboard=true" >> "$GITHUB_OUTPUT" \
+            || echo "dashboard=false" >> "$GITHUB_OUTPUT"
+          changed src test prisma package.json package-lock.json \
+            && echo "bot=true" >> "$GITHUB_OUTPUT" \
+            || echo "bot=false" >> "$GITHUB_OUTPUT"
+          changed prisma \
+            && echo "prisma=true" >> "$GITHUB_OUTPUT" \
+            || echo "prisma=false" >> "$GITHUB_OUTPUT"
+
+      # Restoring a matching .next lets the dashboard build be skipped entirely,
+      # which is the single biggest saving here -- next build is minutes, and
+      # most pushes never touch the dashboard.
+      - name: Cache dashboard dependencies
+        id: dash-modules
+        uses: actions/cache@v4
+        with:
+          path: dashboard/node_modules
+          key: dash-modules-${{ hashFiles('dashboard/package-lock.json', 'prisma/schema.prisma') }}
+
+      - name: Cache dashboard build
+        id: dash-build
+        uses: actions/cache@v4
+        with:
+          path: dashboard/.next
+          key: >-
+            dash-build-${{ hashFiles(
+              'dashboard/src/**', 'dashboard/public/**', 'dashboard/next.config.ts',
+              'dashboard/package-lock.json', 'dashboard/tsconfig.json',
+              'dashboard/postcss.config.mjs', 'prisma/schema.prisma') }}
+
       # --- build -------------------------------------------------------------
 
       - name: Install (bot)
         run: npm ci
 
       - name: Install (dashboard)
+        if: steps.dash-modules.outputs.cache-hit != 'true'
         working-directory: dashboard
         run: npm ci
 
@@ -72,6 +119,9 @@ jobs:
         run: npm run validate:slash
 
       - name: Test
+        # The suite covers bot code only. A dashboard-only push cannot affect
+        # it, and it is the slowest step here at ~100s.
+        if: steps.changed.outputs.bot == 'true'
         env:
           # test/setupEnv.ts wants TEST_REDIS_URL specifically, and copies it into
           # REDIS_URL itself — setting REDIS_URL here does nothing. db 15 matches
@@ -87,6 +137,9 @@ jobs:
         run: npm run build
 
       - name: Build dashboard
+        # Skipped when the cache already holds a .next built from exactly these
+        # sources. This is where most of the pipeline's time used to go.
+        if: steps.dash-build.outputs.cache-hit != 'true'
         working-directory: dashboard
         env:
           # Next evaluates pages at build time, so the build needs the same
@@ -98,21 +151,8 @@ jobs:
 
       # --- database ----------------------------------------------------------
 
-      - name: Detect Prisma changes
-        id: prisma
-        run: |
-          if [ "${{ inputs.run_schema }}" = "true" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif ! git rev-parse HEAD~1 >/dev/null 2>&1; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet HEAD~1 HEAD -- prisma; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Push schema and seed catalogs
-        if: steps.prisma.outputs.changed == 'true'
+        if: steps.changed.outputs.prisma == 'true' || inputs.run_schema
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
@@ -129,28 +169,24 @@ jobs:
 
       - name: Prune to production dependencies (bot)
         # Drops vitest, ts-node, mongodb-memory-server and puppeteer's ~300MB
-        # Chromium from what we ship. postinstall regenerates the Prisma client
-        # for both the bot and the dashboard.
-        run: npm ci --omit=dev
+        # Chromium from what we ship. `prune` removes them in place rather than
+        # reinstalling from scratch as `npm ci --omit=dev` would, and leaves the
+        # already-generated Prisma client alone.
+        run: npm prune --omit=dev
 
       - name: Stage release
         run: |
           set -euo pipefail
-          mkdir -p stage/dashboard stage/src
-          cp -r package.json package-lock.json ecosystem.config.js \
-                node_modules dist prisma deploy assets stage/
-          # 17 call sites across shop, hunt, zoo, properties, roulette,
-          # tutorial and branding resolve art from `process.cwd()/src/assets`,
-          # so the source asset directory has to ship even though dist/assets
-          # holds the same files. Dropping it silently broke every one of them:
-          # a missing image left a ComponentsV2 Section with no accessory,
-          # which throws at toJSON and takes the whole reply down.
-          # The real fix is a shared __dirname-based resolver -- until then,
-          # this stays.
-          cp -r src/assets stage/src/
+          mkdir -p stage/dashboard
+          # Hardlinks, not copies: same filesystem, and nothing mutates these
+          # files afterwards, so staging ~1GB is instant instead of a real copy.
+          # src/ is deliberately absent -- every asset lookup now resolves from
+          # __dirname into dist/assets via src/utils/assetPaths.ts.
+          cp -al package.json package-lock.json ecosystem.config.js \
+                 node_modules dist prisma deploy assets stage/
           cd dashboard
-          cp -r package.json package-lock.json next.config.ts \
-                .next public node_modules ../stage/dashboard/
+          cp -al package.json package-lock.json next.config.ts \
+                 .next public node_modules ../stage/dashboard/
           # Build cache, not runtime input. Often larger than the app itself.
           rm -rf ../stage/dashboard/.next/cache
           du -sh ../stage

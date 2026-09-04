@@ -43,6 +43,7 @@ import { ItemEffectResult } from "../../services/effectService";
 import { ensureDeferredEphemeralReply, ensureDeferredUpdate, isInteractionExpiredError, safeEditReply, safeReply, shouldEarlyAcknowledgeInIndex, shouldIgnoreInteractionError, tryEarlyAcknowledge } from "../../utils/interactionHelpers";
 import { resolveShopItemThumbnailAsset } from "../../utils/shopItemAssets";
 import { LOADED_DICE_ITEM_KEY } from "../../utils/loadedDiceConfig";
+import { ASSET_DIRS, assetPath } from "../../utils/assetPaths";
 
 const SHOP_EPHEMERAL_V2 = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
 
@@ -129,7 +130,7 @@ const ITEMS_PER_PAGE = 4;
 const SHOP_ACCENT_COLOR = 0x9B59B6;
 
 // Asset paths resolved at module load time
-const ASSETS_DIR = path.resolve(process.cwd(), "src", "assets");
+const ASSETS_DIR = assetPath("");
 const GS_MASCOT_PATH  = path.join(ASSETS_DIR, "generalstore_mascot.png");
 const HS_MASCOT_PATH  = path.join(ASSETS_DIR, "huntstore_mascot.png");
 const HS_PAGE1_PATH   = path.join(ASSETS_DIR, "hunt_store1.png");
@@ -269,7 +270,7 @@ const COS_PAGES: Record<number, { asset: string; items: string[] }> = {
 const GS_TOTAL_PAGES = 2;
 const GS_PAGES: Record<number, { asset: string; items: string[] }> = {
   1: {
-    asset: path.resolve(process.cwd(), "src", "assets", "gs_page1.png"),
+    asset: assetPath("gs_page1.png"),
     items: [
       "tax_shield",
       "bandage",
@@ -283,7 +284,7 @@ const GS_PAGES: Record<number, { asset: string; items: string[] }> = {
     ],
   },
   2: {
-    asset: path.resolve(process.cwd(), "src", "assets", "gs_page2.png"),
+    asset: assetPath("gs_page2.png"),
     items: [
       "loaded_dice_of_ruin",
       "celestial_harp",
@@ -315,11 +316,7 @@ function v2Container(title: string, body: string, accentColor = SHOP_ACCENT_COLO
 }
 
 function resolveShopAsset(assetName: string) {
-  const assetDirs = [
-    path.resolve(process.cwd(), "src", "assets"),
-    path.resolve(process.cwd(), "assets"),
-  ];
-  for (const assetDir of assetDirs) {
+  for (const assetDir of ASSET_DIRS) {
     const filePath = [".png", ".jpg", ".jpeg", ".webp", ".gif"]
       .map((ext) => path.join(assetDir, `${assetName}${ext}`))
       .find((candidate) => fs.existsSync(candidate));

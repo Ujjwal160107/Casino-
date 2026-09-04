@@ -22,13 +22,10 @@ import { errorContainer, v2Reply } from "../../utils/componentsV2";
 import { AnimalEmojis } from "../../config/branding";
 import prisma from "../../utils/prisma";
 import { buildHuntCraftPayload } from "../../services/huntCraftService";
+import { ASSET_DIRS } from "../../utils/assetPaths";
 
 function resolveAnimalAsset(assetName: string, prefix = ""): { filePath: string; attachmentName: string } | null {
-  const assetDirs = [
-    path.resolve(process.cwd(), "src", "assets"),
-    path.resolve(process.cwd(), "assets"),
-  ];
-  for (const dir of assetDirs) {
+  for (const dir of ASSET_DIRS) {
     const filePath = [".png", ".jpg", ".jpeg", ".webp"]
       .map((ext) => path.join(dir, `${assetName}${ext}`))
       .find((f) => fs.existsSync(f));

@@ -19,6 +19,7 @@ import * as path from "path";
 import { Mascot } from "../../config/branding";
 import { getGuildPrefix } from "../../utils/guildContext";
 import { nextStepHint } from "../../config/nextSteps";
+import { assetPath } from "../../utils/assetPaths";
 
 const BANNER_NAME = "guide_banner.png";
 const BANNER_URL = `attachment://${BANNER_NAME}`;
@@ -316,7 +317,7 @@ function buildLessonView(lesson: SystemLesson, prefix: string): ContainerBuilder
 
 export async function handleTutorial(message: Message) {
   const prefix = await getGuildPrefix(message.guildId!);
-  const bannerPath = path.join(process.cwd(), "src", "assets", BANNER_NAME);
+  const bannerPath = assetPath(BANNER_NAME);
   const attachment = new AttachmentBuilder(bannerPath, { name: BANNER_NAME });
 
   try {

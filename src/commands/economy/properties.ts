@@ -27,6 +27,7 @@ import { GLOBAL_CURRENCY_EMOJI, Mascot } from "../../config/branding";
 import { Property } from "@prisma/client";
 import { getGuildPrefix } from "../../utils/guildContext";
 import { nextStepHint } from "../../config/nextSteps";
+import { ASSET_DIRS } from "../../utils/assetPaths";
 
 const PROPERTY_ACCENT_COLOR = 0x9B59B6;
 const PROPERTIES_PER_PAGE = 3;
@@ -45,15 +46,7 @@ const PROPERTY_ASSET_MAP: Record<string, string> = {
 function resolvePropertyAsset(key: string): { filePath: string; attachmentName: string } | null {
   const assetName = PROPERTY_ASSET_MAP[key];
   if (!assetName) return null;
-  const assetDirs = [
-    path.resolve(process.cwd(), "src", "assets"),
-    path.resolve(process.cwd(), "assets"),
-    // Relative to this module so assets resolve whether the bot runs from
-    // src (ts-node) or a compiled dist build, regardless of cwd.
-    path.resolve(__dirname, "..", "..", "..", "src", "assets"),
-    path.resolve(__dirname, "..", "..", "assets"),
-  ];
-  for (const dir of assetDirs) {
+  for (const dir of ASSET_DIRS) {
     const filePath = [".png", ".jpg", ".jpeg", ".webp"]
       .map((ext) => path.join(dir, `${assetName}${ext}`))
       .find((f) => fs.existsSync(f));

@@ -1,4 +1,5 @@
 import path from "path";
+import { assetPath } from "../utils/assetPaths";
 
 export const Mascot = {
     Name: "Lady Fortuna",
@@ -119,7 +120,7 @@ export const Mascot = {
         Stonks: "<:graph_up:1456568970504048722>",
     },
     Images: {
-        Main: path.join(process.cwd(), "src", "assets", "guide_banner.png")
+        Main: assetPath("guide_banner.png")
     },
     Colors: {
         Base: "#9B59B6", // Purple-ish to match her hair?

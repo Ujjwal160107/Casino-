@@ -133,7 +133,7 @@ async function prepareEmojis(projectRoot = process.cwd()): Promise<PreparedEmoji
     }
     seenNames.set(emojiName, itemKey);
 
-    const asset = resolveShopItemThumbnailAsset(itemKey, projectRoot);
+    const asset = resolveShopItemThumbnailAsset(itemKey);
     if (!asset) {
       errors.push(`${itemKey}: thumbnail file "${SHOP_ITEM_THUMBNAIL_ASSETS[itemKey]}" is missing.`);
       continue;

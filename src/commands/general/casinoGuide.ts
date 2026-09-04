@@ -21,6 +21,7 @@ import { getGuildPrefix } from "../../utils/guildContext";
 import { emojiInline } from "../../utils/emojiRegistry";
 import { getShopApplicationEmojiName, resolveShopItemThumbnailAsset } from "../../utils/shopItemAssets";
 import { LOADED_DICE_ITEM_KEY } from "../../utils/loadedDiceConfig";
+import { assetPath } from "../../utils/assetPaths";
 
 const CASINO_ACCENT_COLOR = 0x9B59B6;
 const CASINO_BANNER_NAME = "casino_banner.png";
@@ -164,7 +165,7 @@ function buildGuidePageNavigationRow(page: number, totalPages: number, disabled 
 }
 
 export async function handleCasinoGuide(message: Message) {
-    const bannerPath = path.join(process.cwd(), "src", "assets", "casino_banner.png");
+    const bannerPath = assetPath("casino_banner.png");
     const attachment = new AttachmentBuilder(bannerPath, { name: CASINO_BANNER_NAME });
     const prefix = await getGuildPrefix(message.guildId!);
     const loadedDiceEmoji = emojiInline(getShopApplicationEmojiName(LOADED_DICE_ITEM_KEY)) ?? Mascot.Emotes.Dices;
@@ -306,7 +307,7 @@ export async function handleCasinoGuide(message: Message) {
                 break;
 
             case "guide_roulette":
-                const roulBannerPath = path.join(process.cwd(), "src", "assets", "roulette_guide.png");
+                const roulBannerPath = assetPath("roulette_guide.png");
                 const roulAttachment = new AttachmentBuilder(roulBannerPath, { name: ROULETTE_GUIDE_NAME });
 
                 guideContainer = buildGuideContainer(

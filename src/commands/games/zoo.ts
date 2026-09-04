@@ -23,6 +23,7 @@ import { fmtCurrency, fmtAmount } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import prisma from "../../utils/prisma";
 import { AnimalEmojis, Mascot } from "../../config/branding";
+import { ASSET_DIRS } from "../../utils/assetPaths";
 
 const RARITY_COLOR: Record<string, string> = {
   Common: "⬜",
@@ -38,11 +39,7 @@ const ZOO_ASSET_MAP: Record<string, string> = {
 };
 
 function resolveAsset(assetName: string, prefix = ""): { filePath: string; attachmentName: string } | null {
-  const assetDirs = [
-    path.resolve(process.cwd(), "src", "assets"),
-    path.resolve(process.cwd(), "assets"),
-  ];
-  for (const dir of assetDirs) {
+  for (const dir of ASSET_DIRS) {
     const filePath = [".png", ".jpg", ".jpeg", ".webp"]
       .map((ext) => path.join(dir, `${assetName}${ext}`))
       .find((f) => fs.existsSync(f));

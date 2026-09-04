@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { findAsset } from "./assetPaths";
 
 export const SHOP_APPLICATION_EMOJI_PREFIX = "shop_";
 
@@ -101,13 +102,12 @@ export type ShopItemThumbnailAsset = {
 
 export function resolveShopItemThumbnailAsset(
   itemKey: string,
-  projectRoot = process.cwd(),
 ): ShopItemThumbnailAsset | null {
   const fileName = SHOP_ITEM_THUMBNAIL_ASSETS[itemKey];
   if (!fileName) return null;
 
-  const filePath = path.resolve(projectRoot, "src", "assets", fileName);
-  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return null;
+  const filePath = findAsset(fileName);
+  if (!filePath || !fs.statSync(filePath).isFile()) return null;
 
   return {
     itemKey,
