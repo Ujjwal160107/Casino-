@@ -55,7 +55,7 @@ const crimeAndHeat: ModuleDoc = {
       heading: "Robbery: PvP crime",
       body: [
         "!rob @user attempts to steal 8-20% of another player's wallet. Luck, Thief Gloves, Eclipse Mask, and certain crafted gear can influence the result. A failed robbery costs a fine, can send you to jail, and still creates heat.",
-        "Padlocks and Crocodile Hide Armor can block a robbery attempt. Victims receive a direct message when they are robbed or when their Padlock is used.",
+        "Padlocks and Crocodile Hide Armor can block a robbery attempt. Victims receive a direct message when they are robbed or when their Padlock is used; a tax raid DMs you too, reporting the amount seized, your wallet balance afterward, and that your heat reset to zero. All three — robbed, padlock, and tax raid — are always-on security alerts and can't be switched off in !settings.",
       ],
     },
     {

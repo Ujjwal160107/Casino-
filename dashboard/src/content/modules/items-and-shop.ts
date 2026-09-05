@@ -126,6 +126,7 @@ const itemsAndShop: ModuleDoc = {
       body: [
         "Fortuna's player-to-player trading floor, shared across every server, wallet-only. List with the Sell button, browse and buy with the hub, cancel any time. Sellers pay a 10% fee on completion; buyers pay 5% on top of the sticker price.",
         "You can run 5 active listings at once, priced between 1,000 and 50,000,000, and unsold listings return to you after 7 days. Chickens and other unique leveled items can't be listed. Animal parts trade in their own parallel market with identical fees and limits.",
+        "Sellers get a DM the moment a listing sells: quantity, item, sale price, the 10% fee, the net payout, and — if the card is delinquent — the amount garnished to it. Toggle it off under !settings (Account notices → Market sales).",
       ],
       note: "Market sale proceeds are garnished 25% if your credit card is delinquent — the bank gets paid before you do.",
     },
