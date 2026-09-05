@@ -23,6 +23,7 @@ import { buyItem, getUserInventory, seedGeneralShop, seedHuntShop, seedJobShop, 
 import { ensureUserAndWallet } from "../../services/walletService";
 import { getCardSummary } from "../../services/creditCardService";
 import { fmtCurrency } from "../../utils/format";
+import { cardTierMeets, formatCardTierName } from "../../utils/economyConfig";
 import { logToChannel } from "../../utils/discordLogger";
 import { Mascot } from "../../config/branding";
 import { nextStepHint } from "../../config/nextSteps";
@@ -58,8 +59,7 @@ async function denyShopOwner(interaction: ShopPanelInteraction, isOwner: boolean
 async function replyShopInfoCard(interaction: ShopPanelInteraction, item: ShopCatalogItem, ownerId: string) {
   if (!await ensureDeferredEphemeralReply(interaction, SHOP_EPHEMERAL_V2)) return;
   const cardSummary = await getCardSummary(ownerId);
-  const canUseCredit = Boolean(cardSummary.card?.status === "ACTIVE");
-  await safeEditReply(interaction, buildItemInfoCard(item, ownerId, canUseCredit));
+  await safeEditReply(interaction, buildItemInfoCard(item, ownerId, cardSummary.card));
 }
 
 async function replyShopSlotError(interaction: ShopPanelInteraction, message: string) {
@@ -831,12 +831,17 @@ function buildCosmeticsStoreMessage(page: number, ownerId: string, disabled = fa
   } as any;
 }
 
-// Ephemeral info card for one item slot, with thumbnail if asset exists
-function buildItemInfoCard(item: ShopCatalogItem, ownerId: string, canUseCredit = false) {
+type ShopperCard = { status: string; tier: string } | null;
+
+export function buildItemInfoCard(item: ShopCatalogItem, ownerId: string, card: ShopperCard = null) {
   const isLoadedDice = item.key === LOADED_DICE_ITEM_KEY;
   const typeLabel = item.consumable ? "Consumable" : item.itemType === "EQUIPMENT" ? "Equipment" : "Collectible";
   const usableLabel = item.usable ? "Yes" : "No";
   const maxStackLabel = isLoadedDice ? "1 active die" : item.maxStack === 1 ? "1 (one-time use)" : item.maxStack ? String(item.maxStack) : "Unlimited";
+
+  const canUseCredit = card?.status === "ACTIVE";
+  const minTier = item.requiresCardTier;
+  const meetsTier = !minTier || (canUseCredit && cardTierMeets(card!.tier, minTier));
 
   const asset = resolveShopItemThumbnailAsset(item.key);
   const assetPath = asset?.filePath ?? null;
@@ -844,17 +849,19 @@ function buildItemInfoCard(item: ShopCatalogItem, ownerId: string, canUseCredit 
   const safeName = asset?.attachmentName ?? null;
   const attachmentRef = safeName ? `attachment://${safeName}` : null;
 
+  const headline = [
+    `## ${item.name}`,
+    `${Mascot.Emotes.Currency} **${formatAmount(item.price)}**`,
+    minTier ? `-# ${Mascot.Emotes.Credit} **${formatCardTierName(minTier)} Card exclusive** · credit only` : null,
+  ].filter(Boolean).join("\n");
+
   const container = new ContainerBuilder();
 
   // Header: use SectionBuilder with thumbnail if asset available, else plain TextDisplay
   if (hasAsset && attachmentRef && safeName) {
     container.addSectionComponents(
       new SectionBuilder()
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(
-            `## ${item.name}\n${Mascot.Emotes.Currency} **${formatAmount(item.price)}**`,
-          ),
-        )
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(headline))
         .setThumbnailAccessory(
           new ThumbnailBuilder()
             .setURL(attachmentRef)
@@ -862,11 +869,7 @@ function buildItemInfoCard(item: ShopCatalogItem, ownerId: string, canUseCredit 
         ),
     );
   } else {
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `## ${item.name}\n${Mascot.Emotes.Currency} **${formatAmount(item.price)}**`,
-      ),
-    );
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(headline));
   }
 
   container
@@ -893,26 +896,41 @@ function buildItemInfoCard(item: ShopCatalogItem, ownerId: string, canUseCredit 
       ),
     );
 
-  const currencyEmoji = extractEmojiForAPI(Mascot.Emotes.Currency);
-  const buyBtn = new ButtonBuilder()
-    .setCustomId(`shop_buy:${item.key}:${ownerId}`)
-    .setLabel(`Buy — ${formatAmount(item.price)}`)
-    .setStyle(ButtonStyle.Success);
-  if (currencyEmoji) buyBtn.setEmoji(currencyEmoji);
+  const buyRow = new ActionRowBuilder<ButtonBuilder>();
+  const buyCardBtn = new ButtonBuilder()
+    .setCustomId(`shop_buy_card:${item.key}:${ownerId}`)
+    .setLabel("Buy (Credit)")
+    .setStyle(ButtonStyle.Primary)
+    .setEmoji(Mascot.Emotes.Credit);
 
-  const buyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(buyBtn);
+  if (minTier) {
+    // Card-exclusive: no wallet button at all; credit only when the tier qualifies.
+    buyRow.addComponents(buyCardBtn.setDisabled(!meetsTier));
+    if (!meetsTier) {
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          canUseCredit
+            ? `-# Your **${formatCardTierName(card!.tier)}** card doesn't qualify. Upgrade with \`!card upgrade\`.`
+            : `-# Requires an active **${formatCardTierName(minTier)}** Fortuna Card or higher. Apply with \`!card\`.`,
+        ),
+      );
+    }
+  } else {
+    const currencyEmoji = extractEmojiForAPI(Mascot.Emotes.Currency);
+    const buyBtn = new ButtonBuilder()
+      .setCustomId(`shop_buy:${item.key}:${ownerId}`)
+      .setLabel(`Buy — ${formatAmount(item.price)}`)
+      .setStyle(ButtonStyle.Success);
+    if (currencyEmoji) buyBtn.setEmoji(currencyEmoji);
+    buyRow.addComponents(buyBtn);
 
-  if (!item.creditBlocked && canUseCredit) {
-    const buyCardBtn = new ButtonBuilder()
-      .setCustomId(`shop_buy_card:${item.key}:${ownerId}`)
-      .setLabel("Buy (Credit)")
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji(Mascot.Emotes.Credit);
-    buyRow.addComponents(buyCardBtn);
-  } else if (!item.creditBlocked && !canUseCredit) {
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent("-# Credit purchases require an **ACTIVE** Fortuna Card — use `!mycards` or `!bank` → Apply."),
-    );
+    if (!item.creditBlocked && canUseCredit) {
+      buyRow.addComponents(buyCardBtn);
+    } else if (!item.creditBlocked && !canUseCredit) {
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent("-# Credit purchases require an **ACTIVE** Fortuna Card — use `!mycards` or `!bank` → Apply."),
+      );
+    }
   }
 
   const files: AttachmentBuilder[] = [];
