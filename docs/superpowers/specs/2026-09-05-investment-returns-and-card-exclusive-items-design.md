@@ -64,8 +64,8 @@ payout         Float?   // what was actually credited (after the MAX_SAFE_BALANC
 ### Service (`src/services/bankingService.ts`)
 
 - `matureInvestment`: the `COMPLETED` update also sets `completedAt: now`,
-  `interestEarned: calculated.interest`, `payout`. The returned object gains `userId`
-  (needed for DM grouping). Everything else about the function is unchanged, so the
+  `interestEarned: calculated.interest`, `payout`. Consumers read `userId`, `interestEarned`
+  and `payout` from the returned `investment` row. Everything else is unchanged, so the
   cron path and the collect path both record.
 - `processAllInvestments()`: returns the array of non-null matured results instead of a
   count. The scheduler logs `results.length`.
@@ -190,7 +190,7 @@ unbuyable. Existing owners are unaffected; only new purchases are gated.
 - `src/services/creditCardService.ts` — `chargeCardPurchaseTx(trx, discordId, amount,
   meta, opts?: { minTier?: CardTierName })`. After the existing `ACTIVE` check:
   if `opts.minTier` is set and `!cardTierMeets(card.tier, opts.minTier)`, throw
-  `This item needs a **Gold** Fortuna Card or higher. Your card: **Starter**.`
+  `This item needs a **GOLD** Fortuna Card or higher. Your card: **STARTER**.` (service errors keep the uppercase enum, matching the existing card-service messages; UI labels use the title-case form)
   Card rules stay in the card service.
 - `src/services/shopService.ts` — `buyItem`:
   - Hoist the catalog lookup out of the `paymentSource === "card"` branch into a small
@@ -198,7 +198,7 @@ unbuyable. Existing owners are unaffected; only new purchases are gated.
     match `getItemEffectSource` already does; both use the helper).
   - New check next to the `creditBlocked` one:
     `if (entry?.requiresCardTier && paymentSource !== "card" && !tester)` throw
-    `**Royal Cape** is card-exclusive. Buy it on credit with a **Gold** Fortuna Card or
+    `**Royal Cape** is card-exclusive. Buy it on credit with a **GOLD** Fortuna Card or
     higher: \`shop buy card Royal Cape\`.`
   - Pass `{ minTier: entry?.requiresCardTier }` into `chargeCardPurchaseTx`.
 - No pre-check is added in `shop.ts`. Every purchase path (wallet button, credit
