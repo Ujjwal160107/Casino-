@@ -29,7 +29,7 @@ const bankAndCredit: ModuleDoc = {
       heading: "Fixed Deposits (FD): the real product",
       body: [
         "!bank fd <amount> <days> locks money from your BANK balance (deposit it first) at 10% APR simple interest, prorated by the day: interest = amount × 10% × days ÷ 365. Any amount, any duration from 1 day up, and you can run as many FDs at once as you like.",
-        "At maturity the payout lands back in your bank automatically — Fortuna checks every minute, and !bank collect sweeps anything the automation hasn't. There is no early withdrawal: an FD is locked until its date, full stop. That's the entire risk.",
+        "At maturity the payout lands back in your bank automatically — Fortuna checks every minute, DMs you the principal, interest and payout (toggle it off under !settings, Account notices), and the Investments tab keeps your last five returns plus lifetime interest earned. There is no early withdrawal: an FD is locked until its date, full stop. That's the entire risk.",
       ],
       table: {
         title: "What an FD pays (10% APR, simple)",

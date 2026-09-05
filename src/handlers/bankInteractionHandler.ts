@@ -14,7 +14,7 @@ import {
     TextInputBuilder,
     TextInputStyle,
 } from "discord.js";
-import { createInvestment, getFinancialSummary, checkMaturedInvestments } from "../services/bankingService";
+import { createInvestment, getFinancialSummary, getInvestmentReturns, checkMaturedInvestments } from "../services/bankingService";
 import { logToChannel } from "../utils/discordLogger";
 import { fmtCurrency } from "../utils/format";
 import { Mascot } from "../config/branding";
@@ -95,8 +95,11 @@ async function handleButton(interaction: ButtonInteraction) {
         case "bank_invest":
         case "invest": {
             await ensureDeferredUpdate(interaction);
-            const summary = await getFinancialSummary(user.id);
-            const container = buildBankInvestmentsContainer(displayName, avatarUrl, summary, user.id);
+            const [summary, returns] = await Promise.all([
+                getFinancialSummary(user.id),
+                getInvestmentReturns(user.id),
+            ]);
+            const container = buildBankInvestmentsContainer(displayName, avatarUrl, summary, user.id, returns);
             await safeEditReply(interaction, { components: [container], flags: MessageFlags.IsComponentsV2 });
             break;
         }

@@ -18,6 +18,8 @@ import {
     checkMaturedInvestments,
     createInvestment,
     getFinancialSummary,
+    getInvestmentReturns,
+    InvestmentReturns,
 } from "../../services/bankingService";
 import { ensureBankingUser } from "../../services/bankService";
 import {
@@ -34,7 +36,7 @@ import {
     CardTierConfig,
     getCardTierConfig,
 } from "../../utils/economyConfig";
-import { fmtCurrency, parseSmartAmount } from "../../utils/format";
+import { fmtAmount, fmtCurrency, parseSmartAmount } from "../../utils/format";
 import { getGuildPrefix } from "../../utils/guildContext";
 import { Mascot } from "../../config/branding";
 import { nextStepHint } from "../../config/nextSteps";
@@ -549,12 +551,17 @@ export function buildBankInvestmentsContainer(
     avatarUrl: string,
     summary: FinancialSummary,
     ownerId: string,
+    returns: InvestmentReturns,
 ) {
     const container = new ContainerBuilder()
         .addSectionComponents(
             buildBankHeaderSection(
                 `${displayName}'s Investment Portfolio`,
-                `FD Rate: **${BANKING_CONFIG.fdInterestRate}% APR**\nRD Rate: **${BANKING_CONFIG.rdInterestRate}% APR**`,
+                [
+                    `FD Rate: **${BANKING_CONFIG.fdInterestRate}% APR**`,
+                    `RD Rate: **${BANKING_CONFIG.rdInterestRate}% APR**`,
+                    `Lifetime interest earned: **${fmtCurrency(returns.lifetimeInterest)}**`,
+                ].join("\n"),
                 avatarUrl,
             ),
         )
@@ -576,7 +583,33 @@ export function buildBankInvestmentsContainer(
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent("No active investments."));
     }
 
+    container
+        .addSeparatorComponents(
+            new SeparatorBuilder()
+                .setDivider(true)
+                .setSpacing(SeparatorSpacingSize.Small),
+        )
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`### Recent returns\n${formatRecentReturns(returns.recent)}`),
+        );
+
     return container.addActionRowComponents(buildBankSectionNavRow(ownerId));
+}
+
+// One line per matured deposit, packed into a single TextDisplay so a long
+// history never eats into the 40-component cap.
+function formatRecentReturns(recent: InvestmentReturns["recent"]): string {
+    if (recent.length === 0) return "-# No matured deposits yet.";
+    return recent
+        .map((inv) => {
+            const earned = inv.interestEarned ?? 0;
+            const payout = inv.payout ?? 0;
+            const lost = Math.max(0, inv.amount + earned - payout);
+            const when = inv.completedAt ? `<t:${Math.floor(inv.completedAt.getTime() / 1000)}:R>` : "";
+            const shortfall = lost > 0 ? ` · ⚠ bank full, −${fmtAmount(lost)}` : "";
+            return `${inv.type} · **${fmtCurrency(inv.amount)}** → **${fmtCurrency(payout)}** (+${fmtAmount(earned)}) · ${when}${shortfall}`;
+        })
+        .join("\n");
 }
 
 export async function execute(message: Message | any, args: string[]) {
@@ -647,8 +680,9 @@ export async function execute(message: Message | any, args: string[]) {
     const summary = await getFinancialSummary(user.id);
 
     if (subCommand === "investments" || subCommand === "invest") {
+        const returns = await getInvestmentReturns(user.id);
         return message.reply({
-            components: [buildBankInvestmentsContainer(displayName, avatarUrl, summary, user.id)],
+            components: [buildBankInvestmentsContainer(displayName, avatarUrl, summary, user.id, returns)],
             flags: MessageFlags.IsComponentsV2,
         });
     }
