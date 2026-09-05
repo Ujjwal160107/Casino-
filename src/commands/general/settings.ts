@@ -27,10 +27,12 @@ import {
     setNoticeTypeEnabled,
 } from "../../services/dmPrefsService";
 
-const GROUPS: { group: DmNoticeGroup; heading: string }[] = [
-    { group: "cooldown", heading: "Cooldown alarms" },
-    { group: "account", heading: "Account notices" },
-];
+// A Record, not an array: adding a group to DmNoticeGroup is a compile error
+// here until this heading map covers it too.
+const GROUP_HEADINGS: Record<DmNoticeGroup, string> = {
+    cooldown: "Cooldown alarms",
+    account: "Account notices",
+};
 const BUTTONS_PER_ROW = 4;
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -64,7 +66,7 @@ export function buildSettingsPayload(ownerId: string, prefs: DmPrefs) {
     if (!prefs.remindersEnabled) {
         container.addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
-                "-# Reminders are currently off. If your DMs were closed, allow DMs from server members, then turn the master switch back on.",
+                "-# DMs are currently off. If your DMs were closed, allow DMs from server members, then turn the master switch back on.",
             ),
         );
     }
@@ -88,9 +90,9 @@ export function buildSettingsPayload(ownerId: string, prefs: DmPrefs) {
             .setDisabled(!prefs.remindersEnabled);
     };
 
-    for (const { group, heading } of GROUPS) {
+    for (const group of Object.keys(GROUP_HEADINGS) as DmNoticeGroup[]) {
         container.addSeparatorComponents(divider());
-        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`### ${heading}`));
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`### ${GROUP_HEADINGS[group]}`));
         for (const row of chunk(noticeTypesInGroup(group), BUTTONS_PER_ROW)) {
             container.addActionRowComponents(
                 new ActionRowBuilder<ButtonBuilder>().addComponents(...row.map(typeButton)),

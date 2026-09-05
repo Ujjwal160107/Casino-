@@ -68,7 +68,9 @@ describe("settleDueStatements outcomes", () => {
 
   it("PAID_FULL: full-payment score bonus, card ACTIVE, nothing remaining", async () => {
     await seedOverdueStatement({ balance: 500_000, paid: 500_000 });
-    const [o] = await settleMine();
+    const results = await settleMine();
+    expect(results).toHaveLength(1);
+    const [o] = results;
     expect(o).toMatchObject({
       userId: id,
       status: "PAID_FULL",

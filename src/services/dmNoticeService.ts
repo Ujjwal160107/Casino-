@@ -78,7 +78,11 @@ export async function notifyRobbed(
   amount: number,
   guildName: string | null,
 ): Promise<void> {
-  await sendDm(client, victimId, robbedNotice(robberName, amount, guildName));
+  try {
+    await sendDm(client, victimId, robbedNotice(robberName, amount, guildName));
+  } catch (err) {
+    console.error(`notifyRobbed failed for ${victimId}:`, err);
+  }
 }
 
 export function padlockNotice(robberName: string, guildName: string | null): ContainerBuilder {
@@ -96,7 +100,11 @@ export async function notifyPadlockUsed(
   robberName: string,
   guildName: string | null,
 ): Promise<void> {
-  await sendDm(client, victimId, padlockNotice(robberName, guildName));
+  try {
+    await sendDm(client, victimId, padlockNotice(robberName, guildName));
+  } catch (err) {
+    console.error(`notifyPadlockUsed failed for ${victimId}:`, err);
+  }
 }
 
 export function taxRaidNotice(seized: number, walletNow: number): ContainerBuilder {
@@ -112,7 +120,11 @@ export function taxRaidNotice(seized: number, walletNow: number): ContainerBuild
 }
 
 export async function notifyTaxRaid(client: Client, discordId: string, seized: number, walletNow: number): Promise<void> {
-  await sendDm(client, discordId, taxRaidNotice(seized, walletNow));
+  try {
+    await sendDm(client, discordId, taxRaidNotice(seized, walletNow));
+  } catch (err) {
+    console.error(`notifyTaxRaid failed for ${discordId}:`, err);
+  }
 }
 
 // ---- Opt-out notices: governed by !settings and the DM strike count. ----
@@ -178,7 +190,7 @@ export function cardWeeklyNotice(input: CardWeeklyInput): ContainerBuilder | nul
         title = "Card payment missed";
         let line =
           `You missed last week's minimum. Credit score **${signed(settled.scoreDelta)}**. ` +
-          `Interest of **${fmtCurrency(settled.interestCharged)}** was added. Your card is now **${settled.cardStatus}**.`;
+          `Interest of **${fmtCurrency(settled.interestCharged)}** was added to your balance. Your card is now **${settled.cardStatus}**.`;
         if (settled.cardStatus === "LOCKED") line += " Income is garnished at 25% until the balance clears.";
         blocks.push(line);
         break;
@@ -241,5 +253,9 @@ export function marketSaleNotice(sale: MarketSale): ContainerBuilder {
 }
 
 export async function notifyMarketSale(client: Client, sale: MarketSale): Promise<void> {
-  await sendOptOutDm(client, sale.sellerId, "market", marketSaleNotice(sale));
+  try {
+    await sendOptOutDm(client, sale.sellerId, "market", marketSaleNotice(sale));
+  } catch (err) {
+    console.error(`notifyMarketSale failed for ${sale.sellerId}:`, err);
+  }
 }

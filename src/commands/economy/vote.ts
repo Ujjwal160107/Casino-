@@ -30,7 +30,7 @@ export async function handleVote(message: Message, args: string[]) {
         const currentlyOn = isNoticeEnabled(prefs, "vote");
         const newState = await setNoticeTypeEnabled(user.discordId, "vote", !currentlyOn);
         return message.reply(v2Reply(
-            errorContainer("Reminder Settings", `Vote reminders are now **${newState ? "ENABLED" : "DISABLED"}**. Manage all reminders with \`${prefix}settings\`.`)
+            errorContainer("Reminder Settings", `Vote reminders are now **${newState ? "ENABLED" : "DISABLED"}**. Manage all DMs with \`${prefix}settings\`.`)
         ));
     }
 

@@ -34,7 +34,7 @@ describe("cardWeeklyNotice", () => {
 
     const miss = text({ settled: missed });
     expect(miss).toContain("## Card payment missed");
-    expect(miss).toContain(`Credit score **-45**. Interest of **${fmtCurrency(36_000)}** was added. Your card is now **DELINQUENT**.`);
+    expect(miss).toContain(`Credit score **-45**. Interest of **${fmtCurrency(36_000)}** was added to your balance. Your card is now **DELINQUENT**.`);
     expect(miss).not.toContain("garnished");
 
     const lock = text({ settled: locked });

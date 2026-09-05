@@ -89,11 +89,14 @@ export async function recordDmDelivered(discordId: string): Promise<void> {
 
 /** Count a closed or blocked DM. Auto-pauses the master at MAX_DM_FAILS in a row. */
 export async function recordDmFailed(discordId: string): Promise<{ paused: boolean }> {
-  const user = await prisma.user.findUnique({
-    where: { discordId },
-    select: { reminderDmFailCount: true },
-  });
-  const fails = (user?.reminderDmFailCount ?? 0) + 1;
+  const updated = await prisma.user
+    .update({
+      where: { discordId },
+      data: { reminderDmFailCount: { increment: 1 } },
+      select: { reminderDmFailCount: true },
+    })
+    .catch(() => null);
+  const fails = updated?.reminderDmFailCount ?? 0;
   if (fails >= MAX_DM_FAILS) {
     await prisma.user.update({
       where: { discordId },
@@ -101,6 +104,5 @@ export async function recordDmFailed(discordId: string): Promise<{ paused: boole
     }).catch(() => {});
     return { paused: true };
   }
-  await prisma.user.update({ where: { discordId }, data: { reminderDmFailCount: fails } }).catch(() => {});
   return { paused: false };
 }

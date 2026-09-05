@@ -66,7 +66,7 @@ describe("settings panel", () => {
     expect(master.style).toBe(ButtonStyle.Danger);
     for (const b of all.filter((b) => b.custom_id.startsWith("settings:toggle:"))) expect(b.disabled).toBe(true);
     const texts = json.components.filter((c: any) => c.type === ComponentType.TextDisplay).map((c: any) => c.content);
-    expect(texts.some((t: string) => t.startsWith("-# Reminders are currently off."))).toBe(true);
+    expect(texts.some((t: string) => t.startsWith("-# DMs are currently off."))).toBe(true);
   });
 
   it("master on: green master, no re-enable hint", () => {
@@ -75,7 +75,7 @@ describe("settings panel", () => {
     expect(master.label).toBe("All DMs: ON");
     expect(master.style).toBe(ButtonStyle.Success);
     const texts = json.components.filter((c: any) => c.type === ComponentType.TextDisplay).map((c: any) => c.content);
-    expect(texts.some((t: string) => t.startsWith("-# Reminders are currently off."))).toBe(false);
+    expect(texts.some((t: string) => t.startsWith("-# DMs are currently off."))).toBe(false);
   });
 
   it("a disabled type reads OFF in grey while the others stay green", () => {
