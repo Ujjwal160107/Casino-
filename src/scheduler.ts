@@ -47,7 +47,7 @@ export function initScheduler(client: Client) {
     console.log("Running weekly credit card settlement...");
     try {
       const result = await processWeeklyCardSettlement();
-      console.log(`Processed card settlement. Statements generated: ${result.generatedStatements}, statements settled: ${result.settledStatements}.`);
+      console.log(`Processed card settlement. Statements generated: ${result.issued.length}, statements settled: ${result.settled.length}.`);
     } catch (err) {
       console.error("Weekly credit card settlement failed:", err);
     }

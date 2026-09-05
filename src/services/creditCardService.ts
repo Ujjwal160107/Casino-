@@ -452,7 +452,26 @@ export async function applyGarnishment(discordId: string, incomeAmount: number):
   return { garnished: garnishAmount, netIncome: incomeAmount - garnishAmount };
 }
 
-export async function generateWeeklyStatements(now = new Date()) {
+export type StatementIssued = {
+  userId: string;
+  tier: string;
+  statementBalance: number;
+  minimumDue: number;
+  dueAt: Date;
+};
+
+export type StatementOutcome = "PAID_FULL" | "PAID_MINIMUM" | "MISSED";
+
+export type StatementSettled = {
+  userId: string;
+  status: StatementOutcome;
+  scoreDelta: number;
+  interestCharged: number;
+  cardStatus: string;
+  remainingBalance: number;
+};
+
+export async function generateWeeklyStatements(now = new Date()): Promise<StatementIssued[]> {
   const cards = await prisma.creditCard.findMany({
     where: {
       status: { in: ["ACTIVE", "DELINQUENT"] },
@@ -460,25 +479,25 @@ export async function generateWeeklyStatements(now = new Date()) {
     }
   });
 
-  let count = 0;
+  const issued: StatementIssued[] = [];
   for (const card of cards) {
-    const created = await generateStatementForCard(card.id, now);
-    if (created) count++;
+    const result = await generateStatementForCard(card.id, now);
+    if (result) issued.push(result);
   }
-  return count;
+  return issued;
 }
 
-async function generateStatementForCard(cardId: string, now: Date) {
+async function generateStatementForCard(cardId: string, now: Date): Promise<StatementIssued | null> {
   return runWithRetry(async (tx: PrismaClient) => {
     return tx.$transaction(async (trx) => {
       const card = await trx.creditCard.findUnique({ where: { id: cardId } });
-      if (!card || card.status === "LOCKED" || card.status === "CLOSED") return false;
+      if (!card || card.status === "LOCKED" || card.status === "CLOSED") return null;
 
       const cycleKey = getCycleKey(now);
       const existing = await trx.cardStatement.findUnique({
         where: { cardId_cycleKey: { cardId: card.id, cycleKey } }
       });
-      if (existing) return false;
+      if (existing) return null;
 
       const tier = getCardTierConfig(card.tier);
       const statementBalance = card.currentBalance;
@@ -524,12 +543,12 @@ async function generateStatementForCard(cardId: string, now: Date) {
         }
       });
 
-      return true;
+      return { userId: card.userId, tier: card.tier, statementBalance, minimumDue, dueAt };
     });
   });
 }
 
-export async function settleDueStatements(now = new Date()) {
+export async function settleDueStatements(now = new Date()): Promise<StatementSettled[]> {
   const statements = await prisma.cardStatement.findMany({
     where: {
       status: "OPEN",
@@ -539,31 +558,31 @@ export async function settleDueStatements(now = new Date()) {
     select: { id: true }
   });
 
-  let count = 0;
+  const settled: StatementSettled[] = [];
   for (const statement of statements) {
-    const settled = await settleStatement(statement.id);
-    if (settled) count++;
+    const result = await settleStatement(statement.id);
+    if (result) settled.push(result);
   }
-  return count;
+  return settled;
 }
 
-async function settleStatement(statementId: string) {
+async function settleStatement(statementId: string): Promise<StatementSettled | null> {
   return runWithRetry(async (tx: PrismaClient) => {
     return tx.$transaction(async (trx) => {
       const statement = await trx.cardStatement.findUnique({
         where: { id: statementId },
         include: { card: true }
       });
-      if (!statement || statement.status !== "OPEN" || statement.scoreDeltaApplied) return false;
+      if (!statement || statement.status !== "OPEN" || statement.scoreDeltaApplied) return null;
 
       const user = await trx.user.findUnique({ where: { discordId: statement.card.userId } });
-      if (!user) return false;
+      if (!user) return null;
 
       const paidMinimum = statement.amountPaid >= statement.minimumDue;
       const paidFull = statement.amountPaid >= statement.statementBalance;
       const tier = getCardTierConfig(statement.card.tier);
 
-      let status = "MISSED";
+      let status: StatementOutcome = "MISSED";
       let scoreDelta: number = CARD_SCORE_RULES.missPayment;
       let interestCharged = 0;
       const lateFeeCharged = 0;
@@ -630,13 +649,20 @@ async function settleStatement(statementId: string) {
         data: { creditScore: clampCardScore(user.creditScore + scoreDelta) }
       });
 
-      return true;
+      return {
+        userId: user.discordId,
+        status,
+        scoreDelta,
+        interestCharged,
+        cardStatus,
+        remainingBalance: Math.max(0, statement.statementBalance - statement.amountPaid),
+      };
     });
   });
 }
 
 export async function processWeeklyCardSettlement(now = new Date()) {
-  const generatedStatements = await generateWeeklyStatements(now);
-  const settledStatements = await settleDueStatements(now);
-  return { settledStatements, generatedStatements };
+  const issued = await generateWeeklyStatements(now);
+  const settled = await settleDueStatements(now);
+  return { issued, settled };
 }
