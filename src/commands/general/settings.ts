@@ -6,40 +6,62 @@ import {
     ContainerBuilder,
     Message,
     MessageFlags,
+    SectionBuilder,
     SeparatorBuilder,
     SeparatorSpacingSize,
     TextDisplayBuilder,
+    ThumbnailBuilder,
 } from "discord.js";
-import prisma from "../../utils/prisma";
+import { Mascot, getEmoteUrl } from "../../config/branding";
 import { ensureUserAndWallet } from "../../services/walletService";
 import {
     DM_NOTICE_TYPES,
+    DmNoticeGroup,
     DmNoticeType,
-    isDmNoticeType,
+    DmPrefs,
     getDmPrefs,
-    setNoticeTypeEnabled,
+    isDmNoticeType,
+    isNoticeEnabled,
+    noticeTypesInGroup,
     setMasterEnabled,
+    setNoticeTypeEnabled,
 } from "../../services/dmPrefsService";
 
-const TYPE_ORDER: DmNoticeType[] = ["daily", "weekly", "monthly", "crime", "hunt", "work", "vote"];
+const GROUPS: { group: DmNoticeGroup; heading: string }[] = [
+    { group: "cooldown", heading: "Cooldown alarms" },
+    { group: "account", heading: "Account notices" },
+];
+const BUTTONS_PER_ROW = 4;
 
-function buildSettingsPayload(
-    ownerId: string,
-    prefs: { remindersEnabled: boolean; disabledReminders: string[] },
-    autoPaused: boolean,
-) {
-    const container = new ContainerBuilder()
-        .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent("## Your Settings — Cooldown alarms"),
-            new TextDisplayBuilder().setContent(
-                "Fortuna DMs you the moment these cooldowns lift. Toggle what you want.",
-            ),
-        )
-        .addSeparatorComponents(
-            new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small),
+function chunk<T>(items: T[], size: number): T[][] {
+    const rows: T[][] = [];
+    for (let i = 0; i < items.length; i += size) rows.push(items.slice(i, i + size));
+    return rows;
+}
+
+function divider() {
+    return new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
+}
+
+/** The whole panel is one container; every button row lives inside it. */
+export function buildSettingsPayload(ownerId: string, prefs: DmPrefs) {
+    const container = new ContainerBuilder();
+    const intro = "## Your Settings\nFortuna DMs you when these happen. Toggle what you want.";
+    const thumb = getEmoteUrl(Mascot.Emotes.Settings);
+    if (thumb) {
+        container.addSectionComponents(
+            new SectionBuilder()
+                .addTextDisplayComponents(new TextDisplayBuilder().setContent(intro))
+                .setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)),
         );
+    } else {
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(intro));
+    }
 
-    if (autoPaused) {
+    // Auto-pause (closed DMs) leaves the master off; we can't distinguish it
+    // from a manual off, so the hint shows whenever the master is off — the
+    // advice is accurate in both cases.
+    if (!prefs.remindersEnabled) {
         container.addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
                 "-# Reminders are currently off. If your DMs were closed, allow DMs from server members, then turn the master switch back on.",
@@ -47,21 +69,18 @@ function buildSettingsPayload(
         );
     }
 
-    container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(
-            "-# Security alerts (robbery, padlock) are always on.",
+    container.addSeparatorComponents(divider());
+    container.addActionRowComponents(
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`settings:master:${ownerId}`)
+                .setLabel(prefs.remindersEnabled ? "All DMs: ON" : "All DMs: OFF")
+                .setStyle(prefs.remindersEnabled ? ButtonStyle.Success : ButtonStyle.Danger),
         ),
     );
 
-    const masterRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`settings:master:${ownerId}`)
-            .setLabel(prefs.remindersEnabled ? "All reminders: ON" : "All reminders: OFF")
-            .setStyle(prefs.remindersEnabled ? ButtonStyle.Success : ButtonStyle.Danger),
-    );
-
     const typeButton = (type: DmNoticeType) => {
-        const on = prefs.remindersEnabled && !prefs.disabledReminders.includes(type);
+        const on = isNoticeEnabled(prefs, type);
         return new ButtonBuilder()
             .setCustomId(`settings:toggle:${type}:${ownerId}`)
             .setLabel(`${DM_NOTICE_TYPES[type].label}: ${on ? "ON" : "OFF"}`)
@@ -69,40 +88,32 @@ function buildSettingsPayload(
             .setDisabled(!prefs.remindersEnabled);
     };
 
-    const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        ...TYPE_ORDER.slice(0, 4).map(typeButton),
-    );
-    const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        ...TYPE_ORDER.slice(4).map(typeButton),
+    for (const { group, heading } of GROUPS) {
+        container.addSeparatorComponents(divider());
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`### ${heading}`));
+        for (const row of chunk(noticeTypesInGroup(group), BUTTONS_PER_ROW)) {
+            container.addActionRowComponents(
+                new ActionRowBuilder<ButtonBuilder>().addComponents(...row.map(typeButton)),
+            );
+        }
+    }
+
+    container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent("-# Security alerts (robbery, padlock, tax raid) are always on."),
     );
 
     return {
-        components: [container, masterRow, row1, row2],
+        components: [container],
         flags: MessageFlags.IsComponentsV2 as number,
         allowedMentions: { parse: [] },
     };
 }
 
-async function loadPrefsWithPauseFlag(discordId: string) {
-    const user = await prisma.user.findUnique({
-        where: { discordId },
-        select: { remindersEnabled: true, disabledReminders: true },
-    });
-    const prefs = {
-        remindersEnabled: user?.remindersEnabled ?? true,
-        disabledReminders: user?.disabledReminders ?? [],
-    };
-    // Auto-pause (closed DMs) leaves the master off; we can't distinguish it
-    // from a manual off, so the hint shows whenever the master is off — the
-    // advice is accurate in both cases.
-    return { prefs, autoPaused: !prefs.remindersEnabled };
-}
-
 export async function handleSettings(message: Message) {
     if (!message.guildId) return;
     await ensureUserAndWallet(message.author.id, message.guildId, message.author.tag);
-    const { prefs, autoPaused } = await loadPrefsWithPauseFlag(message.author.id);
-    return message.reply(buildSettingsPayload(message.author.id, prefs, autoPaused));
+    const prefs = await getDmPrefs(message.author.id);
+    return message.reply(buildSettingsPayload(message.author.id, prefs));
 }
 
 export async function handleSettingsInteraction(interaction: ButtonInteraction) {
@@ -132,6 +143,6 @@ export async function handleSettingsInteraction(interaction: ButtonInteraction) 
         return interaction.reply({ content: "Unknown setting.", flags: MessageFlags.Ephemeral }).catch(() => {});
     }
 
-    const { prefs, autoPaused } = await loadPrefsWithPauseFlag(ownerId);
-    return interaction.update(buildSettingsPayload(ownerId, prefs, autoPaused)).catch(() => {});
+    const prefs = await getDmPrefs(ownerId);
+    return interaction.update(buildSettingsPayload(ownerId, prefs)).catch(() => {});
 }
