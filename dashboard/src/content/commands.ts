@@ -68,11 +68,16 @@ export const COMMANDS: Command[] = [
     name: "!settings",
     aliases: ["notifications", "reminders"],
     module: "general",
-    short: "Choose which cooldown alarms Fortuna DMs you — or silence the lot.",
+    short:
+      "One All DMs master switch, then separate toggles for cooldown alarms and account notices.",
     usage: "!settings",
     examples: ["!settings"],
     keyNumbers: [
-      { label: "Alarm types", value: "daily, weekly, monthly, crime, hunt, work, vote" },
+      { label: "Master switch", value: "All DMs" },
+      { label: "Cooldown alarms", value: "daily, weekly, monthly, crime, hunt, work, vote" },
+      { label: "Account notices", value: "card statements, market sales" },
+      { label: "Always on (no toggle)", value: "robbery, padlock, tax raid" },
+      { label: "Auto-pause", value: "3 closed DMs in a row turns the master off" },
       { label: "Default", value: "all ON" },
     ],
     interactive: true,

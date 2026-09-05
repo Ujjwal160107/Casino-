@@ -402,7 +402,7 @@ export async function buyHuntPartListing(buyerId: string, listingId: string) {
   });
 
   questBus.emit("economy:market_buy", { discordId: buyerId });
-  return { partName: formatPartName(listing.partKey), amount: listing.amount, fees, sellerId: listing.sellerId };
+  return { partName: formatPartName(listing.partKey), amount: listing.amount, fees, sellerId: listing.sellerId, totalPrice: listing.totalPrice };
 }
 
 export async function cancelHuntPartListing(userId: string, listingId: string) {

@@ -41,6 +41,7 @@ import {
   getHuntPartListings,
   getUserHuntPartListings,
 } from "../../services/huntPartService";
+import { notifyMarketSale } from "../../services/dmNoticeService";
 
 const BM_ACCENT = 0x2C2F33;
 const BM_SUCCESS = 0x2ECC71;
@@ -304,6 +305,7 @@ export async function handleMarket(message: Message, args: string[]) {
       try {
         await interaction.deferUpdate();
         const result = await buyHuntPartListing(ownerId, listingId);
+        void notifyMarketSale(interaction.client, { ...result, name: result.partName });
         await interaction.editReply({
           components: [bmContainer(
             `${E.Accept} Part Purchase Complete`,
@@ -378,6 +380,7 @@ export async function handleMarket(message: Message, args: string[]) {
       try {
         await interaction.deferUpdate();
         const result = await buyListing(ownerId, listingId);
+        void notifyMarketSale(interaction.client, { ...result, name: result.itemName });
 
         const successContainer = new ContainerBuilder()
           .addTextDisplayComponents(
