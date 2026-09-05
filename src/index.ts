@@ -30,6 +30,7 @@ import { initScheduler } from "./scheduler";
 import { backfillStarterChickens } from "./services/starterChickenService";
 import { handleSlashCommand } from "./slash/handle";
 import { buildCommand, SPECS } from "./slash/registry";
+import { notifyMarketSale } from "./services/dmNoticeService";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -128,6 +129,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
         const { buyListing } = require("./services/marketService");
         await ensureDeferredUpdate(interaction);
         const result = await buyListing(ownerId, listingId);
+        void notifyMarketSale(interaction.client, { ...result, name: result.itemName });
         await safeEditReply(interaction, {
           content: `✅ Bought **${result.itemName}** (x${result.amount}) for **${result.fees.buyerTotal.toLocaleString()}**!`,
           components: [],

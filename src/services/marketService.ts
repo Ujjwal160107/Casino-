@@ -155,8 +155,9 @@ export async function buyListing(buyerDiscordId: string, listingId: string) {
   });
 
   // Garnishment: apply AFTER transaction succeeds (seller payout is earned income)
+  let garnished = 0;
   try {
-    const { garnished } = await applyGarnishment(listing.sellerId, fees.sellerPayout);
+    garnished = (await applyGarnishment(listing.sellerId, fees.sellerPayout)).garnished;
     if (garnished > 0) {
       await prisma.wallet.update({
         where: { userId: listing.sellerId },
@@ -166,7 +167,7 @@ export async function buyListing(buyerDiscordId: string, listingId: string) {
   } catch { /* Card service unavailable — skip */ }
 
   questBus.emit("economy:market_buy", { discordId: buyerDiscordId });
-  return { itemName, amount: listing.amount, fees, sellerId: listing.sellerId };
+  return { itemName, amount: listing.amount, fees, sellerId: listing.sellerId, totalPrice: listing.totalPrice, garnished };
 }
 
 export async function cancelListing(discordId: string, listingId: string) {

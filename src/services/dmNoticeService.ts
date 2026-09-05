@@ -220,3 +220,26 @@ export async function notifyCardWeekly(
     }
   }
 }
+
+export type MarketSale = {
+  sellerId: string;
+  name: string;
+  amount: number;
+  totalPrice: number;
+  fees: { sellerFee: number; sellerPayout: number };
+  /** Part of the payout taken by a delinquent card. Only item sales garnish today. */
+  garnished?: number;
+};
+
+export function marketSaleNotice(sale: MarketSale): ContainerBuilder {
+  let body =
+    `**${sale.amount}× ${sale.name}** sold for **${fmtCurrency(sale.totalPrice)}**. ` +
+    `After the **${fmtCurrency(sale.fees.sellerFee)}** fee you received **${fmtCurrency(sale.fees.sellerPayout)}**.`;
+  const garnished = sale.garnished ?? 0;
+  if (garnished > 0) body += `\n**${fmtCurrency(garnished)}** went to your delinquent card.`;
+  return noticeContainer(Mascot.Emotes.Market, "Your listing sold!", body, `-# List more in \`!market\`. ${SETTINGS_HINT}.`);
+}
+
+export async function notifyMarketSale(client: Client, sale: MarketSale): Promise<void> {
+  await sendOptOutDm(client, sale.sellerId, "market", marketSaleNotice(sale));
+}
