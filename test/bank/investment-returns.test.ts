@@ -128,6 +128,12 @@ describe("getInvestmentReturns", () => {
     expect(returns.recent.every((r) => r.completedAt instanceof Date)).toBe(true);
     // 10 + 20 + … + 60: every recorded return counts, not just the five shown.
     expect(returns.lifetimeInterest).toBe(210);
+
+    // With room for every row, the legacy one must still be absent: the isSet
+    // filter excludes it, not the sort order.
+    const all = await getInvestmentReturns(id, 10);
+    expect(all.recent).toHaveLength(6);
+    expect(all.recent.some((r) => r.amount === 1)).toBe(false);
   });
 
   it("is empty for a player with no recorded returns", async () => {
