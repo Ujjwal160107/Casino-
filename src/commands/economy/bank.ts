@@ -34,9 +34,11 @@ import {
     BANKING_CONFIG,
     CARD_TIER_ORDER,
     CardTierConfig,
+    CardTierName,
     formatCardTierName,
     getCardTierConfig,
 } from "../../utils/economyConfig";
+import { getCardExclusiveItems } from "../../utils/shopCatalog";
 import { fmtAmount, fmtCurrency, parseSmartAmount } from "../../utils/format";
 import { getGuildPrefix } from "../../utils/guildContext";
 import { Mascot } from "../../config/branding";
@@ -337,6 +339,14 @@ function formatTierEligibility(tier: CardTierConfig, summary: CardEligibilitySum
     return "Locked";
 }
 
+// The card-exclusive items are what make a tier worth applying for, so every
+// tier screen says what it unlocks.
+function formatTierUnlocks(tier: CardTierName): string | null {
+    const items = getCardExclusiveItems(tier);
+    if (items.length === 0) return null;
+    return `Unlocks: ${items.map((item) => `**${item.name}**`).join(", ")}`;
+}
+
 function addAssetOrFallback(section: SectionBuilder, files: AttachmentBuilder[], tier: string) {
     const asset = resolveCardAsset(tier);
     if (!asset) {
@@ -355,20 +365,22 @@ function addAssetOrFallback(section: SectionBuilder, files: AttachmentBuilder[],
 function addCardTierSections(container: ContainerBuilder, summary: CardEligibilitySummary, files: AttachmentBuilder[]) {
     for (const tierName of CARD_TIER_ORDER) {
         const tier = getCardTierConfig(tierName);
+        const lines = [
+            `### ${formatCardTierName(tier.tier)} Card`,
+            `Credit score required: **${tier.reqScore}**`,
+            `Required career tier: **${tier.reqCareerTier}**`,
+            `Credit limit: **${fmtCurrency(tier.creditLimit)}**`,
+            `Weekly interest: **${tier.weeklyInterestPct}%**`,
+            `Minimum due: **${formatMinimumDueRule(tier)}**`,
+            `Weekly spend cap: **${fmtCurrency(tier.weeklySpendCap)}**`,
+            `Weekly withdraw cap: **${fmtCurrency(tier.weeklyWithdrawCap)}**`,
+            `Status: **${formatTierEligibility(tier, summary)}**`,
+        ];
+        const unlocks = formatTierUnlocks(tierName);
+        if (unlocks) lines.push(unlocks);
+
         const section = new SectionBuilder().addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(
-                [
-                    `### ${formatCardTierName(tier.tier)} Card`,
-                    `Credit score required: **${tier.reqScore}**`,
-                    `Required career tier: **${tier.reqCareerTier}**`,
-                    `Credit limit: **${fmtCurrency(tier.creditLimit)}**`,
-                    `Weekly interest: **${tier.weeklyInterestPct}%**`,
-                    `Minimum due: **${formatMinimumDueRule(tier)}**`,
-                    `Weekly spend cap: **${fmtCurrency(tier.weeklySpendCap)}**`,
-                    `Weekly withdraw cap: **${fmtCurrency(tier.weeklyWithdrawCap)}**`,
-                    `Status: **${formatTierEligibility(tier, summary)}**`,
-                ].join("\n"),
-            ),
+            new TextDisplayBuilder().setContent(lines.join("\n")),
         );
 
         addAssetOrFallback(section, files, tier.tier);
@@ -435,16 +447,18 @@ export async function buildBankCardsPayload(
                 ].filter(Boolean).join(", ")}`
                 : "";
 
+            const lines = [
+                `### ${formatCardTierName(row.tier.tier)} Card`,
+                `Status: **${status}**${missing}`,
+                `Credit score required: **${row.tier.reqScore}**`,
+                `Required career tier: **${row.tier.reqCareerTier}**`,
+                `Credit limit: **${fmtCurrency(row.tier.creditLimit)}**`,
+            ];
+            const unlocks = formatTierUnlocks(row.tier.tier);
+            if (unlocks) lines.push(unlocks);
+
             const section = new SectionBuilder().addTextDisplayComponents(
-                new TextDisplayBuilder().setContent(
-                    [
-                        `### ${formatCardTierName(row.tier.tier)} Card`,
-                        `Status: **${status}**${missing}`,
-                        `Credit score required: **${row.tier.reqScore}**`,
-                        `Required career tier: **${row.tier.reqCareerTier}**`,
-                        `Credit limit: **${fmtCurrency(row.tier.creditLimit)}**`,
-                    ].join("\n"),
-                ),
+                new TextDisplayBuilder().setContent(lines.join("\n")),
             );
 
             addAssetOrFallback(section, files, row.tier.tier);

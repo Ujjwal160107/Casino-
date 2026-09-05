@@ -8,7 +8,7 @@ const itemsAndShop: ModuleDoc = {
   forBeginners: {
     what: "The shop sells tools that change the rules: buffs that fatten payouts, shields that block robbers and taxes, gear your job literally requires, and chaos items that gamble on themselves. One catalog is shared across every server, stock is unlimited, and everything here lists the real effect — not the flavor text.",
     firstCommands: ["!shop", "!inventory", "!use lucky coin"],
-    tip: "!shop buy card <item> charges your Fortuna Card instead of your wallet — but Mystery Box, Treasure Map, Pandora Box, Loaded Dice of Ruin, and Devil Contract are cash-only by design.",
+    tip: "!shop buy card <item> charges your Fortuna Card instead of your wallet — but Mystery Box, Treasure Map, Pandora Box, Loaded Dice of Ruin, and Devil Contract are cash-only by design. Eight items go the other way: card-exclusive and credit-only. Celestial Harp and Demonic Harp need a STARTER card, Crown of Greed and Royal Cape a GOLD, Platinum Crown and Void Wings a PLATINUM, Celestial Halo and Emperor's Throne a BLACK.",
   },
   sections: [
     {
@@ -51,12 +51,12 @@ const itemsAndShop: ModuleDoc = {
         columns: ["Item", "Price", "Real effect"],
         rows: [
           ["Loaded Dice of Ruin", "2,500,000", "Reusable daily relic: every surviving !roll improves its prize odds and raises its shatter risk. Rewards are secured before shattering; a replacement resets to roll 0"],
-          ["Celestial Harp", "450,000", "+25 Luck for 6 hours"],
-          ["Demonic Harp", "600,000", "Target: −25 Luck for 6h + easier to rob (+5% success, +5% loot against them)"],
+          ["Celestial Harp", "450,000", "STARTER Card exclusive, credit only. +25 Luck for 6 hours"],
+          ["Demonic Harp", "600,000", "STARTER Card exclusive, credit only. Target: −25 Luck for 6h + easier to rob (+5% success, +5% loot against them)"],
           ["Pandora Box", "750,000", "Daily chaos roll: 25% money 300k–1.5M · 20% +15 Luck 2h · 20% rare item · 20% −15 Luck 2h · 15% lose 200k–900k (wallet, then bank)"],
           ["Eclipse Mask", "850,000", "Next rob: +12% success, +15% loot — but a failed rob adds a 300k–900k backlash"],
           ["Mirror of Fate", "900,000", "Reflects the next targeted curse back at its caster (24h, one trigger)"],
-          ["Crown of Greed", "1,000,000", "For 1 hour: all income +25% AND all losses +25% (win profits up, losing stakes up)"],
+          ["Crown of Greed", "1,000,000", "GOLD Card exclusive, credit only. For 1 hour: all income +25% AND all losses +25% (win profits up, losing stakes up)"],
           ["Devil Contract", "1,250,000", "Daily: 30% jackpot 2.5M–3.5M / 70% short-changed 300k–700k; your next 3 income claims pay −20% either way"],
           ["Soul Ledger", "1,500,000", "Watches your next loss ≥ 300,000; 24h later, resolve it: 50% refund of 1.5× the loss, 50% nothing"],
         ],
@@ -118,7 +118,7 @@ const itemsAndShop: ModuleDoc = {
       heading: "HUNT, COCK & COSMETICS",
       body: [
         "The HUNT tab sells the four rifles, the hunt buffs — including the reusable Hunter's Compass, a once-a-day pick between a risky and a safe hunting path — and recipe blueprints; every number is in the Hunting & Animals docs. Every player receives a chicken automatically; the COCK tab sells its feed, medicine, and equipment — covered wall-to-wall in Chickens & Cockfights.",
-        "COSMETICS is 18 tiers of pure flex, from the Velvet Name Tag at 50,000 to the Reality Crown at 1,000,000,000. They do nothing mechanical — but they set your Flex Rank on !profile, and several add profile luck: Fortuna Bracelet +5, Platinum Crown +8, Celestial Halo +10, Fortune Dragon Cloak +12, Crown of Immortals +15, Fortuna's Signature +20, Reality Crown +25.",
+        "COSMETICS is 18 tiers of pure flex, from the Velvet Name Tag at 50,000 to the Reality Crown at 1,000,000,000. They do nothing mechanical — but they set your Flex Rank on !profile, and several add profile luck: Fortuna Bracelet +5, Platinum Crown +8, Celestial Halo +10, Fortune Dragon Cloak +12, Crown of Immortals +15, Fortuna's Signature +20, Reality Crown +25. Five of them are card-exclusive and can only be charged to a Fortuna Card of the right tier: Royal Cape (GOLD), Platinum Crown and Void Wings (PLATINUM), Celestial Halo and Emperor's Throne (BLACK).",
       ],
     },
     {

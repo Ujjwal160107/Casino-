@@ -63,6 +63,7 @@ const bankAndCredit: ModuleDoc = {
       body: [
         "One card per player, four tiers, and every tier gates on BOTH numbers: your credit score (everyone starts at 500) and your career tier from the Jobs ladder. A perfect score with a Waiter's career tier still caps you — the card desk checks your business card too.",
         "!card issue grants the best tier you qualify for; !card upgrade moves you up later, but only if your utilization is under 50% and the card isn't delinquent. !credit shows exactly where you stand against every tier.",
+        "Each tier also unlocks card-exclusive shop items that can only be bought on credit with that tier or higher — STARTER: Celestial Harp, Demonic Harp · GOLD: Crown of Greed, Royal Cape · PLATINUM: Platinum Crown, Void Wings · BLACK: Celestial Halo, Emperor's Throne. The weekly spend cap paces them: a BLACK card can charge Emperor's Throne (25,000,000) exactly once a week, and a STARTER card can never charge Royal Cape at all.",
       ],
       table: {
         title: "Card tiers",
@@ -100,6 +101,7 @@ const bankAndCredit: ModuleDoc = {
         "Treat the card as a score machine first, credit second. Small charge, pay in full Monday, +30 score — that loop runs you from 500 to BLACK's 850 requirement in 12 clean weeks, faster than any spending spree, with zero interest paid.",
         "The garnish math is brutal: at 25% of all income, a delinquent card costs a Chief of Medicine over 100,000 per shift. If you're ever choosing between the minimum due and anything else, pay the minimum due.",
         "Career tier is half the gate — plan it with the Jobs docs. GOLD needs tier 2 (Junior Developer, Paralegal, Master Mechanic...), BLACK needs tier 4 (Lead Engineer, Chief of Medicine, Partner). No ladder, no BLACK card, whatever your score.",
+        "Exclusives are the reason to climb. Holding a card isn't enough — the card-exclusive items must be charged to it, and the tier's weekly spend cap is the throttle. A GOLD card buys Royal Cape in one charge; pay it off Monday and the +30 score moves you toward PLATINUM and its Void Wings.",
       ],
     },
   ],
