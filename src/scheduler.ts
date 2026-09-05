@@ -25,8 +25,8 @@ export function initScheduler(client: Client) {
   cron.schedule("* * * * *", async () => {
     console.log("Running banking jobs...");
     try {
-      const processedCount = await processAllInvestments();
-      console.log(`Processed ${processedCount} matured investments.`);
+      const matured = await processAllInvestments();
+      console.log(`Processed ${matured.length} matured investments.`);
 
       await removeTemporaryRoles(client);
       await processDueReminders(client).catch((err) => console.error("Cooldown reminder error:", err));

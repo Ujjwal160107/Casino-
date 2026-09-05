@@ -91,7 +91,12 @@ async function matureInvestment(investmentId: string) {
 
             const updatedInvestment = await trx.investment.update({
                 where: { id: investment.id },
-                data: { status: "COMPLETED" }
+                data: {
+                    status: "COMPLETED",
+                    completedAt: new Date(),
+                    interestEarned: calculated.interest,
+                    payout,
+                }
             });
 
             const updatedBank = payout > 0
@@ -116,7 +121,9 @@ async function matureInvestment(investmentId: string) {
     });
 }
 
-export async function processAllInvestments() {
+export type MaturedInvestment = NonNullable<Awaited<ReturnType<typeof matureInvestment>>>;
+
+export async function processAllInvestments(): Promise<MaturedInvestment[]> {
     const investments = await prisma.investment.findMany({
         where: {
             status: "ACTIVE",
@@ -125,12 +132,12 @@ export async function processAllInvestments() {
         select: { id: true }
     });
 
-    let count = 0;
+    const matured: MaturedInvestment[] = [];
     for (const investment of investments) {
         const result = await matureInvestment(investment.id);
-        if (result) count++;
+        if (result) matured.push(result);
     }
-    return count;
+    return matured;
 }
 
 export async function getFinancialSummary(discordId: string) {

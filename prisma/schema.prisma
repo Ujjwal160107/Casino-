@@ -330,11 +330,15 @@ model Investment {
   startDate    DateTime @default(now())
   maturityDate DateTime
   status       String   // ACTIVE, COMPLETED, WITHDRAWN
-  
-  // For RDs, we might need to track monthly contributions, but keeping it simple for now (lump sum for simplified RD or just recurring deposits logic handled in service)
-  // Re-reading requirements: "keeping money in FDs RDs etc with interest rates"
-  // Assuming standard fixed deposit behavior.
-  
+
+  // Written once, when the deposit matures. Optional on purpose: `db push`
+  // does not backfill, and Prisma's Mongo connector throws reading a required
+  // field that a document lacks. Legacy COMPLETED rows never get these, so
+  // history filters on `completedAt: { isSet: true }`.
+  completedAt    DateTime?
+  interestEarned Float?   // what the deposit earned before the bank cap
+  payout         Float?   // what was actually credited to the bank
+
   updatedAt    DateTime @updatedAt
 }
 
