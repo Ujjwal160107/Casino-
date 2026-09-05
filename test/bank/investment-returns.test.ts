@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { testPrisma, seedUser, resetUser } from "../helpers";
-import { processAllInvestments } from "../../src/services/bankingService";
+import { getInvestmentReturns, processAllInvestments } from "../../src/services/bankingService";
 import { MAX_SAFE_BALANCE } from "../../src/utils/economyConfig";
 
 // Matured FDs/RDs used to flip to COMPLETED and credit the bank with no record
@@ -86,5 +86,54 @@ describe("matureInvestment records what the deposit paid", () => {
     const row = await testPrisma.investment.findUnique({ where: { id: inv.id } });
     expect(row?.status).toBe("ACTIVE");
     expect(row?.completedAt).toBeNull();
+  });
+});
+
+describe("getInvestmentReturns", () => {
+  function completedRow(over: { daysAgo: number; amount: number; interestEarned: number; type?: string }) {
+    return testPrisma.investment.create({
+      data: {
+        userId: id,
+        type: over.type ?? "FD",
+        amount: over.amount,
+        interestRate: 10,
+        startDate: new Date(),
+        maturityDate: new Date(),
+        status: "COMPLETED",
+        completedAt: new Date(Date.now() - over.daysAgo * DAY_MS),
+        interestEarned: over.interestEarned,
+        payout: over.amount + over.interestEarned,
+      },
+    });
+  }
+
+  it("returns the newest matured deposits first, skips legacy rows, and sums lifetime interest", async () => {
+    await seedBank(0);
+    // Legacy: completed before payout recording existed. No completedAt, no payout.
+    await testPrisma.investment.create({
+      data: {
+        userId: id, type: "FD", amount: 1, interestRate: 10,
+        startDate: new Date(), maturityDate: new Date(), status: "COMPLETED",
+      },
+    });
+    for (let i = 0; i < 6; i++) {
+      await completedRow({ daysAgo: i, amount: 1000 * (i + 1), interestEarned: 10 * (i + 1) });
+    }
+
+    const returns = await getInvestmentReturns(id);
+
+    expect(returns.recent).toHaveLength(5);
+    expect(returns.recent[0].amount).toBe(1000);
+    expect(returns.recent[4].amount).toBe(5000);
+    expect(returns.recent.every((r) => r.completedAt instanceof Date)).toBe(true);
+    // 10 + 20 + … + 60: every recorded return counts, not just the five shown.
+    expect(returns.lifetimeInterest).toBe(210);
+  });
+
+  it("is empty for a player with no recorded returns", async () => {
+    await seedBank(0);
+    const returns = await getInvestmentReturns(id);
+    expect(returns.recent).toEqual([]);
+    expect(returns.lifetimeInterest).toBe(0);
   });
 });

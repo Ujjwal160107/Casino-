@@ -1,5 +1,5 @@
 import prisma, { runWithRetry } from "../utils/prisma";
-import { PrismaClient, Investment } from "@prisma/client";
+import { Investment, Prisma, PrismaClient } from "@prisma/client";
 import { BANKING_CONFIG, MAX_SAFE_BALANCE } from "../utils/economyConfig";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -139,6 +139,24 @@ export async function processAllInvestments(): Promise<MaturedInvestment[]> {
     }
     return matured;
 }
+
+export async function getInvestmentReturns(discordId: string, limit = 5) {
+    // Only rows matured after payout recording shipped carry completedAt; legacy
+    // COMPLETED rows have nothing to show. `isSet` is the Mongo-native way to ask
+    // for "field present" — `not: null` does not match a missing field.
+    const where: Prisma.InvestmentWhereInput = {
+        userId: discordId,
+        status: "COMPLETED",
+        completedAt: { isSet: true },
+    };
+    const [recent, totals] = await Promise.all([
+        prisma.investment.findMany({ where, orderBy: { completedAt: "desc" }, take: limit }),
+        prisma.investment.aggregate({ where, _sum: { interestEarned: true } }),
+    ]);
+    return { recent, lifetimeInterest: totals._sum.interestEarned ?? 0 };
+}
+
+export type InvestmentReturns = Awaited<ReturnType<typeof getInvestmentReturns>>;
 
 export async function getFinancialSummary(discordId: string) {
     const user = await prisma.user.findUnique({
