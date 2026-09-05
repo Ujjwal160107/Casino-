@@ -1,6 +1,6 @@
 import { Client } from "discord.js";
 import prisma from "../utils/prisma";
-import { errorContainer, v2Reply } from "../utils/componentsV2";
+import { notifyTaxRaid } from "./dmNoticeService";
 import { TAX_CONFIG } from "../utils/economyConfig";
 import { redisService } from "./redisService";
 import { checkTaxShield } from "./shopBuffs";
@@ -302,21 +302,7 @@ export async function executeRaid(
   const result = await removeBalance(discordId, seized, "tax_raid", { reason: "IRS audit" });
   await prisma.user.update({ where: { discordId }, data: { crimeHeat: 0 } });
 
-  try {
-    const discordUser = await client.users.fetch(discordId).catch(() => null);
-    if (discordUser) {
-      await discordUser.send(v2Reply(errorContainer(
-        "TAX RAID",
-        `The IRS has audited your financial activity.\n\n`
-        + `**Suspicious Income Detected:** Multiple undeclared earnings\n`
-        + `**Amount Seized:** ${result.removedAmount.toLocaleString("en-US")} coins\n`
-        + `**Remaining Wallet:** ${result.newBalance.toLocaleString("en-US")} coins\n\n`
-        + "Your criminal heat has been reset. Stay clean.",
-      ))).catch(() => null);
-    }
-  } catch {
-    // DMs silently fail when a player has them disabled.
-  }
+  await notifyTaxRaid(client, discordId, result.removedAmount, result.newBalance);
 
   return { seized: result.removedAmount, newBalance: result.newBalance };
 }

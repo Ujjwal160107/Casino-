@@ -18,7 +18,7 @@ import { successContainer, errorContainer, v2Reply } from "../../utils/component
 import { nextStepHint } from "../../config/nextSteps";
 import { fmtCurrency } from "../../utils/format";
 import { redisService } from "../../services/redisService";
-import { notifyRobbed, notifyPadlockUsed } from "../../services/victimNotifyService";
+import { notifyRobbed, notifyPadlockUsed } from "../../services/dmNoticeService";
 import { applyEconomyPenalty } from "../../services/penaltyService";
 import { addCrimeHeat } from "../../services/taxService";
 
