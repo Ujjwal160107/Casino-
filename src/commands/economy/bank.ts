@@ -34,6 +34,7 @@ import {
     BANKING_CONFIG,
     CARD_TIER_ORDER,
     CardTierConfig,
+    formatCardTierName,
     getCardTierConfig,
 } from "../../utils/economyConfig";
 import { fmtAmount, fmtCurrency, parseSmartAmount } from "../../utils/format";
@@ -204,7 +205,7 @@ function buildCardMineBody(summary: CardEligibilitySummary, prefix: string) {
     const payMin = getCardPayMinimumAmount(card, openStatement);
 
     const lines = [
-        `### ${formatTierName(card.tier)} Card`,
+        `### ${formatCardTierName(card.tier)} Card`,
         `Credit score required: **${tier.reqScore}** · Your score: **${userScore}**`,
         `Status: **${card.status}**`,
         `Balance owed: **${fmtCurrency(card.currentBalance)} / ${fmtCurrency(card.creditLimit)}** (${utilization}% used)`,
@@ -294,7 +295,7 @@ function buildTierApplyRow(row: CardEligibilitySummary["tiers"][number], summary
         label = "Owned";
         emoji = "✅";
     } else if (canApply) {
-        label = `Apply ${formatTierName(row.tier.tier)}`;
+        label = `Apply ${formatCardTierName(row.tier.tier)}`;
         style = ButtonStyle.Success;
         emoji = Mascot.Emotes.Credit;
     }
@@ -329,14 +330,6 @@ function formatMinimumDueRule(tier: CardTierConfig) {
     return `${tier.minimumDuePct}% of statement or ${fmtCurrency(tier.minimumDueFloor)}, whichever is higher`;
 }
 
-function formatTierName(tier: string) {
-    return tier
-        .toLowerCase()
-        .split("_")
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(" ");
-}
-
 function formatTierEligibility(tier: CardTierConfig, summary: CardEligibilitySummary) {
     const row = summary.tiers.find((item) => item.tier.tier === tier.tier);
     if (row?.alreadyOwned) return "Already owns it";
@@ -354,7 +347,7 @@ function addAssetOrFallback(section: SectionBuilder, files: AttachmentBuilder[],
     section.setThumbnailAccessory(
         new ThumbnailBuilder()
             .setURL(`attachment://${asset.attachmentName}`)
-            .setDescription(`${formatTierName(tier)} card`),
+            .setDescription(`${formatCardTierName(tier)} card`),
     );
     files.push(new AttachmentBuilder(asset.filePath, { name: asset.attachmentName }));
 }
@@ -365,7 +358,7 @@ function addCardTierSections(container: ContainerBuilder, summary: CardEligibili
         const section = new SectionBuilder().addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
                 [
-                    `### ${formatTierName(tier.tier)} Card`,
+                    `### ${formatCardTierName(tier.tier)} Card`,
                     `Credit score required: **${tier.reqScore}**`,
                     `Required career tier: **${tier.reqCareerTier}**`,
                     `Credit limit: **${fmtCurrency(tier.creditLimit)}**`,
@@ -445,7 +438,7 @@ export async function buildBankCardsPayload(
             const section = new SectionBuilder().addTextDisplayComponents(
                 new TextDisplayBuilder().setContent(
                     [
-                        `### ${formatTierName(row.tier.tier)} Card`,
+                        `### ${formatCardTierName(row.tier.tier)} Card`,
                         `Status: **${status}**${missing}`,
                         `Credit score required: **${row.tier.reqScore}**`,
                         `Required career tier: **${row.tier.reqCareerTier}**`,

@@ -273,6 +273,21 @@ export function getCardTierConfig(tier: string): CardTierConfig {
   return CARD_TIERS[(tier.toUpperCase() as CardTierName)] ?? CARD_TIERS.STARTER;
 }
 
+/** Does a card of `cardTier` satisfy a `minTier` requirement? Unknown tiers rank as Starter. */
+export function cardTierMeets(cardTier: string, minTier: CardTierName): boolean {
+  const have = CARD_TIER_ORDER.indexOf(getCardTierConfig(cardTier).tier);
+  return have >= CARD_TIER_ORDER.indexOf(minTier);
+}
+
+/** "GOLD" → "Gold". Display form only; data and service errors keep the uppercase enum. */
+export function formatCardTierName(tier: string): string {
+  return tier
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 export function getEligibleCardTier(user: { creditScore: number }, careerTier: number): CardTierConfig | null {
   const tiers = [CARD_TIERS.BLACK, CARD_TIERS.PLATINUM, CARD_TIERS.GOLD, CARD_TIERS.STARTER];
   return tiers.find((tier) => user.creditScore >= tier.reqScore && careerTier >= tier.reqCareerTier) ?? null;

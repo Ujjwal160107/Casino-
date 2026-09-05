@@ -1,4 +1,5 @@
 import { ItemEffect } from "../services/effectService";
+import type { CardTierName } from "./economyConfig";
 
 export type ShopCategory = "GENERAL" | "JOB" | "UNI" | "COCK" | "HUNT" | "COSMETICS";
 
@@ -16,6 +17,9 @@ export interface ShopCatalogItem {
   effects: ItemEffect[];
   maxStack?: number;
   creditBlocked?: boolean;
+  // Card-exclusive: only buyable on credit with an ACTIVE Fortuna Card of this
+  // tier or higher. Never set together with creditBlocked (tested).
+  requiresCardTier?: CardTierName;
 }
 
 export const SHOP_CATEGORIES: { key: ShopCategory; label: string; emoji: string; emojiKey?: string }[] = [
@@ -198,6 +202,7 @@ export const GENERAL_SHOP_CATALOG: ShopCatalogItem[] = [
     consumable: true,
     usable: true,
     itemType: "CONSUMABLE",
+    requiresCardTier: "STARTER",
     maxStack: 1,
     effects: [{ type: "CUSTOM_MESSAGE", message: "Celestial Harp played! Luck boost active for 6 hours.", trigger: "USE" }],
   },
@@ -212,6 +217,7 @@ export const GENERAL_SHOP_CATALOG: ShopCatalogItem[] = [
     consumable: true,
     usable: true,
     itemType: "CONSUMABLE",
+    requiresCardTier: "STARTER",
     maxStack: 1,
     effects: [{ type: "CUSTOM_MESSAGE", message: "Demonic Harp played! Target's luck has been cursed.", trigger: "USE" }],
   },
@@ -269,6 +275,7 @@ export const GENERAL_SHOP_CATALOG: ShopCatalogItem[] = [
     consumable: true,
     usable: true,
     itemType: "CONSUMABLE",
+    requiresCardTier: "GOLD",
     maxStack: 1,
     effects: [{ type: "CUSTOM_MESSAGE", message: "Crown of Greed worn! Income and losses boosted for 1 hour.", trigger: "USE" }],
   },
@@ -1105,6 +1112,7 @@ export const COSMETICS_SHOP_CATALOG: ShopCatalogItem[] = [
     consumable: false,
     usable: false,
     itemType: "COLLECTIBLE",
+    requiresCardTier: "GOLD",
     effects: [],
   },
   {
@@ -1131,6 +1139,7 @@ export const COSMETICS_SHOP_CATALOG: ShopCatalogItem[] = [
     consumable: false,
     usable: false,
     itemType: "COLLECTIBLE",
+    requiresCardTier: "PLATINUM",
     effects: [],
   },
   {
@@ -1144,6 +1153,7 @@ export const COSMETICS_SHOP_CATALOG: ShopCatalogItem[] = [
     consumable: false,
     usable: false,
     itemType: "COLLECTIBLE",
+    requiresCardTier: "PLATINUM",
     effects: [],
   },
   {
@@ -1157,6 +1167,7 @@ export const COSMETICS_SHOP_CATALOG: ShopCatalogItem[] = [
     consumable: false,
     usable: false,
     itemType: "COLLECTIBLE",
+    requiresCardTier: "BLACK",
     effects: [],
   },
   {
@@ -1170,6 +1181,7 @@ export const COSMETICS_SHOP_CATALOG: ShopCatalogItem[] = [
     consumable: false,
     usable: false,
     itemType: "COLLECTIBLE",
+    requiresCardTier: "BLACK",
     effects: [],
   },
   {
@@ -1267,4 +1279,8 @@ export function getCatalogByCategory(category: ShopCategory): ShopCatalogItem[] 
 
 export function getCatalogItem(key: string): ShopCatalogItem | undefined {
   return SHOP_CATALOG.find(item => item.key === key);
+}
+
+export function getCardExclusiveItems(tier: CardTierName): ShopCatalogItem[] {
+  return SHOP_CATALOG.filter((item) => item.requiresCardTier === tier);
 }
