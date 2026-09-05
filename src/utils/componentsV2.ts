@@ -65,6 +65,15 @@ export function errorContainer(title: string, desc?: string, opts?: StatusOption
     return statusContainer("error", title, desc, opts);
 }
 
+/**
+ * Player DM notice. Same shape as statusContainer, but the thumbnail is the
+ * given emote's CDN image instead of a mascot reaction. Titles stay text-only;
+ * the thumbnail carries the emoji.
+ */
+export function noticeContainer(emote: string, title: string, body: string, hint?: string): ContainerBuilder {
+    return statusContainer("info", title, body, { hint, thumbnailUrl: getEmoteUrl(emote) ?? undefined });
+}
+
 /** Bare container from markdown blocks (one TextDisplay per block). */
 export function plainContainer(...blocks: string[]): ContainerBuilder {
     const container = new ContainerBuilder();
