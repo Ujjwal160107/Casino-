@@ -33,10 +33,9 @@
 |---|---|
 | `prisma/schema.prisma` | `Investment` gains `completedAt`, `interestEarned`, `payout` |
 | `src/services/bankingService.ts` | record payout on maturity; `processAllInvestments` returns results; `getInvestmentReturns` |
-| `src/services/cooldownReminderService.ts` | `investment` reminder type; extracted `sendReminderDm` |
-| `src/services/investmentNotifyService.ts` (new) | build + send the maturity DM |
+| `src/services/dmPrefsService.ts` | `investment` entry in the `DM_NOTICE_TYPES` registry |
+| `src/services/dmNoticeService.ts` | `investmentMaturedNotice` builder + `notifyInvestmentsMatured` sender |
 | `src/scheduler.ts` | pass the matured batch to the notifier |
-| `src/commands/general/settings.ts` | "Investment payouts" toggle |
 | `src/commands/economy/bank.ts` | Recent Returns section; "Unlocks" line on tier screens |
 | `src/handlers/bankInteractionHandler.ts` | fetch returns for the Investments tab |
 | `src/utils/economyConfig.ts` | `cardTierMeets`, `formatCardTierName` |
@@ -45,7 +44,7 @@
 | `src/services/shopService.ts` | `findCatalogEntry`; card-exclusive gate in `buyItem` |
 | `src/commands/economy/shop.ts` | item info card: badge, buttons, hints |
 | `dashboard/src/content/modules/bank-and-credit.ts`, `items-and-shop.ts` | docs |
-| `test/bank/*.test.ts`, `test/reminders/*.test.ts`, `test/shop/*.test.ts` | tests |
+| `test/bank/*.test.ts`, `test/dm/*.test.ts`, `test/shop/*.test.ts` | tests |
 
 ---
 
@@ -340,6 +339,12 @@ describe("getInvestmentReturns", () => {
     expect(returns.recent.every((r) => r.completedAt instanceof Date)).toBe(true);
     // 10 + 20 + … + 60: every recorded return counts, not just the five shown.
     expect(returns.lifetimeInterest).toBe(210);
+
+    // With room for every row, the legacy one must still be absent: the isSet
+    // filter excludes it, not the sort order (a missing field sorts last anyway).
+    const all = await getInvestmentReturns(id, 10);
+    expect(all.recent).toHaveLength(6);
+    expect(all.recent.some((r) => r.amount === 1)).toBe(false);
   });
 
   it("is empty for a player with no recorded returns", async () => {
@@ -406,245 +411,40 @@ Claude-Session: https://claude.ai/code/session_01LekYjKxykkLrsqKL5VTzU8"
 
 ---
 
-### Task 3: Shared DM sender, `investment` reminder type, settings toggle
+### Task 3: Maturity DM through the DM notice seam
+
+> **Why this task changed:** the DM notices work (merge `23c288b`) landed before this plan ran. Every player DM now goes through `src/services/dmNoticeService.ts` (one look via `noticeContainer`, one send policy via `sendOptOutDm`) with prefs in `src/services/dmPrefsService.ts` (`DM_NOTICE_TYPES` registry; `!settings` renders straight from it). The original Tasks 3 and 4 (a `sendReminderDm` extraction, a `REMINDER_TYPES` entry, a `TYPE_ORDER` edit, and a separate `investmentNotifyService.ts`) are replaced by this single task, exactly as the DM spec's "Coordination" section prescribes. Task 4 is folded in here.
 
 **Files:**
-- Modify: `src/services/cooldownReminderService.ts:5-13` (REMINDER_TYPES), `:137-193` (processDueReminders)
-- Modify: `src/commands/general/settings.ts:24` (TYPE_ORDER)
-- Test: `test/reminders/send-reminder-dm.test.ts` (new)
+- Modify: `src/services/dmPrefsService.ts:14-24` (`DM_NOTICE_TYPES`)
+- Modify: `src/services/dmNoticeService.ts` (imports at lines 1-16; new builder and notifier appended after `notifyMarketSale`)
+- Modify: `src/scheduler.ts:9` (import), `:27-28` (after the log line)
+- Modify: `test/dm/prefs.test.ts:20` (account-group expectation)
+- Test: `test/dm/investment-notice.test.ts` (new)
 
 **Interfaces:**
-- Consumes: `getReminderPrefs`, `cancelAll`, `MAX_DM_FAILS` (all already in the file).
+- Consumes: `MaturedInvestment` (Task 1; `m.investment` carries `userId`, `amount`, `type`, `interestEarned`, `payout`; `m.payout`, `m.durationDays`), `noticeContainer` (from `src/utils/componentsV2.ts`, already imported in `dmNoticeService`), `sendOptOutDm` and `SETTINGS_HINT` (already in `dmNoticeService`), `fmtAmount` + `fmtCurrency` (`src/utils/format.ts`), `Mascot.Emotes.Bank`, test helpers `containerText`, `containerThumb`, `fakeDmClient` (`test/dm/helpers.ts`), `seedUser`/`resetUser` (`test/helpers.ts`), `setNoticeTypeEnabled`/`noticeTypesInGroup`/`DM_NOTICE_TYPES` (`dmPrefsService`).
 - Produces:
-  - `REMINDER_TYPES.investment` → `ReminderType` now includes `"investment"`.
-  - `export async function sendReminderDm(client: Client, discordId: string, content: string): Promise<boolean>` — true when delivered. Success resets `reminderDmFailCount`; the third consecutive failure sets `remindersEnabled: false` and clears pending reminders.
+  - `DM_NOTICE_TYPES.investment = { label: "Investment payouts", group: "account" }` (no `command` — that is what keeps it out of the cooldown reminder queue).
+  - `export function investmentMaturedNotice(matured: MaturedInvestment[]): ContainerBuilder`
+  - `export async function notifyInvestmentsMatured(client: Client, matured: MaturedInvestment[]): Promise<void>` — one DM per player, never throws.
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `test/reminders/send-reminder-dm.test.ts`:
+Create `test/dm/investment-notice.test.ts`:
 
 ```ts
-import { describe, it, expect, beforeEach } from "vitest";
-import type { Client } from "discord.js";
-import { testPrisma, seedUser, resetUser } from "../helpers";
-import { sendReminderDm } from "../../src/services/cooldownReminderService";
-
-// The closed-DM bookkeeping used to live inline in processDueReminders. It is
-// now one helper so the investment notifier gets the same auto-pause behaviour.
-
-const id = "reminder-send-dm";
-
-function fakeClient(send: () => Promise<unknown>): Client {
-  return { users: { fetch: async () => ({ send }) } } as unknown as Client;
-}
-
-async function user() {
-  return testPrisma.user.findUnique({ where: { discordId: id } });
-}
-
-beforeEach(async () => {
-  await resetUser(id);
-});
-
-it("resets the fail count after a delivered DM", async () => {
-  await seedUser(id, { reminderDmFailCount: 2 });
-
-  const delivered = await sendReminderDm(fakeClient(async () => ({})), id, "hi");
-
-  expect(delivered).toBe(true);
-  expect((await user())?.reminderDmFailCount).toBe(0);
-});
-
-it("counts a failed DM while under the limit", async () => {
-  await seedUser(id, { reminderDmFailCount: 0 });
-
-  const delivered = await sendReminderDm(fakeClient(async () => { throw new Error("closed DMs"); }), id, "hi");
-
-  expect(delivered).toBe(false);
-  const row = await user();
-  expect(row?.reminderDmFailCount).toBe(1);
-  expect(row?.remindersEnabled).toBe(true);
-});
-
-it("switches reminders off on the third failed DM in a row", async () => {
-  await seedUser(id, { reminderDmFailCount: 2 });
-
-  const delivered = await sendReminderDm(fakeClient(async () => { throw new Error("closed DMs"); }), id, "hi");
-
-  expect(delivered).toBe(false);
-  const row = await user();
-  expect(row?.remindersEnabled).toBe(false);
-  expect(row?.reminderDmFailCount).toBe(0);
-});
-
-it("reports not delivered when the user cannot be fetched", async () => {
-  await seedUser(id);
-  const client = { users: { fetch: async () => { throw new Error("Unknown User"); } } } as unknown as Client;
-
-  expect(await sendReminderDm(client, id, "hi")).toBe(false);
-});
-```
-
-- [ ] **Step 2: Run the tests to confirm they fail**
-
-Run: `npx vitest run test/reminders/send-reminder-dm.test.ts`
-Expected: FAIL with "sendReminderDm is not a function".
-
-- [ ] **Step 3: Add the reminder type and extract the sender**
-
-In `src/services/cooldownReminderService.ts`, change `REMINDER_TYPES` to:
-
-```ts
-export const REMINDER_TYPES = {
-  daily: { label: "Daily reward", command: "!daily" },
-  weekly: { label: "Weekly reward", command: "!weekly" },
-  monthly: { label: "Monthly reward", command: "!monthly" },
-  crime: { label: "Crime board", command: "!crime" },
-  hunt: { label: "Hunt", command: "!hunt" },
-  work: { label: "Work shift", command: "!work" },
-  vote: { label: "Vote", command: "!vote" },
-  // Not a cooldown: matured FD/RD payouts. Never enqueued; listed here so the
-  // settings toggles and getReminderPrefs govern it like every other DM.
-  investment: { label: "Investment payouts", command: "!bank invest" },
-} as const;
-```
-
-Replace everything from the `/** Called by the per-minute cron …` comment through the end of `processDueReminders` with:
-
-```ts
-/**
- * Send one DM and keep the closed-DM bookkeeping: a delivered DM resets the
- * fail count; MAX_DM_FAILS failures in a row switch reminders off for that
- * player. Returns whether the DM was delivered.
- */
-export async function sendReminderDm(client: Client, discordId: string, content: string): Promise<boolean> {
-  const discordUser = await client.users.fetch(discordId).catch(() => null);
-  if (!discordUser) return false;
-
-  try {
-    await discordUser.send({ content });
-    await prisma.user.update({
-      where: { discordId },
-      data: { reminderDmFailCount: 0 },
-    }).catch(() => {});
-    return true;
-  } catch {
-    // DMs closed or blocked — count it; auto-pause after MAX_DM_FAILS in a row.
-    const user = await prisma.user.findUnique({
-      where: { discordId },
-      select: { reminderDmFailCount: true },
-    });
-    const fails = (user?.reminderDmFailCount ?? 0) + 1;
-    if (fails >= MAX_DM_FAILS) {
-      await prisma.user.update({
-        where: { discordId },
-        data: { remindersEnabled: false, reminderDmFailCount: 0 },
-      }).catch(() => {});
-      await cancelAll(discordId);
-    } else {
-      await prisma.user.update({
-        where: { discordId },
-        data: { reminderDmFailCount: fails },
-      }).catch(() => {});
-    }
-    return false;
-  }
-}
-
-/** Called by the per-minute cron. Drains due reminders, one combined DM per player. */
-export async function processDueReminders(client: Client): Promise<void> {
-  const due = await prisma.cooldownReminder.findMany({
-    where: { dueAt: { lte: new Date() } },
-    orderBy: { dueAt: "asc" },
-    take: BATCH_SIZE,
-  });
-  if (due.length === 0) return;
-
-  // Delete the batch up front: fire-once semantics regardless of DM outcome.
-  await prisma.cooldownReminder.deleteMany({ where: { id: { in: due.map((r) => r.id) } } });
-
-  const byUser = new Map<string, ReminderType[]>();
-  for (const row of due) {
-    if (!isReminderType(row.type)) continue; // unknown types are dropped silently
-    const list = byUser.get(row.discordId) ?? [];
-    list.push(row.type);
-    byUser.set(row.discordId, list);
-  }
-
-  for (const [discordId, types] of byUser) {
-    try {
-      const prefs = await getReminderPrefs(discordId);
-      if (!prefs.remindersEnabled) continue;
-      const active = types.filter((t) => !prefs.disabledReminders.includes(t));
-      if (active.length === 0) continue;
-
-      await sendReminderDm(client, discordId, buildDmContent(active));
-    } catch (err) {
-      console.error(`processDueReminders failed for ${discordId}:`, err);
-    }
-  }
-}
-```
-
-- [ ] **Step 4: Add the settings toggle**
-
-In `src/commands/general/settings.ts` line 24, change `TYPE_ORDER` to:
-
-```ts
-const TYPE_ORDER: ReminderType[] = ["daily", "weekly", "monthly", "crime", "hunt", "work", "vote", "investment"];
-```
-
-(Row 1 keeps four buttons; row 2 becomes hunt, work, vote, investment — four buttons, under the five-per-row cap.)
-
-- [ ] **Step 5: Run the tests and typecheck**
-
-Run: `npx vitest run test/reminders/send-reminder-dm.test.ts`
-Expected: 4 passed.
-
-Run: `npm run typecheck`
-Expected: exits 0.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add src/services/cooldownReminderService.ts src/commands/general/settings.ts test/reminders/send-reminder-dm.test.ts
-git commit -m "refactor(reminders): extract sendReminderDm and add an investment payout toggle
-
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_01LekYjKxykkLrsqKL5VTzU8"
-```
-
----
-
-### Task 4: Maturity DM notifier wired into the cron
-
-**Files:**
-- Create: `src/services/investmentNotifyService.ts`
-- Modify: `src/scheduler.ts:3-4` (imports), `:27-28` (after the log line)
-- Test: `test/bank/investment-notify.test.ts` (new)
-
-**Interfaces:**
-- Consumes: `MaturedInvestment` (Task 1), `getReminderPrefs` + `sendReminderDm` (Task 3), `isTester`, `fmtCurrency`, `fmtAmount`.
-- Produces:
-  - `buildMaturedInvestmentDm(matured: MaturedInvestment[]): string`
-  - `notifyMaturedInvestments(client: Client, matured: MaturedInvestment[]): Promise<void>` — one DM per player, never throws.
-
-- [ ] **Step 1: Write the failing tests**
-
-Create `test/bank/investment-notify.test.ts`:
-
-```ts
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { Client } from "discord.js";
-import { testPrisma, seedUser, resetUser } from "../helpers";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { seedUser, resetUser } from "../helpers";
+import { investmentMaturedNotice, notifyInvestmentsMatured } from "../../src/services/dmNoticeService";
+import { DM_NOTICE_TYPES, noticeTypesInGroup, setNoticeTypeEnabled } from "../../src/services/dmPrefsService";
 import type { MaturedInvestment } from "../../src/services/bankingService";
-import {
-  buildMaturedInvestmentDm,
-  notifyMaturedInvestments,
-} from "../../src/services/investmentNotifyService";
+import { Mascot, getEmoteUrl } from "../../src/config/branding";
+import { fmtCurrency } from "../../src/utils/format";
+import { containerText, containerThumb, fakeDmClient } from "./helpers";
 
-const a = "invest-notify-a";
-const b = "invest-notify-b";
+// The per-minute cron matures FDs/RDs silently. This DM is how a player learns
+// what a deposit paid; it is an opt-out account notice like card and market.
 
 function matured(
   userId: string,
@@ -668,123 +468,143 @@ function matured(
   } as unknown as MaturedInvestment;
 }
 
-function fakeClient() {
-  const send = vi.fn(async () => ({}));
-  const client = { users: { fetch: vi.fn(async () => ({ send })) } } as unknown as Client;
-  return { client, send };
-}
-
-function sentContent(send: ReturnType<typeof vi.fn>, call: number): string {
-  return (send.mock.calls[call][0] as { content: string }).content;
-}
-
-beforeEach(async () => {
-  await resetUser(a);
-  await resetUser(b);
+describe("investment registry entry", () => {
+  it("is an account notice with no command, listed after card and market", () => {
+    expect(DM_NOTICE_TYPES.investment).toEqual({ label: "Investment payouts", group: "account" });
+    expect(noticeTypesInGroup("account")).toEqual(["card", "market", "investment"]);
+  });
 });
 
-describe("buildMaturedInvestmentDm", () => {
-  it("lists every deposit with principal, payout and interest", () => {
-    const text = buildMaturedInvestmentDm([
-      matured(a),
-      matured(a, { type: "RD", amount: 50_000, interestEarned: 54, days: 1 }),
+describe("investmentMaturedNotice", () => {
+  it("bank thumbnail and one line per deposit: principal, days, payout, interest", () => {
+    const c = investmentMaturedNotice([
+      matured("u"),
+      matured("u", { type: "RD", amount: 50_000, interestEarned: 54, days: 1 }),
     ]);
-    expect(text).toContain("**FD**");
-    expect(text).toContain("365,000");
-    expect(text).toContain("366,000");
-    expect(text).toContain("+1,000 interest");
-    expect(text).toContain("**RD**");
-    expect(text).toContain("locked for 1 day ");
-    expect(text).not.toContain("bank was full");
-    expect(text).toContain("`!settings`");
+    expect(containerThumb(c)).toBe(getEmoteUrl(Mascot.Emotes.Bank));
+    const t = containerText(c);
+    expect(t).toContain("## Investment matured!");
+    expect(t).toContain(`**FD** — ${fmtCurrency(365_000)} locked for 10 days → paid **${fmtCurrency(366_000)}** (+1,000 interest)`);
+    expect(t).toContain(`**RD** — ${fmtCurrency(50_000)} locked for 1 day → paid **${fmtCurrency(50_054)}** (+54 interest)`);
+    expect(t).not.toContain("bank was full");
+    expect(t).toContain("`!bank invest`");
+    expect(t).toContain("`!settings`");
   });
 
   it("adds the shortfall line only when the bank cap cut the payout", () => {
-    const text = buildMaturedInvestmentDm([matured(a, { payout: 365_500 })]);
-    expect(text).toContain("500 of this payout was lost");
+    const t = containerText(investmentMaturedNotice([matured("u", { payout: 365_500 })]));
+    expect(t).toContain("Your bank was full, so 500 of this payout was lost.");
   });
 });
 
-describe("notifyMaturedInvestments", () => {
-  it("sends one DM per player covering all their deposits", async () => {
+describe("notifyInvestmentsMatured", () => {
+  const a = "invest-dm-a";
+  const b = "invest-dm-b";
+  beforeEach(async () => {
     await seedUser(a);
     await seedUser(b);
-    const { client, send } = fakeClient();
-
-    await notifyMaturedInvestments(client, [matured(a), matured(a, { type: "RD" }), matured(b)]);
-
-    expect(send).toHaveBeenCalledTimes(2);
-    expect(sentContent(send, 0)).toContain("**RD**");
-    expect(sentContent(send, 0)).toContain("**FD**");
+  });
+  afterAll(async () => {
+    await resetUser(a);
+    await resetUser(b);
   });
 
-  it("respects the master switch", async () => {
-    await seedUser(a, { remindersEnabled: false });
-    const { client, send } = fakeClient();
-
-    await notifyMaturedInvestments(client, [matured(a)]);
-
-    expect(send).not.toHaveBeenCalled();
+  it("sends one DM per player covering all their deposits", async () => {
+    const { client, sent } = fakeDmClient();
+    await notifyInvestmentsMatured(client, [matured(a), matured(a, { type: "RD" }), matured(b)]);
+    expect(sent.get(a)).toBe(1);
+    expect(sent.get(b)).toBe(1);
   });
 
-  it("respects the per-type toggle", async () => {
-    await seedUser(a, { disabledReminders: ["investment"] });
-    const { client, send } = fakeClient();
-
-    await notifyMaturedInvestments(client, [matured(a)]);
-
-    expect(send).not.toHaveBeenCalled();
+  it("respects the investment toggle", async () => {
+    await setNoticeTypeEnabled(a, "investment", false);
+    const { client, sent } = fakeDmClient();
+    await notifyInvestmentsMatured(client, [matured(a)]);
+    expect(sent.get(a)).toBeUndefined();
   });
 
   it("does nothing for an empty batch", async () => {
-    const { client, send } = fakeClient();
-    await notifyMaturedInvestments(client, []);
-    expect(send).not.toHaveBeenCalled();
+    const { client, sent } = fakeDmClient();
+    await notifyInvestmentsMatured(client, []);
+    expect(sent.size).toBe(0);
   });
 });
 ```
 
-- [ ] **Step 2: Run the tests to confirm they fail**
-
-Run: `npx vitest run test/bank/investment-notify.test.ts`
-Expected: FAIL — cannot resolve `../../src/services/investmentNotifyService`.
-
-- [ ] **Step 3: Create the notifier**
-
-Create `src/services/investmentNotifyService.ts`:
+Also change `test/dm/prefs.test.ts` line 20 from
 
 ```ts
-import { Client } from "discord.js";
-import { MaturedInvestment } from "./bankingService";
-import { getReminderPrefs, sendReminderDm } from "./cooldownReminderService";
-import { isTester } from "../utils/developerAccess";
-import { fmtAmount, fmtCurrency } from "../utils/format";
+    expect(noticeTypesInGroup("account")).toEqual(["card", "market"]);
+```
 
-const FOOTER = "-# Manage these DMs with `!settings` in any server with Fortuna.";
+to
+
+```ts
+    expect(noticeTypesInGroup("account")).toEqual(["card", "market", "investment"]);
+```
+
+- [ ] **Step 2: Run the tests to confirm they fail**
+
+Run: `npx vitest run test/dm/investment-notice.test.ts test/dm/prefs.test.ts`
+Expected: `investment-notice` FAILs at import (`investmentMaturedNotice` is not exported / `DM_NOTICE_TYPES.investment` undefined); the `prefs` account-group test FAILs because `investment` is missing.
+
+(If a second copy of `test/dm/prefs.test.ts` from `.claude/worktrees/dm-notices/` runs too, ignore it; only the root file matters.)
+
+- [ ] **Step 3: Add the registry entry**
+
+In `src/services/dmPrefsService.ts`, inside `DM_NOTICE_TYPES`, after the `market` line add:
+
+```ts
+  investment: { label: "Investment payouts", group: "account" },
+```
+
+Nothing else changes: `!settings` renders the account group from the registry, and `isCooldownReminderType("investment")` is false because there is no `command`.
+
+- [ ] **Step 4: Add the notice builder and notifier**
+
+In `src/services/dmNoticeService.ts`:
+
+1. Change the format import (line 4) to:
+
+```ts
+import { fmtAmount, fmtCurrency } from "../utils/format";
+```
+
+2. After the `creditCardService` type import (line 16) add:
+
+```ts
+import type { MaturedInvestment } from "./bankingService";
+```
+
+3. Append at the end of the file:
+
+```ts
+// ---- Investment maturity: the per-minute cron's matured FDs/RDs. ----
 
 // interestEarned is what the deposit earned; payout is what the bank cap let
-// through. The difference is money the player never received.
-function shortfall(m: MaturedInvestment): number {
-  return Math.max(0, m.investment.amount + (m.investment.interestEarned ?? 0) - m.payout);
-}
+// through. Anything missing between them is money the player never received.
+const investmentShortfall = (m: MaturedInvestment) =>
+  Math.max(0, m.investment.amount + (m.investment.interestEarned ?? 0) - m.payout);
 
-export function buildMaturedInvestmentDm(matured: MaturedInvestment[]): string {
+export function investmentMaturedNotice(matured: MaturedInvestment[]): ContainerBuilder {
   const lines = matured.map((m) => {
     const inv = m.investment;
     const days = `${m.durationDays} day${m.durationDays === 1 ? "" : "s"}`;
-    const earned = fmtAmount(inv.interestEarned ?? 0);
-    return `• **${inv.type}** — ${fmtCurrency(inv.amount)} locked for ${days} → paid **${fmtCurrency(m.payout)}** (+${earned} interest)`;
+    return `• **${inv.type}** — ${fmtCurrency(inv.amount)} locked for ${days} → paid **${fmtCurrency(m.payout)}** (+${fmtAmount(inv.interestEarned ?? 0)} interest)`;
   });
-
-  const lost = matured.reduce((sum, m) => sum + shortfall(m), 0);
-  const parts = ["💰 **Investment matured!**", ...lines];
-  if (lost > 0) parts.push(`-# Your bank was full, so ${fmtAmount(lost)} of this payout was lost.`);
-  parts.push(FOOTER);
-  return parts.join("\n");
+  const lost = matured.reduce((sum, m) => sum + investmentShortfall(m), 0);
+  let body = lines.join("\n");
+  if (lost > 0) body += `\n\nYour bank was full, so ${fmtAmount(lost)} of this payout was lost.`;
+  return noticeContainer(
+    Mascot.Emotes.Bank,
+    "Investment matured!",
+    body,
+    `-# See your history in \`!bank invest\`. ${SETTINGS_HINT}.`,
+  );
 }
 
-/** One DM per player for a batch matured by the cron. Never throws. */
-export async function notifyMaturedInvestments(client: Client, matured: MaturedInvestment[]): Promise<void> {
+/** Groups the per-minute cron's matured deposits by player and sends one opt-out DM each. */
+export async function notifyInvestmentsMatured(client: Client, matured: MaturedInvestment[]): Promise<void> {
   const byUser = new Map<string, MaturedInvestment[]>();
   for (const m of matured) {
     const list = byUser.get(m.investment.userId) ?? [];
@@ -794,48 +614,51 @@ export async function notifyMaturedInvestments(client: Client, matured: MaturedI
 
   for (const [discordId, list] of byUser) {
     try {
-      if (isTester(discordId)) continue;
-      const prefs = await getReminderPrefs(discordId);
-      if (!prefs.remindersEnabled || prefs.disabledReminders.includes("investment")) continue;
-      await sendReminderDm(client, discordId, buildMaturedInvestmentDm(list));
+      await sendOptOutDm(client, discordId, "investment", investmentMaturedNotice(list));
     } catch (err) {
-      console.error(`notifyMaturedInvestments failed for ${discordId}:`, err);
+      console.error(`notifyInvestmentsMatured failed for ${discordId}:`, err);
     }
   }
 }
 ```
 
-- [ ] **Step 4: Wire it into the scheduler**
+- [ ] **Step 5: Wire it into the scheduler**
 
-In `src/scheduler.ts`, add the import after the `bankingService` import:
+In `src/scheduler.ts`, change line 9 to:
 
 ```ts
-import { notifyMaturedInvestments } from "./services/investmentNotifyService";
+import { notifyCardWeekly, notifyInvestmentsMatured } from "./services/dmNoticeService";
 ```
 
 and directly after `console.log(\`Processed ${matured.length} matured investments.\`);` add:
 
 ```ts
-      await notifyMaturedInvestments(client, matured).catch((err) => console.error("Investment DM error:", err));
+      await notifyInvestmentsMatured(client, matured).catch((err) => console.error("Investment DM error:", err));
 ```
 
-- [ ] **Step 5: Run the tests and typecheck**
+- [ ] **Step 6: Run the tests and typecheck**
 
-Run: `npx vitest run test/bank/investment-notify.test.ts`
-Expected: 6 passed.
+Run: `npx vitest run test/dm/investment-notice.test.ts test/dm/prefs.test.ts test/dm/settings.test.ts`
+Expected: all passed (`investment-notice` 6, `prefs` unchanged count, `settings` unchanged count — it derives the button count from the registry).
 
 Run: `npm run typecheck`
 Expected: exits 0.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/services/investmentNotifyService.ts src/scheduler.ts test/bank/investment-notify.test.ts
+git add src/services/dmPrefsService.ts src/services/dmNoticeService.ts src/scheduler.ts test/dm/prefs.test.ts test/dm/investment-notice.test.ts
 git commit -m "feat(bank): DM players when an FD or RD matures
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01LekYjKxykkLrsqKL5VTzU8"
 ```
+
+---
+
+### Task 4: (folded into Task 3)
+
+The DM notices seam landed first, so the shared sender, the reminder-type entry, the settings toggle, and the notifier are all one registry entry plus one builder/notifier pair in `dmNoticeService`. See Task 3. Nothing to do here.
 
 ---
 
@@ -1045,7 +868,7 @@ and replace `case "invest"` with:
 In `dashboard/src/content/modules/bank-and-credit.ts`, replace the string on line 32 (starts "At maturity the payout lands back in your bank automatically") with:
 
 ```ts
-        "At maturity the payout lands back in your bank automatically — Fortuna checks every minute, DMs you the principal, interest and payout (toggle it under !settings), and the Investments tab keeps your last five returns plus lifetime interest earned. There is no early withdrawal: an FD is locked until its date, full stop. That's the entire risk.",
+        "At maturity the payout lands back in your bank automatically — Fortuna checks every minute, DMs you the principal, interest and payout (toggle it off under !settings, Account notices), and the Investments tab keeps your last five returns plus lifetime interest earned. There is no early withdrawal: an FD is locked until its date, full stop. That's the entire risk.",
 ```
 
 - [ ] **Step 6: Run the tests and typecheck**
@@ -1918,7 +1741,8 @@ Claude-Session: https://claude.ai/code/session_01LekYjKxykkLrsqKL5VTzU8"
 
 - [ ] **Step 1: Run every test file touched or adjacent**
 
-Run: `npx vitest run test/bank test/reminders test/shop test/zoo/feed-purchase.test.ts`
+Run: `npx vitest run test/bank test/dm test/shop test/zoo/feed-purchase.test.ts`
+(The sibling worktree under `.claude/worktrees/dm-notices/` doubles every `test/dm` file in the run; both copies should pass.)
 Expected: all passed.
 
 Run: `npm run typecheck`
@@ -1935,7 +1759,7 @@ With the dev token in a test guild:
 
 1. `!bank fd 365000 1` from a bank balance, then in Mongo set that investment's `maturityDate` to a minute ago. Within a minute the cron matures it: expect a DM listing `FD — 365,000 locked for 1 day → paid 365,100 (+100 interest)` and the bank balance up by 365,100.
 2. `!bank invest`: expect `Lifetime interest earned: 100` in the header and one line under `Recent returns`.
-3. `!settings`: expect an `Investment payouts: ON` button on the second row; toggle it off, repeat step 1, expect no DM.
+3. `!settings`: expect an `Investment payouts: ON` button in the Account notices group; toggle it off, repeat step 1, expect no DM.
 4. `!shop`, open Celestial Harp: with no card expect a `Starter Card exclusive · credit only` line, no wallet Buy button, a disabled Buy (Credit), and the apply hint. `!shop buy celestial harp` expect the card-exclusive refusal.
 5. `!card issue` (Starter), reopen Celestial Harp: Buy (Credit) enabled; buy it; `!mycards` shows the purchase. Open Royal Cape: disabled with the "doesn't qualify" hint.
 6. `!bank cards`: every tier section ends with an `Unlocks:` line.

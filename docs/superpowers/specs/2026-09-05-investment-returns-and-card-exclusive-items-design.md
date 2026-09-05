@@ -78,40 +78,42 @@ payout         Float?   // what was actually credited (after the MAX_SAFE_BALANC
 
 ### DM on maturity
 
-**Plumbing (`src/services/cooldownReminderService.ts`):**
+> **Adapted 2026-09-05:** the DM notices work (spec
+> `docs/superpowers/specs/2026-09-05-dm-notices-design.md`, merge `23c288b`) landed
+> first. Its "Coordination" section prescribes the shape below; the earlier plan for a
+> `sendReminderDm` extraction, a `REMINDER_TYPES` entry and a `TYPE_ORDER` edit is void.
 
-- Add `investment: { label: "Investment payouts", command: "!bank invest" }` to
-  `REMINDER_TYPES`. `enqueueReminder` is never called with this type; it exists so the
-  existing prefs (`remindersEnabled`, `disabledReminders`) and the settings buttons
-  govern it.
-- Extract the fetch-send-bookkeeping block from `processDueReminders` into an exported
-  `sendReminderDm(client, discordId, content): Promise<boolean>`:
-  fetch user → `send({ content })` → on success reset `reminderDmFailCount`; on failure
-  increment it and auto-pause (`remindersEnabled: false`, `cancelAll`) at
-  `MAX_DM_FAILS`. `processDueReminders` calls it. Behaviour is unchanged.
+**Registry (`src/services/dmPrefsService.ts`):** add
+`investment: { label: "Investment payouts", group: "account" }` to `DM_NOTICE_TYPES`.
+No `command` field, so it never enters the cooldown reminder queue. `!settings` renders
+the account group from the registry, so the toggle appears with no settings change; the
+account group ends card, market, investment.
 
-**Notifier (new `src/services/investmentNotifyService.ts`):**
+**Notice (`src/services/dmNoticeService.ts`):**
 
-- `notifyMaturedInvestments(client, results)`:
-  1. Group results by `userId`.
-  2. Per user: skip testers (mirrors `enqueueReminder`), load `getReminderPrefs`, skip
-     if `!remindersEnabled` or `disabledReminders` includes `"investment"`.
-  3. Build one DM and call `sendReminderDm`. Never throws; per-user errors are logged.
-- DM content (plain `content` string, same style as the cooldown DMs):
+- `investmentMaturedNotice(matured: MaturedInvestment[]): ContainerBuilder` — built with
+  `noticeContainer(Mascot.Emotes.Bank, "Investment matured!", body, hint)`. One line per
+  deposit; a shortfall sentence only when the bank cap cut a payout; the hint points at
+  `!bank invest` and `!settings`.
+- `notifyInvestmentsMatured(client, matured)` — groups by `m.investment.userId` and calls
+  `sendOptOutDm(client, discordId, "investment", container)`, which applies the master
+  switch, the per-type toggle, the tester skip and the closed-DM strike count. Never
+  throws; per-user errors are logged.
+- Body copy:
 
   ```
-  💰 **Investment matured!**
-  • **FD** — 100,000 locked for 30 days → paid **100,821** (+821 interest)
-  • **RD** — 50,000 locked for 10 days → paid **50,054** (+54 interest)
-  -# Your bank was full, so 5,000 of this payout was lost.   ← only when shortfall > 0
-  -# Manage these DMs with `!settings` in any server with Fortuna.
+  ## Investment matured!
+  • **FD** — 💰 100,000 locked for 30 days → paid **💰 100,821** (+821 interest)
+  • **RD** — 💰 50,000 locked for 10 days → paid **💰 50,054** (+54 interest)
+
+  Your bank was full, so 5,000 of this payout was lost.   ← only when shortfall > 0
+  -# See your history in `!bank invest`. Manage these DMs with `!settings`.
   ```
 
 **Scheduler (`src/scheduler.ts`):** after `processAllInvestments()`, call
-`notifyMaturedInvestments(client, results).catch(log)`.
+`notifyInvestmentsMatured(client, matured).catch(log)`.
 
-**Settings (`src/commands/general/settings.ts`):** append `"investment"` to
-`TYPE_ORDER`. Row 2 becomes hunt, work, vote, investment (4 buttons, under the 5 cap).
+**Settings:** no change; the registry drives it.
 
 ### Bank Investments tab (`src/commands/economy/bank.ts`)
 
@@ -259,12 +261,11 @@ conventions. New files:
   - `getInvestmentReturns` excludes a `COMPLETED` row seeded without `completedAt`,
     orders newest first, respects `limit`, and sums `lifetimeInterest` correctly.
   - `processAllInvestments` returns the matured results.
-- `test/bank/investment-notify.test.ts`
-  - Fake client whose `users.fetch` returns `{ send: vi.fn() }`.
-  - One DM per user with all their matured deposits; numbers present in the text.
-  - Shortfall line present only when capped.
-  - Skipped when `remindersEnabled` is false or `"investment"` is in
-    `disabledReminders`.
+- `test/dm/investment-notice.test.ts`
+  - Registry entry is an account notice with no command; account group is card, market, investment.
+  - Notice: bank thumbnail, one line per deposit with the numbers; shortfall line only when capped.
+  - One DM per user with all their matured deposits (fake DM client from `test/dm/helpers.ts`).
+  - Skipped when the `investment` toggle is off.
 - `test/shop/card-exclusive.test.ts`
   - Wallet purchase of a gated item throws.
   - Credit purchase with a Starter card for a Gold item throws.
