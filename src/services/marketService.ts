@@ -2,6 +2,7 @@ import prisma from "../utils/prisma";
 import { addBalance } from "./walletService";
 import { applyGarnishment } from "./creditCardService";
 import { questBus } from "./questEvents";
+import { findCatalogEntry } from "./shopService";
 
 const SELLER_FEE_PCT = 10;
 const BUYER_FEE_PCT = 5;
@@ -45,6 +46,12 @@ export async function listItem(discordId: string, shopItemId: string, amount: nu
   const meta = inventoryItem.meta as any;
   if (meta?.level !== undefined || meta?.trait !== undefined) {
     throw new Error("This item cannot be listed on the black market (unique/meta items are non-transferable).");
+  }
+
+  // Card-exclusive items are earned on credit; reselling them for wallet coins
+  // would hand them to players with no card at all.
+  if (findCatalogEntry(inventoryItem.shopItem)?.requiresCardTier) {
+    throw new Error(`**${inventoryItem.shopItem.name}** is card-exclusive and cannot be listed on the black market.`);
   }
 
   const itemName = inventoryItem.shopItem?.name ?? "Unknown";

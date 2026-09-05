@@ -16,7 +16,7 @@ import { STARTER_CHICKEN_ITEM_KEY } from "../utils/chickenConfig";
 
 // Catalog entry for a DB shop row: by key when the row carries one, else by
 // name (rows created before catalogKey existed only have a name).
-function findCatalogEntry(item: { catalogKey?: string | null; name: string }): ShopCatalogItem | undefined {
+export function findCatalogEntry(item: { catalogKey?: string | null; name: string }): ShopCatalogItem | undefined {
   return SHOP_CATALOG.find((entry) => entry.key === item.catalogKey || entry.name.toLowerCase() === item.name.toLowerCase());
 }
 

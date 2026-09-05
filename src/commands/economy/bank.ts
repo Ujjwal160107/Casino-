@@ -567,7 +567,7 @@ export function buildBankInvestmentsContainer(
                 [
                     `FD Rate: **${BANKING_CONFIG.fdInterestRate}% APR**`,
                     `RD Rate: **${BANKING_CONFIG.rdInterestRate}% APR**`,
-                    `Lifetime interest earned: **${fmtCurrency(returns.lifetimeInterest)}**`,
+                    `Recorded interest earned: **${fmtCurrency(returns.lifetimeInterest)}**`,
                 ].join("\n"),
                 avatarUrl,
             ),
@@ -606,8 +606,8 @@ export function buildBankInvestmentsContainer(
 // One line per matured deposit, packed into a single TextDisplay so a long
 // history never eats into the 40-component cap.
 function formatRecentReturns(recent: InvestmentReturns["recent"]): string {
-    if (recent.length === 0) return "-# No matured deposits yet.";
-    return recent
+    if (recent.length === 0) return "-# No recorded returns yet. Deposits that matured before payout tracking began aren't listed.";
+    const lines = recent
         .map((inv) => {
             const earned = inv.interestEarned ?? 0;
             const payout = inv.payout ?? 0;
@@ -617,6 +617,7 @@ function formatRecentReturns(recent: InvestmentReturns["recent"]): string {
             return `${inv.type} · **${fmtCurrency(inv.amount)}** → **${fmtCurrency(payout)}** (+${fmtAmount(earned)}) · ${when}${shortfall}`;
         })
         .join("\n");
+    return lines + "\n-# Only deposits matured since payout tracking began are listed.";
 }
 
 export async function execute(message: Message | any, args: string[]) {

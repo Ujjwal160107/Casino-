@@ -269,6 +269,8 @@ const investmentShortfall = (m: MaturedInvestment) =>
   Math.max(0, m.investment.amount + (m.investment.interestEarned ?? 0) - m.payout);
 
 export function investmentMaturedNotice(matured: MaturedInvestment[]): ContainerBuilder {
+  // interestEarned lives only on the row (m.interest is the post-cap figure);
+  // payout and durationDays come from the wrapper.
   const lines = matured.map((m) => {
     const inv = m.investment;
     const days = `${m.durationDays} day${m.durationDays === 1 ? "" : "s"}`;

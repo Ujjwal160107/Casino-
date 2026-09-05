@@ -32,8 +32,14 @@ describe("buildItemInfoCard for a card-exclusive item", () => {
     expect(text).toContain("Your **Starter** card doesn't qualify");
   });
 
-  it("treats a non-active card like no card", () => {
+  it("tells a locked or delinquent holder to pay the card down", () => {
     const { text, buttons } = render(cape, { status: "LOCKED", tier: "BLACK" });
+    expect(buttons[0].disabled).toBe(true);
+    expect(text).toContain("Your **Black** card is **LOCKED**. Pay it down with `!card pay`");
+  });
+
+  it("treats a closed card like no card", () => {
+    const { text, buttons } = render(cape, { status: "CLOSED", tier: "BLACK" });
     expect(buttons[0].disabled).toBe(true);
     expect(text).toContain("Requires an active **Gold** Fortuna Card");
   });
@@ -55,5 +61,12 @@ describe("buildItemInfoCard for an ordinary item", () => {
     const { text, buttons } = render(shield, null);
     expect(buttons.map((b) => b.custom_id)).toEqual(["shop_buy:tax_shield:u"]);
     expect(text).toContain("Credit purchases require an **ACTIVE** Fortuna Card");
+  });
+
+  it("shows only the wallet button for a credit-blocked item, even with a card", () => {
+    const box = getCatalogItem("mystery_box")!;
+    const { text, buttons } = render(box, { status: "ACTIVE", tier: "GOLD" });
+    expect(buttons.map((b) => b.custom_id)).toEqual(["shop_buy:mystery_box:u"]);
+    expect(text).not.toContain("Credit purchases require");
   });
 });

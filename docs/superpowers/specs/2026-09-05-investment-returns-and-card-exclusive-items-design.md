@@ -119,7 +119,7 @@ account group ends card, market, investment.
 
 - `buildBankInvestmentsContainer` gains a fifth parameter
   `returns: { recent; lifetimeInterest }`.
-- Header subtitle gains a line: `Lifetime interest earned: **X**` (always shown).
+- Header subtitle gains a line: `Recorded interest earned: **X**` (always shown; there is no backfill, so the copy says "recorded").
 - After the active list: a divider separator, `### Recent returns`, and **one**
   `TextDisplay` holding up to five lines (packed into one component so the 40-component
   cap is not eroded):
@@ -129,7 +129,7 @@ account group ends card, market, investment.
   RD · **50,000** → **50,054** (+54) · 1 week ago · ⚠ bank full, −5,000
   ```
 
-  Relative time uses `<t:…:R>`. If there are none: `-# No matured deposits yet.`
+  Relative time uses `<t:…:R>`. The block ends with `-# Only deposits matured since payout tracking began are listed.`; if there are none: `-# No recorded returns yet. Deposits that matured before payout tracking began aren't listed.`
 - Both call sites (`bankInteractionHandler` case `"invest"` and `bank.ts` `execute`
   for `investments`) fetch `getInvestmentReturns(user.id)` alongside
   `getFinancialSummary` with `Promise.all`.
@@ -156,6 +156,10 @@ An item with `requiresCardTier` set can be bought only when all of these hold:
    required one in `CARD_TIER_ORDER`.
 
 Testers bypass the gate, consistent with every other purchase check in `buyItem`.
+
+Card-exclusive items also cannot be listed on the Black Market (`listItem` in
+`marketService` refuses them), so a resale can never hand one to a player with no card.
+Existing owners keep what they own.
 
 ### Default item set
 

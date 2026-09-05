@@ -911,7 +911,9 @@ export function buildItemInfoCard(item: ShopCatalogItem, ownerId: string, card: 
         new TextDisplayBuilder().setContent(
           canUseCredit
             ? `-# Your **${formatCardTierName(card!.tier)}** card doesn't qualify. Upgrade with \`!card upgrade\`.`
-            : `-# Requires an active **${formatCardTierName(minTier)}** Fortuna Card or higher. Apply with \`!card\`.`,
+            : card && card.status !== "CLOSED"
+              ? `-# Your **${formatCardTierName(card.tier)}** card is **${card.status}**. Pay it down with \`!card pay\` to use it here.`
+              : `-# Requires an active **${formatCardTierName(minTier)}** Fortuna Card or higher. Apply with \`!card\`.`,
         ),
       );
     }

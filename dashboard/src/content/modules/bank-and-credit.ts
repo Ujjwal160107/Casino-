@@ -29,7 +29,7 @@ const bankAndCredit: ModuleDoc = {
       heading: "Fixed Deposits (FD): the real product",
       body: [
         "!bank fd <amount> <days> locks money from your BANK balance (deposit it first) at 10% APR simple interest, prorated by the day: interest = amount × 10% × days ÷ 365. Any amount, any duration from 1 day up, and you can run as many FDs at once as you like.",
-        "At maturity the payout lands back in your bank automatically — Fortuna checks every minute, DMs you the principal, interest and payout (toggle it off under !settings, Account notices), and the Investments tab keeps your last five returns plus lifetime interest earned. There is no early withdrawal: an FD is locked until its date, full stop. That's the entire risk.",
+        "At maturity the payout lands back in your bank automatically — Fortuna checks every minute, DMs you the principal, interest and payout (toggle it off under !settings, Account notices), and the Investments tab keeps your last five recorded returns plus recorded interest earned (deposits that matured before payout tracking began aren't listed). There is no early withdrawal: an FD is locked until its date, full stop. That's the entire risk.",
       ],
       table: {
         title: "What an FD pays (10% APR, simple)",
@@ -63,7 +63,7 @@ const bankAndCredit: ModuleDoc = {
       body: [
         "One card per player, four tiers, and every tier gates on BOTH numbers: your credit score (everyone starts at 500) and your career tier from the Jobs ladder. A perfect score with a Waiter's career tier still caps you — the card desk checks your business card too.",
         "!card issue grants the best tier you qualify for; !card upgrade moves you up later, but only if your utilization is under 50% and the card isn't delinquent. !credit shows exactly where you stand against every tier.",
-        "Each tier also unlocks card-exclusive shop items that can only be bought on credit with that tier or higher — STARTER: Celestial Harp, Demonic Harp · GOLD: Crown of Greed, Royal Cape · PLATINUM: Platinum Crown, Void Wings · BLACK: Celestial Halo, Emperor's Throne. The weekly spend cap paces them: a BLACK card can charge Emperor's Throne (25,000,000) exactly once a week, and a STARTER card can never charge Royal Cape at all.",
+        "Each tier also unlocks card-exclusive shop items that can only be bought on credit with that tier or higher — STARTER: Celestial Harp, Demonic Harp · GOLD: Crown of Greed, Royal Cape · PLATINUM: Platinum Crown, Void Wings · BLACK: Celestial Halo, Emperor's Throne. The weekly spend cap paces them: a BLACK card can charge Emperor's Throne (25,000,000) exactly once a week, and a STARTER card can never charge Royal Cape at all. Exclusives can't be resold on the Black Market.",
       ],
       table: {
         title: "Card tiers",

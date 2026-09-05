@@ -30,12 +30,13 @@ describe("buildBankInvestmentsContainer", () => {
       recent: [completed(), completed({ amount: 50_000, interestEarned: 54 })],
       lifetimeInterest: 1054,
     });
-    expect(text).toContain("Lifetime interest earned:");
+    expect(text).toContain("Recorded interest earned:");
     expect(text).toContain("1,054");
     expect(text).toContain("### Recent returns");
     expect(text).toContain("101,000");
     expect(text).toContain("(+1,000)");
     expect(text).toContain("50,054");
+    expect(text).toContain("since payout tracking began");
     // header section, separator, "No active investments", separator, recent returns, nav row
     expect(json.components).toHaveLength(6);
   });
@@ -47,6 +48,6 @@ describe("buildBankInvestmentsContainer", () => {
 
   it("says so when there is no history yet", () => {
     const { text } = render({ recent: [], lifetimeInterest: 0 });
-    expect(text).toContain("No matured deposits yet.");
+    expect(text).toContain("No recorded returns yet.");
   });
 });

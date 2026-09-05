@@ -1,11 +1,12 @@
 import { Message } from "discord.js";
-import { getShopItemByName, seedGeneralShop } from "../../services/shopService";
+import { findCatalogEntry, getShopItemByName, seedGeneralShop } from "../../services/shopService";
 import { fmtCurrency, formatDuration } from "../../utils/format";
 import { errorContainer, plainContainer, v2Reply } from "../../utils/componentsV2";
 import { ItemEffect } from "../../services/effectService";
 import { getGuildPrefix } from "../../utils/guildContext";
 import { getLoadedDiceStatus } from "../../services/loadedDiceService";
 import { LOADED_DICE_ITEM_KEY } from "../../utils/loadedDiceConfig";
+import { formatCardTierName } from "../../utils/economyConfig";
 
 function formatEffectDescription(effect: ItemEffect): string {
     switch (effect.type) {
@@ -55,6 +56,10 @@ export async function handleItemInfo(message: Message, args: string[]) {
 
         const titleBlock = `## <a:BoxBox:1449707866079494154> ${item.name}\n${item.description || "*No description provided*"}`;
         const statsBlock = `**<:pricee:1449707707442528387> Price:** ${fmtCurrency(item.price)}\n**<a:BoxBox:1449707866079494154> Stock:** ${stockText}`;
+        const minTier = findCatalogEntry(item)?.requiresCardTier;
+        const gateBlock = minTier
+            ? `**Card-exclusive:** ${formatCardTierName(minTier)} Fortuna Card or higher · credit only`
+            : null;
         const effectsBlock = `**<:sparks:1456569026292744303> Effects**\n${effectsText}`;
         const isLoadedDice = item.catalogKey === LOADED_DICE_ITEM_KEY
             || item.name.toLowerCase() === "loaded dice of ruin";
@@ -77,6 +82,7 @@ export async function handleItemInfo(message: Message, args: string[]) {
         return message.reply(v2Reply(plainContainer(
             titleBlock,
             statsBlock,
+            ...(gateBlock ? [gateBlock] : []),
             effectsBlock,
             ...(diceStatusBlock ? [diceStatusBlock] : []),
         )));

@@ -8,7 +8,7 @@ const itemsAndShop: ModuleDoc = {
   forBeginners: {
     what: "The shop sells tools that change the rules: buffs that fatten payouts, shields that block robbers and taxes, gear your job literally requires, and chaos items that gamble on themselves. One catalog is shared across every server, stock is unlimited, and everything here lists the real effect — not the flavor text.",
     firstCommands: ["!shop", "!inventory", "!use lucky coin"],
-    tip: "!shop buy card <item> charges your Fortuna Card instead of your wallet — but Mystery Box, Treasure Map, Pandora Box, Loaded Dice of Ruin, and Devil Contract are cash-only by design. Eight items go the other way: card-exclusive and credit-only. Celestial Harp and Demonic Harp need a STARTER card, Crown of Greed and Royal Cape a GOLD, Platinum Crown and Void Wings a PLATINUM, Celestial Halo and Emperor's Throne a BLACK.",
+    tip: "!shop buy card <item> charges your Fortuna Card instead of your wallet — but Mystery Box, Treasure Map, Pandora Box, Loaded Dice of Ruin, and Devil Contract are cash-only by design. Eight items go the other way: card-exclusive and credit-only. Celestial Harp and Demonic Harp need a STARTER card, Crown of Greed and Royal Cape a GOLD, Platinum Crown and Void Wings a PLATINUM, Celestial Halo and Emperor's Throne a BLACK. None of the eight can be listed on the Black Market; the only way to hold one is to charge it.",
   },
   sections: [
     {
