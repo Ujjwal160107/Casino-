@@ -1,7 +1,8 @@
 import prisma from "../utils/prisma";
 import { redisService } from "./redisService";
 import { isTester } from "../utils/developerAccess";
-import { enqueueReminder, isReminderType } from "./cooldownReminderService";
+import { enqueueReminder } from "./cooldownReminderService";
+import { isCooldownReminderType } from "./dmPrefsService";
 
 type CooldownResult = {
   active: boolean;
@@ -78,7 +79,7 @@ export async function setCooldown(discordId: string, commandName: string, cooldo
   try {
     const result = await redisService.getInstance().set(key, expiresAt.toISOString(), "EX", cooldownSeconds, "NX");
     if (result === "OK") {
-      if (isReminderType(commandName)) {
+      if (isCooldownReminderType(commandName)) {
         void enqueueReminder(discordId, commandName, expiresAt);
       }
       return { active: false, key, expiresAt, remainingSeconds: cooldownSeconds };
@@ -135,7 +136,7 @@ export async function setCooldown(discordId: string, commandName: string, cooldo
       }
     });
 
-    if (isReminderType(commandName)) {
+    if (isCooldownReminderType(commandName)) {
       void enqueueReminder(discordId, commandName, expiresAt);
     }
 

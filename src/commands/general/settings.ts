@@ -13,15 +13,15 @@ import {
 import prisma from "../../utils/prisma";
 import { ensureUserAndWallet } from "../../services/walletService";
 import {
-    REMINDER_TYPES,
-    ReminderType,
-    isReminderType,
-    getReminderPrefs,
-    setReminderTypeEnabled,
+    DM_NOTICE_TYPES,
+    DmNoticeType,
+    isDmNoticeType,
+    getDmPrefs,
+    setNoticeTypeEnabled,
     setMasterEnabled,
-} from "../../services/cooldownReminderService";
+} from "../../services/dmPrefsService";
 
-const TYPE_ORDER: ReminderType[] = ["daily", "weekly", "monthly", "crime", "hunt", "work", "vote"];
+const TYPE_ORDER: DmNoticeType[] = ["daily", "weekly", "monthly", "crime", "hunt", "work", "vote"];
 
 function buildSettingsPayload(
     ownerId: string,
@@ -60,11 +60,11 @@ function buildSettingsPayload(
             .setStyle(prefs.remindersEnabled ? ButtonStyle.Success : ButtonStyle.Danger),
     );
 
-    const typeButton = (type: ReminderType) => {
+    const typeButton = (type: DmNoticeType) => {
         const on = prefs.remindersEnabled && !prefs.disabledReminders.includes(type);
         return new ButtonBuilder()
             .setCustomId(`settings:toggle:${type}:${ownerId}`)
-            .setLabel(`${REMINDER_TYPES[type].label}: ${on ? "ON" : "OFF"}`)
+            .setLabel(`${DM_NOTICE_TYPES[type].label}: ${on ? "ON" : "OFF"}`)
             .setStyle(on ? ButtonStyle.Success : ButtonStyle.Secondary)
             .setDisabled(!prefs.remindersEnabled);
     };
@@ -118,16 +118,16 @@ export async function handleSettingsInteraction(interaction: ButtonInteraction) 
     }
 
     if (action === "master") {
-        const prefs = await getReminderPrefs(ownerId);
+        const prefs = await getDmPrefs(ownerId);
         await setMasterEnabled(ownerId, !prefs.remindersEnabled);
     } else if (action === "toggle") {
         const type = parts[2];
-        if (!isReminderType(type)) {
+        if (!isDmNoticeType(type)) {
             return interaction.reply({ content: "Unknown setting.", flags: MessageFlags.Ephemeral }).catch(() => {});
         }
-        const prefs = await getReminderPrefs(ownerId);
+        const prefs = await getDmPrefs(ownerId);
         const currentlyOn = !prefs.disabledReminders.includes(type);
-        await setReminderTypeEnabled(ownerId, type, !currentlyOn);
+        await setNoticeTypeEnabled(ownerId, type, !currentlyOn);
     } else {
         return interaction.reply({ content: "Unknown setting.", flags: MessageFlags.Ephemeral }).catch(() => {});
     }

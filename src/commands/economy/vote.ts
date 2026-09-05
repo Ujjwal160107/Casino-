@@ -6,7 +6,8 @@ import { GLOBAL_CURRENCY_EMOJI, Mascot } from "../../config/branding";
 import { ensureUserAndWallet, addBalance } from "../../services/walletService";
 import fetch from "node-fetch";
 import { getGuildPrefix } from "../../utils/guildContext";
-import { enqueueReminder, setReminderTypeEnabled, getReminderPrefs } from "../../services/cooldownReminderService";
+import { enqueueReminder } from "../../services/cooldownReminderService";
+import { getDmPrefs, isNoticeEnabled, setNoticeTypeEnabled } from "../../services/dmPrefsService";
 import { conditionalClaim, userDateUnchanged } from "../../anticheat/claim";
 
 const TOPGG_BOT_ID = "1371816936857669702";
@@ -25,9 +26,9 @@ export async function handleVote(message: Message, args: string[]) {
 
     // Handle Reminder Toggle
     if (args[0]?.toLowerCase() === "reminder" || args[0]?.toLowerCase() === "remind") {
-        const prefs = await getReminderPrefs(user.discordId);
-        const currentlyOn = prefs.remindersEnabled && !prefs.disabledReminders.includes("vote");
-        const newState = await setReminderTypeEnabled(user.discordId, "vote", !currentlyOn);
+        const prefs = await getDmPrefs(user.discordId);
+        const currentlyOn = isNoticeEnabled(prefs, "vote");
+        const newState = await setNoticeTypeEnabled(user.discordId, "vote", !currentlyOn);
         return message.reply(v2Reply(
             errorContainer("Reminder Settings", `Vote reminders are now **${newState ? "ENABLED" : "DISABLED"}**. Manage all reminders with \`${prefix}settings\`.`)
         ));
