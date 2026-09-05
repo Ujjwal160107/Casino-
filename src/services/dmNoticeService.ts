@@ -2,6 +2,16 @@ import { Client, ContainerBuilder } from "discord.js";
 import { Mascot } from "../config/branding";
 import { noticeContainer, v2Reply } from "../utils/componentsV2";
 import { fmtCurrency } from "../utils/format";
+import { isTester } from "../utils/developerAccess";
+import {
+  CooldownReminderType,
+  DM_NOTICE_TYPES,
+  DmNoticeType,
+  getDmPrefs,
+  isNoticeEnabled,
+  recordDmDelivered,
+  recordDmFailed,
+} from "./dmPrefsService";
 
 // Every DM Fortuna sends a player is built and sent from here, so they all
 // share one look (noticeContainer) and one failure policy: a closed DM is a
@@ -16,6 +26,34 @@ export async function sendDm(client: Client, userId: string, container: Containe
     return true;
   } catch {
     return false;
+  }
+}
+
+const SETTINGS_HINT = "Manage these DMs with `!settings`";
+
+/** Send and record the outcome against the strike count. Caller has already applied prefs. */
+async function deliverCounted(client: Client, discordId: string, container: ContainerBuilder): Promise<void> {
+  if (await sendDm(client, discordId, container)) await recordDmDelivered(discordId);
+  else await recordDmFailed(discordId);
+}
+
+/**
+ * Send a DM the player can switch off in `!settings`. Checks the master switch
+ * and the per-type toggle, then keeps the closed-DM strike count. Never throws.
+ */
+export async function sendOptOutDm(
+  client: Client,
+  discordId: string,
+  type: DmNoticeType,
+  container: ContainerBuilder,
+): Promise<void> {
+  try {
+    if (isTester(discordId)) return;
+    const prefs = await getDmPrefs(discordId);
+    if (!isNoticeEnabled(prefs, type)) return;
+    await deliverCounted(client, discordId, container);
+  } catch (err) {
+    console.error(`sendOptOutDm(${type}) failed for ${discordId}:`, err);
   }
 }
 
@@ -74,4 +112,34 @@ export function taxRaidNotice(seized: number, walletNow: number): ContainerBuild
 
 export async function notifyTaxRaid(client: Client, discordId: string, seized: number, walletNow: number): Promise<void> {
   await sendDm(client, discordId, taxRaidNotice(seized, walletNow));
+}
+
+// ---- Opt-out notices: governed by !settings and the DM strike count. ----
+
+export function cooldownNotice(types: CooldownReminderType[]): ContainerBuilder {
+  const hint = `-# ${SETTINGS_HINT} in any server with Fortuna.`;
+  if (types.length === 1) {
+    const t = DM_NOTICE_TYPES[types[0]];
+    return noticeContainer(
+      Mascot.Emotes.Cooldown,
+      "Cooldown lifted!",
+      `Your **${t.label.toLowerCase()}** is ready. Use \`${t.command}\`.`,
+      hint,
+    );
+  }
+  const lines = types.map((ty) => `• **${DM_NOTICE_TYPES[ty].label}** — \`${DM_NOTICE_TYPES[ty].command}\``);
+  return noticeContainer(Mascot.Emotes.Cooldown, "Cooldowns lifted!", `Ready to use:\n${lines.join("\n")}`, hint);
+}
+
+/** The reminder drain has already filtered by prefs, so this only sends and counts. */
+export async function notifyCooldownsLifted(
+  client: Client,
+  discordId: string,
+  types: CooldownReminderType[],
+): Promise<void> {
+  try {
+    await deliverCounted(client, discordId, cooldownNotice(types));
+  } catch (err) {
+    console.error(`notifyCooldownsLifted failed for ${discordId}:`, err);
+  }
 }

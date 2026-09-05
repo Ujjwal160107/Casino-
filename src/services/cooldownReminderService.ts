@@ -1,22 +1,14 @@
 import { Client } from "discord.js";
 import prisma from "../utils/prisma";
 import { isTester } from "../utils/developerAccess";
-import {
-  CooldownReminderType,
-  DM_NOTICE_TYPES,
-  getDmPrefs,
-  isCooldownReminderType,
-  isNoticeEnabled,
-  recordDmDelivered,
-  recordDmFailed,
-} from "./dmPrefsService";
+import { CooldownReminderType, getDmPrefs, isCooldownReminderType, isNoticeEnabled } from "./dmPrefsService";
+import { notifyCooldownsLifted } from "./dmNoticeService";
 
 // The reminder QUEUE. Which DMs a player allows lives in dmPrefsService; the
 // drain reads those prefs at fire time, so nothing here has to delete rows
 // when a toggle changes.
 
 const BATCH_SIZE = 200;
-const FOOTER = "-# Manage these DMs with `!settings` in any server with Fortuna.";
 
 /**
  * Queue a reminder for when a cooldown lifts. Replaces any pending reminder
@@ -84,15 +76,6 @@ export async function cancelAll(discordId: string): Promise<void> {
   await prisma.cooldownReminder.deleteMany({ where: { discordId } }).catch(() => {});
 }
 
-function buildDmContent(types: CooldownReminderType[]): string {
-  if (types.length === 1) {
-    const t = DM_NOTICE_TYPES[types[0]];
-    return `⏰ **Cooldown lifted!** Your **${t.label.toLowerCase()}** is ready — use \`${t.command}\`.\n${FOOTER}`;
-  }
-  const lines = types.map((ty) => `• **${DM_NOTICE_TYPES[ty].label}** — \`${DM_NOTICE_TYPES[ty].command}\``);
-  return `⏰ **Cooldowns lifted!** Ready to use:\n${lines.join("\n")}\n${FOOTER}`;
-}
-
 /** Called by the per-minute cron. Drains due reminders, one combined DM per player. */
 export async function processDueReminders(client: Client): Promise<void> {
   const due = await prisma.cooldownReminder.findMany({
@@ -118,16 +101,7 @@ export async function processDueReminders(client: Client): Promise<void> {
       const prefs = await getDmPrefs(discordId);
       const active = types.filter((t) => isNoticeEnabled(prefs, t));
       if (active.length === 0) continue;
-
-      const discordUser = await client.users.fetch(discordId).catch(() => null);
-      if (!discordUser) continue;
-
-      try {
-        await discordUser.send({ content: buildDmContent(active) });
-        await recordDmDelivered(discordId);
-      } catch {
-        await recordDmFailed(discordId);
-      }
+      await notifyCooldownsLifted(client, discordId, active);
     } catch (err) {
       console.error(`processDueReminders failed for ${discordId}:`, err);
     }
