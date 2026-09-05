@@ -6,6 +6,7 @@ import { removeTemporaryRoles } from "./services/effectService";
 import { marketTick, initGlobalMarket } from "./services/stockService";
 import { decayAllHeat, runRaidScan } from "./services/taxService";
 import { processDueReminders } from "./services/cooldownReminderService";
+import { notifyCardWeekly } from "./services/dmNoticeService";
 import prisma from "./utils/prisma";
 
 export function initScheduler(client: Client) {
@@ -48,6 +49,7 @@ export function initScheduler(client: Client) {
     try {
       const result = await processWeeklyCardSettlement();
       console.log(`Processed card settlement. Statements generated: ${result.issued.length}, statements settled: ${result.settled.length}.`);
+      await notifyCardWeekly(client, result);
     } catch (err) {
       console.error("Weekly credit card settlement failed:", err);
     }

@@ -12,6 +12,7 @@ import {
   recordDmDelivered,
   recordDmFailed,
 } from "./dmPrefsService";
+import type { StatementIssued, StatementSettled } from "./creditCardService";
 
 // Every DM Fortuna sends a player is built and sent from here, so they all
 // share one look (noticeContainer) and one failure policy: a closed DM is a
@@ -141,5 +142,81 @@ export async function notifyCooldownsLifted(
     await deliverCounted(client, discordId, cooldownNotice(types));
   } catch (err) {
     console.error(`notifyCooldownsLifted failed for ${discordId}:`, err);
+  }
+}
+
+export type CardWeeklyInput = { issued?: StatementIssued; settled?: StatementSettled };
+
+const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+
+/**
+ * One Monday DM per cardholder: last week's settlement (if any) and this
+ * week's statement (if above zero). Null when there is nothing to say.
+ */
+export function cardWeeklyNotice(input: CardWeeklyInput): ContainerBuilder | null {
+  const { issued, settled } = input;
+  const hasStatement = !!issued && issued.statementBalance > 0;
+  if (!settled && !hasStatement) return null;
+
+  let title = "New card statement";
+  const blocks: string[] = [];
+
+  if (settled) {
+    switch (settled.status) {
+      case "PAID_FULL":
+        title = "Card statement paid in full";
+        blocks.push(`Last week's statement is paid in full. Credit score **${signed(settled.scoreDelta)}**.`);
+        break;
+      case "PAID_MINIMUM":
+        title = "Minimum payment received";
+        blocks.push(
+          `You paid the minimum on last week's statement. Credit score **${signed(settled.scoreDelta)}**. ` +
+            `**${fmtCurrency(settled.remainingBalance)}** rolls forward.`,
+        );
+        break;
+      case "MISSED": {
+        title = "Card payment missed";
+        let line =
+          `You missed last week's minimum. Credit score **${signed(settled.scoreDelta)}**. ` +
+          `Interest of **${fmtCurrency(settled.interestCharged)}** was added. Your card is now **${settled.cardStatus}**.`;
+        if (settled.cardStatus === "LOCKED") line += " Income is garnished at 25% until the balance clears.";
+        blocks.push(line);
+        break;
+      }
+    }
+  }
+
+  if (issued && hasStatement) {
+    const dueUnix = Math.floor(issued.dueAt.getTime() / 1000);
+    blocks.push(
+      `**New statement:** ${fmtCurrency(issued.statementBalance)}\n` +
+        `**Minimum due:** ${fmtCurrency(issued.minimumDue)} by <t:${dueUnix}:R>`,
+    );
+  }
+
+  return noticeContainer(
+    Mascot.Emotes.Credit,
+    title,
+    blocks.join("\n\n"),
+    `-# Pay with \`!card pay <amount>\`. ${SETTINGS_HINT}.`,
+  );
+}
+
+/** Groups the Monday cron's results by cardholder and sends one opt-out DM each. */
+export async function notifyCardWeekly(
+  client: Client,
+  result: { issued: StatementIssued[]; settled: StatementSettled[] },
+): Promise<void> {
+  const byUser = new Map<string, CardWeeklyInput>();
+  for (const s of result.settled) byUser.set(s.userId, { ...byUser.get(s.userId), settled: s });
+  for (const i of result.issued) byUser.set(i.userId, { ...byUser.get(i.userId), issued: i });
+
+  for (const [discordId, input] of byUser) {
+    try {
+      const container = cardWeeklyNotice(input);
+      if (container) await sendOptOutDm(client, discordId, "card", container);
+    } catch (err) {
+      console.error(`notifyCardWeekly failed for ${discordId}:`, err);
+    }
   }
 }
