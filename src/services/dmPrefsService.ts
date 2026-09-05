@@ -21,6 +21,7 @@ export const DM_NOTICE_TYPES = {
   vote: { label: "Vote", command: "!vote", group: "cooldown" },
   card: { label: "Card statements", group: "account" },
   market: { label: "Market sales", group: "account" },
+  investment: { label: "Investment payouts", group: "account" },
 } as const;
 
 export type DmNoticeType = keyof typeof DM_NOTICE_TYPES;

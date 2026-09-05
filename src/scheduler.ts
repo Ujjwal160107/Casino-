@@ -6,7 +6,7 @@ import { removeTemporaryRoles } from "./services/effectService";
 import { marketTick, initGlobalMarket } from "./services/stockService";
 import { decayAllHeat, runRaidScan } from "./services/taxService";
 import { processDueReminders } from "./services/cooldownReminderService";
-import { notifyCardWeekly } from "./services/dmNoticeService";
+import { notifyCardWeekly, notifyInvestmentsMatured } from "./services/dmNoticeService";
 import prisma from "./utils/prisma";
 
 export function initScheduler(client: Client) {
@@ -27,6 +27,7 @@ export function initScheduler(client: Client) {
     try {
       const matured = await processAllInvestments();
       console.log(`Processed ${matured.length} matured investments.`);
+      await notifyInvestmentsMatured(client, matured).catch((err) => console.error("Investment DM error:", err));
 
       await removeTemporaryRoles(client);
       await processDueReminders(client).catch((err) => console.error("Cooldown reminder error:", err));

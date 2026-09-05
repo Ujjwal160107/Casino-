@@ -1,7 +1,7 @@
 import { Client, ContainerBuilder } from "discord.js";
 import { Mascot } from "../config/branding";
 import { noticeContainer, v2Reply } from "../utils/componentsV2";
-import { fmtCurrency } from "../utils/format";
+import { fmtAmount, fmtCurrency } from "../utils/format";
 import { isTester } from "../utils/developerAccess";
 import {
   CooldownReminderType,
@@ -13,6 +13,7 @@ import {
   recordDmFailed,
 } from "./dmPrefsService";
 import type { StatementIssued, StatementSettled } from "./creditCardService";
+import type { MaturedInvestment } from "./bankingService";
 
 // Every DM Fortuna sends a player is built and sent from here, so they all
 // share one look (noticeContainer) and one failure policy: a closed DM is a
@@ -257,5 +258,47 @@ export async function notifyMarketSale(client: Client, sale: MarketSale): Promis
     await sendOptOutDm(client, sale.sellerId, "market", marketSaleNotice(sale));
   } catch (err) {
     console.error(`notifyMarketSale failed for ${sale.sellerId}:`, err);
+  }
+}
+
+// ---- Investment maturity: the per-minute cron's matured FDs/RDs. ----
+
+// interestEarned is what the deposit earned; payout is what the bank cap let
+// through. Anything missing between them is money the player never received.
+const investmentShortfall = (m: MaturedInvestment) =>
+  Math.max(0, m.investment.amount + (m.investment.interestEarned ?? 0) - m.payout);
+
+export function investmentMaturedNotice(matured: MaturedInvestment[]): ContainerBuilder {
+  const lines = matured.map((m) => {
+    const inv = m.investment;
+    const days = `${m.durationDays} day${m.durationDays === 1 ? "" : "s"}`;
+    return `• **${inv.type}** — ${fmtCurrency(inv.amount)} locked for ${days} → paid **${fmtCurrency(m.payout)}** (+${fmtAmount(inv.interestEarned ?? 0)} interest)`;
+  });
+  const lost = matured.reduce((sum, m) => sum + investmentShortfall(m), 0);
+  let body = lines.join("\n");
+  if (lost > 0) body += `\n\nYour bank was full, so ${fmtAmount(lost)} of this payout was lost.`;
+  return noticeContainer(
+    Mascot.Emotes.Bank,
+    "Investment matured!",
+    body,
+    `-# See your history in \`!bank invest\`. ${SETTINGS_HINT}.`,
+  );
+}
+
+/** Groups the per-minute cron's matured deposits by player and sends one opt-out DM each. */
+export async function notifyInvestmentsMatured(client: Client, matured: MaturedInvestment[]): Promise<void> {
+  const byUser = new Map<string, MaturedInvestment[]>();
+  for (const m of matured) {
+    const list = byUser.get(m.investment.userId) ?? [];
+    list.push(m);
+    byUser.set(m.investment.userId, list);
+  }
+
+  for (const [discordId, list] of byUser) {
+    try {
+      await sendOptOutDm(client, discordId, "investment", investmentMaturedNotice(list));
+    } catch (err) {
+      console.error(`notifyInvestmentsMatured failed for ${discordId}:`, err);
+    }
   }
 }
