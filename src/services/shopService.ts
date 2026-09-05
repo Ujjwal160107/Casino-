@@ -14,8 +14,14 @@ import type { ShopCatalogItem } from "../utils/shopCatalog";
 import { LOADED_DICE_ITEM_KEY } from "../utils/loadedDiceConfig";
 import { STARTER_CHICKEN_ITEM_KEY } from "../utils/chickenConfig";
 
+// Catalog entry for a DB shop row: by key when the row carries one, else by
+// name (rows created before catalogKey existed only have a name).
+function findCatalogEntry(item: { catalogKey?: string | null; name: string }): ShopCatalogItem | undefined {
+  return SHOP_CATALOG.find((entry) => entry.key === item.catalogKey || entry.name.toLowerCase() === item.name.toLowerCase());
+}
+
 function getItemEffectSource(item: { catalogKey?: string | null; name: string; emoji?: string | null }): ItemEffectSource {
-  const catalog = SHOP_CATALOG.find((entry) => entry.key === item.catalogKey || entry.name.toLowerCase() === item.name.toLowerCase());
+  const catalog = findCatalogEntry(item);
   return {
     key: item.catalogKey ?? catalog?.key,
     name: item.name,
@@ -160,6 +166,8 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
 
   const totalPrice = item.price * qty;
 
+  const catalogEntry = findCatalogEntry(item);
+
   const res = await prisma.$transaction(async (tx) => {
     const user = await (tx.user.findUnique as any)({
       where: { discordId: userId },
@@ -170,9 +178,15 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
       throw new Error("User or wallet not found.");
     }
 
+    // Card-exclusive items must go on the card; refuse before the balance check
+    // so a rich wallet still gets the right message.
+    if (catalogEntry?.requiresCardTier && paymentSource !== "card" && !tester) {
+      throw new Error(
+        `**${item.name}** is card-exclusive. Buy it on credit with a **${catalogEntry.requiresCardTier}** Fortuna Card or higher: \`shop buy card ${item.name.toLowerCase()}\`.`,
+      );
+    }
+
     if (paymentSource === "card" && !tester) {
-      const allCatalogs = [...GENERAL_SHOP_CATALOG, ...HUNT_SHOP_CATALOG, ...JOB_SHOP_CATALOG, ...UNI_SHOP_CATALOG, ...COCK_SHOP_CATALOG, ...COSMETICS_SHOP_CATALOG];
-      const catalogEntry = allCatalogs.find(c => c.name.toLowerCase() === item.name.toLowerCase());
       if (catalogEntry?.creditBlocked) {
         throw new Error(`**${item.name}** cannot be purchased with a credit card.`);
       }
@@ -257,7 +271,7 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
         itemName: item.name,
         quantity: qty,
         guildId,
-      });
+      }, { minTier: catalogEntry?.requiresCardTier });
       cardInfo = result.card;
     } else {
       await tx.wallet.update({

@@ -5,6 +5,8 @@ import {
   CARD_SCORE_RULES,
   CARD_TIER_ORDER,
   CardTierConfig,
+  CardTierName,
+  cardTierMeets,
   clampCardScore,
   getCardTierConfig,
   getCycleKey,
@@ -370,11 +372,20 @@ export async function chargeCardPurchase(discordId: string, amount: number, meta
   });
 }
 
-export async function chargeCardPurchaseTx(trx: any, discordId: string, amount: number, meta: any = {}) {
+export async function chargeCardPurchaseTx(
+  trx: any,
+  discordId: string,
+  amount: number,
+  meta: any = {},
+  opts: { minTier?: CardTierName } = {},
+) {
   const purchaseAmount = requireIntAmount(amount);
   const card = await trx.creditCard.findUnique({ where: { userId: discordId } });
   if (!card) throw new Error("You do not have a card.");
   if (card.status !== "ACTIVE") throw new Error("Only active cards can be used for purchases.");
+  if (opts.minTier && !cardTierMeets(card.tier, opts.minTier)) {
+    throw new Error(`This item needs a **${opts.minTier}** Fortuna Card or higher. Your card: **${card.tier}**.`);
+  }
   if (card.currentBalance + purchaseAmount > card.creditLimit) throw new Error("This purchase would exceed your credit limit.");
   if (card.spentThisCycle + purchaseAmount > card.weeklySpendCap) {
     const remaining = Math.max(0, card.weeklySpendCap - card.spentThisCycle);
