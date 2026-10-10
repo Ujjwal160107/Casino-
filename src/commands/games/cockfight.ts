@@ -324,17 +324,20 @@ export async function handleCockFight(message: Message, args: string[]) {
 
             gameStarted = true;
 
+            // The acceptor may click again, so a bail-out here must free their lock.
             try {
                 await i.deferUpdate();
             } catch (e) {
                 gameStarted = false;
+                await releaseActiveGameLock("cockfight", targetUser.id);
                 return;
             }
 
             const latestTarget = await ensureUserAndWallet(targetUser.id, message.guild!.id, targetName);
             if (!latestTarget.wallet || latestTarget.wallet.balance < betAmount) {
-                await i.followUp({ content: "You don't have enough money in your wallet to accept!", ephemeral: true });
                 gameStarted = false;
+                await releaseActiveGameLock("cockfight", targetUser.id);
+                await i.followUp({ content: "You don't have enough money in your wallet to accept!", ephemeral: true });
                 return;
             }
 
@@ -472,6 +475,9 @@ export async function runCockFight(
                 messageId: gameMsg.id
             }).catch(() => { });
         }
+        // No fight happened, so neither fighter should wait out the lock's TTL.
+        await releaseActiveGameLock("cockfight", p1.user.id);
+        await releaseActiveGameLock("cockfight", p2.user.id);
         await gameMsg.edit({
             components: [buildContainer("Cockfight Cancelled", "A fighter no longer had enough wallet funds. No fight was started.", 0xE74C3C), buildAcceptRow(fightId, true)],
             flags: COCKFIGHT_FLAGS

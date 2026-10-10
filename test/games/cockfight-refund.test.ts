@@ -13,6 +13,7 @@ vi.mock("../../src/utils/imageUtils", () => ({
 vi.mock("../../src/utils/guildContext", () => ({ getGuildPrefix: async () => "!" }));
 
 import { runCockFight } from "../../src/commands/games/cockfight";
+import { acquireActiveGameLock, releaseActiveGameLock } from "../../src/services/casinoCooldownService";
 
 const p1Id = "cockfight-refund-p1";
 const p2Id = "cockfight-refund-p2";
@@ -48,6 +49,8 @@ async function setup(editImpl: (n: number) => Promise<unknown>) {
 describe("cockfight refunds a fight that cannot finish", () => {
   beforeEach(async () => {
     render.fail = false;
+    await releaseActiveGameLock("cockfight", p1Id);
+    await releaseActiveGameLock("cockfight", p2Id);
     await seedUser(p1Id, { wallet: { create: { balance: 50_000 } } });
     await seedUser(p2Id, { wallet: { create: { balance: 50_000 } } });
   });
@@ -60,6 +63,20 @@ describe("cockfight refunds a fight that cannot finish", () => {
     await runCockFight(originalMsg, gameMsg, p1, p2, BET, "000000000000000000000000");
 
     expect(await balances()).toEqual([50_000, 50_000]);
+  });
+
+  it("frees both fighters' game locks when one can't pay the entry", async () => {
+    await testPrisma.wallet.update({ where: { userId: p2Id }, data: { balance: BET - 1 } });
+    const { gameMsg, originalMsg, p1, p2 } = await setup(async () => ({}));
+    expect(await acquireActiveGameLock("cockfight", p1Id)).toBe(true);
+    expect(await acquireActiveGameLock("cockfight", p2Id)).toBe(true);
+
+    await runCockFight(originalMsg, gameMsg, p1, p2, BET, "000000000000000000000000");
+
+    expect(await balances()).toEqual([50_000, BET - 1]);
+    // Otherwise both stay locked out of cockfights until the 5-minute TTL.
+    expect(await acquireActiveGameLock("cockfight", p1Id)).toBe(true);
+    expect(await acquireActiveGameLock("cockfight", p2Id)).toBe(true);
   });
 
   it("hands both entries back when the fight throws after betting closes", async () => {
