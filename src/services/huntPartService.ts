@@ -122,13 +122,17 @@ export async function storeSpeciesPartsFromAnimals(userId: string, animalKey: st
   if (counts.size === 0) throw new Error("No harvestable parts are left on this animal group.");
 
   await prisma.$transaction(async (tx) => {
+    // Claim exactly the animals the parts were counted from, before paying out.
+    // A double-click or a concurrent sell that already took any of them leaves
+    // the count short and rolls this back, so the parts are never paid twice.
+    const claimed = await tx.caughtAnimal.deleteMany({
+      where: { id: { in: caught.map((row) => row.id) }, discordId: userId, inZoo: false },
+    });
+    if (claimed.count !== caught.length) throw new Error("Those animals were already stored or sold. Try again.");
+
     for (const [partKey, amount] of counts.entries()) {
       await addHuntParts(userId, partKey, amount, tx);
     }
-
-    await tx.caughtAnimal.deleteMany({
-      where: { discordId: userId, animalKey, inZoo: false },
-    });
   });
 
   return {
