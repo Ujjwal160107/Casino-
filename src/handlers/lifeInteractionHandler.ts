@@ -18,6 +18,7 @@ import { enqueueWorkReminder } from "../services/cooldownReminderService";
 import { globalCatalogGuildFilter } from "../utils/globalCatalog";
 import { MAX_SAFE_BALANCE } from "../utils/economyConfig";
 import { checkJailStatus } from "../services/jailService";
+import { issueWorkEventTicket, claimWorkEventTicket } from "../services/workEventTicket";
 import {
     ensureDeferredEphemeralReply,
     ensureDeferredUpdate,
@@ -348,28 +349,28 @@ async function handleButton(interaction: ButtonInteraction) {
     else if (customId === "work_resign_cancel") {
         await safeUpdate(interaction, v2Reply(plainContainer(`${Mascot.Emotes.Success} Cancelled resignation. Get back to work!`)));
     }
-    else if (customId.startsWith("work_event_choice_")) {
+    else if (customId.startsWith("work_evt:") || customId.startsWith("work_event_choice_")) {
         if (await rejectIfJailed(interaction)) return;
-        const parts = customId.split("_"); // work_event_choice_eventId_choiceIdx
-        const eventId = parts[3] + "_" + parts[4]; // e.g., tech_crash. WAIT, split limit?
-        // ID might contain underscores. Let's start from index 3.
-        // Actually event IDs like "tech_crash" have underscores.
-        // CustomID: work_event_choice_tech_crash_0
-        // Split: ["work", "event", "choice", "tech", "crash", "0"]
-        // The last part is index. The middle parts are ID.
-
-        const choiceIdx = parseInt(parts[parts.length - 1]);
-        const eventIdParts = parts.slice(3, parts.length - 1);
-        const targetEventId = eventIdParts.join("_");
-
-        const { WORK_EVENTS } = require("../services/jobService");
-        const event = WORK_EVENTS.find((e: any) => e.id === targetEventId);
-
-        if (!event) {
-            return safeUpdate(interaction, v2Reply(plainContainer("Event expired or invalid.")));
+        // work_evt:<ownerId>:<ticket>:<choiceIdx>. The event is paid only to the
+        // player it was shown to, once, through the ticket issued with it.
+        // Legacy work_event_choice_<eventId>_<idx> buttons carry neither, so
+        // they are expired.
+        const [, ownerId, ticket, rawChoiceIdx] = customId.split(":");
+        if (customId.startsWith("work_event_choice_") || !ownerId || !ticket) {
+            return safeReply(interaction, { content: `${Mascot.Emotes.Fail} This work event expired.`, flags: MessageFlags.Ephemeral });
+        }
+        if (ownerId !== user.id) {
+            return safeReply(interaction, { content: `${Mascot.Emotes.Fail} This is someone else's shift.`, flags: MessageFlags.Ephemeral });
         }
 
-        const choice = event.choices[choiceIdx];
+        const targetEventId = await claimWorkEventTicket(user.id, ticket);
+        const { WORK_EVENTS } = require("../services/jobService");
+        const event = targetEventId ? WORK_EVENTS.find((e: any) => e.id === targetEventId) : null;
+        const choice = event?.choices[parseInt(rawChoiceIdx)];
+
+        if (!event || !choice) {
+            return safeUpdate(interaction, v2Reply(plainContainer("Event expired or already resolved.")));
+        }
 
         // Lucky Tie: +10% success chance on event choices
         const tieData = await redisService.get<{ active: boolean }>(`lucky_tie:${user.id}`);
@@ -817,8 +818,13 @@ async function handleButton(interaction: ButtonInteraction) {
                     `${event.description}\n\nChoose wisely...`,
                 );
 
+                // The event IS this shift: start the cooldown now and hand out a
+                // one-time ticket the owner's choice must consume to get paid.
+                const ticket = await issueWorkEventTicket(user.id, event.id);
+                await prisma.user.update({ where: { discordId: user.id }, data: { lastShift: new Date() } });
+
                 const rows = event.choices.map((c: any, idx: number) =>
-                    new ButtonBuilder().setCustomId(`work_event_choice_${event.id}_${idx}`).setLabel(c.label).setStyle(
+                    new ButtonBuilder().setCustomId(`work_evt:${user.id}:${ticket}:${idx}`).setLabel(c.label).setStyle(
                         c.style === 'success' ? ButtonStyle.Success :
                             c.style === 'danger' ? ButtonStyle.Danger :
                                 c.style === 'primary' ? ButtonStyle.Primary : ButtonStyle.Secondary
