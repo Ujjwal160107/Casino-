@@ -305,7 +305,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const { handleCard } = require("./commands/economy/card");
       return handleCard(message, args);
     }
-    case "my cards":
+    case "mycards":
     case "my-cards":
     case "mycard": {
       const { handleMyCards } = require("./commands/economy/card");
