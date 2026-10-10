@@ -4,7 +4,7 @@ import { fmtCurrency, formatDuration } from "../utils/format";
 import { Mascot, getEmoteUrl } from "../config/branding";
 import prisma from "../utils/prisma";
 import { logToChannel } from "../utils/discordLogger";
-import { questBus } from "../services/questEvents";
+import { recordShiftOutcome } from "../services/shiftOutcomeService";
 import { applyRelaxOption, getRelaxSnapshot } from "../services/relaxService";
 import { buildRelaxDashboard } from "../commands/life/relax";
 import { checkCounterfeitKit, checkCrownOfGreed, checkDevilContract } from "../services/shopBuffs";
@@ -498,6 +498,13 @@ async function handleButton(interaction: ButtonInteraction) {
             }
         });
         void enqueueWorkReminder(userData.discordId);
+        const eventTax = await recordShiftOutcome({
+            discordId: userData.discordId,
+            jobId: userData.jobId,
+            shiftType: "event",
+            success: success || pagerSaved,
+            earnings,
+        });
 
         // Grant reputation AFTER DB write — only on success/pager
         if (success || pagerSaved) {
@@ -560,6 +567,9 @@ async function handleButton(interaction: ButtonInteraction) {
         const resTitle = success ? `${Mascot.Emotes.Success} Event Resolved` : pagerSaved ? `${Mascot.Emotes.Alert} Event Saved` : `${Mascot.Emotes.Fail} Event Failed`;
         let resBody = `## ${resTitle}\n` +
             `**${choice.label}**\n${msg}\n\n**Result:**\n${Mascot.Emotes.MoneyBag} ${fmtCurrency(earnings)}\n${Mascot.Emotes.Alert} +${stressGain} Stress`;
+        if (earnings > 0) {
+            resBody += eventTax.shielded ? `\n**Tax:** Shielded` : `\n**Tax (8%):** -${fmtCurrency(eventTax.taxPaid)}`;
+        }
 
         const eventRows: ActionRowBuilder<ButtonBuilder>[] = [];
 
@@ -1063,9 +1073,14 @@ async function handleButton(interaction: ButtonInteraction) {
             // Check Promotion with the shift just worked counted
             const promoCheck = await checkPromotion({ ...userData, shiftsWorked: (userData.shiftsWorked ?? 0) + 1 }, guild.id);
 
-            // Apply income tax on work shift payout
-            const { applyIncomeTax } = await import("../services/taxService");
-            const workTax = walletFull ? { net: 0, taxPaid: 0, shielded: false } : await applyIncomeTax(user.id, amount);
+            // Income tax, work log and quest progress (amount is 0 when the wallet was full)
+            const workTax = await recordShiftOutcome({
+                discordId: userData.discordId,
+                jobId: userData.jobId!,
+                shiftType: game.type,
+                success: true,
+                earnings: amount,
+            });
 
             let earningsText = `${fmtCurrency(amount)}\n(Base Pay + ${streakBonusPct}% Streak Bonus)`;
             if (walletFull) {
@@ -1161,17 +1176,6 @@ async function handleButton(interaction: ButtonInteraction) {
             // Disable buttons on the original game embed
             await safeEditReply(interaction, v2Reply(buildQuestionContainer()));
 
-            // Create Work Log
-            await prisma.workLog.create({
-                data: {
-                    userId: userData.discordId,
-                    jobId: userData.jobId!,
-                    shiftType: game.type,
-                    success: true,
-                    earnings: amount
-                }
-            });
-
             // Log Success
             logToChannel(interaction.client, {
                 guild: guild,
@@ -1187,9 +1191,6 @@ async function handleButton(interaction: ButtonInteraction) {
                 thumbnail: user.displayAvatarURL(),
                 color: 0x2ECC71
             });
-
-            // Update Quest Progress
-            questBus.emit("work:complete", { discordId: userData.discordId });
 
             const workPrefix = await getGuildPrefix(guild.id);
             const winContainer = plainContainer(winBody, nextStepHint("work", workPrefix)!);
@@ -1229,15 +1230,12 @@ async function handleButton(interaction: ButtonInteraction) {
             // Disable buttons on the original game embed
             await safeEditReply(interaction, v2Reply(buildQuestionContainer()));
 
-            // Create Work Log
-            await prisma.workLog.create({
-                data: {
-                    userId: userData.discordId,
-                    jobId: userData.jobId!,
-                    shiftType: game.type,
-                    success: false,
-                    earnings: 0
-                }
+            await recordShiftOutcome({
+                discordId: userData.discordId,
+                jobId: userData.jobId!,
+                shiftType: game.type,
+                success: false,
+                earnings: 0,
             });
 
             // Log Failure
