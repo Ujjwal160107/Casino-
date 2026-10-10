@@ -7,6 +7,7 @@ import { nextStepHint } from "../../config/nextSteps";
 import { Mascot } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { shuffle } from "../../utils/shuffle";
 
 // --- Types ---
 interface RRPlayer {
@@ -161,6 +162,27 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
             choice: "join"
         });
 
+        // The lobby can start, time out, fill up or see this player join twice
+        // while the debit awaits the database. Only a still-open seat takes the
+        // stake; otherwise hand it back rather than strand it outside the game.
+        if (
+            waitingLobbies.get(message.channelId) !== lobby ||
+            lobby.status !== "WAITING" ||
+            lobby.players.length >= MAX_PLAYERS ||
+            lobby.players.some(p => p.id === message.author.id)
+        ) {
+            await creditGamePayout(user.wallet!.id, lobby.betAmount, "game_refund", {
+                game: "russian_roulette",
+                betAmount: lobby.betAmount,
+                payout: lobby.betAmount,
+                result: "join_refused",
+                guildId: message.guildId!,
+                channelId: message.channelId,
+                messageId: lobby.message?.id
+            });
+            return message.reply(v2Reply(errorContainer("Lobby Closed", "The lobby closed before you got a seat. Your bet was refunded.")));
+        }
+
         lobby.players.push({ id: message.author.id, username: message.author.username, walletId: user.wallet!.id });
 
         // Update lobby frame from state
@@ -243,8 +265,8 @@ async function startGame(channelId: string, message: Message) {
     lobby.status = "PLAYING";
     const prefix = await getGuildPrefix(message.guildId!);
 
-    // Shuffle players
-    const players = lobby.players.sort(() => Math.random() - 0.5);
+    // Turn order decides who faces the early, safer chambers, so it must be a fair shuffle.
+    const players = shuffle(lobby.players);
 
     // Initial Game Frame
     const startTitle = `${Mascot.Emotes.Rip} Russian Roulette Started`;

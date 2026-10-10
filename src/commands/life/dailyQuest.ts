@@ -153,16 +153,10 @@ export async function handleDailyQuest(message: Message, args: string[]) {
     }
 
     if (i.customId === `quest_reroll:${discordId}`) {
-      const incomplete = tasks.findIndex(t => !t.completed);
-      if (incomplete === -1) {
-        await i.reply({ content: "All quests are complete!", ephemeral: true });
-        return;
-      }
-
       try {
-        const newTask = await rerollQuest(discordId, incomplete);
+        const { index, task: newTask } = await rerollQuest(discordId);
         await i.reply({
-          content: `${E.Refresh} Rerolled quest #${incomplete + 1} → **${newTask.description}** (${newTask.target}x, ${DIFFICULTY_LABEL[newTask.difficulty]})`,
+          content: `${E.Refresh} Rerolled quest #${index + 1} → **${newTask.description}** (${newTask.target}x, ${DIFFICULTY_LABEL[newTask.difficulty]})`,
           ephemeral: true,
         });
       } catch (err) {

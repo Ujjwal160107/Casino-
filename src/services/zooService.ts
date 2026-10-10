@@ -283,10 +283,13 @@ export async function houseAnimals(
   });
   if (available.length === 0) return { housed: 0, reason: `You have no ${def.name} in your inventory.` };
 
-  await prisma.caughtAnimal.updateMany({
-    where: { id: { in: available.map((a) => a.id) } },
+  // inZoo: false so rows a concurrent call housed (or that left inventory)
+  // since the read above are not moved, or counted, a second time.
+  const moved = await prisma.caughtAnimal.updateMany({
+    where: { id: { in: available.map((a) => a.id) }, inZoo: false },
     data: { inZoo: true },
   });
+  if (moved.count === 0) return { housed: 0, reason: `You have no ${def.name} in your inventory.` };
 
   // Self-heal: the stackRoom check above reads then writes with nothing in
   // between, so two concurrent calls for the same species (e.g. a
@@ -314,11 +317,12 @@ export async function houseAnimals(
   // housed (or vice versa) — a locally computed excess set is a snapshot
   // that a concurrent call can invalidate. Ask the database the actual
   // question — of the ids this call housed, how many are inZoo: true right
-  // now — so the answer is true regardless of interleaving.
+  // now — so the answer is true regardless of interleaving. Capped at what
+  // this call moved, since some of those ids may have been housed by another.
   const stillHoused = await prisma.caughtAnimal.count({
     where: { id: { in: available.map((a) => a.id) }, inZoo: true },
   });
-  return { housed: stillHoused, reason: null };
+  return { housed: Math.min(moved.count, stillHoused), reason: null };
 }
 
 /** Remove every unit of a species from the zoo, freeing its slot. */

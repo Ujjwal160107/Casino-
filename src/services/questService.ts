@@ -1,7 +1,8 @@
-import prisma from "../utils/prisma";
+import prisma, { runWithRetry } from "../utils/prisma";
 import { questBus } from "./questEvents";
 import { addBalance } from "./walletService";
 import { conditionalClaim } from "../anticheat/claim";
+import { invalidateUserCache } from "./userService";
 
 export type QuestDifficulty = "EASY" | "MEDIUM" | "HARD";
 
@@ -278,61 +279,94 @@ export async function claimQuestReward(discordId: string): Promise<{ totalReward
   return { totalReward, streakBonus, newStreak };
 }
 
-export async function rerollQuest(discordId: string, taskIndex: number): Promise<QuestTask> {
-  const now = new Date();
-  const quest = await prisma.dailyQuest.findFirst({
-    where: { userId: discordId, expiresAt: { gt: now }, rewardClaimed: false },
-    orderBy: { createdAt: "desc" },
-  });
+const REROLL_COST = 50_000;
 
-  if (!quest) throw new Error("No active quest.");
-  const tasks = quest.tasks as unknown as QuestTask[];
-  if (taskIndex < 0 || taskIndex >= tasks.length) throw new Error("Invalid quest index.");
-  if (tasks[taskIndex].completed) throw new Error("Cannot reroll a completed quest.");
+/**
+ * Rerolls the first task that is still incomplete, chosen from the quest as
+ * it is now: the quest card's buttons outlive the task list they were drawn
+ * from, and a task completed since then can no longer be rerolled.
+ */
+export async function rerollQuest(discordId: string): Promise<{ index: number; task: QuestTask }> {
+  // The reroll rewrites the whole tasks JSON, so it takes the same updatedAt
+  // CAS as updateQuestProgress: a plain update erased progress an event wrote
+  // meanwhile, and two rerolls could both spend the same free one.
+  for (let attempt = 0; attempt < QUEST_PROGRESS_MAX_ATTEMPTS; attempt++) {
+    const now = new Date();
+    const quest = await prisma.dailyQuest.findFirst({
+      where: { userId: discordId, expiresAt: { gt: now }, rewardClaimed: false },
+      orderBy: { createdAt: "desc" },
+    });
 
-  const rerolls = quest.rerollsUsed ?? 0;
-  if (rerolls >= 3) throw new Error("Max rerolls reached (1 free + 2 paid).");
+    if (!quest) throw new Error("No active quest.");
+    const tasks = quest.tasks as unknown as QuestTask[];
+    const taskIndex = tasks.findIndex(t => !t.completed);
+    if (taskIndex === -1) throw new Error("All quests are complete!");
 
-  if (rerolls >= 1) {
-    const wallet = await prisma.wallet.findUnique({ where: { userId: discordId } });
-    if (!wallet || wallet.balance < 50_000) throw new Error("Insufficient funds. Reroll costs **50,000** coins.");
-    await prisma.wallet.update({ where: { id: wallet.id }, data: { balance: { decrement: 50_000 } } });
-  }
+    const rerolls = quest.rerollsUsed ?? 0;
+    if (rerolls >= 3) throw new Error("Max rerolls reached (1 free + 2 paid).");
 
-  const difficulty = tasks[taskIndex].difficulty;
-  const usedKeys = new Set(tasks.map(t => t.key));
-  const eligible = QUEST_POOL.filter(q => q.difficulty === difficulty && !usedKeys.has(q.key));
+    const paid = rerolls >= 1;
+    const insufficient = "Insufficient funds. Reroll costs **50,000** coins.";
+    if (paid) {
+      const wallet = await prisma.wallet.findUnique({ where: { userId: discordId } });
+      if (!wallet || wallet.balance < REROLL_COST) throw new Error(insufficient);
+    }
 
-  const validQuests: QuestDefinition[] = [];
-  for (const q of eligible) {
-    if (!q.prerequisite || await checkPrerequisite(discordId, q.prerequisite)) {
-      validQuests.push(q);
+    const difficulty = tasks[taskIndex].difficulty;
+    const usedKeys = new Set(tasks.map(t => t.key));
+    const eligible = QUEST_POOL.filter(q => q.difficulty === difficulty && !usedKeys.has(q.key));
+
+    const validQuests: QuestDefinition[] = [];
+    for (const q of eligible) {
+      if (!q.prerequisite || await checkPrerequisite(discordId, q.prerequisite)) {
+        validQuests.push(q);
+      }
+    }
+
+    const pool = validQuests.length > 0 ? validQuests : eligible;
+    if (pool.length === 0) throw new Error("No alternative quests available.");
+
+    const newDef = pickRandom(pool);
+    const target = randomInRange(newDef.targetRange[0], newDef.targetRange[1]);
+    const newTask: QuestTask = {
+      key: newDef.key,
+      description: newDef.description,
+      difficulty: newDef.difficulty,
+      target,
+      progress: 0,
+      completed: false,
+      reward: DIFFICULTY_REWARDS[newDef.difficulty],
+    };
+
+    tasks[taskIndex] = newTask;
+
+    // The fee is taken in the same transaction as the CAS, so a lost race
+    // (retried below) never charges, and the guarded decrement can't overdraw.
+    const applied = await runWithRetry(() => prisma.$transaction(async (tx) => {
+      const { count } = await tx.dailyQuest.updateMany({
+        where: { id: quest.id, updatedAt: quest.updatedAt },
+        data: {
+          tasks: tasks as any,
+          rerollsUsed: rerolls + 1,
+          updatedAt: new Date(Math.max(now.getTime(), quest.updatedAt.getTime() + 1)),
+        },
+      });
+      if (count === 0) return false;
+      if (paid) {
+        const charged = await tx.wallet.updateMany({
+          where: { userId: discordId, balance: { gte: REROLL_COST } },
+          data: { balance: { decrement: REROLL_COST } },
+        });
+        if (charged.count === 0) throw new Error(insufficient);
+      }
+      return true;
+    }));
+    if (applied) {
+      if (paid) await invalidateUserCache(discordId, "");
+      return { index: taskIndex, task: newTask };
     }
   }
-
-  const pool = validQuests.length > 0 ? validQuests : eligible;
-  if (pool.length === 0) throw new Error("No alternative quests available.");
-
-  const newDef = pickRandom(pool);
-  const target = randomInRange(newDef.targetRange[0], newDef.targetRange[1]);
-  const newTask: QuestTask = {
-    key: newDef.key,
-    description: newDef.description,
-    difficulty: newDef.difficulty,
-    target,
-    progress: 0,
-    completed: false,
-    reward: DIFFICULTY_REWARDS[newDef.difficulty],
-  };
-
-  tasks[taskIndex] = newTask;
-
-  await prisma.dailyQuest.update({
-    where: { id: quest.id },
-    data: { tasks: tasks as any, rerollsUsed: rerolls + 1 },
-  });
-
-  return newTask;
+  throw new Error("Your quests changed while rerolling. Try again.");
 }
 
 // --- Event Bus Listeners ---

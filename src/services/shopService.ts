@@ -7,6 +7,7 @@ import { Mascot } from "../config/branding";
 import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG, JOB_SHOP_CATALOG, UNI_SHOP_CATALOG, COCK_SHOP_CATALOG, COCK_SYSTEM_ITEMS, COSMETICS_SHOP_CATALOG, SHOP_CATALOG } from "../utils/shopCatalog";
 import { RIFLE_PRIORITY } from "../utils/animalCatalog";
 import { redisService } from "./redisService";
+import { getNetWorth } from "./netWorthService";
 import { isTester } from "../utils/developerAccess";
 import { ensureUserAndWallet } from "./walletService";
 import { GLOBAL_CATALOG_GUILD_ID, globalCatalogGuildFilter } from "../utils/globalCatalog";
@@ -205,7 +206,9 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
     }
 
     if (reqs.netWorth && !tester) {
-      const netWorth = user.wallet.balance + (user.bank?.balance || 0);
+      // The figure the profile and leaderboard show (all assets minus card
+      // debt), not just wallet + bank.
+      const { total: netWorth } = await getNetWorth(userId);
       if (netWorth < reqs.netWorth) {
         throw new Error(`You need a net worth of ${reqs.netWorth} to buy this.`);
       }

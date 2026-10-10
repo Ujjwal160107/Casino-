@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  APIContainerComponent,
   ButtonBuilder,
   ButtonInteraction,
   ComponentType,
@@ -18,7 +19,7 @@ import {
 } from "../services/huntService";
 import { claimZooIncome, feedAll, getZooStatus, houseAnimals, removeAnimalsByKey } from "../services/zooService";
 import { buildZooContainer, formatCareNote, formatFeedShortfall } from "../commands/games/zoo";
-import { reattachMedia, removeHuntGroups } from "../commands/games/hunt";
+import { reattachMedia, removeAllHuntAnimals, removeHuntGroups } from "../commands/games/hunt";
 import { successContainer, v2Reply } from "../utils/componentsV2";
 import { fmtCurrency } from "../utils/format";
 import { getAnimal } from "../utils/animalCatalog";
@@ -122,7 +123,7 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
         undefined,
         MessageFlags.Ephemeral,
       ));
-      await removeGroupsFromCard(interaction, () => true);
+      await trimCard(interaction, removeAllHuntAnimals);
     } catch (err: any) {
       await safeFollowUp(interaction, { content: err.message || "Could not sell hunted animals.", flags: MessageFlags.Ephemeral });
     }
@@ -145,7 +146,7 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
         undefined,
         MessageFlags.Ephemeral,
       ));
-      await removeGroupsFromCard(interaction, (key) => key === animalKey);
+      await trimCard(interaction, (card) => removeHuntGroups(card, (key) => key === animalKey));
     } catch (err: any) {
       await safeFollowUp(interaction, { content: err.message, flags: MessageFlags.Ephemeral });
     }
@@ -218,7 +219,7 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
         )],
         flags: V2_FLAGS | MessageFlags.Ephemeral,
       });
-      await removeGroupsFromCard(interaction, (key) => key === animalKey);
+      await trimCard(interaction, (card) => removeHuntGroups(card, (key) => key === animalKey));
     } catch (err: any) {
       await safeFollowUp(interaction, { content: err.message || "Could not store parts.", flags: MessageFlags.Ephemeral });
     }
@@ -307,7 +308,7 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
         content: `Sent **${count}x ${def?.name ?? animalKey}** to your zoo!`,
         flags: MessageFlags.Ephemeral,
       });
-      await removeGroupsFromCard(interaction, (key) => key === animalKey);
+      await trimCard(interaction, (card) => removeHuntGroups(card, (key) => key === animalKey));
     } catch (err: any) {
       await safeFollowUp(interaction, { content: err.message, flags: MessageFlags.Ephemeral });
     }
@@ -418,11 +419,11 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
 }
 
 // Once an animal's units are gone, its block on the Hunt Results card is stale.
-async function removeGroupsFromCard(interaction: ButtonInteraction, isRemoved: (animalKey: string) => boolean) {
+async function trimCard(interaction: ButtonInteraction, trim: (card: APIContainerComponent) => APIContainerComponent) {
   try {
     const [card] = interaction.message.components;
     if (card?.type !== ComponentType.Container) return;
-    const trimmed = removeHuntGroups(card.toJSON(), isRemoved);
+    const trimmed = trim(card.toJSON());
     const attachments = [...interaction.message.attachments.values()];
     await safeEditReply(interaction, { components: [reattachMedia(trimmed, attachments)] });
   } catch (err) {

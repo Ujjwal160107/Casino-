@@ -4,7 +4,7 @@ import { buyStock, sellStock, marketTick } from "../../src/services/stockService
 import { computeFill } from "../../src/services/stockEngine";
 import { MAX_SAFE_BALANCE } from "../../src/utils/economyConfig";
 import { RESERVE_STOCKS, STARTING_STOCKS } from "../../src/config/stockConfig";
-import { testPrisma, seedUser, resetUser } from "../helpers";
+import { testPrisma, testRedis, seedUser, resetUser } from "../helpers";
 
 const SYMBOL = "FILL";
 const trader = "100000000000000901";
@@ -86,5 +86,36 @@ describe("stock trade fills", () => {
     await marketTick();
 
     expect(await walletOf(trader)).toBe(MAX_SAFE_BALANCE);
+  });
+
+  // The cached profile (user:<id>) includes the wallet, so a trade that moves
+  // money must drop it or balance views keep showing the pre-trade wallet.
+  describe("drops the trader's cached profile", () => {
+    const cacheStale = () => testRedis().set(`user:${trader}`, JSON.stringify({ stale: true }));
+    const cached = () => testRedis().get(`user:${trader}`);
+
+    it("after a buy", async () => {
+      await seedUser(trader, { wallet: { create: { balance: 10_000 } } });
+      await cacheStale();
+      await buyStock(trader, SYMBOL, 1);
+      expect(await cached()).toBeNull();
+    });
+
+    it("after a sell", async () => {
+      await seedUser(trader, { wallet: { create: { balance: 0 } } });
+      await giveShares(trader, stockId, 1);
+      await cacheStale();
+      await sellStock(trader, SYMBOL, 1);
+      expect(await cached()).toBeNull();
+    });
+
+    it("after a delisting payout", async () => {
+      await seedUser(trader, { wallet: { create: { balance: 0 } } });
+      await giveShares(trader, stockId, 1);
+      await testPrisma.stock.update({ where: { id: stockId }, data: { status: "DELISTED", currentPrice: 5 } });
+      await cacheStale();
+      await marketTick();
+      expect(await cached()).toBeNull();
+    });
   });
 });

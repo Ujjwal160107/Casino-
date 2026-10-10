@@ -72,6 +72,31 @@ describe("resolveVaultWithdrawRequest", () => {
     expect(await balances()).toEqual({ wallet: AMOUNT, joint: 0 });
   });
 
+  it("a decline that read PENDING before an approval committed does not overwrite it", async () => {
+    const delegate = prisma.marriageVaultRequest as any;
+    const original = delegate.findUnique;
+    let first = true;
+    delegate.findUnique = async (args: any) => {
+      const snapshot = await original.call(delegate, args);
+      if (first) {
+        first = false;
+        await resolveVaultWithdrawRequest(requestId, spouse, true);
+      }
+      return snapshot;
+    };
+    let declined: unknown;
+    try {
+      declined = await resolveVaultWithdrawRequest(requestId, spouse, false).catch((err) => err);
+    } finally {
+      delegate.findUnique = original;
+    }
+
+    expect(declined).toBeInstanceOf(Error);
+    const request = await testPrisma.marriageVaultRequest.findUnique({ where: { id: requestId } });
+    expect(request!.status).toBe("APPROVED");
+    expect(await balances()).toEqual({ wallet: AMOUNT, joint: 0 });
+  });
+
   it("pays once under concurrent double-click", async () => {
     await Promise.allSettled([
       resolveVaultWithdrawRequest(requestId, spouse, true),

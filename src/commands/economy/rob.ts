@@ -108,7 +108,7 @@ export async function handleRob(message: Message, args: string[]) {
     const jail = await checkJailStatus(message.author.id);
     if (jail.isJailed) {
         return message.reply(
-            v2Reply(errorContainer("Incarcerated", `You cannot rob while jailed. Use \`,bail\` or wait for release.`))
+            v2Reply(errorContainer("Incarcerated", `You cannot rob while jailed. Use \`/bail\` or wait for release.`))
         );
     }
 

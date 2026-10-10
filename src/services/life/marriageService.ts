@@ -298,24 +298,28 @@ export async function resolveVaultWithdrawRequest(requestId: string, resolverId:
 
   const now = new Date();
   if (request.expiresAt.getTime() <= now.getTime()) {
-    await prisma.marriageVaultRequest.update({
-      where: { id: request.id },
+    await prisma.marriageVaultRequest.updateMany({
+      where: { id: request.id, status: "PENDING" },
       data: { status: "EXPIRED", resolvedAt: now },
     });
     throw new Error("This withdrawal request expired.");
   }
 
   if (!approve) {
-    const updated = await prisma.marriageVaultRequest.update({
-      where: { id: request.id },
+    // Guarded like approval: an approval can commit after the PENDING check
+    // above, and a plain update would relabel that paid request DECLINED.
+    const declined = await prisma.marriageVaultRequest.updateMany({
+      where: { id: request.id, status: "PENDING" },
       data: { status: "DECLINED", resolvedAt: now },
     });
+    if (declined.count !== 1) throw new Error("This request is no longer pending.");
+    const updated = await prisma.marriageVaultRequest.findUniqueOrThrow({ where: { id: request.id } });
     return { request: updated, newBalance: request.marriage.jointBalance, approved: false };
   }
 
   if (request.marriage.jointBalance < request.amount) {
-    await prisma.marriageVaultRequest.update({
-      where: { id: request.id },
+    await prisma.marriageVaultRequest.updateMany({
+      where: { id: request.id, status: "PENDING" },
       data: { status: "EXPIRED", resolvedAt: now },
     });
     throw new Error("The Couple Vault no longer has enough money.");

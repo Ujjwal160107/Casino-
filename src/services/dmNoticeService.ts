@@ -163,11 +163,14 @@ export type CardWeeklyInput = { issued?: StatementIssued; settled?: StatementSet
 const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 
 /**
- * One Monday DM per cardholder: last week's settlement (if any) and this
- * week's statement (if above zero). Null when there is nothing to say.
+ * One Monday DM per cardholder: last week's settlement (if it billed
+ * anything) and this week's statement (if above zero). Null when there is nothing to say.
  */
 export function cardWeeklyNotice(input: CardWeeklyInput): ContainerBuilder | null {
-  const { issued, settled } = input;
+  const { issued } = input;
+  // An idle card settles an empty statement every week (always "paid in
+  // full", score +0); that is not news, so only billed statements count.
+  const settled = input.settled && input.settled.statementBalance > 0 ? input.settled : undefined;
   const hasStatement = !!issued && issued.statementBalance > 0;
   if (!settled && !hasStatement) return null;
 
