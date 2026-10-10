@@ -9,7 +9,6 @@ import {
   resolveCrimeSuccess,
 } from "../services/crimeService";
 import {
-  clearCrimeRun,
   getCrimeRun,
   startCrimeRun,
   submitStageAnswer,
@@ -124,7 +123,6 @@ async function handleMinigameAnswer(
       run.crimeKey,
       interaction.guild.id,
     );
-    await clearCrimeRun(ownerId);
     const failNote = `\n\nFailed at stage **${result.failedStage}**. Correct move: **${result.correctLabel}**`;
     return finishCrimeResult(interaction, resolve, failNote);
   }
@@ -136,7 +134,6 @@ async function handleMinigameAnswer(
       run.crimeKey,
       interaction.guild.id,
     );
-    await clearCrimeRun(ownerId);
     return finishCrimeResult(interaction, resolve);
   }
 

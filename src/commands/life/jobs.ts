@@ -61,7 +61,7 @@ function formatRequirement(job: JobDefinition) {
     return requirements.length ? requirements.join("\n") : "No degree required";
 }
 
-function buildMenuContainer(prefix: string, ownerId: string) {
+function buildMenuContainer(prefix: string, ownerId: string, disabled = false) {
     const container = new ContainerBuilder()
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.JobWorking} Career Center`),
@@ -85,7 +85,8 @@ function buildMenuContainer(prefix: string, ownerId: string) {
                             .setCustomId(jobsId("sector", ownerId, sector))
                             .setLabel("Browse")
                             .setEmoji(info.emoji)
-                            .setStyle(ButtonStyle.Secondary),
+                            .setStyle(ButtonStyle.Secondary)
+                            .setDisabled(disabled),
                     ),
             )
             .addSeparatorComponents(separator());
@@ -97,7 +98,7 @@ function buildMenuContainer(prefix: string, ownerId: string) {
     return container;
 }
 
-function buildSectorContainer(sector: JobDefinition["sector"], page: number, prefix: string, user: any, ownerId: string) {
+function buildSectorContainer(sector: JobDefinition["sector"], page: number, prefix: string, user: any, ownerId: string, disabled = false) {
     const jobs = getJobsBySector(sector);
     const totalPages = Math.max(1, Math.ceil(jobs.length / JOBS_PER_PAGE));
     const safePage = Math.min(Math.max(page, 0), totalPages - 1);
@@ -139,7 +140,7 @@ function buildSectorContainer(sector: JobDefinition["sector"], page: number, pre
                                 .setLabel(buttonLabel)
                                 .setStyle(buttonStyle)
                                 .setEmoji(status.canApply ? Mascot.Emotes.Accept : Mascot.Emotes.Lock)
-                                .setDisabled(!status.canApply),
+                                .setDisabled(disabled || !status.canApply),
                         ),
                 )
                 .addSeparatorComponents(separator());
@@ -244,7 +245,10 @@ export async function handleJobs(message: Message) {
         await interaction.update(render());
     });
 
+    // jobs:* buttons (including the ones inside the container) are only handled
+    // by this collector, so the final render disables them rather than leaving
+    // live-looking buttons that fail when clicked.
     collector.on("end", () => {
-        reply.edit({ components: [currentView === "MENU" || !selectedSector ? buildMenuContainer(prefix, message.author.id) : buildSectorContainer(selectedSector, currentPage, prefix, user, message.author.id).container] }).catch(() => { });
+        reply.edit({ components: [currentView === "MENU" || !selectedSector ? buildMenuContainer(prefix, message.author.id, true) : buildSectorContainer(selectedSector, currentPage, prefix, user, message.author.id, true).container] }).catch(() => { });
     });
 }

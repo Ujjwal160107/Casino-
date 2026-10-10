@@ -138,6 +138,11 @@ export function getJobByName(query: string) {
         ?? JOBS.find((job) => normalizeJobLookup(job.title).includes(normalized));
 }
 
+/** Degrees `job` requires that are not in `ownedDegreeNames`. One rule for hiring and promotion. */
+export function getMissingDegrees(ownedDegreeNames: Set<string>, job: JobDefinition): string[] {
+    return job.reqDegrees.filter((degree) => !ownedDegreeNames.has(degree));
+}
+
 export function getJobApplicationStatus(
     user: { jobId?: string | null; shiftsWorked?: number; degrees?: { degree: { name: string } }[] },
     job: JobDefinition
@@ -153,9 +158,7 @@ export function getJobApplicationStatus(
         return { canApply: false, label: "Locked", missing: ["Resign before changing fields"] };
     }
 
-    for (const degree of job.reqDegrees) {
-        if (!ownedDegrees.has(degree)) missing.push(`Need ${degree}`);
-    }
+    for (const degree of getMissingDegrees(ownedDegrees, job)) missing.push(`Need ${degree}`);
 
     if (job.reqJobId && user.jobId !== job.reqJobId) {
         const previousJob = getJob(job.reqJobId);
@@ -200,20 +203,44 @@ export async function getJobPay(job: JobDefinition, _guildId: string): Promise<n
     return getJobPaySync(job);
 }
 
+export interface PromotionCheck {
+    eligible: boolean;
+    nextJob: JobDefinition | null;
+    missingShifts: number;
+    missingDegrees: string[];
+}
+
 /**
- * Checks if a user is eligible for a promotion based on lifetime shifts worked.
+ * Checks if a user is eligible for a promotion: enough lifetime shifts AND the
+ * next job's required degrees (e.g. Surgeon needs the MD on top of the MBBS).
+ * Shifts alone used to be enough, so the promote button skipped degree gates.
  */
-export async function checkPromotion(user: any, _guildId?: string): Promise<{ eligible: boolean; nextJob: JobDefinition | null; missingShifts: number }> {
-    if (!user.jobId) return { eligible: false, nextJob: null, missingShifts: 0 };
+export async function checkPromotion(user: { discordId: string; jobId?: string | null; shiftsWorked?: number }, _guildId?: string): Promise<PromotionCheck> {
+    const none = { eligible: false, nextJob: null, missingShifts: 0, missingDegrees: [] };
+    if (!user.jobId) return none;
 
     // Find a job that requires this current job as a prereq
     const nextJob = JOBS.find(j => j.reqJobId === user.jobId);
-    if (!nextJob) return { eligible: false, nextJob: null, missingShifts: 0 };
+    if (!nextJob) return none;
 
     const reqShifts = nextJob.reqShifts ?? 0;
     const missingShifts = Math.max(0, reqShifts - (user.shiftsWorked || 0));
 
-    return { eligible: missingShifts === 0, nextJob, missingShifts };
+    const owned = nextJob.reqDegrees.length === 0 ? [] : await prisma.userDegree.findMany({
+        where: { userId: user.discordId },
+        select: { degree: { select: { name: true } } },
+    });
+    const missingDegrees = getMissingDegrees(new Set(owned.map((d) => d.degree.name)), nextJob);
+
+    return { eligible: missingShifts === 0 && missingDegrees.length === 0, nextJob, missingShifts, missingDegrees };
+}
+
+/** What still stands between the player and the next job, e.g. "12 more shifts + MBBS". */
+export function promotionGapText(promo: Pick<PromotionCheck, "missingShifts" | "missingDegrees">): string {
+    const parts: string[] = [];
+    if (promo.missingShifts > 0) parts.push(`${promo.missingShifts} more shifts`);
+    if (promo.missingDegrees.length > 0) parts.push(promo.missingDegrees.join(", "));
+    return parts.join(" + ") || "requirements not met";
 }
 
 /**
@@ -227,9 +254,9 @@ export function getNextJob(currentJobId: string): JobDefinition | null {
  * Returns checkPromotion result plus a human-readable progressText string.
  */
 export async function getPromotionProgress(
-    user: { jobId?: string | null; shiftsWorked: number },
+    user: { discordId: string; jobId?: string | null; shiftsWorked: number },
     guildId?: string
-): Promise<{ eligible: boolean; nextJob: JobDefinition | null; missingShifts: number; progressText: string }> {
+): Promise<PromotionCheck & { progressText: string }> {
     const result = await checkPromotion(user, guildId);
     let progressText = "";
     if (!result.nextJob) {
@@ -237,7 +264,7 @@ export async function getPromotionProgress(
     } else if (result.eligible) {
         progressText = `Ready for **${result.nextJob.title}**!`;
     } else {
-        progressText = `Need: ${result.missingShifts} more shifts → ${result.nextJob.title}`;
+        progressText = `Need: ${promotionGapText(result)} → ${result.nextJob.title}`;
     }
     return { ...result, progressText };
 }

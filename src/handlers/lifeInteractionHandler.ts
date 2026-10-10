@@ -4,7 +4,7 @@ import { fmtCurrency, formatDuration } from "../utils/format";
 import { Mascot, getEmoteUrl } from "../config/branding";
 import prisma from "../utils/prisma";
 import { logToChannel } from "../utils/discordLogger";
-import { questBus } from "../services/questEvents";
+import { recordShiftOutcome } from "../services/shiftOutcomeService";
 import { applyRelaxOption, getRelaxSnapshot } from "../services/relaxService";
 import { buildRelaxDashboard } from "../commands/life/relax";
 import { checkCounterfeitKit, checkCrownOfGreed, checkDevilContract } from "../services/shopBuffs";
@@ -17,6 +17,8 @@ import { nextStepHint } from "../config/nextSteps";
 import { enqueueWorkReminder } from "../services/cooldownReminderService";
 import { globalCatalogGuildFilter } from "../utils/globalCatalog";
 import { MAX_SAFE_BALANCE } from "../utils/economyConfig";
+import { checkJailStatus } from "../services/jailService";
+import { issueWorkEventTicket, claimWorkEventTicket } from "../services/workEventTicket";
 import {
     ensureDeferredEphemeralReply,
     ensureDeferredUpdate,
@@ -28,6 +30,20 @@ import {
 } from "../utils/interactionHelpers";
 import { successContainer, errorContainer, statusContainer, plainContainer, v2Reply } from "../utils/componentsV2";
 import { awaitTypedAnswer, typedAnswerRow } from "../utils/typedAnswer";
+
+/**
+ * The router blocks `work` while jailed, but the Start Shift / event buttons on
+ * an old dashboard bypass it. Replies (ephemeral) and returns true if jailed.
+ */
+async function rejectIfJailed(interaction: ButtonInteraction): Promise<boolean> {
+    const { isJailed } = await checkJailStatus(interaction.user.id);
+    if (!isJailed) return false;
+    await safeReply(interaction, {
+        content: `${Mascot.Emotes.Lock} You cannot work while jailed. Use \`/bail\` or wait for release.`,
+        flags: MessageFlags.Ephemeral,
+    });
+    return true;
+}
 
 function textContainer(title: string, body: string, color = 0x2ECC71) {
     return new ContainerBuilder()
@@ -188,7 +204,24 @@ async function handleButton(interaction: ButtonInteraction) {
     else if (customId === "cancel_stress") {
         await safeUpdate(interaction, { content: `${Mascot.Emotes.Decline} Activity cancelled.`, components: [] });
     }
-    else if (customId === "dropout_confirm") {
+    else if (customId.startsWith("dropout_confirm") || customId.startsWith("dropout_cancel")) {
+        // The prompt is public and dropout acts on the CLICKER's degree, so the
+        // button must carry its owner: otherwise anyone clicking someone else's
+        // prompt dropped out of their own program. Legacy owner-less buttons
+        // are treated as expired.
+        const [action, ownerId] = customId.split(":");
+        if (ownerId !== user.id) {
+            return safeReply(interaction, {
+                content: ownerId
+                    ? `${Mascot.Emotes.Fail} This dropout prompt is not for you.`
+                    : `${Mascot.Emotes.Fail} This dropout prompt expired. Run dropout again.`,
+                flags: MessageFlags.Ephemeral,
+            });
+        }
+        if (action === "dropout_cancel") {
+            return safeUpdate(interaction, v2Reply(plainContainer(`${Mascot.Emotes.Decline} Dropout cancelled. Phew!`)));
+        }
+
         if (!await ensureDeferredUpdate(interaction)) return;
         try {
             const res = await dropout(user.id, guild.id);
@@ -206,9 +239,6 @@ async function handleButton(interaction: ButtonInteraction) {
         } catch (err: any) {
             await safeEditReply(interaction, v2Reply(errorContainer("Dropout Failed", err.message)));
         }
-    }
-    else if (customId === "dropout_cancel") {
-        await safeUpdate(interaction, v2Reply(plainContainer(`${Mascot.Emotes.Decline} Dropout cancelled. Phew!`)));
     }
     // JOB HANDLERS
     else if (customId === "work_resign") {
@@ -240,14 +270,11 @@ async function handleButton(interaction: ButtonInteraction) {
             return safeEditReply(interaction, { content: "You don't have a job to promote from." });
         }
 
-        const { checkPromotion: _checkPromo, getJob: _getJob } = require("../services/jobService");
+        const { checkPromotion: _checkPromo, getJob: _getJob, promotionGapText: _gapText } = require("../services/jobService");
         const promoCheck = await _checkPromo(freshUser, guild.id);
 
         if (!promoCheck.eligible || !promoCheck.nextJob) {
-            const missing = promoCheck.missingShifts > 0
-                ? `**${promoCheck.missingShifts} more lifetime shifts**`
-                : "requirements not met";
-            return safeEditReply(interaction, { content: `You need ${missing} before you can be promoted.` });
+            return safeEditReply(interaction, { content: `You need **${_gapText(promoCheck)}** before you can be promoted.` });
         }
 
         if (promoCheck.nextJob.id !== requestedNextJobId) {
@@ -290,9 +317,11 @@ async function handleButton(interaction: ButtonInteraction) {
     else if (customId === "work_resign_confirm") {
         if (!await ensureDeferredUpdate(interaction)) return;
         try {
+            // lastShift is kept: clearing it let resign -> re-apply skip the
+            // shift cooldown and work again immediately.
             await prisma.user.update({
                 where: { discordId: user.id },
-                data: { jobId: null, lastShift: null }
+                data: { jobId: null }
             });
 
             const container = plainContainer(
@@ -321,27 +350,28 @@ async function handleButton(interaction: ButtonInteraction) {
     else if (customId === "work_resign_cancel") {
         await safeUpdate(interaction, v2Reply(plainContainer(`${Mascot.Emotes.Success} Cancelled resignation. Get back to work!`)));
     }
-    else if (customId.startsWith("work_event_choice_")) {
-        const parts = customId.split("_"); // work_event_choice_eventId_choiceIdx
-        const eventId = parts[3] + "_" + parts[4]; // e.g., tech_crash. WAIT, split limit?
-        // ID might contain underscores. Let's start from index 3.
-        // Actually event IDs like "tech_crash" have underscores.
-        // CustomID: work_event_choice_tech_crash_0
-        // Split: ["work", "event", "choice", "tech", "crash", "0"]
-        // The last part is index. The middle parts are ID.
-
-        const choiceIdx = parseInt(parts[parts.length - 1]);
-        const eventIdParts = parts.slice(3, parts.length - 1);
-        const targetEventId = eventIdParts.join("_");
-
-        const { WORK_EVENTS } = require("../services/jobService");
-        const event = WORK_EVENTS.find((e: any) => e.id === targetEventId);
-
-        if (!event) {
-            return safeUpdate(interaction, v2Reply(plainContainer("Event expired or invalid.")));
+    else if (customId.startsWith("work_evt:") || customId.startsWith("work_event_choice_")) {
+        if (await rejectIfJailed(interaction)) return;
+        // work_evt:<ownerId>:<ticket>:<choiceIdx>. The event is paid only to the
+        // player it was shown to, once, through the ticket issued with it.
+        // Legacy work_event_choice_<eventId>_<idx> buttons carry neither, so
+        // they are expired.
+        const [, ownerId, ticket, rawChoiceIdx] = customId.split(":");
+        if (customId.startsWith("work_event_choice_") || !ownerId || !ticket) {
+            return safeReply(interaction, { content: `${Mascot.Emotes.Fail} This work event expired.`, flags: MessageFlags.Ephemeral });
+        }
+        if (ownerId !== user.id) {
+            return safeReply(interaction, { content: `${Mascot.Emotes.Fail} This is someone else's shift.`, flags: MessageFlags.Ephemeral });
         }
 
-        const choice = event.choices[choiceIdx];
+        const targetEventId = await claimWorkEventTicket(user.id, ticket);
+        const { WORK_EVENTS } = require("../services/jobService");
+        const event = targetEventId ? WORK_EVENTS.find((e: any) => e.id === targetEventId) : null;
+        const choice = event?.choices[parseInt(rawChoiceIdx)];
+
+        if (!event || !choice) {
+            return safeUpdate(interaction, v2Reply(plainContainer("Event expired or already resolved.")));
+        }
 
         // Lucky Tie: +10% success chance on event choices
         const tieData = await redisService.get<{ active: boolean }>(`lucky_tie:${user.id}`);
@@ -358,7 +388,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
         if (!userData || !userData.jobId) return;
 
-        const { getJob, getJobPay, checkPromotion, checkDemotion } = require("../services/jobService");
+        const { getJob, getJobPay, checkPromotion, checkDemotion, promotionGapText } = require("../services/jobService");
         const job = getJob(userData.jobId);
         const basePay = await getJobPay(job, guild.id);
 
@@ -469,6 +499,13 @@ async function handleButton(interaction: ButtonInteraction) {
             }
         });
         void enqueueWorkReminder(userData.discordId);
+        const eventTax = await recordShiftOutcome({
+            discordId: userData.discordId,
+            jobId: userData.jobId,
+            shiftType: "event",
+            success: success || pagerSaved,
+            earnings,
+        });
 
         // Grant reputation AFTER DB write — only on success/pager
         if (success || pagerSaved) {
@@ -509,7 +546,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 // Let's just note it for now, implementation plan says Celebration later
                 footerText = `Promotion Available: ${promoCheck.nextJob.title}`;
             } else if (promoCheck.nextJob) {
-                footerText = `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingShifts} shifts to go)`;
+                footerText = `Next Job: ${promoCheck.nextJob.title} (needs ${promotionGapText(promoCheck)})`;
             }
         }
 
@@ -531,6 +568,9 @@ async function handleButton(interaction: ButtonInteraction) {
         const resTitle = success ? `${Mascot.Emotes.Success} Event Resolved` : pagerSaved ? `${Mascot.Emotes.Alert} Event Saved` : `${Mascot.Emotes.Fail} Event Failed`;
         let resBody = `## ${resTitle}\n` +
             `**${choice.label}**\n${msg}\n\n**Result:**\n${Mascot.Emotes.MoneyBag} ${fmtCurrency(earnings)}\n${Mascot.Emotes.Alert} +${stressGain} Stress`;
+        if (earnings > 0) {
+            resBody += eventTax.shielded ? `\n**Tax:** Shielded` : `\n**Tax (8%):** -${fmtCurrency(eventTax.taxPaid)}`;
+        }
 
         const eventRows: ActionRowBuilder<ButtonBuilder>[] = [];
 
@@ -548,7 +588,7 @@ async function handleButton(interaction: ButtonInteraction) {
                         .setEmoji(Mascot.Emotes.JobPromotion)
                 ));
             } else if (promoCheck.nextJob) {
-                resBody += `\n\nProgress to ${promoCheck.nextJob.title}: need ${promoCheck.missingShifts} more shifts`;
+                resBody += `\n\nProgress to ${promoCheck.nextJob.title}: need ${promotionGapText(promoCheck)}`;
             }
         } else if (footerText) {
             resBody += `\n\n${footerText}`;
@@ -622,13 +662,15 @@ async function handleButton(interaction: ButtonInteraction) {
         }
     }
     else if (customId === "work_shift") {
+        if (await rejectIfJailed(interaction)) return;
+
         // Defer immediately to prevent timeout (Unknown Interaction)
         // We use ephemeral: false because the game is intended to be public.
         // This means validation errors will also be public, which is a necessary trade-off to prevent crashes.
         if (!await safeDeferReply(interaction)) return;
 
         // Import here to avoid circular dependencies if any
-        const { getJob, getJobPay, checkPromotion, checkDemotion, getWorkEvent } = require("../services/jobService");
+        const { getJob, getJobPay, checkPromotion, checkDemotion, getWorkEvent, promotionGapText } = require("../services/jobService");
         const { getWorkGame, getWorkGameForUser } = require("../services/minigameService");
         const { getRecentIds, recordRecentId } = require("../services/jobAntiRepeat");
 
@@ -753,7 +795,7 @@ async function handleButton(interaction: ButtonInteraction) {
                     where: { discordId: userData.discordId },
                     data: {
                         lastShift: new Date(),
-                        jobStress: { increment: 5 } // Even more stress
+                        jobStress: Math.min(100, (userData.jobStress || 0) + 5) // Even more stress, capped at 100
                     }
                 });
                 void enqueueWorkReminder(userData.discordId);
@@ -787,8 +829,13 @@ async function handleButton(interaction: ButtonInteraction) {
                     `${event.description}\n\nChoose wisely...`,
                 );
 
+                // The event IS this shift: start the cooldown now and hand out a
+                // one-time ticket the owner's choice must consume to get paid.
+                const ticket = await issueWorkEventTicket(user.id, event.id);
+                await prisma.user.update({ where: { discordId: user.id }, data: { lastShift: new Date() } });
+
                 const rows = event.choices.map((c: any, idx: number) =>
-                    new ButtonBuilder().setCustomId(`work_event_choice_${event.id}_${idx}`).setLabel(c.label).setStyle(
+                    new ButtonBuilder().setCustomId(`work_evt:${user.id}:${ticket}:${idx}`).setLabel(c.label).setStyle(
                         c.style === 'success' ? ButtonStyle.Success :
                             c.style === 'danger' ? ButtonStyle.Danger :
                                 c.style === 'primary' ? ButtonStyle.Primary : ButtonStyle.Secondary
@@ -952,8 +999,7 @@ async function handleButton(interaction: ButtonInteraction) {
                     jobEffectNotes.push(`Corporate Blessing: Massive payout! (${mult.toFixed(1)}x)`);
                 } else {
                     // Failure: +25 stress, amount unchanged, plus durability damage below
-                    corporateBlessingFailed = true;
-                    await prisma.user.update({ where: { discordId: user.id }, data: { jobStress: { increment: 25 } } });
+                    corporateBlessingFailed = true; // +25 stress is added (capped) with the shift update below
                     jobEffectNotes.push(`Corporate Blessing: Failed — +25 stress and extra gear wear`);
                 }
             }
@@ -978,7 +1024,8 @@ async function handleButton(interaction: ButtonInteraction) {
                 data: {
                     wallet: { update: { balance: { increment: amount } } },
                     shiftsWorked: { increment: 1 },
-                    jobStress: { increment: Math.max(0, 5 - repStressReduction) }, // +5 base, reduced by rep tier
+                    // +5 base (reduced by rep tier), +25 on a failed Corporate Blessing, capped at 100
+                    jobStress: Math.min(100, (userData.jobStress || 0) + Math.max(0, 5 - repStressReduction) + (corporateBlessingFailed ? 25 : 0)),
                     jobStreak: newStreak,
                     lastShift: new Date(),
                     jobFailStreak: 0 // Reset fail streak on success
@@ -1011,9 +1058,14 @@ async function handleButton(interaction: ButtonInteraction) {
             // Check Promotion with the shift just worked counted
             const promoCheck = await checkPromotion({ ...userData, shiftsWorked: (userData.shiftsWorked ?? 0) + 1 }, guild.id);
 
-            // Apply income tax on work shift payout
-            const { applyIncomeTax } = await import("../services/taxService");
-            const workTax = walletFull ? { net: 0, taxPaid: 0, shielded: false } : await applyIncomeTax(user.id, amount);
+            // Income tax, work log and quest progress (amount is 0 when the wallet was full)
+            const workTax = await recordShiftOutcome({
+                discordId: userData.discordId,
+                jobId: userData.jobId!,
+                shiftType: game.type,
+                success: true,
+                earnings: amount,
+            });
 
             let earningsText = `${fmtCurrency(amount)}\n(Base Pay + ${streakBonusPct}% Streak Bonus)`;
             if (walletFull) {
@@ -1103,22 +1155,11 @@ async function handleButton(interaction: ButtonInteraction) {
                         .setEmoji(Mascot.Emotes.JobPromotion)
                 ));
             } else if (promoCheck.nextJob) {
-                winBody += `\n\nProgress to ${promoCheck.nextJob.title}: need ${promoCheck.missingShifts} more shifts`;
+                winBody += `\n\nProgress to ${promoCheck.nextJob.title}: need ${promotionGapText(promoCheck)}`;
             }
 
             // Disable buttons on the original game embed
             await safeEditReply(interaction, v2Reply(buildQuestionContainer()));
-
-            // Create Work Log
-            await prisma.workLog.create({
-                data: {
-                    userId: userData.discordId,
-                    jobId: userData.jobId!,
-                    shiftType: game.type,
-                    success: true,
-                    earnings: amount
-                }
-            });
 
             // Log Success
             logToChannel(interaction.client, {
@@ -1135,9 +1176,6 @@ async function handleButton(interaction: ButtonInteraction) {
                 thumbnail: user.displayAvatarURL(),
                 color: 0x2ECC71
             });
-
-            // Update Quest Progress
-            questBus.emit("work:complete", { discordId: userData.discordId });
 
             const workPrefix = await getGuildPrefix(guild.id);
             const winContainer = plainContainer(winBody, nextStepHint("work", workPrefix)!);
@@ -1173,15 +1211,12 @@ async function handleButton(interaction: ButtonInteraction) {
             // Disable buttons on the original game embed
             await safeEditReply(interaction, v2Reply(buildQuestionContainer()));
 
-            // Create Work Log
-            await prisma.workLog.create({
-                data: {
-                    userId: userData.discordId,
-                    jobId: userData.jobId!,
-                    shiftType: game.type,
-                    success: false,
-                    earnings: 0
-                }
+            await recordShiftOutcome({
+                discordId: userData.discordId,
+                jobId: userData.jobId!,
+                shiftType: game.type,
+                success: false,
+                earnings: 0,
             });
 
             // Log Failure

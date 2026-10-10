@@ -168,7 +168,9 @@ async function runInterview(reply: Message, source: Message | ButtonInteraction,
     if (passed) {
         await prisma.user.update({
             where: { discordId },
-            data: { jobId: job.id, lastShift: null }
+            // Keep lastShift: resetting it on hire let resign -> re-apply
+            // bypass the shift cooldown.
+            data: { jobId: job.id }
         });
     }
 

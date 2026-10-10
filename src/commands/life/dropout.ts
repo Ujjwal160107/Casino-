@@ -26,12 +26,12 @@ export async function handleDropout(message: Message) {
 
         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder()
-                .setCustomId("dropout_confirm")
+                .setCustomId(`dropout_confirm:${message.author.id}`)
                 .setLabel("I want to Dropout")
                 .setStyle(ButtonStyle.Danger)
                 .setEmoji(Mascot.Emotes.Fail), // Skull or Sad or Fail
             new ButtonBuilder()
-                .setCustomId("dropout_cancel")
+                .setCustomId(`dropout_cancel:${message.author.id}`)
                 .setLabel("Cancel")
                 .setStyle(ButtonStyle.Secondary)
                 .setEmoji(Mascot.Emotes.Decline)

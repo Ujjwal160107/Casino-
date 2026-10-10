@@ -66,7 +66,7 @@ export async function handleWork(message: Message) {
 
     // Promotion progress (lifetime-shift-based)
     const promo = await getPromotionProgress(
-        { jobId: user.jobId, shiftsWorked: user.shiftsWorked },
+        { discordId: user.discordId, jobId: user.jobId, shiftsWorked: user.shiftsWorked },
         message.guildId!
     );
 
