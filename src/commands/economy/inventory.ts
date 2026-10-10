@@ -415,7 +415,7 @@ function buildItemDetailPayload(slot: InventorySlot, ownerId: string, canAct: bo
         .setCustomId(`inv2_sell:${slot.id}:${ownerId}`)
         .setLabel("Quick Sell")
         .setStyle(ButtonStyle.Danger)
-        .setDisabled(resaleBlocked),
+        .setDisabled(resaleBlocked || Number(item.price || 0) <= 0),
       new ButtonBuilder()
         .setCustomId(`inv2_market:${slot.id}:${ownerId}`)
         .setLabel("Black Market")
@@ -482,6 +482,8 @@ export async function sellOne(slotId: string, discordId: string) {
   if (!slot || slot.userId !== discordId || slot.amount <= 0) throw new Error("Item not found in your inventory.");
   const blocked = resaleBlockReason(slot);
   if (blocked) throw new Error(blocked);
+  // A price-0 item would sell for nothing; the sale would only destroy it.
+  if (Number(slot.shopItem.price || 0) <= 0) throw new Error(`**${slot.shopItem.name}** has no resale value.`);
 
   const { value: sellValue, rate } = getQuickSellValue(Number(slot.shopItem.price || 0));
   await prisma.$transaction([

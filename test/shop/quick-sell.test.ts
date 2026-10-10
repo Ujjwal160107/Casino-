@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { testPrisma, seedUser, resetUser } from "../helpers";
 import { sellOne } from "../../src/commands/economy/inventory";
-import { seedCosmeticsShop, seedGeneralShop } from "../../src/services/shopService";
+import { seedCockShop, seedCosmeticsShop, seedGeneralShop } from "../../src/services/shopService";
 
 // Quick Sell is a resale exit just like the Black Market, so it must refuse
 // whatever listing refuses.
@@ -33,6 +33,27 @@ describe("Quick Sell", () => {
     await expect(sellOne(slot.id, uid)).rejects.toThrow(/card-exclusive/);
     expect((await testPrisma.inventory.findUnique({ where: { id: slot.id } }))?.amount).toBe(1);
     expect(await balance()).toBe(0);
+  });
+
+  it("refuses the chicken (unique level/trait meta) and leaves it in place", async () => {
+    await seedCockShop();
+    const slot = await give("chicken", 1, { level: 3, trait: "Brawler" });
+    await expect(sellOne(slot.id, uid)).rejects.toThrow(/unique/);
+    const row = await testPrisma.inventory.findUnique({ where: { id: slot.id } });
+    expect(row?.amount).toBe(1);
+    expect((row?.meta as any)?.trait).toBe("Brawler");
+  });
+
+  it("refuses a price-0 item instead of destroying it for nothing", async () => {
+    const free = await testPrisma.shopItem.create({ data: { guildId: "global", name: "Quick Sell Freebie", price: 0 } });
+    try {
+      const slot = await testPrisma.inventory.create({ data: { userId: uid, shopItemId: free.id, amount: 1 } });
+      await expect(sellOne(slot.id, uid)).rejects.toThrow(/no resale value/);
+      expect((await testPrisma.inventory.findUnique({ where: { id: slot.id } }))?.amount).toBe(1);
+    } finally {
+      await testPrisma.inventory.deleteMany({ where: { shopItemId: free.id } });
+      await testPrisma.shopItem.delete({ where: { id: free.id } });
+    }
   });
 
   it("still sells an ordinary item", async () => {

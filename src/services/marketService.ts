@@ -36,6 +36,12 @@ export function resaleBlockReason(row: ResaleRow): string | null {
   if (findCatalogEntry(row.shopItem)?.requiresCardTier) {
     return `**${row.shopItem.name}** is card-exclusive and cannot be resold.`;
   }
+  // Unique rows (the chicken: level/trait meta) are non-transferable. Selling
+  // one destroys it, and the starter chicken is then regranted with a new trait.
+  const meta = row.meta as any;
+  if (meta?.level !== undefined || meta?.trait !== undefined) {
+    return `**${row.shopItem.name}** is unique and cannot be resold.`;
+  }
   return null;
 }
 
@@ -56,11 +62,6 @@ export async function listItem(discordId: string, shopItemId: string, amount: nu
 
   if (!inventoryItem || inventoryItem.amount < amount) {
     throw new Error("You don't have enough of this item.");
-  }
-
-  const meta = inventoryItem.meta as any;
-  if (meta?.level !== undefined || meta?.trait !== undefined) {
-    throw new Error("This item cannot be listed on the black market (unique/meta items are non-transferable).");
   }
 
   const blocked = resaleBlockReason(inventoryItem);
@@ -252,11 +253,8 @@ export async function getUserInventoryForSale(discordId: string) {
     where: { userId: discordId, amount: { gte: 1 } },
     include: { shopItem: true },
   });
-  // Filter out meta-bearing items (chickens, etc.) and anything listItem would refuse
-  return items.filter((i) => {
-    const meta = i.meta as any;
-    return !(meta?.level !== undefined || meta?.trait !== undefined) && !resaleBlockReason(i);
-  });
+  // Leave out anything listItem would refuse (chickens, card-exclusives, ...)
+  return items.filter((i) => !resaleBlockReason(i));
 }
 
 export async function expireOldListings(): Promise<number> {
