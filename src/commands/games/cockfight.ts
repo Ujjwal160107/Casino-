@@ -545,8 +545,9 @@ async function runCockFight(
         const target = i.customId.endsWith(":p1") ? "p1" : "p2";
         const targetName = target === "p1" ? p1.displayName : p2.displayName;
 
+        const modalId = `cockfight_modal:${fightId}:${target}:${i.id}`;
         const modal = new ModalBuilder()
-            .setCustomId(`cockfight_modal:${fightId}:${target}:${i.id}`)
+            .setCustomId(modalId)
             .setTitle(`Bet on ${targetName}`);
 
         const input = new TextInputBuilder()
@@ -560,7 +561,12 @@ async function runCockFight(
         await i.showModal(modal);
 
         try {
-            const submit = await i.awaitModalSubmit({ time: 30000 });
+            // awaitModalSubmit listens bot-wide, so without a filter it takes the
+            // next modal anyone submits anywhere, not this bettor's bet.
+            const submit = await i.awaitModalSubmit({
+                time: 30000,
+                filter: (m) => m.customId === modalId && m.user.id === i.user.id
+            });
 
             if (bettingClosed) {
                 await submit.reply({ content: "Bets are closed!", ephemeral: true });
