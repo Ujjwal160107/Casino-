@@ -63,6 +63,17 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
   const customId = interaction.customId;
   const parts = customId.split(":");
 
+  // The hunt card's Craft button. Opened as its own ephemeral dashboard, like
+  // the inventory's, so paging it doesn't replace the unsold hunt results.
+  if (customId.startsWith("hunt_craft_open:") && interaction.isButton()) {
+    const [, ownerId] = parts;
+    if (interaction.user.id !== ownerId) return replyEphemeral(interaction, "This isn't your hunt result.");
+
+    if (!await ensureDeferredEphemeralReply(interaction, V2_FLAGS | MessageFlags.Ephemeral)) return;
+    await safeEditReply(interaction, await buildHuntCraftPayload(ownerId, ownerId, 1));
+    return;
+  }
+
   if (customId.startsWith("hunt_craft_page:") && interaction.isButton()) {
     const [, pageRaw, ownerId] = parts;
     if (interaction.user.id !== ownerId) return replyEphemeral(interaction, "This isn't your craft dashboard.");
