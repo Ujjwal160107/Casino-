@@ -459,7 +459,26 @@ export async function runAffectionAction(discordId: string, username: string, ac
     [cooldownField]: now,
   };
 
-  await prisma.$transaction(async (tx) => {
+  // The cooldown above was read outside the transaction, so two concurrent
+  // actions both saw it ready and both paid. Claim it with a guarded write:
+  // only the action that still finds the field unset/null/expired wins. A
+  // never-used action has the field ABSENT in Mongo, which `null` alone
+  // does not match — hence the isSet:false branch.
+  const readyBefore = new Date(now.getTime() - cooldownMs);
+  const cooldownReady = isTester(discordId)
+    ? {}
+    : { OR: [{ [cooldownField]: { isSet: false } }, { [cooldownField]: null }, { [cooldownField]: { lte: readyBefore } }] };
+
+  const claimed = await prisma.$transaction(async (tx) => {
+    const won = await tx.marriage.updateMany({
+      where: { id: marriage.id, ...cooldownReady },
+      data: {
+        ...data,
+        jointBalance: scaledReward > 0 ? { increment: scaledReward } : undefined,
+      },
+    });
+    if (won.count !== 1) return false;
+
     if (cost > 0 && wallet) {
       await tx.wallet.update({
         where: { id: wallet.id },
@@ -469,15 +488,9 @@ export async function runAffectionAction(discordId: string, username: string, ac
         data: { walletId: wallet.id, amount: -cost, type: "marriage_date_cost", meta: { marriageId: marriage.id, action }, isEarned: false },
       });
     }
-
-    await tx.marriage.update({
-      where: { id: marriage.id },
-      data: {
-        ...data,
-        jointBalance: scaledReward > 0 ? { increment: scaledReward } : undefined,
-      },
-    });
+    return true;
   });
+  if (!claimed) return { success: false, cooldownMs };
 
   return {
     success: true,
