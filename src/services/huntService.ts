@@ -8,7 +8,6 @@ import {
   RIFLE_PRIORITY,
   AnimalDefinition,
   AnimalRarity,
-  PART_VALUES,
   FED_WINDOW_MS,
   getAnimal,
   rollRarity,
@@ -261,74 +260,6 @@ export async function sellAllInventoryAnimals(
   if (earned <= 0) throw new Error("No sellable hunted animals found.");
   await addBalance(discordId, username, earned, "animal_sell_all", { count, summary });
   return { earned, count, summary };
-}
-
-// Keep backward-compat single-id sell (used by legacy paths)
-export async function sellAnimal(discordId: string, animalId: string, username: string): Promise<number> {
-  const animal = await prisma.caughtAnimal.findFirst({ where: { id: animalId, discordId, inZoo: false } });
-  if (!animal) throw new Error("Animal not found in your inventory.");
-
-  const def = getAnimal(animal.animalKey);
-  if (!def) throw new Error("Unknown animal type.");
-
-  await addBalance(discordId, username, def.sellValue, "animal_sell", { animalKey: animal.animalKey });
-  await prisma.caughtAnimal.delete({ where: { id: animalId } });
-  return def.sellValue;
-}
-
-// Sell parts for ALL units of a species not in zoo
-export async function sellAllPartsByKey(
-  discordId: string,
-  animalKey: string,
-  username: string
-): Promise<{ totalEarned: number; partsSummary: Record<string, number> }> {
-  const animals = await prisma.caughtAnimal.findMany({
-    where: { discordId, animalKey, inZoo: false },
-  });
-  if (animals.length === 0) throw new Error("No animals of that type in your inventory.");
-
-  const partsSummary: Record<string, number> = {};
-  let totalEarned = 0;
-
-  for (const animal of animals) {
-    const parts = animal.partsAvailable as string[];
-    for (const part of parts) {
-      const val = PART_VALUES[part] ?? 0;
-      totalEarned += val;
-      partsSummary[part] = (partsSummary[part] ?? 0) + 1;
-    }
-  }
-
-  if (totalEarned > 0) {
-    await addBalance(discordId, username, totalEarned, "parts_sell", {
-      animalKey,
-      count: animals.length,
-    });
-  }
-  await prisma.caughtAnimal.deleteMany({ where: { discordId, animalKey, inZoo: false } });
-  return { totalEarned, partsSummary };
-}
-
-// Legacy single-id parts sell
-export async function sellAllParts(
-  discordId: string,
-  animalId: string,
-  username: string
-): Promise<{ totalEarned: number; parts: string[] }> {
-  const animal = await prisma.caughtAnimal.findFirst({ where: { id: animalId, discordId, inZoo: false } });
-  if (!animal) throw new Error("Animal not found in your inventory.");
-
-  const parts = animal.partsAvailable as string[];
-  if (parts.length === 0) throw new Error("This animal has no parts left.");
-
-  let totalEarned = 0;
-  for (const part of parts) totalEarned += PART_VALUES[part] ?? 0;
-
-  if (totalEarned > 0) {
-    await addBalance(discordId, username, totalEarned, "parts_sell", { animalKey: animal.animalKey, parts });
-  }
-  await prisma.caughtAnimal.delete({ where: { id: animalId } });
-  return { totalEarned, parts };
 }
 
 export async function getZooAnimals(discordId: string): Promise<CaughtAnimalWithDef[]> {
