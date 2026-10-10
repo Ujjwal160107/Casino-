@@ -57,14 +57,14 @@ export async function listItem(discordId: string, shopItemId: string, amount: nu
   const itemName = inventoryItem.shopItem?.name ?? "Unknown";
 
   await prisma.$transaction(async (tx) => {
-    if (inventoryItem.amount === amount) {
-      await tx.inventory.delete({ where: { id: inventoryItem.id } });
-    } else {
-      await tx.inventory.update({
-        where: { id: inventoryItem.id },
-        data: { amount: { decrement: amount } },
-      });
-    }
+    // The amount read above is stale by now (a concurrent listing, sale or use
+    // may have taken units), so the decrement itself must be guarded.
+    const taken = await tx.inventory.updateMany({
+      where: { id: inventoryItem.id, amount: { gte: amount } },
+      data: { amount: { decrement: amount } },
+    });
+    if (taken.count !== 1) throw new Error("You don't have enough of this item.");
+    await tx.inventory.deleteMany({ where: { id: inventoryItem.id, amount: { lte: 0 } } });
 
     await tx.marketListing.create({
       data: {

@@ -157,14 +157,14 @@ export async function listPartFromInventory(userId: string, partKey: string, amo
   if (!inv || inv.amount < amount) throw new Error(`You don't have enough **${formatPartName(partKey)}**.`);
 
   await prisma.$transaction(async (tx) => {
-    if (inv.amount === amount) {
-      await tx.huntPartInventory.delete({ where: { id: inv.id } });
-    } else {
-      await tx.huntPartInventory.update({
-        where: { id: inv.id },
-        data: { amount: { decrement: amount } },
-      });
-    }
+    // The amount read above is stale by now (a concurrent listing or craft may
+    // have taken parts), so the decrement itself must be guarded.
+    const taken = await tx.huntPartInventory.updateMany({
+      where: { id: inv.id, amount: { gte: amount } },
+      data: { amount: { decrement: amount } },
+    });
+    if (taken.count !== 1) throw new Error(`You don't have enough **${formatPartName(partKey)}**.`);
+    await tx.huntPartInventory.deleteMany({ where: { id: inv.id, amount: { lte: 0 } } });
 
     await tx.huntPartListing.create({
       data: {
