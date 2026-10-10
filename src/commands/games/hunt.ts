@@ -1,8 +1,11 @@
 import {
+  APIComponentInContainer,
+  APIContainerComponent,
   ActionRowBuilder,
   AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ComponentType,
   ContainerBuilder,
   Message,
   MessageFlags,
@@ -201,6 +204,57 @@ export function buildHuntResultPayload(
     files,
     flags: MessageFlags.IsComponentsV2,
   };
+}
+
+// The animal key of a group's button row, or null for any other component.
+function groupKeyOf(component: APIComponentInContainer): string | null {
+  if (component.type !== ComponentType.ActionRow) return null;
+  const first = component.components[0];
+  const id = first && "custom_id" in first ? first.custom_id : undefined;
+  return id?.startsWith("hunt_sell:") ? id.split(":")[1] : null;
+}
+
+/**
+ * Removes the blocks of animals that were sold, zoo'd or broken down from a
+ * sent result card. Works on the card's JSON, which buildHuntResultPayload
+ * lays out as: header, then per group [separator] + text/section + button row.
+ */
+export function removeHuntGroups(
+  card: APIContainerComponent,
+  isRemoved: (animalKey: string) => boolean,
+): APIContainerComponent {
+  const components = [...card.components];
+  for (let i = components.length - 1; i >= 0; i--) {
+    const key = groupKeyOf(components[i]);
+    if (!key || !isRemoved(key)) continue;
+
+    // The first group has no separator above it, so it takes the one below.
+    let start = i - 1;
+    let end = i + 1;
+    if (components[start - 1]?.type === ComponentType.Separator) start--;
+    else if (components[end]?.type === ComponentType.Separator) end++;
+    components.splice(start, end - start);
+    i = start;
+  }
+  return { ...card, components };
+}
+
+/**
+ * Re-points thumbnails at the message's own attachments. A fetched card holds
+ * signed CDN links that expire; editing with `attachment://` keeps the art.
+ */
+export function reattachMedia(
+  card: APIContainerComponent,
+  attachments: { url: string; name: string }[],
+): APIContainerComponent {
+  const nameByPath = new Map(attachments.map((a) => [a.url.split("?")[0], a.name]));
+  const components = card.components.map((component) => {
+    if (component.type !== ComponentType.Section || component.accessory.type !== ComponentType.Thumbnail) return component;
+    const name = nameByPath.get(component.accessory.media.url.split("?")[0]);
+    if (!name) return component;
+    return { ...component, accessory: { ...component.accessory, media: { url: `attachment://${name}` } } };
+  });
+  return { ...card, components };
 }
 
 export async function handleHunt(message: Message, args: string[]) {

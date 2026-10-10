@@ -2,6 +2,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonInteraction,
+  ComponentType,
   ContainerBuilder,
   Interaction,
   MessageFlags,
@@ -17,6 +18,7 @@ import {
 } from "../services/huntService";
 import { claimZooIncome, feedAll, getZooStatus, houseAnimals, removeAnimalsByKey } from "../services/zooService";
 import { buildZooContainer, formatCareNote, formatFeedShortfall } from "../commands/games/zoo";
+import { reattachMedia, removeHuntGroups } from "../commands/games/hunt";
 import { successContainer, v2Reply } from "../utils/componentsV2";
 import { fmtCurrency } from "../utils/format";
 import { getAnimal } from "../utils/animalCatalog";
@@ -132,7 +134,7 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
         undefined,
         MessageFlags.Ephemeral,
       ));
-      await disableGroupButtons(interaction, animalKey, ownerId);
+      await removeGroupFromCard(interaction, animalKey);
     } catch (err: any) {
       await safeFollowUp(interaction, { content: err.message, flags: MessageFlags.Ephemeral });
     }
@@ -205,7 +207,7 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
         )],
         flags: V2_FLAGS | MessageFlags.Ephemeral,
       });
-      await disableGroupButtons(interaction, animalKey, ownerId);
+      await removeGroupFromCard(interaction, animalKey);
     } catch (err: any) {
       await safeFollowUp(interaction, { content: err.message || "Could not store parts.", flags: MessageFlags.Ephemeral });
     }
@@ -294,7 +296,7 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
         content: `Sent **${count}x ${def?.name ?? animalKey}** to your zoo!`,
         flags: MessageFlags.Ephemeral,
       });
-      await disableGroupButtons(interaction, animalKey, ownerId);
+      await removeGroupFromCard(interaction, animalKey);
     } catch (err: any) {
       await safeFollowUp(interaction, { content: err.message, flags: MessageFlags.Ephemeral });
     }
@@ -404,30 +406,17 @@ export async function handleHuntInteraction(interaction: Interaction): Promise<v
   }
 }
 
-async function disableGroupButtons(interaction: ButtonInteraction, animalKey: string, ownerId: string) {
+// Once an animal's units are gone, its block on the Hunt Results card is stale.
+async function removeGroupFromCard(interaction: ButtonInteraction, animalKey: string) {
   try {
-    const msg = interaction.message;
-    if (!msg?.components) return;
-
-    const sellId = `hunt_sell:${animalKey}:${ownerId}`;
-    const marketId = `hunt_market:${animalKey}:${ownerId}`;
-    const storeId = `hunt_store_parts:${animalKey}:${ownerId}`;
-    const zooId = `hunt_zoo:${animalKey}:${ownerId}`;
-
-    const updated = msg.components.map((component: any) => {
-      if (component.type !== 1) return component;
-      return {
-        ...component,
-        components: component.components.map((btn: any) => {
-          if ([sellId, marketId, storeId, zooId].includes(btn.custom_id)) return { ...btn, disabled: true };
-          return btn;
-        }),
-      };
-    });
-
-    await safeEditReply(interaction, { components: updated });
-  } catch {
-    // Non-critical UI cleanup.
+    const [card] = interaction.message.components;
+    if (card?.type !== ComponentType.Container) return;
+    const trimmed = removeHuntGroups(card.toJSON(), (key) => key === animalKey);
+    const attachments = [...interaction.message.attachments.values()];
+    await safeEditReply(interaction, { components: [reattachMedia(trimmed, attachments)] });
+  } catch (err) {
+    // The action itself succeeded and was confirmed; only the card is stale.
+    console.error(`Hunt card: could not remove ${animalKey}:`, err);
   }
 }
 
