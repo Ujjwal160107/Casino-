@@ -1,5 +1,6 @@
 import {
     ChatInputCommandInteraction,
+    InteractionContextType,
     SlashCommandBuilder,
     User,
 } from "discord.js";
@@ -196,7 +197,12 @@ export const SPECS: Spec[] = [
 
 /** Turn a spec into the Discord command definition. */
 export function buildCommand(spec: Spec): SlashCommandBuilder {
-    const b = new SlashCommandBuilder().setName(spec.name).setDescription(spec.desc);
+    // Guild-only: a global command is otherwise usable in the bot's DMs, where
+    // there is no guildId and the router's ban and jail gates do not apply.
+    const b = new SlashCommandBuilder()
+        .setName(spec.name)
+        .setDescription(spec.desc)
+        .setContexts(InteractionContextType.Guild);
     for (const o of spec.opts ?? []) {
         if (o.kind === "user") {
             b.addUserOption((x) => x.setName(o.name).setDescription(o.desc).setRequired(!!o.required));

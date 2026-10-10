@@ -206,6 +206,13 @@ async function getUserRecord(message: Message) {
 }
 
 export async function routeMessage(client: Client, message: Message, prefix: string) {
+  // The ban and jail gates below only run with a guild context (getUserRecord
+  // returns null without one), so a DM invocation -- e.g. from a client that
+  // cached a command before it was made guild-only -- must stop here.
+  if (!message.guildId) {
+    return message.reply(v2Reply(errorContainer("Server Only", "Fortuna commands only work inside a server.")));
+  }
+
   const raw = message.content.slice(1).trim();
   const [cmd, ...args] = raw.split(/\s+/);
   const normalized = normalizeCommand(cmd, args);
