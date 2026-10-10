@@ -91,6 +91,11 @@ function buildGlobalRow(ownerId: string): ActionRowBuilder<ButtonBuilder> {
 // the top groups get their own section/buttons; the rest render as text.
 const MAX_DETAILED_GROUPS = 3;
 
+// Fixed id on the overflow list so a sent card can find it again (it has no
+// buttons to key on). Discord numbers unset ids from 1 and a card holds at
+// most 40 components, so this can't collide.
+const OVERFLOW_TEXT_ID = 1000;
+
 const RARITY_SORT: Record<string, number> = { Legendary: 0, Rare: 1, Uncommon: 2, Common: 3 };
 
 export function buildHuntResultPayload(
@@ -175,7 +180,7 @@ export function buildHuntResultPayload(
       return `${emojiDisplay} **${group.count}×** **${group.def.name}** — ${group.def.rarity} · Sell: **${fmtCurrency(totalSell)}** | Zoo: **+${fmtCurrency(zooPerDay)}/day**`;
     });
     container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
+      new TextDisplayBuilder().setId(OVERFLOW_TEXT_ID).setContent(
         overflowLines.join("\n") + "\n-# Manage these with **Sell All** below, `!zoo`, or the black market."
       )
     );
@@ -237,6 +242,20 @@ export function removeHuntGroups(
     i = start;
   }
   return { ...card, components };
+}
+
+/**
+ * The card after Sell All: every group block and the overflow list (and the
+ * divider above it) go, since those animals were sold too.
+ */
+export function removeAllHuntAnimals(card: APIContainerComponent): APIContainerComponent {
+  const trimmed = removeHuntGroups(card, () => true);
+  const components = [...trimmed.components];
+  const at = components.findIndex((c) => c.id === OVERFLOW_TEXT_ID);
+  if (at === -1) return trimmed;
+  const start = components[at - 1]?.type === ComponentType.Separator ? at - 1 : at;
+  components.splice(start, at + 1 - start);
+  return { ...trimmed, components };
 }
 
 /**

@@ -8,7 +8,7 @@ vi.mock("../../src/services/shopService", () => ({ seedHuntShop: vi.fn() }));
 vi.mock("../../src/services/huntCraftService", () => ({ buildHuntCraftPayload: vi.fn() }));
 vi.mock("../../src/utils/prisma", () => ({ default: {} }));
 
-import { buildHuntResultPayload, reattachMedia, removeHuntGroups } from "../../src/commands/games/hunt";
+import { buildHuntResultPayload, reattachMedia, removeAllHuntAnimals, removeHuntGroups } from "../../src/commands/games/hunt";
 import { getAnimal } from "../../src/utils/animalCatalog";
 
 const group = (key: string, count: number) => ({ animalKey: key, count, def: getAnimal(key)!, ids: [] });
@@ -48,6 +48,33 @@ describe("removeHuntGroups", () => {
     expect(text(card)).toContain("Next hunt");
     expect(text(card)).toContain("hunt_sell_all:owner");
     expect(text(card)).not.toContain("hunt_sell:");
+  });
+});
+
+describe("removeAllHuntAnimals", () => {
+  // Five species: three get their own block, two land in the overflow list.
+  const five = ["rabbit", "squirrel", "deer", "fox", "boar"];
+
+  it("drops the overflow list along with every block after Sell All", () => {
+    const before = resultCard(...five);
+    expect(text(before)).toContain("Manage these with **Sell All**");
+
+    const card = removeAllHuntAnimals(before);
+
+    expect(text(card)).not.toContain("Manage these with **Sell All**");
+    expect(text(card)).not.toContain("hunt_sell:");
+    expect(text(card)).toContain("## Hunt Results");
+    expect(text(card)).toContain("Next hunt");
+    expect(text(card)).toContain("hunt_sell_all:owner");
+    const kinds = types(card);
+    kinds.forEach((kind: number, i: number) => {
+      if (kind === ComponentType.Separator) expect(kinds[i + 1]).not.toBe(ComponentType.Separator);
+    });
+  });
+
+  it("selling one species keeps the overflow list, whose animals are still unsold", () => {
+    const card = removeHuntGroups(resultCard(...five), (key) => key === "rabbit");
+    expect(text(card)).toContain("Manage these with **Sell All**");
   });
 });
 
