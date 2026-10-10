@@ -123,6 +123,55 @@ export async function handleMarket(message: Message, args: string[]) {
 }
 
 /**
+ * My Listings can hold 5 item + 5 part listings. ComponentsV2 caps a message
+ * at 40 components (nested ones count), so each listing is one Section with a
+ * single TextDisplay and its Cancel button (3) and no separators between them:
+ * 3 header components + 10 x 3 = 33.
+ */
+export function buildMyListingsContainer(
+  ownerId: string,
+  listings: Awaited<ReturnType<typeof getUserListings>>,
+  partListings: Awaited<ReturnType<typeof getUserHuntPartListings>>,
+) {
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## ${E.Inventory} My Listings\n-# Items ${listings.length}/5 ${E.Scroll} Animal parts ${partListings.length}/5`,
+      ),
+    )
+    .addSeparatorComponents(separator());
+
+  const addRow = (title: string, totalPrice: number, expiresAt: Date, note: string, cancelId: string) => {
+    const fees = calculateFees(totalPrice);
+    container.addSectionComponents(
+      new SectionBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            `${title}\n` +
+            `${E.Price} ${fmt(totalPrice)} ${E.Currency} ${E.MoneyBag} You get: ${fmt(fees.sellerPayout)}\n` +
+            `-# ${note}${E.Cooldown} <t:${Math.floor(expiresAt.getTime() / 1000)}:R>`,
+          ),
+        )
+        .setButtonAccessory(
+          new ButtonBuilder()
+            .setCustomId(cancelId)
+            .setLabel("Cancel")
+            .setStyle(ButtonStyle.Danger),
+        ),
+    );
+  };
+
+  for (const listing of listings) {
+    const itemName = listing.shopItem?.name ?? "Unknown";
+    addRow(`**${itemName}** (x${listing.amount})`, listing.totalPrice, listing.expiresAt, "", `bm_cancel:${listing.id}:${ownerId}`);
+  }
+  for (const listing of partListings) {
+    addRow(`**${listing.partName}** (x${listing.amount})`, listing.totalPrice, listing.expiresAt, "Animal Part ", `bm_part_cancel:${listing.id}:${ownerId}`);
+  }
+  return container;
+}
+
+/**
  * Routes every Black Market button and select (bm_*), called from index.ts.
  * Most of them sit on ephemeral replies, which a collector on the hub message
  * never sees, so routing is by customId and the owner is its last segment.
@@ -503,60 +552,15 @@ export async function handleBlackMarketInteraction(interaction: MessageComponent
       return true;
     }
 
-    const container = new ContainerBuilder()
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(`## ${E.Inventory} My Listings (${listings.length + partListings.length}/5)`),
-      )
-      .addSeparatorComponents(separator());
-
-    for (const listing of listings) {
-      const itemName = listing.shopItem?.name ?? "Unknown";
-      const expiresUnix = Math.floor(listing.expiresAt.getTime() / 1000);
-      const fees = calculateFees(listing.totalPrice);
-
-      container.addSectionComponents(
-        new SectionBuilder()
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(`**${itemName}** (x${listing.amount})`),
-            new TextDisplayBuilder().setContent(
-              `${E.Price} ${fmt(listing.totalPrice)} ${E.Currency} ${E.MoneyBag} You get: ${fmt(fees.sellerPayout)}\n` +
-              `-# ${E.Cooldown} <t:${expiresUnix}:R>`,
-            ),
-          )
-          .setButtonAccessory(
-            new ButtonBuilder()
-              .setCustomId(`bm_cancel:${listing.id}:${ownerId}`)
-              .setLabel("Cancel")
-              .setStyle(ButtonStyle.Danger),
-          ),
-      );
-      container.addSeparatorComponents(softSeparator());
+    try {
+      await interaction.reply({
+        components: [buildMyListingsContainer(ownerId, listings, partListings)],
+        flags: BM_FLAGS | MessageFlags.Ephemeral,
+      });
+    } catch (err) {
+      console.error("Black Market My Listings reply failed:", err);
+      await safeReply(interaction, { components: [bmContainer(`${E.Decline} Error`, "Couldn't show your listings. Try again.", BM_ERROR)], flags: BM_FLAGS | MessageFlags.Ephemeral });
     }
-
-    for (const listing of partListings) {
-      const expiresUnix = Math.floor(listing.expiresAt.getTime() / 1000);
-      const fees = calculateFees(listing.totalPrice);
-
-      container.addSectionComponents(
-        new SectionBuilder()
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(`**${listing.partName}** (x${listing.amount})`),
-            new TextDisplayBuilder().setContent(
-              `${E.Price} ${fmt(listing.totalPrice)} ${E.Currency} ${E.MoneyBag} You get: ${fmt(fees.sellerPayout)}\n` +
-              `-# Animal Part ${E.Cooldown} <t:${expiresUnix}:R>`,
-            ),
-          )
-          .setButtonAccessory(
-            new ButtonBuilder()
-              .setCustomId(`bm_part_cancel:${listing.id}:${ownerId}`)
-              .setLabel("Cancel")
-              .setStyle(ButtonStyle.Danger),
-          ),
-      );
-      container.addSeparatorComponents(softSeparator());
-    }
-
-    await interaction.reply({ components: [container], flags: BM_FLAGS | MessageFlags.Ephemeral });
     return true;
   }
 
