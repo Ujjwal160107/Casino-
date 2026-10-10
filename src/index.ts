@@ -14,7 +14,6 @@ import {
 } from "discord.js";
 import prisma from "./utils/prisma";
 import { routeMessage } from "./commandRouter";
-import { getGuildSettings } from "./services/guildSettingsService";
 import { isInteractionExpiredError, safeInteractionReply, shouldEarlyAcknowledgeInIndex, shouldIgnoreInteractionError, tryEarlyAcknowledge, ensureDeferredUpdate, safeEditReply, safeReply } from "./utils/interactionHelpers";
 import { initEmojiRegistry, listEmojiKeys } from "./utils/emojiRegistry";
 import { handleBankInteraction } from "./handlers/bankInteractionHandler";
@@ -41,10 +40,10 @@ if (!token) {
 const client = new Client({
   // No privileged intents. Discord denied MessageContent for this use case
   // (their position: a command bot should use slash commands) and the grant
-  // lapsed on 2026-08-19. Commands still work via @mention and DM, which
-  // Discord delivers content for without the intent -- see the mention branch
-  // below. Restore MessageContent/GuildMembers here only if a future
-  // application is approved.
+  // lapsed on 2026-08-19. Commands run as slash commands, or via @mention,
+  // which Discord delivers content for without the intent -- see the
+  // messageCreate handler below. Restore MessageContent/GuildMembers here
+  // only if a future application is approved.
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages
@@ -252,36 +251,25 @@ client.on("messageCreate", async (message) => {
   try {
     if (message.author.bot || !message.guild) return;
 
-    const settings = await getGuildSettings(message.guild.id);
-    const prefix = settings.prefix ?? "!";
+    // Only @mentions reach us with content: without the Message Content
+    // intent a plain "!cmd" arrives empty, so there is no prefix to match.
+    if (!message.mentions.has(client.user!) || message.mentions.everyone) return;
 
-    let isCommand = false;
-    let contentToProcess = "";
+    const mentionRegex = new RegExp(`^<@!?${client.user!.id}>`);
+    if (!mentionRegex.test(message.content)) return;
 
-    if (message.content.startsWith(prefix)) {
-      isCommand = true;
-      contentToProcess = message.content.slice(prefix.length).trim();
-    } else if (message.mentions.has(client.user!) && !message.mentions.everyone) {
-      const mentionRegex = new RegExp(`^<@!?${client.user!.id}>`);
-      if (mentionRegex.test(message.content)) {
-        const rawContent = message.content.replace(mentionRegex, "").trim();
-        if (!rawContent) {
-          return message.reply(
-            `**Need Help?**\nView all commands: <${Mascot.Links.CommandList}>\nJoin support: ${Mascot.Links.Support}\nOr use \`${prefix}help\` to start!`
-          );
-        }
-
-        isCommand = true;
-        contentToProcess = rawContent;
-      }
+    const contentToProcess = message.content.replace(mentionRegex, "").trim();
+    if (!contentToProcess) {
+      return message.reply(
+        `**Need Help?**\nView all commands: <${Mascot.Links.CommandList}>\nJoin support: ${Mascot.Links.Support}\nOr use \`/help\` to start!`
+      );
     }
-
-    if (!isCommand || !contentToProcess) return;
 
     const originalContent = message.content;
     try {
       (message as any).content = "!" + contentToProcess;
-      await routeMessage(client, message, prefix);
+      // "/" so help text points at slash commands, the same as handle.ts.
+      await routeMessage(client, message, "/");
     } finally {
       (message as any).content = originalContent;
     }
