@@ -528,6 +528,8 @@ export type StatementOutcome = "PAID_FULL" | "PAID_MINIMUM" | "MISSED";
 export type StatementSettled = {
   userId: string;
   status: StatementOutcome;
+  /** What the settled statement billed; 0 for an idle card's empty statement. */
+  statementBalance: number;
   scoreDelta: number;
   interestCharged: number;
   cardStatus: string;
@@ -729,6 +731,7 @@ async function settleStatement(statementId: string): Promise<StatementSettled | 
       return {
         userId: user.discordId,
         status,
+        statementBalance: statement.statementBalance,
         scoreDelta,
         interestCharged,
         cardStatus,

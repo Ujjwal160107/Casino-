@@ -9,9 +9,10 @@ import { containerText, containerThumb, fakeDmClient } from "./helpers";
 
 const dueAt = new Date(Date.now() + 7 * 24 * 3_600_000);
 const issued: StatementIssued = { userId: "u", tier: "STARTER", statementBalance: 300_000, minimumDue: 75_000, dueAt };
-const settledBase = { userId: "u", interestCharged: 0, cardStatus: "ACTIVE", remainingBalance: 0 };
+const settledBase = { userId: "u", statementBalance: 300_000, interestCharged: 0, cardStatus: "ACTIVE", remainingBalance: 0 };
 const paidFull: StatementSettled = { ...settledBase, status: "PAID_FULL", scoreDelta: 30 };
 const paidMin: StatementSettled = { ...settledBase, status: "PAID_MINIMUM", scoreDelta: 20, remainingBalance: 225_000 };
+const idle: StatementSettled = { ...settledBase, status: "PAID_FULL", statementBalance: 0, scoreDelta: 0 };
 const missed: StatementSettled = { ...settledBase, status: "MISSED", scoreDelta: -45, interestCharged: 36_000, cardStatus: "DELINQUENT", remainingBalance: 300_000 };
 const locked: StatementSettled = { ...missed, scoreDelta: -60, cardStatus: "LOCKED" };
 
@@ -21,6 +22,14 @@ describe("cardWeeklyNotice", () => {
   it("returns null when nothing settled and the statement is zero", () => {
     expect(cardWeeklyNotice({ issued: { ...issued, statementBalance: 0, minimumDue: 0 } })).toBeNull();
     expect(cardWeeklyNotice({})).toBeNull();
+  });
+
+  it("ignores an idle card's empty settled statement", () => {
+    expect(cardWeeklyNotice({ settled: idle, issued: { ...issued, statementBalance: 0, minimumDue: 0 } })).toBeNull();
+
+    const fresh = text({ settled: idle, issued });
+    expect(fresh).toContain("## New card statement");
+    expect(fresh).not.toContain("paid in full");
   });
 
   it("titles and first block follow last week's outcome", () => {
@@ -85,6 +94,15 @@ describe("notifyCardWeekly", () => {
     await setNoticeTypeEnabled(a, "card", false);
     const { client, sent } = fakeDmClient();
     await notifyCardWeekly(client, { issued: [{ ...issued, userId: a }], settled: [] });
+    expect(sent.get(a)).toBeUndefined();
+  });
+
+  it("skips an idle cardholder whose empty statement settled", async () => {
+    const { client, sent } = fakeDmClient();
+    await notifyCardWeekly(client, {
+      issued: [{ ...issued, userId: a, statementBalance: 0, minimumDue: 0 }],
+      settled: [{ ...idle, userId: a }],
+    });
     expect(sent.get(a)).toBeUndefined();
   });
 

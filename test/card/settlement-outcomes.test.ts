@@ -141,7 +141,7 @@ describe("settleDueStatements outcomes", () => {
     const before = await testPrisma.user.findUniqueOrThrow({ where: { discordId: id } });
     await seedOverdueStatement({ balance: 0, paid: 0 });
     const [o] = await settleMine();
-    expect(o).toMatchObject({ status: "PAID_FULL", scoreDelta: 0, interestCharged: 0, cardStatus: "ACTIVE" });
+    expect(o).toMatchObject({ status: "PAID_FULL", statementBalance: 0, scoreDelta: 0, interestCharged: 0, cardStatus: "ACTIVE" });
     const after = await testPrisma.user.findUniqueOrThrow({ where: { discordId: id } });
     expect(after.creditScore).toBe(before.creditScore);
   });
