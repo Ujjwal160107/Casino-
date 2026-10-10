@@ -187,40 +187,58 @@ export async function getOrCreateDailyQuest(discordId: string) {
   });
 }
 
+// Bounded retries for the compare-and-swap below; one player's events rarely
+// overlap more than two or three deep (e.g. casino:play + casino:win).
+const QUEST_PROGRESS_MAX_ATTEMPTS = 10;
+
 export async function updateQuestProgress(discordId: string, key: QuestKey, amount: number = 1) {
-  const now = new Date();
-  const quest = await prisma.dailyQuest.findFirst({
-    where: { userId: discordId, expiresAt: { gt: now }, completed: false },
-    orderBy: { createdAt: "desc" },
-  });
+  // Events for one player fire back-to-back (casino:play then casino:win) and
+  // each read-modify-writes the whole tasks JSON, so a plain update let the
+  // later write erase the earlier one's progress. Write only if the quest is
+  // unchanged since our read (updatedAt CAS); otherwise re-read and retry.
+  for (let attempt = 0; attempt < QUEST_PROGRESS_MAX_ATTEMPTS; attempt++) {
+    const now = new Date();
+    const quest = await prisma.dailyQuest.findFirst({
+      where: { userId: discordId, expiresAt: { gt: now }, completed: false },
+      orderBy: { createdAt: "desc" },
+    });
 
-  if (!quest) return;
+    if (!quest) return;
 
-  const tasks = quest.tasks as unknown as QuestTask[];
-  let changed = false;
+    const tasks = quest.tasks as unknown as QuestTask[];
+    let changed = false;
 
-  for (const task of tasks) {
-    if (task.completed) continue;
+    for (const task of tasks) {
+      if (task.completed) continue;
 
-    let matches = task.key === key;
-    if (!matches && key.startsWith("WIN_") && task.key === "GAMBLE_ANY") matches = true;
-    if (!matches && key === "GAMBLE_ANY" && task.key === "CASINO_GRIND") matches = true;
-    if (!matches && key === "STUDY" && task.key === "STUDY_MULTI") matches = true;
-    if (!matches && key === "WORK_SHIFT" && task.key === "WORK_MULTI") matches = true;
+      // No WIN_* -> GAMBLE_ANY alias: every casino win already emits
+      // casino:play, so the alias counted each win twice.
+      let matches = task.key === key;
+      if (!matches && key === "GAMBLE_ANY" && task.key === "CASINO_GRIND") matches = true;
+      if (!matches && key === "STUDY" && task.key === "STUDY_MULTI") matches = true;
+      if (!matches && key === "WORK_SHIFT" && task.key === "WORK_MULTI") matches = true;
 
-    if (matches) {
-      task.progress = Math.min(task.target, task.progress + amount);
-      if (task.progress >= task.target) task.completed = true;
-      changed = true;
+      if (matches) {
+        task.progress = Math.min(task.target, task.progress + amount);
+        if (task.progress >= task.target) task.completed = true;
+        changed = true;
+      }
     }
+
+    if (!changed) return;
+
+    const { count } = await prisma.dailyQuest.updateMany({
+      where: { id: quest.id, updatedAt: quest.updatedAt },
+      data: {
+        tasks: tasks as any,
+        completed: tasks.every(t => t.completed),
+        // Strictly newer than what we read, even within the same millisecond,
+        // so a racing writer's CAS can never match a version it did not see.
+        updatedAt: new Date(Math.max(now.getTime(), quest.updatedAt.getTime() + 1)),
+      },
+    });
+    if (count === 1) return;
   }
-
-  if (!changed) return;
-
-  await prisma.dailyQuest.update({
-    where: { id: quest.id },
-    data: { tasks: tasks as any, completed: tasks.every(t => t.completed) },
-  });
 }
 
 export async function claimQuestReward(discordId: string): Promise<{ totalReward: number; streakBonus: number; newStreak: number }> {
