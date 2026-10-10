@@ -18,7 +18,6 @@ import { Mascot, getEmoteUrl } from "../../config/branding";
 import { getNetWorthMany, NetWorthBreakdown } from "../../services/netWorthService";
 
 type LbType = "net" | "cash" | "bank" | "shifts" | "passive";
-type LbScope = "global" | "server";
 
 const TITLES: Record<LbType, string> = {
     net: "Net Worth Leaderboard",
@@ -114,38 +113,17 @@ function buildTypeSelect(active: LbType, ownerId: string, disabled = false) {
     );
 }
 
-function buildScopeSelect(active: LbScope, ownerId: string, disabled = false) {
-    return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-        new StringSelectMenuBuilder()
-            .setCustomId(`lb:scope:${ownerId}`)
-            .setPlaceholder("Scope")
-            .setDisabled(disabled)
-            .addOptions(
-                new StringSelectMenuOptionBuilder()
-                    .setValue("global").setLabel("Global")
-                    .setDescription("Every Fortuna player, every server")
-                    .setDefault(active === "global"),
-                new StringSelectMenuOptionBuilder()
-                    .setValue("server").setLabel("This Server")
-                    .setDescription("Only players in this server")
-                    .setDefault(active === "server"),
-            ),
-    );
-}
-
 function buildLeaderboardContainer(
     users: LbUser[],
     type: LbType,
-    scope: LbScope,
     ownerId: string,
     expired = false,
 ) {
     const thumbUrl = getEmoteUrl(type === "shifts" ? Mascot.Emotes.JobWorking : Mascot.Emotes.Money);
-    const scopeLabel = scope === "global" ? "Global" : "This server";
 
     const header = new SectionBuilder().addTextDisplayComponents(
         new TextDisplayBuilder().setContent(`## ${Mascot.Emotes.MedalGold} ${TITLES[type]}`),
-        new TextDisplayBuilder().setContent(`${SUBTITLES[type]} · ${scopeLabel}`),
+        new TextDisplayBuilder().setContent(`${SUBTITLES[type]} · Global`),
     );
     if (thumbUrl) {
         header.setThumbnailAccessory(new ThumbnailBuilder().setURL(thumbUrl).setDescription(TITLES[type]));
@@ -165,8 +143,7 @@ function buildLeaderboardContainer(
 
     container
         .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
-        .addActionRowComponents(buildTypeSelect(type, ownerId, expired))
-        .addActionRowComponents(buildScopeSelect(scope, ownerId, expired));
+        .addActionRowComponents(buildTypeSelect(type, ownerId, expired));
 
     return container;
 }
@@ -202,34 +179,15 @@ export async function handleLeaderboard(message: Message, args: string[]) {
     if (arg === "net") currentType = "net";
     if (arg === "shifts" || arg === "work" || arg === "shift" || arg === "employees" || arg === "employee") currentType = "shifts";
 
-    let currentScope: LbScope = "global";
-
+    // Global only. A server board needs the server's member list, which
+    // requires the privileged GuildMembers intent Discord denied us.
     const allUsers = await loadUsers();
-    let serverMemberIds: Set<string> | null = null;
-
-    // Server scope needs the whole member list, which requires the privileged
-    // GuildMembers intent we no longer hold. Fall back to global rather than
-    // throwing, so the leaderboard still renders.
-    const scopedUsers = async (): Promise<LbUser[]> => {
-        if (currentScope === "global") return allUsers;
-        if (!serverMemberIds) {
-            try {
-                const members = await message.guild!.members.fetch();
-                serverMemberIds = new Set(members.keys());
-            } catch {
-                currentScope = "global";
-                return allUsers;
-            }
-        }
-        return allUsers.filter((u) => serverMemberIds!.has(u.discordId));
-    };
 
     const render = async (): Promise<ContainerBuilder> => {
-        const users = await scopedUsers();
         if (currentType === "net" || currentType === "bank" || currentType === "passive") {
-            await attachNetWorth(users);
+            await attachNetWorth(allUsers);
         }
-        return buildLeaderboardContainer(users, currentType, currentScope, ownerId);
+        return buildLeaderboardContainer(allUsers, currentType, ownerId);
     };
 
     const sent = await message.reply({
@@ -250,7 +208,6 @@ export async function handleLeaderboard(message: Message, args: string[]) {
         const kind = i.customId.split(":")[1];
         const value = i.values[0];
         if (kind === "type") currentType = value as LbType;
-        if (kind === "scope") currentScope = value as LbScope;
         await i.update({
             components: [await render()],
             flags: MessageFlags.IsComponentsV2,
@@ -259,9 +216,8 @@ export async function handleLeaderboard(message: Message, args: string[]) {
 
     collector.on("end", async () => {
         try {
-            const users = await scopedUsers();
             await sent.edit({
-                components: [buildLeaderboardContainer(users, currentType, currentScope, ownerId, true)],
+                components: [buildLeaderboardContainer(allUsers, currentType, ownerId, true)],
                 flags: MessageFlags.IsComponentsV2,
             });
         } catch { }

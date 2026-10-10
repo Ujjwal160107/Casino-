@@ -296,7 +296,7 @@ const CATEGORIES: CategoryData[] = [
     commands: [
       { name: "profile", aliases: ["p", "me"], description: "Your full profile: Overview, Wealth, Career, Cosmetics, Education, Relationship.", example: "{p}profile" },
       {
-        name: "leaderboard", aliases: ["lb", "top", "rich"], description: "Server leaderboard (net worth by default).",
+        name: "leaderboard", aliases: ["lb", "top", "rich"], description: "Global leaderboard (net worth by default).",
         subcommands: ["cash — wallet leaderboard", "work — work / employee leaderboard"],
         example: "{p}leaderboard cash"
       },
