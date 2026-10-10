@@ -7,7 +7,7 @@
  */
 import { buildHuntResultPayload } from "../commands/games/hunt";
 import { buildHuntStoreMessage, buildJobStoreMessage } from "../commands/economy/shop";
-import { buildZooPayload } from "../commands/games/zoo";
+import { buildZooPayload, ZOO_SLOTS_PER_PAGE } from "../commands/games/zoo";
 import { ANIMAL_CATALOG, RARITY_INCOME_PER_DAY, ZOO_TIERS } from "../utils/animalCatalog";
 import type { HuntGroup } from "../services/huntService";
 import type { ZooSlot } from "../services/zooService";
@@ -108,9 +108,9 @@ const zooView = {
     evicted: 4,
 };
 
-// 16 types at 6 a page is 3 pages. Every page carries the header, action row
+// 16 types spread over several pages. Every page carries the header, action row
 // and navigation, so each needs its own budget check -- not just the first.
-const zooPages = Math.ceil(zooSlots.length / 6);
+const zooPages = Math.ceil(zooSlots.length / ZOO_SLOTS_PER_PAGE);
 for (let page = 1; page <= zooPages; page++) {
     check(
         `zoo worst case (16 types, all hungry, died + evicted) — page ${page}/${zooPages}`,

@@ -440,7 +440,13 @@ export async function craftHuntRecipe(userId: string, guildId: string, recipeKey
       }
     }
 
-    await tx.wallet.update({ where: { id: wallet.id }, data: { balance: { decrement: recipe.coinCost } } });
+    // The balance read above is outside this transaction; spending in between
+    // would let an unconditional decrement drive the wallet negative.
+    const debited = await tx.wallet.updateMany({
+      where: { id: wallet.id, balance: { gte: recipe.coinCost } },
+      data: { balance: { decrement: recipe.coinCost } },
+    });
+    if (debited.count !== 1) throw new Error(`You need **${fmtCurrency(recipe.coinCost)}** to craft this.`);
     await tx.transaction.create({
       data: {
         walletId: wallet.id,

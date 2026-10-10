@@ -44,8 +44,8 @@ const EMOJI_RIP = GameConfig.Emojis.Rip;
 const COCKFIGHT_ACCENT = 0xFFA500;
 const COCKFIGHT_FLAGS = MessageFlags.IsComponentsV2 as const;
 
-type FighterKey = "p1" | "p2";
-type SideBet = { userId: string; displayName: string; amount: number; target: FighterKey; walletId: string };
+export type FighterKey = "p1" | "p2";
+export type SideBet = { userId: string; displayName: string; amount: number; target: FighterKey; walletId: string };
 type FighterProfile = { user: User; member: GuildMember | null; displayName: string; discordId: string; walletId: string };
 
 function getDisplayName(member: GuildMember | null | undefined, user: User): string {
@@ -80,6 +80,28 @@ function addImageSection(container: ContainerBuilder, title: string, body: strin
                     .setDescription(description)
             )
     );
+}
+
+const SIDE_PAYOUT_RATIO = 1.5;
+
+/**
+ * What a decided fight pays out. The winning fighter takes the duel pot (both
+ * entries) and nothing more; side bets are a separate book against the house.
+ * Folding side stakes into the pot paid each winning side stake twice: once to
+ * the fighter inside the pot, and again to the bettor at 1.5x.
+ */
+export function settleCockfight(bet: number, sideBets: SideBet[], winnerKey: FighterKey) {
+    const sidePayouts = new Map<string, { amount: number; walletId: string; displayName: string }>();
+    for (const b of sideBets) {
+        if (b.target !== winnerKey) continue;
+        const current = sidePayouts.get(b.userId);
+        sidePayouts.set(b.userId, {
+            amount: (current?.amount ?? 0) + Math.floor(b.amount * SIDE_PAYOUT_RATIO),
+            walletId: b.walletId,
+            displayName: b.displayName
+        });
+    }
+    return { mainWinnerPayout: bet * 2, sidePayouts };
 }
 
 function buildAcceptRow(fightId: string, disabled = false) {
@@ -404,7 +426,7 @@ function formatChickenStats(meta: any, level: number): string {
     ].join("\n");
 }
 
-async function runCockFight(
+export async function runCockFight(
     originalMsg: Message,
     gameMsg: Message,
     p1: FighterProfile,
@@ -457,17 +479,55 @@ async function runCockFight(
         return;
     }
 
-    let pot = bet * 2;
+    const pot = bet * 2;
     const sideBets: SideBet[] = [];
+    let bettingClosed = false;
 
     const betTimeSeconds = GAME_UI_TIMINGS.cockfightBetSeconds; // Default 60s
     const betTimeMs = betTimeSeconds * 1000;
 
-    // --- GENERATE VS IMAGE ---
-    const vsImage = await generateVsImage(
-        p1.user.displayAvatarURL({ extension: "png", size: 256 }),
-        p2.user.displayAvatarURL({ extension: "png", size: 256 })
-    );
+    // From here on stakes are held, so a fight that can't be finished (an image
+    // render, a message edit or a DB read throwing) must hand every one back,
+    // or both entries and all side bets were simply gone.
+    async function refundAll() {
+        settled = true;
+        bettingClosed = true;
+        const stakes = [
+            { walletId: p1.walletId, amount: bet },
+            { walletId: p2.walletId, amount: bet },
+            ...sideBets.map(b => ({ walletId: b.walletId, amount: b.amount }))
+        ];
+        for (const stake of stakes) {
+            await creditGamePayout(stake.walletId, stake.amount, "game_refund", {
+                game: "cockfight",
+                betAmount: stake.amount,
+                payout: stake.amount,
+                result: "fight_cancelled",
+                guildId,
+                channelId,
+                messageId: gameMsg.id
+            }).catch(err => console.error(`Cockfight refund failed for wallet ${stake.walletId}:`, err));
+        }
+        await releaseActiveGameLock("cockfight", p1.user.id);
+        await releaseActiveGameLock("cockfight", p2.user.id);
+        await gameMsg.edit({
+            components: [buildContainer("Cockfight Cancelled", "The fight couldn't be finished. Every stake was refunded.", 0xE74C3C)],
+            attachments: [],
+            flags: COCKFIGHT_FLAGS
+        }).catch(() => { });
+    }
+
+    let vsImage: Awaited<ReturnType<typeof generateVsImage>>;
+    try {
+        vsImage = await generateVsImage(
+            p1.user.displayAvatarURL({ extension: "png", size: 256 }),
+            p2.user.displayAvatarURL({ extension: "png", size: 256 })
+        );
+    } catch (err) {
+        console.error("Cockfight: could not render the matchup:", err);
+        await refundAll();
+        return;
+    }
 
     function buildBettingContainer() {
         const p1Total = sideBets.filter(b => b.target === "p1").reduce((a, b) => a + b.amount, 0);
@@ -503,13 +563,18 @@ async function runCockFight(
         return container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
     }
 
-    await gameMsg.edit({
-        components: [buildBettingContainer(), buildSideBetRow(fightId, p1.displayName, p2.displayName)],
-        files: [vsImage],
-        flags: COCKFIGHT_FLAGS
-    });
+    try {
+        await gameMsg.edit({
+            components: [buildBettingContainer(), buildSideBetRow(fightId, p1.displayName, p2.displayName)],
+            files: [vsImage],
+            flags: COCKFIGHT_FLAGS
+        });
+    } catch (err) {
+        console.error("Cockfight: could not open betting:", err);
+        await refundAll();
+        return;
+    }
 
-    let bettingClosed = false;
     const betCollector = gameMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: betTimeMs });
 
     betCollector.on("collect", async (i: ButtonInteraction) => {
@@ -523,8 +588,9 @@ async function runCockFight(
         const target = i.customId.endsWith(":p1") ? "p1" : "p2";
         const targetName = target === "p1" ? p1.displayName : p2.displayName;
 
+        const modalId = `cockfight_modal:${fightId}:${target}:${i.id}`;
         const modal = new ModalBuilder()
-            .setCustomId(`cockfight_modal:${fightId}:${target}:${i.id}`)
+            .setCustomId(modalId)
             .setTitle(`Bet on ${targetName}`);
 
         const input = new TextInputBuilder()
@@ -538,7 +604,12 @@ async function runCockFight(
         await i.showModal(modal);
 
         try {
-            const submit = await i.awaitModalSubmit({ time: 30000 });
+            // awaitModalSubmit listens bot-wide, so without a filter it takes the
+            // next modal anyone submits anywhere, not this bettor's bet.
+            const submit = await i.awaitModalSubmit({
+                time: 30000,
+                filter: (m) => m.customId === modalId && m.user.id === i.user.id
+            });
 
             if (bettingClosed) {
                 await submit.reply({ content: "Bets are closed!", ephemeral: true });
@@ -596,7 +667,6 @@ async function runCockFight(
             }
 
             sideBets.push({ userId: submit.user.id, displayName, amount, target, walletId: user.wallet.id });
-            pot += amount;
 
             await submit.editReply({ content: `Placed bet of **${fmtCurrency(amount)}** on **${targetName}**!` });
 
@@ -624,8 +694,16 @@ async function runCockFight(
         }
     });
 
-    betCollector.on("end", async (collected: any, reason: string) => {
+    betCollector.on("end", () => {
         if (settled) return;
+        resolveFight().catch(async (err) => {
+            console.error("Cockfight: fight could not be finished:", err);
+            // Once payouts have begun a refund would pay twice, so only an unsettled fight is refunded.
+            if (!settled) await refundAll();
+        });
+    });
+
+    async function resolveFight() {
         bettingClosed = true;
         const p1Id = p1.discordId;
         const p1Inv = await prisma.inventory.findUnique({ where: { userId_shopItemId: { userId: p1Id, shopItemId: chickenItemId } } });
@@ -733,24 +811,9 @@ async function runCockFight(
         }
         // --- SIMULATION END ---
 
-        const winningSideBets = sideBets.filter(b => b.target === winnerKey);
-        const sidePayoutRatio = 1.5;
-
         const payoutOps: any[] = [];
-        const mainWinnerPayout = pot;
-        const sideWinnersDetails: string[] = [];
-        const payoutMap = new Map<string, { amount: number; walletId: string; displayName: string }>();
-
-        for (const b of winningSideBets) {
-            const payout = Math.floor(b.amount * sidePayoutRatio);
-            const current = payoutMap.get(b.userId);
-            payoutMap.set(b.userId, {
-                amount: (current?.amount ?? 0) + payout,
-                walletId: b.walletId,
-                displayName: b.displayName
-            });
-            sideWinnersDetails.push(`${b.displayName}: +${fmtCurrency(payout)}`);
-        }
+        const { mainWinnerPayout, sidePayouts: payoutMap } = settleCockfight(bet, sideBets, winnerKey);
+        const sideWinnersDetails = [...payoutMap.values()].map(p => `${p.displayName}: +${fmtCurrency(p.amount)}`);
 
         settled = true;
         for (const [, payoutInfo] of payoutMap.entries()) {
@@ -977,7 +1040,7 @@ async function runCockFight(
                 `- Win chance: **${displayWinChance.toFixed(1)}%**`,
                 `- Main payout: **${fmtCurrency(mainWinnerPayout)}**`,
                 `- Total pot: **${fmtCurrency(pot)}**`,
-                `- Side ROI: **${sidePayoutRatio.toFixed(2)}x**`
+                `- Side ROI: **${SIDE_PAYOUT_RATIO.toFixed(2)}x**`
             ].join("\n"),
             winnerIsP1 ? 0x2ECC71 : 0xE74C3C
         );
@@ -1011,5 +1074,5 @@ async function runCockFight(
         await setCasinoCooldown("cockfight", p2.user.id, guildId);
 
         await gameMsg.edit({ components: [resultContainer], files: [winnerImage], flags: COCKFIGHT_FLAGS });
-    });
+    }
 }

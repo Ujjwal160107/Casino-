@@ -20,7 +20,8 @@ interface RRLobby {
     hostId: string;
     betAmount: number;
     players: RRPlayer[];
-    status: "WAITING" | "PLAYING";
+    // PAYING marks the point after which a failure must not refund: survivors may already be paid.
+    status: "WAITING" | "PLAYING" | "PAYING";
     timeout: NodeJS.Timeout | null;
     message: Message | null; // The lobby message to edit
 }
@@ -122,9 +123,10 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
             const current = waitingLobbies.get(message.channelId);
             if (current && current.status === "WAITING") {
                 if (current.players.length >= MIN_PLAYERS) {
-                    startGame(message.channelId, message);
+                    runGame(message.channelId, message);
                 } else {
-                    cancelGame(message.channelId, message, "Not enough players joined.");
+                    cancelGame(message.channelId, message, "Not enough players joined.")
+                        .catch(err => console.error("Russian Roulette: lobby cancel failed:", err));
                 }
             }
         }, LOBBY_TIME);
@@ -173,11 +175,16 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
             // Allow start if it's "start" command but check lobby existence handled above
             return message.reply(v2Reply(errorContainer("Not Host", "Only the host can force start.")));
         }
+        // The lobby stays registered while its game runs, so forcing again would
+        // start a second game loop on it and pay the survivors twice.
+        if (lobby.status !== "WAITING") {
+            return message.reply(v2Reply(errorContainer("Game Active", "This game has already started.")));
+        }
         if (lobby.players.length < MIN_PLAYERS) {
             return message.reply(v2Reply(errorContainer("Not Enough Players", `Need at least ${MIN_PLAYERS} players.`)));
         }
         if (lobby.timeout) clearTimeout(lobby.timeout);
-        startGame(message.channelId, message);
+        runGame(message.channelId, message);
         return;
     }
 
@@ -213,6 +220,20 @@ async function cancelGame(channelId: string, message: Message, reason: string) {
 
     const container = errorContainer("Game Cancelled", reason + "\nAll bets refunded.");
     if (lobby.message) await lobby.message.reply(v2Reply(container));
+}
+
+// Every stake is already debited when a game starts. If it dies before payouts
+// (the channel or message is gone, an edit is rejected), refund the lobby rather
+// than strand the stakes, and never let the rejection escape the timer.
+function runGame(channelId: string, message: Message) {
+    const lobby = waitingLobbies.get(channelId);
+    startGame(channelId, message).catch(async (err) => {
+        console.error("Russian Roulette: game failed:", err);
+        if (lobby && lobby.status !== "PAYING") {
+            await cancelGame(channelId, message, "The game was interrupted.")
+                .catch(cancelErr => console.error("Russian Roulette: cancelling the failed game failed:", cancelErr));
+        }
+    });
 }
 
 async function startGame(channelId: string, message: Message) {
@@ -300,6 +321,7 @@ async function startGame(channelId: string, message: Message) {
 
         const winAmount = Math.floor(pot / winners.length);
 
+        lobby.status = "PAYING";
         for (const w of winners) {
             await creditGamePayout(w.walletId, winAmount, "game_win", {
                 game: "russian_roulette",
@@ -348,7 +370,7 @@ async function startGame(channelId: string, message: Message) {
         await lobby.message!.reply(v2Reply(finalContainer));
     } else {
         // Should not happen in 1-bullet fixed logic unless logic fails
-        cancelGame(channelId, message, "The gun jammed? (Error)");
+        await cancelGame(channelId, message, "The gun jammed? (Error)");
     }
 
     waitingLobbies.delete(channelId);

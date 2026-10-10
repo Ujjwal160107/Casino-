@@ -4,7 +4,7 @@ import { placeBetWithTransaction } from "../../services/gameService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { successContainer, errorContainer, v2Reply } from "../../utils/componentsV2";
 import { nextStepHint } from "../../config/nextSteps";
-import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage } from "../../services/casinoCooldownService";
+import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage, acquireActiveGameLock, releaseActiveGameLock } from "../../services/casinoCooldownService";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { questBus } from "../../services/questEvents";
 import { checkLuckyCoin, checkCrownOfGreed, recordPotentialSoulLedgerLoss, getCurrentLuck } from "../../services/shopBuffs";
@@ -98,6 +98,16 @@ export async function handleSlots(message: Message, args: string[]) {
     return message.reply(v2Reply(errorContainer("Insufficient Funds", "You don't have enough money in your wallet.")));
   }
 
+  // The cooldown is only set after the spin settles, so spammed spins could all
+  // pass the check above. The lock (SET NX) lets exactly one through.
+  if (!await acquireActiveGameLock("slots", message.author.id)) {
+    return message.reply(v2Reply(errorContainer("Game In Progress", "Your last spin is still settling.")));
+  }
+  return playSlots(message, { discordId: user.discordId, wallet: user.wallet }, amount)
+    .finally(() => releaseActiveGameLock("slots", message.author.id));
+}
+
+async function playSlots(message: Message, user: { discordId: string; wallet: { id: string; balance: number } }, amount: number) {
   const luckyCoinMult = await checkLuckyCoin(message.author.id);
   const crownMult = await checkCrownOfGreed(message.author.id);
   const luck = await getCurrentLuck(message.author.id);

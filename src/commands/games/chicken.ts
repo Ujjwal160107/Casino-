@@ -284,18 +284,29 @@ async function handleView(message: Message, args: string[]) {
                     if (i.user.id !== user.id) return i.reply({ content: "Not your chicken.", ephemeral: true });
 
                     if (i.customId === "train_wakeup") {
-                        // Cancel Logic
-                        delete meta.training;
-                        // Partial XP? Let's give 10 XP for effort.
-                        meta.xp = (meta.xp || 0) + 10;
+                        // Re-read rather than write back `meta`, which is as old as this
+                        // view: saving it would undo a fight's injury or the stat point
+                        // from training that has since completed.
+                        const cancelled = await prisma.$transaction(async (tx) => {
+                            const freshInv = await tx.inventory.findUnique({ where: { id: inventoryItem.id } });
+                            const freshMeta = (freshInv?.meta as any) || {};
+                            if (!freshMeta.training) return false;
 
-                        await prisma.inventory.update({
-                            where: { id: inventoryItem.id },
-                            data: { meta }
+                            delete freshMeta.training;
+                            // Partial XP? Let's give 10 XP for effort.
+                            freshMeta.xp = (freshMeta.xp || 0) + 10;
+
+                            await tx.inventory.update({
+                                where: { id: inventoryItem.id },
+                                data: { meta: freshMeta }
+                            });
+                            return true;
                         });
 
                         await i.update({
-                            components: [plainContainer("Training Cancelled. You got 10 XP for the effort.")],
+                            components: [plainContainer(cancelled
+                                ? "Training Cancelled. You got 10 XP for the effort."
+                                : "Your chicken isn't training anymore.")],
                             flags: MessageFlags.IsComponentsV2
                         });
                         collector.stop();
@@ -642,13 +653,21 @@ async function handleTrain(message: Message, args: string[]) {
                         throw new Error("Insufficient funds.");
                     }
 
+                    // `meta` was read when this prompt opened. Writing it back would
+                    // erase an injury or critical state from a fight since then, and a
+                    // second confirm would pay again for training already under way.
+                    const freshInv = await tx.inventory.findUnique({ where: { id: inv.id } });
+                    const newMeta = (freshInv?.meta as any) || {};
+                    if (newMeta.critical || newMeta.injured || newMeta.training) {
+                        throw new Error("Chicken unavailable.");
+                    }
+
                     await tx.wallet.update({
                         where: { id: u.wallet.id },
                         data: { balance: { decrement: cost } }
                     });
 
                     // Update Chicken Meta
-                    const newMeta = JSON.parse(JSON.stringify(meta)); // Deep copy safer
                     newMeta.training = {
                         stat: stat,
                         endTime: Date.now() + durationMs,
@@ -708,7 +727,7 @@ async function handleTrain(message: Message, args: string[]) {
                 // ---------------------------------------------
 
             } catch (err) {
-                await i.update({ components: [plainContainer("Transaction failed (Maybe insufficient funds).")], flags: MessageFlags.IsComponentsV2 });
+                await i.update({ components: [plainContainer("Training didn't start. Check your funds, and that your chicken isn't injured, critical or already training.")], flags: MessageFlags.IsComponentsV2 });
             }
         }
     });

@@ -69,13 +69,15 @@ export interface ZooView {
 
 // Discord rejects ComponentsV2 messages with more than 40 total components or
 // more than 10 file attachments (50035 Invalid Form Body). Each slot costs a
-// section + text + accessory + a thumbnail attachment, so six is what fits
-// alongside the header, action row and navigation.
+// separator + section + text + thumbnail + a button row with its Remove button
+// (a section holds only one accessory, so the button can't share it), and a
+// thumbnail attachment. Four is what fits alongside the header, action row and
+// navigation: 7 + 4 * 6 - 1 + 5 = 35.
 //
 // Species beyond this used to be crammed into a compact text list at the
 // bottom, which made them second-class: no thumbnail, no hunger bar, no Remove
 // button. They now go on their own page instead, rendered identically.
-const ZOO_SLOTS_PER_PAGE = 6;
+export const ZOO_SLOTS_PER_PAGE = 4;
 
 /**
  * Factual, short note about animals a player just lost to starvation or
@@ -148,6 +150,35 @@ function buildHungerBar(slot: ZooSlot, guild: import("discord.js").Guild | null)
   if (slot.fedCount > 0 && filled === 0) filled = 1;
   if (slot.hungryCount > 0 && filled === HUNGER_BAR_MAX) filled = HUNGER_BAR_MAX - 1;
   return full.repeat(filled) + empty.repeat(HUNGER_BAR_MAX - filled);
+}
+
+/**
+ * Adds a text block with the asset as its thumbnail. A section holds one
+ * accessory, so a section's button would be replaced by the thumbnail; buttons
+ * go in a row below instead. A section with no accessory is invalid, so
+ * without art the text is added on its own.
+ */
+function addTextWithThumbnail(
+  container: ContainerBuilder,
+  text: TextDisplayBuilder,
+  asset: { filePath: string; attachmentName: string } | null,
+  description: string,
+  files: AttachmentBuilder[],
+) {
+  if (!asset || files.some((f) => (f as any).name === asset.attachmentName)) {
+    container.addTextDisplayComponents(text);
+    return;
+  }
+  container.addSectionComponents(
+    new SectionBuilder()
+      .addTextDisplayComponents(text)
+      .setThumbnailAccessory(
+        new ThumbnailBuilder()
+          .setURL(`attachment://${asset.attachmentName}`)
+          .setDescription(description),
+      ),
+  );
+  files.push(new AttachmentBuilder(asset.filePath, { name: asset.attachmentName }));
 }
 
 /** Pure renderer — no DB access, so it can be unit-checked (see checkV2Payloads). */
@@ -249,34 +280,20 @@ export function buildZooPayload(
       ? `\n${bar} ${slot.fedCount}/${slot.count} fed — ⚠️ **${slot.hungryCount} hungry**, dies in ${Math.max(0, Math.floor((slot.soonestDeathMs ?? 0) / 3_600_000))}h`
       : `\n${bar} ${slot.count}/${slot.count} fed`;
 
-    const section = new SectionBuilder()
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(
-          `**${slot.count}x** ${emojiDisplay} **${slot.def.name}** — ${slot.def.rarity}\n` +
-          `${Mascot.Emotes.Currency} +${fmtCurrency(slot.incomePerDay)}/day · feed ${fmtCurrency(slot.feedCostPerDay)}/day` +
-          hungerLine
-        ),
-      )
-      .setButtonAccessory(
+    const text = new TextDisplayBuilder().setContent(
+      `**${slot.count}x** ${emojiDisplay} **${slot.def.name}** — ${slot.def.rarity}\n` +
+      `${Mascot.Emotes.Currency} +${fmtCurrency(slot.incomePerDay)}/day · feed ${fmtCurrency(slot.feedCostPerDay)}/day` +
+      hungerLine
+    );
+    addTextWithThumbnail(container, text, slot.def.asset ? resolveAsset(slot.def.asset, "zoo_") : null, slot.def.name, files);
+    container.addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
           .setCustomId(`zoo_remove:${slot.animalKey}:${discordId}`)
           .setLabel(`Remove All`)
           .setStyle(ButtonStyle.Danger),
-      );
-
-    if (slot.def.asset) {
-      const asset = resolveAsset(slot.def.asset, "zoo_");
-      if (asset && !files.find((f) => (f as any).name === asset.attachmentName)) {
-        section.setThumbnailAccessory(
-          new ThumbnailBuilder()
-            .setURL(`attachment://${asset.attachmentName}`)
-            .setDescription(slot.def.name),
-        );
-        files.push(new AttachmentBuilder(asset.filePath, { name: asset.attachmentName }));
-      }
-    }
-
-    container.addSectionComponents(section);
+      ),
+    );
   }
 
   if (totalPages > 1) {
@@ -462,33 +479,19 @@ export async function handleZoo(message: Message, args: string[]) {
     for (const def of ZOO_PROPERTY_DEFS) {
       const capacity = ZOO_CAPACITY[def.key];
       const assetName = ZOO_ASSET_MAP[def.key];
-      const section = new SectionBuilder()
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(`### ${def.name}`),
-          new TextDisplayBuilder().setContent(
-            `Price: **${fmtCurrency(def.price)}**\nCapacity: **${capacity} animal types**${def.key === "world_zoo" ? " · the only zoo that can house a Legendary" : ""}\n-# ${def.description}`
-          ),
-        )
-        .setButtonAccessory(
+      const text = new TextDisplayBuilder().setContent(
+        `### ${def.name}\n` +
+        `Price: **${fmtCurrency(def.price)}**\nCapacity: **${capacity} animal types**${def.key === "world_zoo" ? " · the only zoo that can house a Legendary" : ""}\n-# ${def.description}`
+      );
+      addTextWithThumbnail(noZooContainer, text, assetName ? resolveAsset(assetName, "nozoo_") : null, def.name, files);
+      noZooContainer.addActionRowComponents(
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
           new ButtonBuilder()
             .setCustomId(`buy_property_${def.key}`)
             .setLabel(`Buy`)
             .setStyle(ButtonStyle.Primary),
-        );
-
-      if (assetName) {
-        const asset = resolveAsset(assetName, "nozoo_");
-        if (asset && !files.find((f) => (f as any).name === asset.attachmentName)) {
-          section.setThumbnailAccessory(
-            new ThumbnailBuilder()
-              .setURL(`attachment://${asset.attachmentName}`)
-              .setDescription(def.name),
-          );
-          files.push(new AttachmentBuilder(asset.filePath, { name: asset.attachmentName }));
-        }
-      }
-
-      noZooContainer.addSectionComponents(section);
+        ),
+      );
     }
 
     noZooContainer.addSeparatorComponents(
