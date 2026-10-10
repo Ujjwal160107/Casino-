@@ -74,7 +74,9 @@ class RedisService {
     /**
      * Atomically set a key only if it doesn't exist (SET NX EX).
      * Returns true if the key was set (claim acquired), false if it already existed.
-     * Fails open (returns true) on Redis errors, consistent with get/set above.
+     * Fails CLOSED (returns false) on Redis errors, unlike get/set above: callers
+     * use this as a claim (item cooldowns), and failing open would let every
+     * cooldown vanish for the length of a Redis outage.
      */
     public async setIfNotExists(key: string, value: any, ttlSeconds: number): Promise<boolean> {
         try {
@@ -82,7 +84,7 @@ class RedisService {
             return res === "OK";
         } catch (error) {
             console.error(`Redis setnx error for key ${key}:`, error);
-            return true;
+            return false;
         }
     }
 }
