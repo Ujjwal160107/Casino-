@@ -94,6 +94,7 @@ function buildDashboardPayload(
   marriage: NonNullable<Awaited<ReturnType<typeof getMarriage>>>,
   viewer: User,
   warning?: string | null,
+  interactive = true,
 ) {
   const spouse = getSpouseRecord(marriage, viewer.id);
   const tier = getAffectionTier(marriage.affection);
@@ -127,7 +128,7 @@ function buildDashboardPayload(
     marriage.lastDrama ? `\n**Last Drama:** ${marriage.lastDrama}` : "",
   ].filter(Boolean).join("\n");
 
-  return payload(`${Mascot.Emotes.FortunaHeart} Marriage Dashboard`, body, LOVE_COLOR, actionRows(viewer.id));
+  return payload(`${Mascot.Emotes.FortunaHeart} Marriage Dashboard`, body, LOVE_COLOR, interactive ? actionRows(viewer.id) : []);
 }
 
 async function sendDashboard(message: Message) {
@@ -147,8 +148,16 @@ async function sendDashboard(message: Message) {
     ));
   }
 
-  const msg = await message.reply(buildDashboardPayload(decay.marriage, message.author, decay.warning));
+  let shown = decay.marriage;
+  let shownWarning = decay.warning;
+  const msg = await message.reply(buildDashboardPayload(shown, message.author, shownWarning));
   const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120_000 });
+
+  // marriage_action:* is only handled by this collector (no global route), so
+  // once it ends the buttons would just fail. Re-render without them.
+  collector.on("end", async () => {
+    await msg.edit(buildDashboardPayload(shown, message.author, shownWarning, false)).catch(() => undefined);
+  });
 
   collector.on("collect", async (interaction) => {
     const [scope, rawAction, ownerId] = interaction.customId.split(":");
@@ -171,7 +180,11 @@ async function sendDashboard(message: Message) {
         return;
       }
       const updated = await getMarriage(message.author.id);
-      if (updated) await interaction.update(buildDashboardPayload(updated, message.author));
+      if (updated) {
+        shown = updated;
+        shownWarning = null;
+        await interaction.update(buildDashboardPayload(updated, message.author));
+      }
     } catch (error: any) {
       await interaction.reply({
         ...payload(`${Mascot.Emotes.Fail} Action Failed`, error.message || "Something went wrong.", FAIL_COLOR),
@@ -363,6 +376,10 @@ export async function handleDivorce(message: Message) {
         flags: V2 | MessageFlags.Ephemeral,
       });
     }
+  });
+  collector.on("end", async (_collected, reason) => {
+    if (reason !== "time") return;
+    await msg.edit(payload(`${Mascot.Emotes.Cooldown} Divorce Cancelled`, "The confirmation timed out.", WARN_COLOR)).catch(() => undefined);
   });
 }
 

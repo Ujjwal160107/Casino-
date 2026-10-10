@@ -170,4 +170,10 @@ export async function handleDailyQuest(message: Message, args: string[]) {
       }
     }
   });
+  // quest_claim:/quest_reroll: are only handled by this collector (no global
+  // route); when it times out, drop the buttons instead of leaving dead ones.
+  collector.on("end", async (_collected, reason) => {
+    if (reason !== "time") return;
+    await reply.edit({ components: [container] }).catch(() => undefined);
+  });
 }
