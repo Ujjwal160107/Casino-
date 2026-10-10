@@ -1,3 +1,4 @@
+import { randomInt } from "crypto";
 import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ButtonInteraction, ContainerBuilder, SectionBuilder, SeparatorBuilder, SeparatorSpacingSize, TextDisplayBuilder, ThumbnailBuilder, MessageFlags } from "discord.js";
 import { ensureUserAndWallet } from "../../services/walletService";
 import { creditGamePayout, debitGameBet } from "../../services/gameService";
@@ -95,7 +96,13 @@ export function createDeck(): Card[] {
             deck.push({ suit, rank, value });
         }
     }
-    return deck.sort(() => Math.random() - 0.5);
+    // Fisher-Yates. Sorting with a random comparator is not a uniform shuffle:
+    // some deck orders come up far more often than others, which is exploitable at a card table.
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = randomInt(i + 1);
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    return deck;
 }
 
 export function calculateScore(hand: Card[]): number {
