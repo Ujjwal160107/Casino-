@@ -7,6 +7,7 @@ import { nextStepHint } from "../../config/nextSteps";
 import { Mascot } from "../../config/branding";
 import { getGameBetLimits } from "../../utils/gameUtils";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { shuffle } from "../../utils/shuffle";
 
 // --- Types ---
 interface RRPlayer {
@@ -243,8 +244,8 @@ async function startGame(channelId: string, message: Message) {
     lobby.status = "PLAYING";
     const prefix = await getGuildPrefix(message.guildId!);
 
-    // Shuffle players
-    const players = lobby.players.sort(() => Math.random() - 0.5);
+    // Turn order decides who faces the early, safer chambers, so it must be a fair shuffle.
+    const players = shuffle(lobby.players);
 
     // Initial Game Frame
     const startTitle = `${Mascot.Emotes.Rip} Russian Roulette Started`;
