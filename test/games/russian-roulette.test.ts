@@ -31,7 +31,7 @@ function fakeMessage(authorId: string, channel: any) {
   } as any;
 }
 
-describe("russian roulette force start", () => {
+describe("russian roulette", () => {
   beforeEach(() => {
     ledger.credits = [];
     vi.useFakeTimers();
@@ -51,5 +51,19 @@ describe("russian roulette force start", () => {
 
     expect(channel.send).toHaveBeenCalledTimes(1);
     expect(ledger.credits.filter((c) => c.type === "game_win")).toHaveLength(1);
+  });
+
+  it("refunds every stake when the lobby timer starts a game that cannot run", async () => {
+    const channel = { send: vi.fn(async () => { throw new Error("Missing Access"); }) };
+
+    await handleRussianRoulette(fakeMessage("host", channel), ["start", "50000"]);
+    await handleRussianRoulette(fakeMessage("guest", channel), ["join"]);
+
+    // The 60s lobby timer starts the game; the opening send is rejected.
+    await vi.advanceTimersByTimeAsync(61_000);
+
+    expect(ledger.credits.filter((c) => c.type === "game_win")).toHaveLength(0);
+    expect(ledger.credits.filter((c) => c.type === "game_refund").map((c) => c.walletId).sort())
+      .toEqual(["w-guest", "w-host"]);
   });
 });
