@@ -173,6 +173,11 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
             // Allow start if it's "start" command but check lobby existence handled above
             return message.reply(v2Reply(errorContainer("Not Host", "Only the host can force start.")));
         }
+        // The lobby stays registered while its game runs, so forcing again would
+        // start a second game loop on it and pay the survivors twice.
+        if (lobby.status !== "WAITING") {
+            return message.reply(v2Reply(errorContainer("Game Active", "This game has already started.")));
+        }
         if (lobby.players.length < MIN_PLAYERS) {
             return message.reply(v2Reply(errorContainer("Not Enough Players", `Need at least ${MIN_PLAYERS} players.`)));
         }
