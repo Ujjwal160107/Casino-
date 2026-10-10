@@ -5,7 +5,7 @@ import {
   TextDisplayBuilder,
 } from "discord.js";
 import prisma from "../../utils/prisma";
-import { useItem } from "../../services/shopService";
+import { findCatalogEntry, findOwnedItemForUse, useItem } from "../../services/shopService";
 import { handleSpecialItemUse } from "../../services/shopItemEffects";
 import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG, JOB_SHOP_CATALOG, UNI_SHOP_CATALOG, COCK_SHOP_CATALOG } from "../../utils/shopCatalog";
 import { seedCockShop } from "../../services/shopService";
@@ -148,6 +148,18 @@ export async function handleUse(message: Message, args: string[]) {
         itemName = strippedName;
         extraArg = HUNT_PATH_MODES[lastWord];
       }
+    }
+  }
+
+  // `use thieves` / `use 3` name the item by prefix or inventory index. Resolve
+  // those to the owned row so catalog items still go through their handler
+  // (cooldowns, caps) instead of useItem's raw DB effects.
+  if (!catalogKey) {
+    const owned = await findOwnedItemForUse(message.author.id, itemName);
+    const catalog = owned ? findCatalogEntry(owned.shopItem) : undefined;
+    if (catalog) {
+      catalogKey = catalog.key;
+      itemName = owned.shopItem.name;
     }
   }
 
