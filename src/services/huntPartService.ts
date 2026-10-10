@@ -367,10 +367,13 @@ export async function buyHuntPartListing(buyerId: string, listingId: string) {
     const deleted = await tx.huntPartListing.deleteMany({ where: { id: listingId } });
     if (deleted.count === 0) throw new Error("Listing was already purchased or cancelled.");
 
-    await tx.wallet.update({
-      where: { id: buyerWallet.id },
+    // The balance read above is stale by now, so the debit itself is guarded;
+    // a miss rolls the sale back.
+    const debited = await tx.wallet.updateMany({
+      where: { id: buyerWallet.id, balance: { gte: fees.buyerTotal } },
       data: { balance: { decrement: fees.buyerTotal } },
     });
+    if (debited.count !== 1) throw new Error(`Insufficient funds. Need **${fees.buyerTotal.toLocaleString()}** coins.`);
     await tx.transaction.create({
       data: {
         walletId: buyerWallet.id,
