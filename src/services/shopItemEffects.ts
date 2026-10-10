@@ -1140,21 +1140,51 @@ async function handleScholarshipLetter(discordId: string): Promise<ShopItemUseRe
 // Cock Store Handlers
 // ---------------------------------------------------------------------------
 
-async function getChickenMeta(discordId: string, _guildId: string) {
-  const chickenItem = await prisma.shopItem.findFirst({
+type DbClient = Pick<typeof prisma, "shopItem" | "inventory">;
+
+async function getChickenMeta(discordId: string, _guildId: string, client: DbClient = prisma) {
+  const chickenItem = await client.shopItem.findFirst({
     where: globalCatalogGuildFilter({
       name: { equals: "Chicken", mode: "insensitive" },
     }),
   });
   if (!chickenItem) return { chickenInv: null, meta: {} as any };
 
-  const chickenInv = await prisma.inventory.findUnique({
+  const chickenInv = await client.inventory.findUnique({
     where: { userId_shopItemId: { userId: discordId, shopItemId: chickenItem.id } },
   });
   if (!chickenInv) return { chickenInv: null, meta: {} as any };
 
   const meta = (chickenInv.meta as any) || {};
   return { chickenInv, meta };
+}
+
+/**
+ * Takes an item off the chicken once its owner no longer has it. Equipping
+ * never consumes the item and cockfights read only the chicken's meta, so gear
+ * sold or listed away would otherwise keep fighting for free. Pass the
+ * transaction client so the unequip commits with the sale.
+ */
+export async function unequipChickenGear(
+  discordId: string,
+  gear: { id: string; name: string },
+  client: DbClient = prisma,
+): Promise<void> {
+  const { chickenInv, meta } = await getChickenMeta(discordId, "", client);
+  if (!chickenInv) return;
+
+  const isGear = (e: any) => e?.id === gear.id || e?.name?.toLowerCase() === gear.name.toLowerCase();
+  const equipment = meta.equipment ?? {};
+  const kept = Object.fromEntries(Object.entries(equipment).filter(([, e]) => !isGear(e)));
+  const legacy = meta.equippedItemName?.toLowerCase() === gear.name.toLowerCase();
+  if (Object.keys(kept).length === Object.keys(equipment).length && !legacy) return;
+
+  const next = { ...meta, equipment: kept };
+  if (legacy) {
+    delete next.equippedItem;
+    delete next.equippedItemName;
+  }
+  await client.inventory.update({ where: { id: chickenInv.id }, data: { meta: next } });
 }
 
 const FEED_XP: Record<string, number> = {

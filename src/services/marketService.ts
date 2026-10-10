@@ -3,6 +3,7 @@ import { addBalance } from "./walletService";
 import { applyGarnishment } from "./creditCardService";
 import { questBus } from "./questEvents";
 import { findCatalogEntry } from "./shopService";
+import { unequipChickenGear } from "./shopItemEffects";
 
 const SELLER_FEE_PCT = 10;
 const BUYER_FEE_PCT = 5;
@@ -77,7 +78,9 @@ export async function listItem(discordId: string, shopItemId: string, amount: nu
       data: { amount: { decrement: amount } },
     });
     if (taken.count !== 1) throw new Error("You don't have enough of this item.");
-    await tx.inventory.deleteMany({ where: { id: inventoryItem.id, amount: { lte: 0 } } });
+    const emptied = await tx.inventory.deleteMany({ where: { id: inventoryItem.id, amount: { lte: 0 } } });
+    // Listed the last one: it can't stay on the chicken.
+    if (emptied.count > 0) await unequipChickenGear(discordId, inventoryItem.shopItem, tx);
 
     await tx.marketListing.create({
       data: {

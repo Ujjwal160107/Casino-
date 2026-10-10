@@ -22,7 +22,7 @@ import { refreshMessageComponent, ensureDeferredEphemeralReply, ensureDeferredUp
 import { ensureUserAndWallet } from "../../services/walletService";
 import { fmtCurrency } from "../../utils/format";
 import { Mascot } from "../../config/branding";
-import { useInventoryItem } from "../../services/shopItemEffects";
+import { unequipChickenGear, useInventoryItem } from "../../services/shopItemEffects";
 import {
   COCK_SHOP_CATALOG,
   GENERAL_SHOP_CATALOG,
@@ -486,12 +486,17 @@ export async function sellOne(slotId: string, discordId: string) {
   if (Number(slot.shopItem.price || 0) <= 0) throw new Error(`**${slot.shopItem.name}** has no resale value.`);
 
   const { value: sellValue, rate } = getQuickSellValue(Number(slot.shopItem.price || 0));
-  await prisma.$transaction([
-    slot.amount <= 1
-      ? prisma.inventory.delete({ where: { id: slot.id } })
-      : prisma.inventory.update({ where: { id: slot.id }, data: { amount: { decrement: 1 } } }),
-    prisma.wallet.update({ where: { userId: discordId }, data: { balance: { increment: sellValue } } }),
-  ]);
+  await prisma.$transaction(async (tx) => {
+    const taken = await tx.inventory.updateMany({
+      where: { id: slot.id, amount: { gte: 1 } },
+      data: { amount: { decrement: 1 } },
+    });
+    if (taken.count !== 1) throw new Error("Item not found in your inventory.");
+    const emptied = await tx.inventory.deleteMany({ where: { id: slot.id, amount: { lte: 0 } } });
+    // Sold the last one: it can't stay on the chicken.
+    if (emptied.count > 0) await unequipChickenGear(discordId, slot.shopItem, tx);
+    await tx.wallet.update({ where: { userId: discordId }, data: { balance: { increment: sellValue } } });
+  });
 
   return { itemName: slot.shopItem.name, sellValue, rate };
 }
