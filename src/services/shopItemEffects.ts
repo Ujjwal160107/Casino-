@@ -159,7 +159,8 @@ const NOTHING_LEFT: ShopItemUseResult = {
  * BEFORE the handler runs, so two concurrent uses of the last unit can never
  * both resolve; it is given back when the use didn't happen (success:false,
  * shouldConsume:false, no handler, or a throw). The emptied row is only deleted
- * once the use is final, so a give-back keeps the row (and its meta).
+ * once the use is final, so a give-back normally keeps the row; if a concurrent
+ * use already swept it, the give-back recreates it by (user, item).
  */
 export async function useInventoryItem(
   slot: { id: string; shopItemId: string },

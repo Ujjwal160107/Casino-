@@ -53,7 +53,11 @@ describe("useInventoryItem claims the unit before resolving", () => {
       useInventoryItem(slot, "scholarship_letter", uid, "g"),
     ]);
     expect(results.filter((r) => r?.success).length).toBe(1);
-    const row = await testPrisma.inventory.findUnique({ where: { id: slot.id } });
+    // By (user, item), not row id: when the winner sweeps the row the loser
+    // zeroed, the loser's give-back recreates it.
+    const row = await testPrisma.inventory.findUnique({
+      where: { userId_shopItemId: { userId: uid, shopItemId: slot.shopItemId } },
+    });
     expect(row?.amount).toBe(1);
   });
 });
