@@ -15,17 +15,14 @@ export const TESTER_ROLE_IDS = new Set<string>([
   // Add tester role IDs here. Users with any of these roles bypass cooldowns and shop costs.
 ]);
 
+// Tester status comes only from the explicit allowlists. Role IDs are global
+// snowflakes, so TESTER_ROLE_IDS can only match roles in the guild that owns
+// them. Never match on role NAME: anyone can make a server with a "tester" role,
+// and testers buy for free.
 export function isTester(userId: string, member?: GuildMember | null): boolean {
   if (member && TESTER_ROLE_IDS.size > 0) {
     const hasTesterRole = [...TESTER_ROLE_IDS].some((roleId) => member.roles.cache.has(roleId));
     if (hasTesterRole) return true;
-  }
-  if (member) {
-    const hasTesterName = member.roles.cache.some((role) => {
-      const name = role.name.toLowerCase();
-      return name === "tester" || name === "testers";
-    });
-    if (hasTesterName) return true;
   }
   return TESTER_IDS.has(userId) || isBotDeveloper(userId);
 }
