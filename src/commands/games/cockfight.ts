@@ -44,8 +44,8 @@ const EMOJI_RIP = GameConfig.Emojis.Rip;
 const COCKFIGHT_ACCENT = 0xFFA500;
 const COCKFIGHT_FLAGS = MessageFlags.IsComponentsV2 as const;
 
-type FighterKey = "p1" | "p2";
-type SideBet = { userId: string; displayName: string; amount: number; target: FighterKey; walletId: string };
+export type FighterKey = "p1" | "p2";
+export type SideBet = { userId: string; displayName: string; amount: number; target: FighterKey; walletId: string };
 type FighterProfile = { user: User; member: GuildMember | null; displayName: string; discordId: string; walletId: string };
 
 function getDisplayName(member: GuildMember | null | undefined, user: User): string {
@@ -80,6 +80,28 @@ function addImageSection(container: ContainerBuilder, title: string, body: strin
                     .setDescription(description)
             )
     );
+}
+
+const SIDE_PAYOUT_RATIO = 1.5;
+
+/**
+ * What a decided fight pays out. The winning fighter takes the duel pot (both
+ * entries) and nothing more; side bets are a separate book against the house.
+ * Folding side stakes into the pot paid each winning side stake twice: once to
+ * the fighter inside the pot, and again to the bettor at 1.5x.
+ */
+export function settleCockfight(bet: number, sideBets: SideBet[], winnerKey: FighterKey) {
+    const sidePayouts = new Map<string, { amount: number; walletId: string; displayName: string }>();
+    for (const b of sideBets) {
+        if (b.target !== winnerKey) continue;
+        const current = sidePayouts.get(b.userId);
+        sidePayouts.set(b.userId, {
+            amount: (current?.amount ?? 0) + Math.floor(b.amount * SIDE_PAYOUT_RATIO),
+            walletId: b.walletId,
+            displayName: b.displayName
+        });
+    }
+    return { mainWinnerPayout: bet * 2, sidePayouts };
 }
 
 function buildAcceptRow(fightId: string, disabled = false) {
@@ -457,7 +479,7 @@ async function runCockFight(
         return;
     }
 
-    let pot = bet * 2;
+    const pot = bet * 2;
     const sideBets: SideBet[] = [];
 
     const betTimeSeconds = GAME_UI_TIMINGS.cockfightBetSeconds; // Default 60s
@@ -596,7 +618,6 @@ async function runCockFight(
             }
 
             sideBets.push({ userId: submit.user.id, displayName, amount, target, walletId: user.wallet.id });
-            pot += amount;
 
             await submit.editReply({ content: `Placed bet of **${fmtCurrency(amount)}** on **${targetName}**!` });
 
@@ -733,24 +754,9 @@ async function runCockFight(
         }
         // --- SIMULATION END ---
 
-        const winningSideBets = sideBets.filter(b => b.target === winnerKey);
-        const sidePayoutRatio = 1.5;
-
         const payoutOps: any[] = [];
-        const mainWinnerPayout = pot;
-        const sideWinnersDetails: string[] = [];
-        const payoutMap = new Map<string, { amount: number; walletId: string; displayName: string }>();
-
-        for (const b of winningSideBets) {
-            const payout = Math.floor(b.amount * sidePayoutRatio);
-            const current = payoutMap.get(b.userId);
-            payoutMap.set(b.userId, {
-                amount: (current?.amount ?? 0) + payout,
-                walletId: b.walletId,
-                displayName: b.displayName
-            });
-            sideWinnersDetails.push(`${b.displayName}: +${fmtCurrency(payout)}`);
-        }
+        const { mainWinnerPayout, sidePayouts: payoutMap } = settleCockfight(bet, sideBets, winnerKey);
+        const sideWinnersDetails = [...payoutMap.values()].map(p => `${p.displayName}: +${fmtCurrency(p.amount)}`);
 
         settled = true;
         for (const [, payoutInfo] of payoutMap.entries()) {
@@ -977,7 +983,7 @@ async function runCockFight(
                 `- Win chance: **${displayWinChance.toFixed(1)}%**`,
                 `- Main payout: **${fmtCurrency(mainWinnerPayout)}**`,
                 `- Total pot: **${fmtCurrency(pot)}**`,
-                `- Side ROI: **${sidePayoutRatio.toFixed(2)}x**`
+                `- Side ROI: **${SIDE_PAYOUT_RATIO.toFixed(2)}x**`
             ].join("\n"),
             winnerIsP1 ? 0x2ECC71 : 0xE74C3C
         );
