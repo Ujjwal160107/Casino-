@@ -17,6 +17,7 @@ import { nextStepHint } from "../config/nextSteps";
 import { enqueueWorkReminder } from "../services/cooldownReminderService";
 import { globalCatalogGuildFilter } from "../utils/globalCatalog";
 import { MAX_SAFE_BALANCE } from "../utils/economyConfig";
+import { checkJailStatus } from "../services/jailService";
 import {
     ensureDeferredEphemeralReply,
     ensureDeferredUpdate,
@@ -27,6 +28,20 @@ import {
     safeUpdate,
 } from "../utils/interactionHelpers";
 import { successContainer, errorContainer, statusContainer, plainContainer, v2Reply } from "../utils/componentsV2";
+
+/**
+ * The router blocks `work` while jailed, but the Start Shift / event buttons on
+ * an old dashboard bypass it. Replies (ephemeral) and returns true if jailed.
+ */
+async function rejectIfJailed(interaction: ButtonInteraction): Promise<boolean> {
+    const { isJailed } = await checkJailStatus(interaction.user.id);
+    if (!isJailed) return false;
+    await safeReply(interaction, {
+        content: `${Mascot.Emotes.Lock} You cannot work while jailed. Use \`/bail\` or wait for release.`,
+        flags: MessageFlags.Ephemeral,
+    });
+    return true;
+}
 
 function textContainer(title: string, body: string, color = 0x2ECC71) {
     return new ContainerBuilder()
@@ -334,6 +349,7 @@ async function handleButton(interaction: ButtonInteraction) {
         await safeUpdate(interaction, v2Reply(plainContainer(`${Mascot.Emotes.Success} Cancelled resignation. Get back to work!`)));
     }
     else if (customId.startsWith("work_event_choice_")) {
+        if (await rejectIfJailed(interaction)) return;
         const parts = customId.split("_"); // work_event_choice_eventId_choiceIdx
         const eventId = parts[3] + "_" + parts[4]; // e.g., tech_crash. WAIT, split limit?
         // ID might contain underscores. Let's start from index 3.
@@ -634,6 +650,8 @@ async function handleButton(interaction: ButtonInteraction) {
         }
     }
     else if (customId === "work_shift") {
+        if (await rejectIfJailed(interaction)) return;
+
         // Defer immediately to prevent timeout (Unknown Interaction)
         // We use ephemeral: false because the game is intended to be public.
         // This means validation errors will also be public, which is a necessary trade-off to prevent crashes.
