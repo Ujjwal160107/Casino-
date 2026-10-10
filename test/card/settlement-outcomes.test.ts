@@ -137,6 +137,15 @@ describe("settleDueStatements outcomes", () => {
     expect(results).toHaveLength(1);
   });
 
+  it("a zero-balance statement settles without moving the credit score (no farming an unused card)", async () => {
+    const before = await testPrisma.user.findUniqueOrThrow({ where: { discordId: id } });
+    await seedOverdueStatement({ balance: 0, paid: 0 });
+    const [o] = await settleMine();
+    expect(o).toMatchObject({ status: "PAID_FULL", scoreDelta: 0, interestCharged: 0, cardStatus: "ACTIVE" });
+    const after = await testPrisma.user.findUniqueOrThrow({ where: { discordId: id } });
+    expect(after.creditScore).toBe(before.creditScore);
+  });
+
   it("an already-settled statement is not reported again", async () => {
     await seedOverdueStatement({ balance: 500_000, paid: 500_000 });
     await settleMine();

@@ -629,7 +629,9 @@ async function settleStatement(statementId: string): Promise<StatementSettled | 
 
       if (paidFull) {
         status = "PAID_FULL";
-        scoreDelta = CARD_SCORE_RULES.payFullStatement;
+        // A zero statement had nothing to repay; rewarding it would let an
+        // unused card farm +score every week up to the cap.
+        scoreDelta = statement.statementBalance > 0 ? CARD_SCORE_RULES.payFullStatement : 0;
         missStreak = 0;
         cardStatus = "ACTIVE";
       } else if (paidMinimum) {
