@@ -371,14 +371,9 @@ export async function rollLoadedDice(
     questBus.emit("economy:earn", { discordId, amount: result.reward.amount });
     await invalidateUserCache(discordId, "");
     try {
+      // applyGarnishment debits the wallet itself, atomically with the card.
       const { applyGarnishment } = await import("./creditCardService");
-      const { garnished } = await applyGarnishment(discordId, result.reward.amount);
-      if (garnished > 0) {
-        await withTransactionRetry(() => prisma.wallet.update({
-          where: { userId: discordId },
-          data: { balance: { decrement: garnished } },
-        }));
-      }
+      await applyGarnishment(discordId, result.reward.amount);
     } catch {
       // Card debt processing is non-critical; the successful roll remains committed.
     }

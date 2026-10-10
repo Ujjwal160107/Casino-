@@ -440,54 +440,79 @@ export async function rehabilitateCard(discordId: string) {
   });
 }
 
+/**
+ * Takes up to 25% of just-credited income from the wallet toward DELINQUENT or
+ * LOCKED card debt. The wallet debit, card decrement and statement credit are
+ * one transaction, so the debt can never drop without the wallet paying for
+ * it; callers must not debit the wallet themselves.
+ */
 export async function applyGarnishment(discordId: string, incomeAmount: number): Promise<{ garnished: number; netIncome: number }> {
-  const card = await prisma.creditCard.findUnique({ where: { userId: discordId } });
-  if (!card || !["DELINQUENT", "LOCKED"].includes(card.status) || card.currentBalance <= 0) {
-    return { garnished: 0, netIncome: incomeAmount };
-  }
-
   const GARNISH_RATE = 0.25;
-  const garnishAmount = Math.min(
-    Math.floor(incomeAmount * GARNISH_RATE),
-    card.currentBalance
-  );
 
-  if (garnishAmount <= 0) return { garnished: 0, netIncome: incomeAmount };
-
-  await prisma.$transaction(async (trx) => {
-    await trx.creditCard.update({
-      where: { id: card.id },
-      data: { currentBalance: { decrement: garnishAmount } }
-    });
-
-    // Garnishment is a payment: credit the open statement like payCard does,
-    // or settlement still sees it unpaid and charges MISSED + interest.
-    const openStatement = await trx.cardStatement.findFirst({
-      where: { cardId: card.id, status: "OPEN" },
-      orderBy: { statementAt: "asc" }
-    });
-    const statementPaid = openStatement
-      ? Math.min(garnishAmount, Math.max(0, openStatement.statementBalance - openStatement.amountPaid))
-      : 0;
-    if (openStatement && statementPaid > 0) {
-      await trx.cardStatement.update({
-        where: { id: openStatement.id },
-        data: { amountPaid: { increment: statementPaid } }
-      });
-    }
-
-    await trx.cardTransaction.create({
-      data: {
-        cardId: card.id,
-        type: "GARNISHMENT",
-        amount: garnishAmount,
-        cycleKey: card.currentCycleKey,
-        meta: { source: "income_garnishment", originalIncome: incomeAmount, statementPaid }
+  const garnished = await runWithRetry(async (tx: PrismaClient) => {
+    return tx.$transaction(async (trx) => {
+      const [card, wallet] = await Promise.all([
+        trx.creditCard.findUnique({ where: { userId: discordId } }),
+        trx.wallet.findUnique({ where: { userId: discordId } })
+      ]);
+      if (!card || !wallet || !["DELINQUENT", "LOCKED"].includes(card.status) || card.currentBalance <= 0) {
+        return 0;
       }
+
+      // Income may already be spent by the time we run: never take more than
+      // the wallet holds.
+      const garnishAmount = Math.min(
+        Math.floor(incomeAmount * GARNISH_RATE),
+        card.currentBalance,
+        wallet.balance
+      );
+      if (garnishAmount <= 0) return 0;
+
+      // Guarded writes: a concurrent payment/garnishment that moved either
+      // balance under us aborts the whole step instead of overdrawing.
+      const walletDebit = await trx.wallet.updateMany({
+        where: { id: wallet.id, balance: { gte: garnishAmount } },
+        data: { balance: { decrement: garnishAmount } }
+      });
+      const cardCredit = await trx.creditCard.updateMany({
+        where: { id: card.id, currentBalance: { gte: garnishAmount } },
+        data: { currentBalance: { decrement: garnishAmount } }
+      });
+      if (walletDebit.count !== 1 || cardCredit.count !== 1) {
+        throw new Error("Garnishment balances changed concurrently.");
+      }
+
+      // Garnishment is a payment: credit the open statement like payCard does,
+      // or settlement still sees it unpaid and charges MISSED + interest.
+      const openStatement = await trx.cardStatement.findFirst({
+        where: { cardId: card.id, status: "OPEN" },
+        orderBy: { statementAt: "asc" }
+      });
+      const statementPaid = openStatement
+        ? Math.min(garnishAmount, Math.max(0, openStatement.statementBalance - openStatement.amountPaid))
+        : 0;
+      if (openStatement && statementPaid > 0) {
+        await trx.cardStatement.update({
+          where: { id: openStatement.id },
+          data: { amountPaid: { increment: statementPaid } }
+        });
+      }
+
+      await trx.cardTransaction.create({
+        data: {
+          cardId: card.id,
+          type: "GARNISHMENT",
+          amount: garnishAmount,
+          cycleKey: card.currentCycleKey,
+          meta: { source: "income_garnishment", originalIncome: incomeAmount, statementPaid }
+        }
+      });
+
+      return garnishAmount;
     });
   });
 
-  return { garnished: garnishAmount, netIncome: incomeAmount - garnishAmount };
+  return { garnished, netIncome: incomeAmount - garnished };
 }
 
 export type StatementIssued = {

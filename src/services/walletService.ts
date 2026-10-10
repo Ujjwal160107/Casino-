@@ -199,19 +199,16 @@ export async function addBalance(discordId: string, username: string, amount: nu
   }));
 
   // Garnishment: deduct 25% of earned income toward delinquent/locked card debt
+  // (applyGarnishment debits the wallet itself, atomically with the card).
   if (earned && result.appliedAmount > 0) {
     try {
       const { applyGarnishment } = await import("./creditCardService");
       const { garnished } = await applyGarnishment(discordId, result.appliedAmount);
       if (garnished > 0) {
-        await withTransactionRetry(() => prisma.wallet.update({
-          where: { id: result.walletId },
-          data: { balance: { decrement: garnished } }
-        }));
         result.newBalance -= garnished;
         (result as any).garnished = garnished;
       }
-    } catch { /* Card service unavailable — skip garnishment */ }
+    } catch { /* Garnishment rolled back as a whole — income stays intact */ }
   }
 
   if (earned && result.appliedAmount > 0) {
