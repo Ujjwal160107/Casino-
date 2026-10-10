@@ -1791,8 +1791,10 @@ export async function handleShopUseInteraction(interaction: import("discord.js")
       return;
     }
 
-    const { handleSpecialItemUse } = await import("../../services/shopItemEffects");
-    const result = await handleSpecialItemUse(
+    // Claims one unit before the handler runs; gives it back if the use didn't happen
+    const { useInventoryItem } = await import("../../services/shopItemEffects");
+    const result = await useInventoryItem(
+      entry,
       itemKey,
       interaction.user.id,
       interaction.guildId!,
@@ -1800,16 +1802,6 @@ export async function handleShopUseInteraction(interaction: import("discord.js")
     );
 
     if (result) {
-      const shouldConsume = result.success && result.shouldConsume !== false;
-      if (shouldConsume) {
-        const prismaModule = await import("../../utils/prisma");
-        const prisma = prismaModule.default;
-        if (entry.amount <= 1) {
-          await prisma.inventory.delete({ where: { id: entry.id } });
-        } else {
-          await prisma.inventory.update({ where: { id: entry.id }, data: { amount: { decrement: 1 } } });
-        }
-      }
       const color = result.success ? 0x2ECC71 : 0xE74C3C;
       await safeEditReply(interaction, {
         components: [v2Container(catalogItem.name, result.message, color)],

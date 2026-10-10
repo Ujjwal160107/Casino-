@@ -6,7 +6,7 @@ import {
 } from "discord.js";
 import prisma from "../../utils/prisma";
 import { findCatalogEntry, findOwnedItemForUse, useItem } from "../../services/shopService";
-import { handleSpecialItemUse } from "../../services/shopItemEffects";
+import { handleSpecialItemUse, useInventoryItem } from "../../services/shopItemEffects";
 import { GENERAL_SHOP_CATALOG, HUNT_SHOP_CATALOG, JOB_SHOP_CATALOG, UNI_SHOP_CATALOG, COCK_SHOP_CATALOG } from "../../utils/shopCatalog";
 import { seedCockShop } from "../../services/shopService";
 
@@ -62,24 +62,6 @@ const HUNT_PATH_MODES: Record<string, string> = {
   risky: "risky",
   riskier: "risky",
 };
-
-/** Removes one unit of an item from inventory. Deletes the row if it was the last unit. */
-async function consumeInventoryItem(discordId: string, itemName: string): Promise<void> {
-  const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
-  const inv = await prisma.inventory.findMany({
-    where: { userId: discordId },
-    include: { shopItem: true },
-  }) as any[];
-
-  const entry = inv.find((i: any) => normalize(i.shopItem.name) === normalize(itemName) && i.amount > 0);
-  if (!entry) return; // already gone or not found — no-op
-
-  if (entry.amount <= 1) {
-    await prisma.inventory.delete({ where: { id: entry.id } });
-  } else {
-    await prisma.inventory.update({ where: { id: entry.id }, data: { amount: { decrement: 1 } } });
-  }
-}
 
 export async function handleUse(message: Message, args: string[]) {
   if (!message.guild || !message.member) return;
@@ -251,18 +233,10 @@ export async function handleUse(message: Message, args: string[]) {
         let totalConsumed = 0;
         let lastResult: any = null;
         for (let i = 0; i < feedAmount; i++) {
-          const result = await handleSpecialItemUse(catalogKey, message.author.id, message.guildId!, message.member, undefined);
-          if (!result || !result.success) { lastResult = result; break; }
+          const result = await useInventoryItem(entry, catalogKey, message.author.id, message.guildId!, message.member);
           lastResult = result;
+          if (!result || !result.success) break;
           totalConsumed++;
-        }
-
-        if (totalConsumed > 0) {
-          if (entry.amount <= totalConsumed) {
-            await prisma.inventory.delete({ where: { id: entry.id } });
-          } else {
-            await prisma.inventory.update({ where: { id: entry.id }, data: { amount: { decrement: totalConsumed } } });
-          }
         }
 
         const color = totalConsumed > 0 ? 0x2ECC71 : 0xE74C3C;
@@ -273,8 +247,9 @@ export async function handleUse(message: Message, args: string[]) {
         });
       }
 
-      // Run the special handler BEFORE consuming
-      const specialResult = await handleSpecialItemUse(
+      // Claims one unit before the handler runs; gives it back if the use didn't happen
+      const specialResult = await useInventoryItem(
+        entry,
         catalogKey,
         message.author.id,
         message.guildId!,
@@ -284,12 +259,6 @@ export async function handleUse(message: Message, args: string[]) {
       );
 
       if (specialResult) {
-        // Consume only if the handler says to (defaults to true)
-        const shouldConsume = specialResult.success && specialResult.shouldConsume !== false;
-        if (shouldConsume) {
-          await consumeInventoryItem(message.author.id, entry.shopItem.name);
-        }
-
         const color = specialResult.success ? 0x2ECC71 : 0xE74C3C;
         return message.reply({
           components: [v2Container(entry.shopItem.name, specialResult.message, color)],

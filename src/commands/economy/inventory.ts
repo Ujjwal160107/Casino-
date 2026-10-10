@@ -22,7 +22,7 @@ import { refreshMessageComponent, ensureDeferredEphemeralReply, ensureDeferredUp
 import { ensureUserAndWallet } from "../../services/walletService";
 import { fmtCurrency } from "../../utils/format";
 import { Mascot } from "../../config/branding";
-import { handleSpecialItemUse } from "../../services/shopItemEffects";
+import { useInventoryItem } from "../../services/shopItemEffects";
 import {
   COCK_SHOP_CATALOG,
   GENERAL_SHOP_CATALOG,
@@ -473,17 +473,6 @@ function buildHuntPartMarketPayload(
   return { components, flags: MessageFlags.IsComponentsV2 } as any;
 }
 
-async function consumeSlot(slotId: string) {
-  const fresh = await prisma.inventory.findUnique({ where: { id: slotId } });
-  if (!fresh) return;
-
-  if (fresh.amount <= 1) {
-    await prisma.inventory.delete({ where: { id: fresh.id } });
-  } else {
-    await prisma.inventory.update({ where: { id: fresh.id }, data: { amount: { decrement: 1 } } });
-  }
-}
-
 async function sellOne(slotId: string, discordId: string) {
   const slot = await prisma.inventory.findUnique({ where: { id: slotId }, include: { shopItem: true } });
   if (!slot || slot.userId !== discordId || slot.amount <= 0) throw new Error("Item not found in your inventory.");
@@ -506,13 +495,10 @@ async function useInventorySlot(slotId: string, discordId: string, guildId: stri
 
   const catalog = findCatalogByName(slot.shopItem.name);
   if (catalog) {
-    const result = await handleSpecialItemUse(catalog.key, discordId, guildId, member);
-    if (result) {
-      if (result.success && result.shouldConsume !== false && slot.shopItem.consumable) {
-        await consumeSlot(slot.id);
-      }
-      return result.message;
-    }
+    // Claims one unit before the handler runs; gives it back if the use didn't
+    // happen. Non-consumable usables (compass, chicken gear) return shouldConsume:false.
+    const result = await useInventoryItem(slot, catalog.key, discordId, guildId, member);
+    if (result) return result.message;
   }
 
   const used = await useItem(discordId, guildId, slot.shopItem.name, member);
