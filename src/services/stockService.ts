@@ -8,6 +8,7 @@ import {
   applyPct, computeFill, nextDelistWatch, delistStatus,
 } from "./stockEngine";
 import { redisService } from "./redisService";
+import { invalidateUserCache } from "./userService";
 import { MAX_SAFE_BALANCE } from "../utils/economyConfig";
 
 const STOCKS_CACHE_KEY = "stocks:all_active";
@@ -137,7 +138,7 @@ export async function buyStock(discordId: string, symbol: string, quantity: numb
   if (!user) throw new Error("User not found. Try chatting first to register.");
   if (!user.wallet) throw new Error("Insufficient funds.");
 
-  return runWithRetry(() => prisma.$transaction(async (tx) => {
+  const result = await runWithRetry(() => prisma.$transaction(async (tx) => {
     const stock = await getStockInTx(tx, symbol);
     if (stock.status !== "ACTIVE") throw new Error(`**${stock.symbol}** is being delisted — you can only sell.`);
 
@@ -171,6 +172,9 @@ export async function buyStock(discordId: string, symbol: string, quantity: numb
 
     return { stock, avgPrice: fill.avgPrice, cost: fill.total, impactPct: fill.impactPct, newQty };
   }));
+  // The cached profile carries the wallet; drop it so balance views see the trade.
+  await invalidateUserCache(discordId, "");
+  return result;
 }
 
 export async function sellStock(discordId: string, symbol: string, quantity: number) {
@@ -182,7 +186,7 @@ export async function sellStock(discordId: string, symbol: string, quantity: num
   const portfolio = await prisma.portfolio.findUnique({ where: { userId: user.discordId } });
   if (!portfolio) throw new Error("You don't own any stocks.");
 
-  return runWithRetry(() => prisma.$transaction(async (tx) => {
+  const result = await runWithRetry(() => prisma.$transaction(async (tx) => {
     const stock = await getStockInTx(tx, symbol);
     if (stock.status === "DELISTED") throw new Error(`**${stock.symbol}** has been delisted — it can no longer be traded.`);
 
@@ -204,6 +208,8 @@ export async function sellStock(discordId: string, symbol: string, quantity: num
     const profit = value - holding.avgBuyPrice * quantity;
     return { stock, avgPrice: fill.avgPrice, value, impactPct: fill.impactPct, profit, remaining: holding.quantity - quantity };
   }));
+  await invalidateUserCache(discordId, "");
+  return result;
 }
 
 // --- MARKET TICK ENGINE ---
@@ -346,6 +352,7 @@ async function liquidateAndRelist(stock: NonNullable<StockRow>): Promise<void> {
         await creditCapped(tx, wallet.id, payout);
         await tx.stockHolding.delete({ where: { id: h.id } });
       }));
+      await invalidateUserCache(wallet.userId, "");
     } else {
       await prisma.stockHolding.delete({ where: { id: h.id } });
     }
