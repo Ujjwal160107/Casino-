@@ -14,6 +14,7 @@ import {
 } from "discord.js";
 import prisma from "./utils/prisma";
 import { routeMessage } from "./commandRouter";
+import { scopeMentionsToCommand } from "./utils/commandMentions";
 import { isInteractionExpiredError, safeInteractionReply, shouldEarlyAcknowledgeInIndex, shouldIgnoreInteractionError, tryEarlyAcknowledge, ensureDeferredUpdate, safeEditReply, safeReply } from "./utils/interactionHelpers";
 import { initEmojiRegistry, listEmojiKeys } from "./utils/emojiRegistry";
 import { handleBankInteraction } from "./handlers/bankInteractionHandler";
@@ -264,6 +265,8 @@ client.on("messageCreate", async (message) => {
         `**Need Help?**\nView all commands: <${Mascot.Links.CommandList}>\nJoin support: ${Mascot.Links.Support}\nOr use \`/help\` to start!`
       );
     }
+
+    scopeMentionsToCommand(message.mentions, contentToProcess);
 
     const originalContent = message.content;
     try {
