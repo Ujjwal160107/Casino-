@@ -313,7 +313,7 @@ export async function resolveCrimeFailure(
   }
 
   if (jailed && jailReleaseAt) {
-    description += `\n\n${Mascot.Emotes.Lock} You were arrested. Use \`,bail\` or wait until <t:${Math.floor(jailReleaseAt.getTime() / 1000)}:R>.`;
+    description += `\n\n${Mascot.Emotes.Lock} You were arrested. Use \`/bail\` or wait until <t:${Math.floor(jailReleaseAt.getTime() / 1000)}:R>.`;
   }
 
   await clearCrimeSession(userId);

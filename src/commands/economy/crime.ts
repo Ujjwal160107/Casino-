@@ -33,7 +33,7 @@ export async function handleCrime(message: Message) {
       v2Reply(
         errorContainer(
           "Incarcerated",
-          `${Mascot.Emotes.Lock} You cannot commit crimes while jailed. Use \`,bail\` or wait for release.`,
+          `${Mascot.Emotes.Lock} You cannot commit crimes while jailed. Use \`/bail\` or wait for release.`,
         ),
       ),
     );
