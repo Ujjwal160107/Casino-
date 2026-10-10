@@ -9,6 +9,7 @@ import { redisService } from "./redisService";
 import { STUDY_EVENTS, type StudyEvent } from "../data/studyEvents";
 import { addBalance } from "./walletService";
 import { conditionalClaim } from "../anticheat/claim";
+import { questBus } from "./questEvents";
 
 function getStudyEvent(degreeType: string): StudyEvent {
     const eligible = STUDY_EVENTS.filter(e => e.degreeType === degreeType || e.degreeType === "all");
@@ -502,6 +503,8 @@ export async function takeExam(userId: string, guildId: string): Promise<{ succe
     ]);
 
     await invalidateUserCache(userId, guildId);
+    // PASS_EXAM quests listen for this; nothing emitted it, so they could never complete.
+    questBus.emit("education:exam_pass", { discordId: user.discordId });
 
     const bonusText = deg.intelligenceBoost > 0 ? `\nPermanent Intelligence: **+${deg.intelligenceBoost}**` : "";
     return { success: true, msg: `You have completed your **${deg.name}**! Final XP: **${finalXp}/${deg.xpRequired}**${bonusText}`, finalXp };

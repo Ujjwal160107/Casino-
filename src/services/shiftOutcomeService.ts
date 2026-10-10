@@ -34,6 +34,8 @@ export async function recordShiftOutcome(outcome: ShiftOutcome) {
   });
 
   if (outcome.success) questBus.emit("work:complete", { discordId: outcome.discordId });
+  // EARN_WORK ("earn 100k+ from work") listens for this; nothing emitted it.
+  if (outcome.earnings > 0) questBus.emit("work:earn", { discordId: outcome.discordId, amount: outcome.earnings });
 
   return tax;
 }
