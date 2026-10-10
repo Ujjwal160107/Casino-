@@ -5,7 +5,7 @@ import {
 } from "../config/stockConfig";
 import {
   baselineNoisePct, pickEvent, rollEventMagnitude, resolveForecast,
-  applyPct, computeFill,
+  applyPct, computeFill, nextDelistWatch, delistStatus,
 } from "./stockEngine";
 import { redisService } from "./redisService";
 
@@ -292,11 +292,10 @@ async function processStockTick(stock: NonNullable<StockRow>, tick: number): Pro
   // 5. Compute new price (hard floor at 1, no auto-bounce)
   const newPrice = applyPct(stock.currentPrice, pendingPct);
 
-  // 6. Delisting watch
-  const watch = newPrice < stock.basePrice * 0.03 ? stock.delistWatch + 1 : 0;
-  let status: string = "ACTIVE";
-  if (watch >= 8) status = "DELISTED";
-  else if (watch >= 4) status = "DELISTING";
+  // 6. Delisting watch -- the engine owns the rule, so the guide's numbers
+  //    and the tick can't drift apart.
+  const watch = nextDelistWatch(newPrice, stock.basePrice, stock.delistWatch);
+  const status = delistStatus(watch);
 
   await prisma.stock.update({
     where: { id: stock.id },

@@ -233,7 +233,7 @@ function buildHelpContainer(prefix: string) {
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `### ${Mascot.Emotes.GraphDown} Delisting / bankruptcy\n` +
-        `If a stock falls below **3% of its starting price** and stays there, it enters ` +
+        `If a stock falls below **3% of its starting price** (or onto the price floor of **1**) and stays there, it enters ` +
         `**DELISTING** (sell-only) after **4 ticks** and is fully **DELISTED** after **8 ticks**. ` +
         `On delisting, remaining holders are paid out at the crashed price (near-zero) and the stock is ` +
         `replaced by a fresh IPO. Prices have a hard floor of **1** and **do not auto-recover** — ` +

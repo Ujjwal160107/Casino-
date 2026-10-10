@@ -11,7 +11,7 @@ describe("interrupted delisting", () => {
     await testPrisma.portfolio.deleteMany({ where: { userId: holder } });
     await resetUser(holder);
     const seeded = [...STARTING_STOCKS, ...RESERVE_STOCKS].map((s) => s.symbol);
-    await testPrisma.stock.deleteMany({ where: { symbol: { in: [SYMBOL, ...seeded] } } });
+    await testPrisma.stock.deleteMany({ where: { symbol: { in: [SYMBOL, "FLOR", ...seeded] } } });
   });
 
   it("pays out holders of a stock left DELISTED by a failed liquidation", async () => {
@@ -31,5 +31,20 @@ describe("interrupted delisting", () => {
     expect(wallet?.balance).toBe(2 * 50);
     expect(await testPrisma.stockHolding.count({ where: { stockId: stock.id } })).toBe(0);
     expect(await testPrisma.stock.findUnique({ where: { symbol: SYMBOL } })).toBeNull();
+  });
+
+  it("delists a stock whose 3% line is below the price floor", async () => {
+    // BUST's shape: base 15, so 3% is 0.45 and a price of 1 never got "below"
+    // it. Low volatility keeps any single tick's move under +50%, so the
+    // price stays rounded to 1 and this tick is its 8th distressed one.
+    await testPrisma.stock.create({
+      data: { symbol: "FLOR", name: "Floor", currentPrice: 1, previousPrice: 1, basePrice: 15,
+        volatility: 1, liquidity: 200, status: "DELISTING", delistWatch: 7,
+        lastUpdate: new Date(Date.now() - 2 * 60 * 60 * 1000) },
+    });
+
+    await marketTick();
+
+    expect(await testPrisma.stock.findUnique({ where: { symbol: "FLOR" } })).toBeNull();
   });
 });

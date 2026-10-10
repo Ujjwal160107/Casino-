@@ -56,13 +56,23 @@ export function computeFill(
   side: "BUY" | "SELL",
 ): { avgPrice: number; total: number; impactPct: number } {
   const impact = computeImpact(qty, liquidity);
-  const raw = side === "BUY" ? currentPrice * (1 + impact) : currentPrice * (1 - impact);
-  const avgPrice = Math.max(1, Math.round(raw));
-  return { avgPrice, total: avgPrice * qty, impactPct: impact * 100 };
+  // Round the order total, and always against the trader. Rounding the
+  // per-share price to nearest let any order whose slippage came to under
+  // half a coin per share fill at the quoted price -- at a price of 1 that
+  // is every order, so cheap stocks traded with no cost at all. The epsilon
+  // stops float noise (100 * 100 * 1.05 = 10500.000000000002) from costing
+  // an extra coin on an exact total.
+  const raw = currentPrice * qty * (side === "BUY" ? 1 + impact : 1 - impact);
+  const total = side === "BUY" ? Math.ceil(raw - 1e-9) : Math.floor(raw + 1e-9);
+  return { avgPrice: total / qty, total, impactPct: impact * 100 };
 }
 
 export function nextDelistWatch(currentPrice: number, basePrice: number, watch: number): number {
-  return currentPrice < basePrice * DELIST_PRICE_RATIO ? watch + 1 : 0;
+  // Prices floor at 1, so for a stock whose delist line sits below 1 (BUST,
+  // WILD) "below the line" was unreachable and it could never delist.
+  // Sitting on the floor counts as below it.
+  const distressed = currentPrice <= 1 || currentPrice < basePrice * DELIST_PRICE_RATIO;
+  return distressed ? watch + 1 : 0;
 }
 
 export function delistStatus(watch: number): "ACTIVE" | "DELISTING" | "DELISTED" {
