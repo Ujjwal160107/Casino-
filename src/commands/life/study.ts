@@ -1,4 +1,4 @@
-import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, TextChannel } from "discord.js";
+import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from "discord.js";
 import { study } from "../../services/educationService";
 import { successContainer, errorContainer, infoContainer, plainContainer, v2Reply } from "../../utils/componentsV2";
 import { nextStepHint } from "../../config/nextSteps";
@@ -8,6 +8,7 @@ import { fmtCurrency } from "../../utils/format";
 
 import prisma from "../../utils/prisma";
 import { getStudyGame, Minigame } from "../../services/minigameService";
+import { awaitTypedAnswer, typedAnswerRow } from "../../utils/typedAnswer";
 import { redisService } from "../../services/redisService";
 import { isTesterMember } from "../../utils/developerAccess";
 import { getGuildPrefix } from "../../utils/guildContext";
@@ -179,28 +180,16 @@ export async function handleStudy(message: Message, _args: string[] = []) {
     }
     // --- TYPING GAME ---
     else {
+        const questionContainer = buildQuestionContainer(game, prefix).addActionRowComponents(typedAnswerRow());
+
         if (!reply) {
-            reply = await message.reply(v2Reply(buildQuestionContainer(game, prefix)));
+            reply = await message.reply(v2Reply(questionContainer));
         } else {
-            await reply.edit(v2Reply(buildQuestionContainer(game, prefix)));
+            await reply.edit(v2Reply(questionContainer));
         }
 
-        try {
-            const channel = message.channel as TextChannel;
-            const collected = await channel.awaitMessages({
-                filter: (m: Message) => m.author.id === message.author.id,
-                max: 1,
-                time: game.time * 1000,
-                errors: ['time']
-            });
-
-            const userMsg = collected.first();
-            if (userMsg) {
-                isWin = userMsg.content.trim() === game.answer;
-            }
-        } catch (e) {
-            isWin = false; // Timeout
-        }
+        const answer = await awaitTypedAnswer(reply, message.author.id, game.time * 1000);
+        isWin = answer === game.answer;
     }
 
     // Disable buttons on game message (re-send text-only frame, no action row)

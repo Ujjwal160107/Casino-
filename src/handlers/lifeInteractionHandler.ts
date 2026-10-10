@@ -1,4 +1,4 @@
-import { Interaction, ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Message, TextChannel, MessageFlags, ContainerBuilder, TextDisplayBuilder } from "discord.js";
+import { Interaction, ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags, ContainerBuilder, TextDisplayBuilder } from "discord.js";
 import { enroll, claimScholarship, dropout } from "../services/educationService";
 import { fmtCurrency, formatDuration } from "../utils/format";
 import { Mascot, getEmoteUrl } from "../config/branding";
@@ -27,6 +27,7 @@ import {
     safeUpdate,
 } from "../utils/interactionHelpers";
 import { successContainer, errorContainer, statusContainer, plainContainer, v2Reply } from "../utils/componentsV2";
+import { awaitTypedAnswer, typedAnswerRow } from "../utils/typedAnswer";
 
 function textContainer(title: string, body: string, color = 0x2ECC71) {
     return new ContainerBuilder()
@@ -807,7 +808,6 @@ async function handleButton(interaction: ButtonInteraction) {
         // --- PREVIEW LOGIC ---
         let reply: any;
         let isWin = false;
-        let userMessage: Message | null = null;
 
         const buildQuestionContainer = () => plainContainer(
             `## ${game.title}\n${game.description}\n\nYou have **${game.time}** seconds!`
@@ -863,29 +863,14 @@ async function handleButton(interaction: ButtonInteraction) {
         }
         // --- TYPING GAME ---
         else {
-            // TYPING GAME
-            // We just edit the embed to show the question
-            reply = await safeEditReply(interaction, v2Reply(buildQuestionContainer()));
+            await safeEditReply(interaction, v2Reply(buildQuestionContainer().addActionRowComponents(typedAnswerRow())));
+            reply = await interaction.fetchReply();
 
-            if (interaction.channel) {
-                try {
-                    // We listen to the channel the interaction happened in
-                    const collected = await (interaction.channel as TextChannel).awaitMessages({
-                        filter: (m: Message) => m.author.id === user.id,
-                        max: 1,
-                        time: game.time * 1000,
-                        errors: ['time']
-                    });
+            const answer = await awaitTypedAnswer(reply, user.id, game.time * 1000);
+            isWin = answer === game.answer;
 
-                    const msg = collected.first();
-                    if (msg) {
-                        userMessage = msg;
-                        isWin = msg.content.trim() === game.answer;
-                    }
-                } catch (e) {
-                    isWin = false;
-                }
-            }
+            // Drop the Answer button so a late click doesn't hit an unrouted id.
+            await safeEditReply(interaction, v2Reply(buildQuestionContainer()));
         }
 
         // --- Emergency Pager: redirect one shift failure ---
@@ -1158,11 +1143,7 @@ async function handleButton(interaction: ButtonInteraction) {
             const winContainer = plainContainer(winBody, nextStepHint("work", workPrefix)!);
             for (const r of rows) winContainer.addActionRowComponents(r);
 
-            if (userMessage) {
-                await (userMessage as Message).reply(v2Reply(winContainer));
-            } else {
-                await safeFollowUp(interaction, v2Reply(winContainer));
-            }
+            await safeFollowUp(interaction, v2Reply(winContainer));
 
         } else {
             // FAILED — no lifetime shift credit, no XP anymore, just cooldown + stress
@@ -1220,11 +1201,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
             const failContainer = plainContainer(failBody);
 
-            if (userMessage) {
-                await (userMessage as Message).reply(v2Reply(failContainer));
-            } else {
-                await safeFollowUp(interaction, v2Reply(failContainer));
-            }
+            await safeFollowUp(interaction, v2Reply(failContainer));
         }
     }
 }
