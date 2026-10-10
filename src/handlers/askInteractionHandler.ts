@@ -1,5 +1,7 @@
 import { Interaction, MessageFlags, ButtonInteraction, ContainerBuilder, TextDisplayBuilder } from "discord.js";
-import { transferMoney } from "../services/walletService";
+import { ensureUserAndWallet } from "../services/walletService";
+import { transferAnyFunds } from "../services/transferService";
+import { cooldownClaim } from "../anticheat/claim";
 import { logToChannel } from "../utils/discordLogger";
 import { Mascot } from "../config/branding";
 import { blockRequester } from "../services/askService";
@@ -44,6 +46,13 @@ export async function handleAskInteraction(interaction: Interaction) {
 
   if (!await ensureDeferredUpdate(interaction)) return;
 
+  // Each click is its own interaction, so a double-click on Accept would pay
+  // twice. The first click on any button resolves the request for good.
+  const claim = await cooldownClaim("ask_request", interaction.message.id, 24 * 3600);
+  if (!claim.ok) {
+    return safeFollowUp(interaction, { content: "This request was already handled.", flags: MessageFlags.Ephemeral });
+  }
+
   try {
     if (action === "ask_decline") {
       const container = disabledRequestContainer(interaction, `Declined by ${interaction.user.username}`);
@@ -85,7 +94,9 @@ export async function handleAskInteraction(interaction: Interaction) {
     if (action === "ask_accept") {
       const amount = parseInt(amountStr, 10);
       try {
-        await transferMoney(interaction.user.id, requesterId, amount, interaction.guildId!);
+        // Same path and transfer tax as the transfer command, so asking isn't a tax-free route.
+        const payer = await ensureUserAndWallet(interaction.user.id, interaction.guildId!, interaction.user.username);
+        await transferAnyFunds(payer.wallet!.id, requesterId, amount, interaction.user.id, interaction.guildId!);
 
         const container = disabledRequestContainer(interaction, `Accepted by ${interaction.user.username} • Transfer Complete`);
 
@@ -99,6 +110,7 @@ export async function handleAskInteraction(interaction: Interaction) {
           color: 0x00FF00,
         });
       } catch (error: any) {
+        await claim.release(); // nothing moved, so let them accept again later
         if (error.message === "Insufficient funds.") {
           return safeFollowUp(interaction, {
             content: `${Mascot.Emotes.Fail} You do not have enough funds in your **wallet** to fulfill this request.`,

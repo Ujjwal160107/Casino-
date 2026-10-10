@@ -1,6 +1,7 @@
-import prisma from "../utils/prisma";
+import prisma, { runWithRetry } from "../utils/prisma";
 import { applyTransferTax } from "./taxService";
 import { ensureStarterChicken } from "./starterChickenService";
+import { invalidateUserCache } from "./userService";
 
 export async function transferAnyFunds(
   fromWalletId: string,
@@ -28,21 +29,25 @@ export async function transferAnyFunds(
 
   const toWalletId = (recipient as any).wallet!.id;
 
-  const ops: any[] = [
-    prisma.wallet.update({ where: { id: fromWalletId }, data: { balance: { decrement: amount } } }),
-    prisma.transaction.create({ data: { walletId: fromWalletId, amount: -amount, type: "transfer_sent", meta: { to: toDiscordId, taxPaid, shielded }, isEarned: false } }),
-    prisma.wallet.update({ where: { id: toWalletId }, data: { balance: { increment: net } } }),
-    prisma.transaction.create({ data: { walletId: toWalletId, amount: net, type: "transfer_recv", meta: { from: fromDiscordId }, isEarned: false } }),
-    prisma.audit.create({ data: { guildId: guildId ?? undefined, userId: fromDiscordId, type: "transfer", meta: { to: toDiscordId, amount, taxPaid } } }),
-  ];
+  // The balance check above is only a fast fail. The guarded decrement is the
+  // real check: two transfers racing on the same wallet both pass the read,
+  // and an unconditional decrement would pay out twice and go negative.
+  await runWithRetry(() => prisma.$transaction(async (tx) => {
+    const debit = await tx.wallet.updateMany({
+      where: { id: fromWalletId, balance: { gte: amount } },
+      data: { balance: { decrement: amount } },
+    });
+    if (debit.count === 0) throw new Error("Insufficient funds.");
 
-  if (taxPaid > 0) {
-    ops.push(
-      prisma.transaction.create({ data: { walletId: fromWalletId, amount: -taxPaid, type: "transfer_tax", meta: { gross: amount, shielded }, isEarned: false } })
-    );
-  }
-
-  await prisma.$transaction(ops);
+    await tx.transaction.create({ data: { walletId: fromWalletId, amount: -amount, type: "transfer_sent", meta: { to: toDiscordId, taxPaid, shielded }, isEarned: false } });
+    await tx.wallet.update({ where: { id: toWalletId }, data: { balance: { increment: net } } });
+    await tx.transaction.create({ data: { walletId: toWalletId, amount: net, type: "transfer_recv", meta: { from: fromDiscordId }, isEarned: false } });
+    await tx.audit.create({ data: { guildId: guildId ?? undefined, userId: fromDiscordId, type: "transfer", meta: { to: toDiscordId, amount, taxPaid } } });
+    if (taxPaid > 0) {
+      await tx.transaction.create({ data: { walletId: fromWalletId, amount: -taxPaid, type: "transfer_tax", meta: { gross: amount, shielded }, isEarned: false } });
+    }
+  }));
+  await Promise.all([invalidateUserCache(fromDiscordId, ""), invalidateUserCache(toDiscordId, "")]);
   await ensureStarterChicken(toDiscordId, (recipient as any).username ?? "Unknown");
   return { net, taxPaid, shielded };
 }

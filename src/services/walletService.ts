@@ -109,36 +109,6 @@ export async function removeMoneyFromWallet(walletId: string, amount: number) {
   return wallet.balance - amount;
 }
 
-export async function transferMoney(fromDiscordId: string, toDiscordId: string, amount: number, guildId: string) {
-  if (amount <= 0) throw new Error("Amount must be positive.");
-  if (fromDiscordId === toDiscordId) throw new Error("Cannot transfer to self.");
-
-  const fromUser = await prisma.user.findUnique({
-    where: { discordId: fromDiscordId },
-    include: { wallet: true }
-  });
-
-  if (!fromUser || !fromUser.wallet) throw new Error("Sender has no wallet.");
-  if (fromUser.wallet.balance < amount) throw new Error("Insufficient funds.");
-
-  const toUser = await ensureUserAndWallet(toDiscordId, guildId, "UnknownUser");
-
-  if (toUser.wallet!.balance + amount > MAX_SAFE_BALANCE) {
-    throw new Error(`Recipient's wallet is full (Max: ${MAX_SAFE_BALANCE}).`);
-  }
-
-  await prisma.$transaction([
-    prisma.wallet.update({ where: { id: fromUser.wallet.id }, data: { balance: { decrement: amount } } }),
-    prisma.transaction.create({ data: { walletId: fromUser.wallet.id, amount: -amount, type: "transfer_sent", meta: { to: toDiscordId } } }),
-    prisma.wallet.update({ where: { id: toUser.wallet!.id }, data: { balance: { increment: amount } } }),
-    prisma.transaction.create({ data: { walletId: toUser.wallet!.id, amount: amount, type: "transfer_recv", meta: { from: fromDiscordId } } })
-  ]);
-  await Promise.all([
-    invalidateUserCache(fromDiscordId, ""),
-    invalidateUserCache(toDiscordId, ""),
-  ]);
-}
-
 export async function addBalance(discordId: string, username: string, amount: number, type = "income", meta: any = {}, earned = true) {
   if (amount <= 0) throw new Error("Amount must be positive.");
 
