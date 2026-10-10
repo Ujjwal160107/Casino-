@@ -426,7 +426,7 @@ function formatChickenStats(meta: any, level: number): string {
     ].join("\n");
 }
 
-async function runCockFight(
+export async function runCockFight(
     originalMsg: Message,
     gameMsg: Message,
     p1: FighterProfile,
@@ -481,15 +481,53 @@ async function runCockFight(
 
     const pot = bet * 2;
     const sideBets: SideBet[] = [];
+    let bettingClosed = false;
 
     const betTimeSeconds = GAME_UI_TIMINGS.cockfightBetSeconds; // Default 60s
     const betTimeMs = betTimeSeconds * 1000;
 
-    // --- GENERATE VS IMAGE ---
-    const vsImage = await generateVsImage(
-        p1.user.displayAvatarURL({ extension: "png", size: 256 }),
-        p2.user.displayAvatarURL({ extension: "png", size: 256 })
-    );
+    // From here on stakes are held, so a fight that can't be finished (an image
+    // render, a message edit or a DB read throwing) must hand every one back,
+    // or both entries and all side bets were simply gone.
+    async function refundAll() {
+        settled = true;
+        bettingClosed = true;
+        const stakes = [
+            { walletId: p1.walletId, amount: bet },
+            { walletId: p2.walletId, amount: bet },
+            ...sideBets.map(b => ({ walletId: b.walletId, amount: b.amount }))
+        ];
+        for (const stake of stakes) {
+            await creditGamePayout(stake.walletId, stake.amount, "game_refund", {
+                game: "cockfight",
+                betAmount: stake.amount,
+                payout: stake.amount,
+                result: "fight_cancelled",
+                guildId,
+                channelId,
+                messageId: gameMsg.id
+            }).catch(err => console.error(`Cockfight refund failed for wallet ${stake.walletId}:`, err));
+        }
+        await releaseActiveGameLock("cockfight", p1.user.id);
+        await releaseActiveGameLock("cockfight", p2.user.id);
+        await gameMsg.edit({
+            components: [buildContainer("Cockfight Cancelled", "The fight couldn't be finished. Every stake was refunded.", 0xE74C3C)],
+            attachments: [],
+            flags: COCKFIGHT_FLAGS
+        }).catch(() => { });
+    }
+
+    let vsImage: Awaited<ReturnType<typeof generateVsImage>>;
+    try {
+        vsImage = await generateVsImage(
+            p1.user.displayAvatarURL({ extension: "png", size: 256 }),
+            p2.user.displayAvatarURL({ extension: "png", size: 256 })
+        );
+    } catch (err) {
+        console.error("Cockfight: could not render the matchup:", err);
+        await refundAll();
+        return;
+    }
 
     function buildBettingContainer() {
         const p1Total = sideBets.filter(b => b.target === "p1").reduce((a, b) => a + b.amount, 0);
@@ -525,13 +563,18 @@ async function runCockFight(
         return container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
     }
 
-    await gameMsg.edit({
-        components: [buildBettingContainer(), buildSideBetRow(fightId, p1.displayName, p2.displayName)],
-        files: [vsImage],
-        flags: COCKFIGHT_FLAGS
-    });
+    try {
+        await gameMsg.edit({
+            components: [buildBettingContainer(), buildSideBetRow(fightId, p1.displayName, p2.displayName)],
+            files: [vsImage],
+            flags: COCKFIGHT_FLAGS
+        });
+    } catch (err) {
+        console.error("Cockfight: could not open betting:", err);
+        await refundAll();
+        return;
+    }
 
-    let bettingClosed = false;
     const betCollector = gameMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: betTimeMs });
 
     betCollector.on("collect", async (i: ButtonInteraction) => {
@@ -651,8 +694,16 @@ async function runCockFight(
         }
     });
 
-    betCollector.on("end", async (collected: any, reason: string) => {
+    betCollector.on("end", () => {
         if (settled) return;
+        resolveFight().catch(async (err) => {
+            console.error("Cockfight: fight could not be finished:", err);
+            // Once payouts have begun a refund would pay twice, so only an unsettled fight is refunded.
+            if (!settled) await refundAll();
+        });
+    });
+
+    async function resolveFight() {
         bettingClosed = true;
         const p1Id = p1.discordId;
         const p1Inv = await prisma.inventory.findUnique({ where: { userId_shopItemId: { userId: p1Id, shopItemId: chickenItemId } } });
@@ -1023,5 +1074,5 @@ async function runCockFight(
         await setCasinoCooldown("cockfight", p2.user.id, guildId);
 
         await gameMsg.edit({ components: [resultContainer], files: [winnerImage], flags: COCKFIGHT_FLAGS });
-    });
+    }
 }
