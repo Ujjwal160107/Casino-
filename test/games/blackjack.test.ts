@@ -77,6 +77,29 @@ describe("blackjack stake", () => {
     expect(wallet!.balance).toBeGreaterThanOrEqual(0);
   });
 
+  it("still settles when the click can't be acknowledged and the message is gone", async () => {
+    const { collector, msg } = await dealOpenHand();
+    msg.edit.mockRejectedValue(new Error("Unknown Message"));
+
+    collector.emit("collect", {
+      customId: `bj:${id}:stand`,
+      deferUpdate: vi.fn(async () => { throw new Error("Unknown interaction"); }),
+      update: vi.fn(async () => {}),
+      reply: vi.fn(async () => {}),
+    });
+    await vi.waitFor(async () => {
+      const wallet = await testPrisma.wallet.findUnique({ where: { userId: id } });
+      const settled = await testPrisma.transaction.count({
+        where: { walletId: wallet!.id, type: { in: ["game_win", "game_loss", "game_refund"] } },
+      });
+      expect(settled).toBe(1);
+    }, { timeout: 5_000 });
+
+    // The end-of-collector edit has nowhere to land either; it must not throw.
+    collector.emit("end", new Map(), "time");
+    await new Promise((r) => setTimeout(r, 100));
+  });
+
   it("settles once when Stand is clicked while a Double is being charged", async () => {
     const { collector, msg } = await dealOpenHand();
     await testPrisma.wallet.update({ where: { userId: id }, data: { balance: BET } });

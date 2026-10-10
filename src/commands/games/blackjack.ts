@@ -373,7 +373,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
         if (!gameOver) {
             const updateContainer = getContainer(false);
             for (const row of getRows(false)) updateContainer.addActionRowComponents(row);
-            await i.update({ components: [updateContainer], flags: MessageFlags.IsComponentsV2 });
+            await i.update({ components: [updateContainer], flags: MessageFlags.IsComponentsV2 }).catch(() => { });
         } else {
             if (playerScore <= 21) {
                 while (dealerScore < 17) {
@@ -395,12 +395,13 @@ export async function handleBlackjack(message: Message, args: string[]) {
                 }
             }
 
-            await i.deferUpdate();
+            // A rejected ack (an expired or already-answered click) must not stop the hand from settling.
+            await i.deferUpdate().catch(() => { });
 
             try {
                 payout = await settle();
             } catch (e) {
-                await msg.edit(v2Reply(errorContainer("Transaction Failed", (e as Error).message)));
+                await msg.edit(v2Reply(errorContainer("Transaction Failed", (e as Error).message))).catch(() => { });
                 return;
             }
             await releaseActiveGameLock("blackjack", user.discordId);
@@ -419,7 +420,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
                 }).catch(() => { });
             });
 
-            await msg.edit({ components: [getContainer(true)], flags: MessageFlags.IsComponentsV2 });
+            await msg.edit({ components: [getContainer(true)], flags: MessageFlags.IsComponentsV2 }).catch(() => { });
         }
     });
 
@@ -432,7 +433,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
             try {
                 payout = await settle();
             } catch (e) {
-                await msg.edit(v2Reply(errorContainer("Transaction Failed", (e as Error).message)));
+                await msg.edit(v2Reply(errorContainer("Transaction Failed", (e as Error).message))).catch(() => { });
                 return;
             }
             await releaseActiveGameLock("blackjack", user.discordId);
@@ -440,7 +441,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
             questBus.emit("casino:play", { discordId: user.discordId, bet: amount });
             // No WIN_BLACKJACK update
 
-            await msg.edit({ components: [getContainer(true)], flags: MessageFlags.IsComponentsV2 });
+            await msg.edit({ components: [getContainer(true)], flags: MessageFlags.IsComponentsV2 }).catch(() => { });
         }
     });
 }
