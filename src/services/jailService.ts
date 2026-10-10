@@ -46,6 +46,9 @@ export async function checkJailStatus(discordId: string): Promise<{ isJailed: bo
     return { isJailed: true, releaseTime: user.jailReleaseTime };
 }
 
+/** Thrown inside the bail transaction to roll back the release when the wallet can't cover it. */
+class InsufficientBailError extends Error {}
+
 export async function payBail(discordId: string, _guildId: string): Promise<{ success: boolean; message: string }> {
     const fine = DEFAULT_JAIL_FINE;
 
@@ -62,31 +65,42 @@ export async function payBail(discordId: string, _guildId: string): Promise<{ su
         return { success: false, message: `You need **${fine}** coins to post bail.` };
     }
 
-    // Deduct money and release
-    // Deduct money and release
+    // Release and charge inside one transaction, each guarded on the state we
+    // checked above: only the call that flips isJailed true -> false pays, so a
+    // double-click (or a P2034 retry after the other click committed) cannot
+    // charge the fine twice or bail out a player who is already free.
     let retries = 3;
     while (retries > 0) {
         try {
-            await prisma.$transaction([
-                prisma.wallet.update({
-                    where: { id: user.wallet.id },
+            const outcome = await prisma.$transaction(async (tx) => {
+                const released = await tx.user.updateMany({
+                    where: { discordId, isJailed: true },
+                    data: { isJailed: false, jailReleaseTime: null }
+                });
+                if (released.count !== 1) return "not_jailed" as const;
+
+                const charged = await tx.wallet.updateMany({
+                    where: { id: user.wallet!.id, balance: { gte: fine } },
                     data: { balance: { decrement: fine } }
-                }),
-                prisma.transaction.create({
+                });
+                if (charged.count !== 1) throw new InsufficientBailError();
+
+                await tx.transaction.create({
                     data: {
-                        walletId: user.wallet.id,
+                        walletId: user.wallet!.id,
                         amount: -fine,
                         type: "jail_bail",
                         meta: { fine }
                     }
-                }),
-                prisma.user.update({
-                    where: { discordId },
-                    data: { isJailed: false, jailReleaseTime: null }
-                })
-            ]);
+                });
+                return "paid" as const;
+            });
+            if (outcome === "not_jailed") return { success: false, message: "You are not in jail!" };
             break; // Success
         } catch (error: any) {
+            if (error instanceof InsufficientBailError) {
+                return { success: false, message: `You need **${fine}** coins to post bail.` };
+            }
             if (error.code === 'P2034' && retries > 1) {
                 retries--;
                 await new Promise(res => setTimeout(res, 200)); // Backoff
