@@ -71,6 +71,9 @@ model User {
   // Education Relations
   currentEducation UserEducation?
   degrees          UserDegree[]
+  // Scholarship milestones ever claimed, as "<degreeId>:<milestone>". Kept on
+  // the user because dropout deletes UserEducation; absent on older docs (= []).
+  scholarshipClaims String[] @default([])
   
   // Employment
   jobId       String?   // Static ID from jobService (e.g., "tech_intern")

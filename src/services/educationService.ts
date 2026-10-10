@@ -230,7 +230,12 @@ export async function enroll(userId: string, guildId: string, degreeId: string, 
                 degreeId: degree.id,
                 currentSemester: 1,
                 educationXp: 0,
-                stress: 0
+                stress: 0,
+                // Milestones already claimed for this degree in an earlier
+                // enrollment stay claimed (see claimScholarship).
+                scholarshipsClaimed: user.scholarshipClaims
+                    .filter(key => key.startsWith(`${degree.id}:`))
+                    .map(key => Number(key.slice(degree.id.length + 1)))
             },
             include: { degree: true }
         });
@@ -510,6 +515,23 @@ export async function takeExam(userId: string, guildId: string): Promise<{ succe
     return { success: true, msg: `You have completed your **${deg.name}**! Final XP: **${finalXp}/${deg.xpRequired}**${bonusText}`, finalXp };
 }
 
+function scholarshipClaimKey(degreeId: string, milestone: number) {
+    return `${degreeId}:${milestone}`;
+}
+
+/**
+ * User docs written before `scholarshipClaims` existed have no such field, and
+ * no Prisma list filter (has / NOT has / isEmpty / equals) matches a MISSING
+ * list on Mongo — the CAS below would never win for them. Materialize it as []
+ * first; the $exists guard makes this a no-op once set and safe to race.
+ */
+async function ensureScholarshipClaimsField(discordId: string) {
+    await prisma.$runCommandRaw({
+        update: "User",
+        updates: [{ q: { _id: discordId, scholarshipClaims: { $exists: false } }, u: { $set: { scholarshipClaims: [] } } }],
+    });
+}
+
 export async function claimScholarship(userId: string, guildId: string, milestone: number) {
     const user = await prisma.user.findUnique({
         where: { discordId: userId },
@@ -529,15 +551,24 @@ export async function claimScholarship(userId: string, guildId: string, mileston
 
     const amount = edu.degree.tuitionPerSem * edu.currentSemester * multiplier;
 
-    // Reserve the milestone atomically BEFORE crediting. The CAS pushes the
-    // milestone only if it is still absent; concurrent claims see count 0.
+    // Reserve the milestone atomically BEFORE crediting. The guard lives on the
+    // User row, keyed by degree: UserEducation (and its scholarshipsClaimed) is
+    // deleted on dropout, so a per-enrollment guard let dropout -> re-enroll
+    // claim the same milestones again. Concurrent claims see count 0.
+    const claimKey = scholarshipClaimKey(edu.degreeId, milestone);
+    await ensureScholarshipClaimsField(user.discordId);
     const claimed = await conditionalClaim(() =>
-        prisma.userEducation.updateMany({
-            where: { id: edu.id, NOT: { scholarshipsClaimed: { has: milestone } } },
-            data: { scholarshipsClaimed: { push: milestone } },
+        prisma.user.updateMany({
+            where: { discordId: user.discordId, NOT: { scholarshipClaims: { has: claimKey } } },
+            data: { scholarshipClaims: { push: claimKey } },
         })
     );
     if (!claimed) throw new Error("Scholarship already claimed.");
+    // Mirror onto the enrollment, which study() reads to decide what to offer.
+    await prisma.userEducation.update({
+        where: { id: edu.id },
+        data: { scholarshipsClaimed: { push: milestone } },
+    });
 
     await addBalance(userId, user.username, amount, "scholarship", { milestone }, true);
 
@@ -555,6 +586,17 @@ export async function dropout(userId: string, guildId: string) {
     if (!user || !user.currentEducation) throw new Error("You are not enrolled in any school.");
 
     const degreeName = user.currentEducation.degree.name;
+
+    // Enrollments from before claims were recorded on the user only carry them
+    // here; carry them over before this row (and that record) is deleted.
+    const { degreeId, scholarshipsClaimed } = user.currentEducation;
+    const unrecorded = scholarshipsClaimed
+        .map(m => scholarshipClaimKey(degreeId, m))
+        .filter(key => !user.scholarshipClaims.includes(key));
+    if (unrecorded.length > 0) {
+        await ensureScholarshipClaimsField(user.discordId);
+        await prisma.user.update({ where: { discordId: user.discordId }, data: { scholarshipClaims: { push: unrecorded } } });
+    }
 
     // Just delete the enrollment. Tuition is already paid (sunk cost).
     await prisma.userEducation.delete({ where: { id: user.currentEducation.id } });
