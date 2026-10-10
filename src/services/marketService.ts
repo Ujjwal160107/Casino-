@@ -46,6 +46,23 @@ export function resaleBlockReason(row: ResaleRow): string | null {
   return null;
 }
 
+/**
+ * Why an owned row can't be listed on the Black Market, or null: the resale
+ * rule plus per-row state. A listing carries no meta, and buy/cancel/expire
+ * recreate the row without it, so listing worn gear (durability) or a rolled
+ * Loaded Dice (rollCount) would reset that state for free. Only rows with no
+ * state can be listed; Quick Sell destroys the row, so it doesn't need this.
+ */
+export function listingBlockReason(row: ResaleRow): string | null {
+  const resale = resaleBlockReason(row);
+  if (resale) return resale;
+  const meta = row.meta;
+  if (meta && typeof meta === "object" && Object.keys(meta).length > 0) {
+    return `**${row.shopItem.name}** has been used (wear, rolls or charges) and cannot be listed.`;
+  }
+  return null;
+}
+
 export async function listItem(discordId: string, shopItemId: string, amount: number, totalPrice: number) {
   if (amount <= 0) throw new Error("Amount must be positive.");
   if (!Number.isInteger(totalPrice) || totalPrice < MIN_PRICE) throw new Error(`Minimum listing price is **${MIN_PRICE.toLocaleString()}** coins.`);
@@ -65,7 +82,7 @@ export async function listItem(discordId: string, shopItemId: string, amount: nu
     throw new Error("You don't have enough of this item.");
   }
 
-  const blocked = resaleBlockReason(inventoryItem);
+  const blocked = listingBlockReason(inventoryItem);
   if (blocked) throw new Error(blocked);
 
   const itemName = inventoryItem.shopItem?.name ?? "Unknown";
@@ -257,7 +274,7 @@ export async function getUserInventoryForSale(discordId: string) {
     include: { shopItem: true },
   });
   // Leave out anything listItem would refuse (chickens, card-exclusives, ...)
-  return items.filter((i) => !resaleBlockReason(i));
+  return items.filter((i) => !listingBlockReason(i));
 }
 
 export async function expireOldListings(): Promise<number> {

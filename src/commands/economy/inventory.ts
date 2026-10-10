@@ -35,7 +35,7 @@ import { useItem } from "../../services/shopService";
 import { buildHuntCraftPayload } from "../../services/huntCraftService";
 import { getHuntParts, listPartFromInventory } from "../../services/huntPartService";
 import { getInventoryAnimals } from "../../services/huntService";
-import { listItem, resaleBlockReason } from "../../services/marketService";
+import { listItem, listingBlockReason, resaleBlockReason } from "../../services/marketService";
 import { nextStepHint } from "../../config/nextSteps";
 
 const ITEMS_PER_PAGE = 4;
@@ -420,7 +420,7 @@ function buildItemDetailPayload(slot: InventorySlot, ownerId: string, canAct: bo
         .setCustomId(`inv2_market:${slot.id}:${ownerId}`)
         .setLabel("Black Market")
         .setStyle(ButtonStyle.Secondary)
-        .setDisabled(resaleBlocked),
+        .setDisabled(listingBlockReason(slot) !== null),
     );
   }
 
