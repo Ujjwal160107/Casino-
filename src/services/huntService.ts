@@ -199,6 +199,15 @@ export async function hunt(
   return { groups, rifleName, newlyUnlockedRecipes: allNewlyUnlocked };
 }
 
+// Takes the given animals out of inventory and returns how many THIS caller
+// removed. Selling pays only for that count: paying for what was read and
+// deleting afterwards let a double-click pay twice, and a Send to Zoo landing
+// in between got paid for animals that stayed in the zoo.
+async function claimInventoryAnimals(ids: string[]): Promise<number> {
+  const { count } = await prisma.caughtAnimal.deleteMany({ where: { id: { in: ids }, inZoo: false } });
+  return count;
+}
+
 // Sell ALL units of a species from non-zoo inventory
 export async function sellAnimalsByKey(
   discordId: string,
@@ -213,10 +222,12 @@ export async function sellAnimalsByKey(
   const def = getAnimal(animalKey);
   if (!def) throw new Error("Unknown animal type.");
 
-  const earned = def.sellValue * animals.length;
-  await addBalance(discordId, username, earned, "animal_sell", { animalKey, count: animals.length });
-  await prisma.caughtAnimal.deleteMany({ where: { discordId, animalKey, inZoo: false } });
-  return { earned, count: animals.length };
+  const count = await claimInventoryAnimals(animals.map((a) => a.id));
+  if (count === 0) throw new Error("No animals of that type in your inventory.");
+
+  const earned = def.sellValue * count;
+  await addBalance(discordId, username, earned, "animal_sell", { animalKey, count });
+  return { earned, count };
 }
 
 export async function sellAllInventoryAnimals(
@@ -228,19 +239,28 @@ export async function sellAllInventoryAnimals(
   });
   if (animals.length === 0) throw new Error("No hunted animals in your inventory.");
 
-  let earned = 0;
-  const summary: Record<string, number> = {};
+  const idsByKey = new Map<string, string[]>();
   for (const animal of animals) {
-    const def = getAnimal(animal.animalKey);
+    idsByKey.set(animal.animalKey, [...(idsByKey.get(animal.animalKey) ?? []), animal.id]);
+  }
+
+  // Claimed per species, since the count is all deleteMany reports back.
+  let earned = 0;
+  let count = 0;
+  const summary: Record<string, number> = {};
+  for (const [animalKey, ids] of idsByKey) {
+    const def = getAnimal(animalKey);
     if (!def) continue;
-    earned += def.sellValue;
-    summary[def.name] = (summary[def.name] ?? 0) + 1;
+    const claimed = await claimInventoryAnimals(ids);
+    if (claimed === 0) continue;
+    count += claimed;
+    earned += def.sellValue * claimed;
+    summary[def.name] = (summary[def.name] ?? 0) + claimed;
   }
 
   if (earned <= 0) throw new Error("No sellable hunted animals found.");
-  await addBalance(discordId, username, earned, "animal_sell_all", { count: animals.length, summary });
-  await prisma.caughtAnimal.deleteMany({ where: { discordId, inZoo: false } });
-  return { earned, count: animals.length, summary };
+  await addBalance(discordId, username, earned, "animal_sell_all", { count, summary });
+  return { earned, count, summary };
 }
 
 // Keep backward-compat single-id sell (used by legacy paths)
