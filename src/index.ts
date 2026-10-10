@@ -52,6 +52,20 @@ const client = new Client({
   partials: [Partials.Channel]
 });
 
+// Node exits on an unhandled rejection by default, so one rejected Discord
+// call in a collector or fire-and-forget path (an expired interaction, a
+// deleted message) would take every guild offline. Log it loudly instead --
+// it is still a bug to fix where it was thrown.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection:", reason);
+});
+
+// An "error" event with no listener is rethrown by EventEmitter and would
+// crash the process the same way; discord.js reconnects on its own.
+client.on("error", (err) => {
+  console.error("Discord client error:", err);
+});
+
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user?.tag}`);
   client.user?.setActivity("V2 is finally out! Check what's new in changelog", { type: ActivityType.Playing });
