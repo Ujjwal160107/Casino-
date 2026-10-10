@@ -7,7 +7,9 @@ import {
 } from "../data/crimeMinigameCatalog";
 import { getCrimeByKey } from "../data/crimeCatalog";
 
-const RUN_TTL = 900;
+// A run is kept well past the 1h crime cooldown so a run the player walked away
+// from is still there to be settled (fined) the next time they open `crime`.
+const RUN_TTL = 7 * 24 * 60 * 60;
 const RUN_KEY = (userId: string) => `crime_run:${userId}`;
 
 export interface CrimeRun {
@@ -61,6 +63,20 @@ async function swapRun(ownerId: string, expectedRaw: string, next: CrimeRun | nu
     .getInstance()
     .eval(RUN_CAS_SCRIPT, 1, RUN_KEY(ownerId), expectedRaw, next ? JSON.stringify(next) : "", RUN_TTL);
   return won === 1;
+}
+
+/**
+ * Claims a run whose current stage timed out without an answer, so the caller
+ * can settle it as a failure. Returns null while the run is still live (or
+ * when another caller already claimed it).
+ */
+export async function claimAbandonedCrimeRun(userId: string): Promise<CrimeRun | null> {
+  const raw = await redisService.getInstance().get(RUN_KEY(userId));
+  if (!raw) return null;
+  const run = JSON.parse(raw) as CrimeRun;
+  const stage = getCurrentStageForRun(run);
+  if (stage && !isStageTimedOut(run, stage)) return null;
+  return (await swapRun(userId, raw, null)) ? run : null;
 }
 
 export async function startCrimeRun(

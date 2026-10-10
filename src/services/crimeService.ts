@@ -10,6 +10,7 @@ import {
 } from "../data/crimeCatalog";
 import { getCrimePrepItem } from "../data/crimePrepWhitelist";
 import { getStageCountForTier } from "../data/crimeMinigameCatalog";
+import { claimAbandonedCrimeRun } from "./crimeRunService";
 import { checkCrownOfGreed, checkDevilContract, recordPotentialSoulLedgerLoss } from "./shopBuffs";
 import { addCrimeHeat } from "./taxService";
 import { addBalance } from "./walletService";
@@ -334,6 +335,21 @@ export async function resolveCrimeFailure(
     jailed,
     jailReleaseAt,
   };
+}
+
+/**
+ * Settles a run the player walked away from mid-stage as a normal failure
+ * (fine + jail roll). Without this, simply never answering a stage you could
+ * not solve dodged the penalty. Returns null when there is nothing to settle.
+ */
+export async function settleAbandonedCrimeRun(
+  userId: string,
+  username: string,
+  guildId: string,
+): Promise<CrimeExecuteResult | null> {
+  const run = await claimAbandonedCrimeRun(userId);
+  if (!run) return null;
+  return resolveCrimeFailure(userId, username, run.crimeKey, guildId);
 }
 
 export async function getLastCrimeResult(userId: string): Promise<{

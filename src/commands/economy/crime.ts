@@ -2,14 +2,30 @@ import { Message } from "discord.js";
 import { GRINDING_COMMANDS } from "../../utils/economyConfig";
 import { checkCooldown } from "../../services/cooldownService";
 import { checkJailStatus } from "../../services/jailService";
-import { getOrCreateCrimeSession, getLastCrimeResult } from "../../services/crimeService";
-import { buildCrimeBoardPayload, buildCrimeCooldownPayload } from "./crimeUi";
+import { getOrCreateCrimeSession, getLastCrimeResult, settleAbandonedCrimeRun } from "../../services/crimeService";
+import { buildCrimeBoardPayload, buildCrimeCooldownPayload, buildCrimeResultPayload } from "./crimeUi";
+import { fmtCurrency } from "../../utils/format";
 import { getGuildPrefix } from "../../utils/guildContext";
 import { errorContainer, v2Reply } from "../../utils/componentsV2";
 import { Mascot } from "../../config/branding";
 
 export async function handleCrime(message: Message) {
   if (!message.guild) return;
+
+  // A run left unanswered past its stage timer is a failed job: charge it now,
+  // before anything else, so walking away is never cheaper than a wrong answer.
+  const abandoned = await settleAbandonedCrimeRun(message.author.id, message.author.username, message.guild.id);
+  if (abandoned) {
+    return message.reply(
+      buildCrimeResultPayload(
+        `${Mascot.Emotes.Fail} ${abandoned.crime.name} — Abandoned`,
+        `You walked away from the job mid-stage, so it counts as a failure.\n\n${abandoned.message}\n\n**Wallet:** ${fmtCurrency(abandoned.newBalance)}`,
+        0xe74c3c,
+        abandoned.jailed ? "jailed" : undefined,
+        await getGuildPrefix(message.guild.id),
+      ),
+    );
+  }
 
   const jail = await checkJailStatus(message.author.id);
   if (jail.isJailed) {
