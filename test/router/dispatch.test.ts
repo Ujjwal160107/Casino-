@@ -37,6 +37,24 @@ describe("routeMessage dispatch", () => {
     expect(out).toContain("No Permission");
   });
 
+  const RESTRICTED_ALIASES = [
+    "transfer", "give", "ask", "ask-money", "askmoney", "creditcard", "credit-card",
+    "steal", "store", "slot", "cock-fight", "cock", "stocks", "stock-market", "stockmarket",
+    "job", "myjob", "bm", "black-market", "blackmarket", "cockstore", "cock-store", "cs",
+  ];
+
+  it.each(RESTRICTED_ALIASES)("keeps a jailed player out of %s", async (cmd) => {
+    const id = await freshUser({ isJailed: true, jailReleaseTime: new Date(Date.now() + 3_600_000) });
+    const out = await route(`!${cmd}`, id);
+    expect(out).toContain("You are in Jail");
+  });
+
+  it.each(["give", "store", "cock", "myjob", "credit-card", "slot"])("still routes the %s alias when free", async (cmd) => {
+    const out = await route(`!${cmd}`, await freshUser());
+    expect(out).not.toContain("Unknown Command");
+    expect(out).not.toContain("You are in Jail");
+  });
+
   it.each(["mycards", "my-cards", "mycard"])("routes %s to the card dashboard", async (cmd) => {
     const out = await route(`!${cmd}`, await freshUser());
     expect(out).not.toContain("Unknown Command");
