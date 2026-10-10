@@ -16,6 +16,7 @@ import prisma from "../../utils/prisma";
 import { fmtCurrency } from "../../utils/format";
 import { Mascot, getEmoteUrl } from "../../config/branding";
 import { getNetWorthMany, NetWorthBreakdown } from "../../services/netWorthService";
+import { shouldIgnoreInteractionError } from "../../utils/interactionHelpers";
 
 type LbType = "net" | "cash" | "bank" | "shifts" | "passive";
 
@@ -200,18 +201,27 @@ export async function handleLeaderboard(message: Message, args: string[]) {
         time: 120_000,
     });
 
+    // A rejection escaping an async listener is an unhandled rejection, so
+    // everything here is caught. The re-render (net worth for every user) can
+    // outlast Discord's 3s window, hence acknowledging before rendering.
     collector.on("collect", async (i) => {
-        if (i.user.id !== ownerId) {
-            await i.reply({ content: "This leaderboard was opened by someone else.", ephemeral: true });
-            return;
+        try {
+            if (i.user.id !== ownerId) {
+                await i.reply({ content: "This leaderboard was opened by someone else.", ephemeral: true });
+                return;
+            }
+            const kind = i.customId.split(":")[1];
+            const value = i.values[0];
+            if (kind === "type") currentType = value as LbType;
+            await i.deferUpdate();
+            await i.editReply({
+                components: [await render()],
+                flags: MessageFlags.IsComponentsV2,
+            });
+        } catch (err) {
+            if (shouldIgnoreInteractionError(err)) return;
+            console.error("Leaderboard select failed:", err);
         }
-        const kind = i.customId.split(":")[1];
-        const value = i.values[0];
-        if (kind === "type") currentType = value as LbType;
-        await i.update({
-            components: [await render()],
-            flags: MessageFlags.IsComponentsV2,
-        });
     });
 
     collector.on("end", async () => {

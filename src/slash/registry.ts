@@ -1,5 +1,6 @@
 import {
     ChatInputCommandInteraction,
+    InteractionContextType,
     SlashCommandBuilder,
     User,
 } from "discord.js";
@@ -70,8 +71,11 @@ export const SPECS: Spec[] = [
     {
         name: "bank", desc: "Manage your bank account",
         opts: [
-            { kind: "str", name: "action", desc: "What to do", required: false, choices: ["deposit", "withdraw", "info", "upgrade"] },
-            { kind: "str", name: "amount", desc: "Amount -- accepts all, max, or 5k", required: false },
+            // Matches the bank handler's subcommands. Deposits and withdrawals
+            // are their own commands (/deposit, /withdraw), not bank actions.
+            { kind: "str", name: "action", desc: "What to open -- leave blank for the overview", required: false, choices: ["fd", "rd", "investments", "cards"] },
+            { kind: "str", name: "amount", desc: "Amount to lock, for fd and rd -- accepts shorthand like 5k", required: false },
+            { kind: "int", name: "days", desc: "Term in days, for fd and rd", required: false, min: 1 },
         ],
     },
     { name: "deposit", desc: "Deposit cash into your bank", opts: [amount("How much to deposit")] },
@@ -134,7 +138,18 @@ export const SPECS: Spec[] = [
     },
 
     // --- casino ----------------------------------------------------------
-    { name: "bet", desc: "Place a bet on roulette", opts: [amount("How much to bet")] },
+    {
+        // Free text, not choices: the handler also takes any number 0-36,
+        // which would blow past Discord's 25-choice cap.
+        name: "bet", desc: "Place a bet on roulette",
+        opts: [
+            amount("How much to bet"),
+            {
+                kind: "str", name: "choice", required: true,
+                desc: "red, black, odd, even, 1-12, 13-24, 25-36, 1st, 2nd, 3rd, 1-18, 19-36, or 0-36",
+            },
+        ],
+    },
     { name: "blackjack", desc: "Play a hand of blackjack", opts: [amount("How much to bet")] },
     { name: "slots", desc: "Spin the slot machine", opts: [amount("How much to bet")] },
     {
@@ -144,15 +159,33 @@ export const SPECS: Spec[] = [
             { kind: "str", name: "side", desc: "Which side to call", required: true, choices: ["heads", "tails"] },
         ],
     },
-    { name: "rr", desc: "Play russian roulette", opts: [{ kind: "str", name: "amount", desc: "How much to bet", required: false }] },
+    {
+        name: "rr", desc: "Play russian roulette",
+        opts: [
+            { kind: "str", name: "action", desc: "Host, join, or force-start a game", required: true, choices: ["start", "join", "force"] },
+            { kind: "str", name: "amount", desc: "Buy-in when starting -- accepts all, max, or 5k", required: false },
+        ],
+    },
     { name: "roll", desc: "Roll the dice" },
     { name: "rouletteguide", desc: "Explain how roulette betting works" },
 
     // --- chickens, hunting, zoo ------------------------------------------
-    { name: "cockfight", desc: "Challenge another player to a cockfight", opts: [{ kind: "user", name: "user", desc: "Who to challenge", required: true }] },
     {
+        name: "cockfight", desc: "Challenge another player to a cockfight",
+        opts: [
+            { kind: "user", name: "user", desc: "Who to challenge", required: true },
+            amount("How much to wager"),
+        ],
+    },
+    {
+        // One shared free-text slot: the name for `name`, the stat for `train`.
+        // Options serialise positionally, so two optionals at the same position
+        // would shift each other.
         name: "chicken", desc: "Manage your chicken",
-        opts: [{ kind: "str", name: "action", desc: "What to do", required: false, choices: ["info", "rename", "train", "heal"] }],
+        opts: [
+            { kind: "str", name: "action", desc: "What to do", required: false, choices: ["info", "name", "train", "top"] },
+            { kind: "str", name: "value", desc: "New name, or stat to train: strength, agility, defense", required: false },
+        ],
     },
     { name: "feed", desc: "Feed your chicken" },
     {
@@ -180,7 +213,14 @@ export const SPECS: Spec[] = [
     { name: "degrees", desc: "List the degrees you hold" },
 
     // --- stocks and property ---------------------------------------------
-    { name: "stock", desc: "Open the stock market" },
+    {
+        name: "stock", desc: "Open the stock market",
+        opts: [
+            { kind: "str", name: "action", desc: "What to do -- leave blank for the market", required: false, choices: ["buy", "sell", "portfolio", "news", "help"] },
+            { kind: "str", name: "symbol", desc: "Stock symbol, for buy and sell", required: false },
+            { kind: "int", name: "quantity", desc: "Number of shares, for buy and sell", required: false, min: 1 },
+        ],
+    },
     { name: "mystocks", desc: "View your stock portfolio" },
     { name: "properties", desc: "Browse properties for sale" },
     { name: "buy-property", desc: "Buy a property", opts: [{ kind: "str", name: "property", desc: "Property to buy", required: true }] },
@@ -196,7 +236,12 @@ export const SPECS: Spec[] = [
 
 /** Turn a spec into the Discord command definition. */
 export function buildCommand(spec: Spec): SlashCommandBuilder {
-    const b = new SlashCommandBuilder().setName(spec.name).setDescription(spec.desc);
+    // Guild-only: a global command is otherwise usable in the bot's DMs, where
+    // there is no guildId and the router's ban and jail gates do not apply.
+    const b = new SlashCommandBuilder()
+        .setName(spec.name)
+        .setDescription(spec.desc)
+        .setContexts(InteractionContextType.Guild);
     for (const o of spec.opts ?? []) {
         if (o.kind === "user") {
             b.addUserOption((x) => x.setName(o.name).setDescription(o.desc).setRequired(!!o.required));

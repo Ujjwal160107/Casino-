@@ -5,9 +5,10 @@ import {
 } from "../config/stockConfig";
 import {
   baselineNoisePct, pickEvent, rollEventMagnitude, resolveForecast,
-  applyPct, computeFill,
+  applyPct, computeFill, nextDelistWatch, delistStatus,
 } from "./stockEngine";
 import { redisService } from "./redisService";
+import { MAX_SAFE_BALANCE } from "../utils/economyConfig";
 
 const STOCKS_CACHE_KEY = "stocks:all_active";
 const FORECASTS_CACHE_KEY = "stocks:active_forecasts";
@@ -107,21 +108,41 @@ export async function getPortfolio(discordId: string) {
   });
 }
 
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Credit a wallet inside a transaction without passing MAX_SAFE_BALANCE --
+ * the same cap addBalance applies to every other payout. Returns what was
+ * actually credited.
+ */
+async function creditCapped(tx: Tx, walletId: string, amount: number): Promise<number> {
+  const wallet = await tx.wallet.findUnique({ where: { id: walletId } });
+  const applied = Math.min(amount, Math.max(0, MAX_SAFE_BALANCE - (wallet?.balance ?? 0)));
+  if (applied > 0) await tx.wallet.update({ where: { id: walletId }, data: { balance: { increment: applied } } });
+  return applied;
+}
+
+/** Read inside the trade's transaction, so the fill price and status are the
+ *  ones current when money moves -- not a read taken before a tick landed. */
+async function getStockInTx(tx: Tx, symbol: string) {
+  const stock = await tx.stock.findUnique({ where: { symbol: symbol.toUpperCase() } });
+  if (!stock) throw new Error(`Stock **${symbol.toUpperCase()}** not found.`);
+  return stock;
+}
+
 export async function buyStock(discordId: string, symbol: string, quantity: number) {
   if (!Number.isInteger(quantity) || quantity <= 0) throw new Error("Quantity must be a positive whole number.");
 
-  const stock = await getStock(symbol);
-  if (!stock) throw new Error(`Stock **${symbol.toUpperCase()}** not found.`);
-  if (stock.status !== "ACTIVE") throw new Error(`**${stock.symbol}** is being delisted — you can only sell.`);
-
-  const fill = computeFill(stock.currentPrice, quantity, stock.liquidity, "BUY");
-
   const user = await prisma.user.findUnique({ where: { discordId }, include: { wallet: true } });
   if (!user) throw new Error("User not found. Try chatting first to register.");
-  // Fast-fail pre-check; the atomic conditional update inside runWithRetry is the authoritative guard.
-  if (!user.wallet || user.wallet.balance < fill.total) throw new Error(`Insufficient funds. Cost (incl. slippage): ${fill.total}`);
+  if (!user.wallet) throw new Error("Insufficient funds.");
 
   return runWithRetry(() => prisma.$transaction(async (tx) => {
+    const stock = await getStockInTx(tx, symbol);
+    if (stock.status !== "ACTIVE") throw new Error(`**${stock.symbol}** is being delisted — you can only sell.`);
+
+    const fill = computeFill(stock.currentPrice, quantity, stock.liquidity, "BUY");
+
     let portfolio = await tx.portfolio.findUnique({ where: { userId: user.discordId } });
     if (!portfolio) portfolio = await tx.portfolio.create({ data: { userId: user.discordId } });
 
@@ -155,25 +176,24 @@ export async function buyStock(discordId: string, symbol: string, quantity: numb
 export async function sellStock(discordId: string, symbol: string, quantity: number) {
   if (!Number.isInteger(quantity) || quantity <= 0) throw new Error("Quantity must be a positive whole number.");
 
-  const stock = await getStock(symbol);
-  if (!stock) throw new Error(`Stock **${symbol.toUpperCase()}** not found.`);
-  if (stock.status === "DELISTED") throw new Error(`**${stock.symbol}** has been delisted — it can no longer be traded.`);
-
   const user = await prisma.user.findUnique({ where: { discordId }, include: { wallet: true } });
   if (!user || !user.wallet) throw new Error("User not found.");
 
   const portfolio = await prisma.portfolio.findUnique({ where: { userId: user.discordId } });
   if (!portfolio) throw new Error("You don't own any stocks.");
 
-  const fill = computeFill(stock.currentPrice, quantity, stock.liquidity, "SELL");
-
   return runWithRetry(() => prisma.$transaction(async (tx) => {
+    const stock = await getStockInTx(tx, symbol);
+    if (stock.status === "DELISTED") throw new Error(`**${stock.symbol}** has been delisted — it can no longer be traded.`);
+
+    const fill = computeFill(stock.currentPrice, quantity, stock.liquidity, "SELL");
+
     const holding = await tx.stockHolding.findUnique({
       where: { portfolioId_stockId: { portfolioId: portfolio.id, stockId: stock.id } },
     });
     if (!holding || holding.quantity < quantity) throw new Error(`You don't have enough shares (${holding?.quantity || 0}).`);
 
-    await tx.wallet.update({ where: { id: user.wallet!.id }, data: { balance: { increment: fill.total } } });
+    const value = await creditCapped(tx, user.wallet!.id, fill.total);
 
     if (holding.quantity === quantity) {
       await tx.stockHolding.delete({ where: { id: holding.id } });
@@ -181,14 +201,29 @@ export async function sellStock(discordId: string, symbol: string, quantity: num
       await tx.stockHolding.update({ where: { id: holding.id }, data: { quantity: { decrement: quantity } } });
     }
 
-    const profit = fill.total - holding.avgBuyPrice * quantity;
-    return { stock, avgPrice: fill.avgPrice, value: fill.total, impactPct: fill.impactPct, profit, remaining: holding.quantity - quantity };
+    const profit = value - holding.avgBuyPrice * quantity;
+    return { stock, avgPrice: fill.avgPrice, value, impactPct: fill.impactPct, profit, remaining: holding.quantity - quantity };
   }));
 }
 
 // --- MARKET TICK ENGINE ---
 
 export async function marketTick(): Promise<void> {
+  // A stock is marked DELISTED before its holders are paid out. If that
+  // payout failed part-way, the stock is excluded from the ticks below and
+  // its holders can no longer sell -- so finish any interrupted liquidation
+  // first. Each holder's payout is atomic with removing their holding, so a
+  // retry only pays the holders still waiting.
+  const stranded = await prisma.stock.findMany({ where: { status: "DELISTED" } });
+  for (const stock of stranded) {
+    try {
+      await liquidateAndRelist(stock);
+    } catch (err) {
+      console.error(`Delisting retry failed for ${stock.symbol}:`, err);
+    }
+  }
+  if (stranded.length > 0) await invalidateMarketCache();
+
   const cutoff = new Date(Date.now() - TICK_INTERVAL_MS);
   const stocks = await prisma.stock.findMany({
     where: { status: { not: "DELISTED" }, lastUpdate: { lt: cutoff } },
@@ -277,11 +312,10 @@ async function processStockTick(stock: NonNullable<StockRow>, tick: number): Pro
   // 5. Compute new price (hard floor at 1, no auto-bounce)
   const newPrice = applyPct(stock.currentPrice, pendingPct);
 
-  // 6. Delisting watch
-  const watch = newPrice < stock.basePrice * 0.03 ? stock.delistWatch + 1 : 0;
-  let status: string = "ACTIVE";
-  if (watch >= 8) status = "DELISTED";
-  else if (watch >= 4) status = "DELISTING";
+  // 6. Delisting watch -- the engine owns the rule, so the guide's numbers
+  //    and the tick can't drift apart.
+  const watch = nextDelistWatch(newPrice, stock.basePrice, stock.delistWatch);
+  const status = delistStatus(watch);
 
   await prisma.stock.update({
     where: { id: stock.id },
@@ -308,10 +342,10 @@ async function liquidateAndRelist(stock: NonNullable<StockRow>): Promise<void> {
     if (wallet) {
       const payout = Math.max(1, Math.round(stock.currentPrice)) * h.quantity;
       // Atomic: pay out the holder and remove the holding together so a crash can't do one without the other.
-      await runWithRetry(() => prisma.$transaction([
-        prisma.wallet.update({ where: { id: wallet.id }, data: { balance: { increment: payout } } }),
-        prisma.stockHolding.delete({ where: { id: h.id } }),
-      ]));
+      await runWithRetry(() => prisma.$transaction(async (tx) => {
+        await creditCapped(tx, wallet.id, payout);
+        await tx.stockHolding.delete({ where: { id: h.id } });
+      }));
     } else {
       await prisma.stockHolding.delete({ where: { id: h.id } });
     }

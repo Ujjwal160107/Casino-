@@ -64,7 +64,7 @@ const LEGACY_REMOVED_COMMANDS = new Set([
   "collect",
   "setincome", "set-income",
   "set-income-cooldown", "setincomecooldown", "set-income-cd", "setincomecd",
-  "setrob", "set-rob", "config-rob",
+  "config-rob",
   "setcurrencyemoji", "set-currency-emoji", "setemoji", "set-emoji",
   "set-currency", "setcurrency",
   "set-start-money", "setstartmoney", "set-start", "setstart",
@@ -170,7 +170,28 @@ function normalizeCommand(command: string, args: string[]) {
     roul: "bet",
     bj: "blackjack",
     cf: "coinflip",
-    chicken: "chicken"
+    chicken: "chicken",
+    // Aliases of jail-restricted commands live here, not as extra case
+    // labels, because the jail gate checks the normalized name -- an alias
+    // the gate never sees is a way out of jail.
+    give: "transfer",
+    "ask-money": "ask",
+    askmoney: "ask",
+    creditcard: "card",
+    "credit-card": "card",
+    steal: "rob",
+    store: "shop",
+    slot: "slots",
+    "cock-fight": "cockfight",
+    cock: "chicken",
+    stocks: "stock",
+    "stock-market": "stock",
+    stockmarket: "stock",
+    job: "work",
+    myjob: "work",
+    bm: "market",
+    "black-market": "market",
+    blackmarket: "market",
   } as Record<string, string>)[normalized] ?? normalized;
 }
 
@@ -206,6 +227,13 @@ async function getUserRecord(message: Message) {
 }
 
 export async function routeMessage(client: Client, message: Message, prefix: string) {
+  // The ban and jail gates below only run with a guild context (getUserRecord
+  // returns null without one), so a DM invocation -- e.g. from a client that
+  // cached a command before it was made guild-only -- must stop here.
+  if (!message.guildId) {
+    return message.reply(v2Reply(errorContainer("Server Only", "Fortuna commands only work inside a server.")));
+  }
+
   const raw = message.content.slice(1).trim();
   const [cmd, ...args] = raw.split(/\s+/);
   const normalized = normalizeCommand(cmd, args);
@@ -233,9 +261,9 @@ export async function routeMessage(client: Client, message: Message, prefix: str
   }
 
   const restrictedInJail = new Set([
-    "work", "crime", "beg", "slut", "rob", "shop", "buy", "sell", "market",
+    "work", "crime", "beg", "slut", "rob", "shop", "cockstore", "cock-store", "cs", "buy", "sell", "market",
     "bet", "blackjack", "roulette", "slots", "coinflip", "cockfight", "chicken", "roll",
-    "withdraw", "deposit", "transfer", "daily", "weekly", "monthly", "bank", "card",
+    "withdraw", "deposit", "transfer", "ask", "daily", "weekly", "monthly", "bank", "card",
     "invest", "stock", "trade"
   ]);
 
@@ -292,13 +320,11 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleBalance(message);
     case "bank":
       return handleBank(message, args);
-    case "card":
-    case "creditcard":
-    case "credit-card": {
+    case "card": {
       const { handleCard } = require("./commands/economy/card");
       return handleCard(message, args);
     }
-    case "my cards":
+    case "mycards":
     case "my-cards":
     case "mycard": {
       const { handleMyCards } = require("./commands/economy/card");
@@ -309,7 +335,6 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "withdraw":
       return handleWithdrawBank(message, args);
     case "transfer":
-    case "give":
       return handleTransfer(message, args);
     case "crime":
       return handleCrime(message);
@@ -343,10 +368,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const { handleVote } = require("./commands/economy/vote");
       return handleVote(message, args);
     }
-    case "stock":
-    case "stocks":
-    case "stock-market":
-    case "stockmarket": {
+    case "stock": {
       const { handleStock } = require("./commands/economy/stock");
       return handleStock(message, args);
     }
@@ -359,14 +381,12 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       return handleMyStocks(message);
     }
     case "rob":
-    case "steal":
       return handleRob(message, args);
     case "heat":
     case "laylow":
     case "lay-low":
       return handleHeat(message);
     case "shop":
-    case "store":
       return handleShop(message, args);
     case "buy":
       return handleShop(message, ["buy", ...args]);
@@ -397,17 +417,14 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "coinflip":
       return handleCoinflip(message, args);
     case "slots":
-    case "slot":
       return handleSlots(message, args);
     case "roll": {
       const { handleRoll } = require("./commands/economy/roll");
       return handleRoll(message, prefix);
     }
     case "cockfight":
-    case "cock-fight":
       return handleCockFight(message, args);
-    case "chicken":
-    case "cock": {
+    case "chicken": {
       const { handleChicken } = require("./commands/games/chicken");
       return handleChicken(message, args);
     }
@@ -437,10 +454,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "global-announcement-send":
     case "fortuna-global-send":
       return handleGlobalAnnouncementSend(message);
-    case "bm":
     case "market":
-    case "black-market":
-    case "blackmarket":
       return handleMarket(message, args);
     case "uni":
     case "university":
@@ -459,9 +473,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const { handleSetCreditScore } = require("./commands/admin/manageCreditScore");
       return handleSetCreditScore(message, args);
     }
-    case "ask":
-    case "ask-money":
-    case "askmoney": {
+    case "ask": {
       const { handleAsk } = require("./commands/economy/ask");
       return handleAsk(message, args);
     }
@@ -513,9 +525,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     case "jobshop":
     case "job-shop":
       return message.reply(STORE_MOVED_MESSAGE);
-    case "work":
-    case "job":
-    case "myjob": {
+    case "work": {
       const { handleWork } = require("./commands/life/work");
       return handleWork(message);
     }

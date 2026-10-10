@@ -7,6 +7,7 @@ import { fmtCurrency, parseSmartAmount } from "../../utils/format";
 import { logToChannel } from "../../utils/discordLogger";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { invalidateUserCache } from "../../services/userService";
 
 export async function handleSetMoney(message: Message, args: string[]) {
     if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
@@ -30,7 +31,12 @@ export async function handleSetMoney(message: Message, args: string[]) {
     const prefix = await getGuildPrefix(message.guildId!);
     
 
+    // ensureUserAndWallet creates whatever id it is given, so a typo would
+    // otherwise mint a junk account.
     const discordId = mention.replace(/[<@!>]/g, "");
+    if (!/^\d{17,20}$/.test(discordId)) {
+        return message.reply(v2Reply(errorContainer("Invalid User", "Mention a user or give their numeric user ID.")));
+    }
     const target = await ensureUserAndWallet(discordId, message.guildId!, "Unknown");
 
     if (targetType === "bank") {
@@ -59,6 +65,7 @@ export async function handleSetMoney(message: Message, args: string[]) {
                 }
             })
         ]);
+        await invalidateUserCache(target.discordId, "");
 
         await logToChannel(message.client, {
             guild: message.guild!,
@@ -95,6 +102,7 @@ export async function handleSetMoney(message: Message, args: string[]) {
                 }
             })
         ]);
+        await invalidateUserCache(target.discordId, "");
 
         await logToChannel(message.client, {
             guild: message.guild!,

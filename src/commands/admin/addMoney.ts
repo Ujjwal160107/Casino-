@@ -8,6 +8,7 @@ import { logToChannel } from "../../utils/discordLogger";
 import { canExecuteAdminCommand } from "../../utils/permissionUtils";
 import { Mascot } from "../../config/branding";
 import { getGuildPrefix } from "../../utils/guildContext";
+import { invalidateUserCache } from "../../services/userService";
 
 export async function handleAddMoney(message: Message, args: string[]) {
   if (!message.member || !(await canExecuteAdminCommand(message, message.member))) {
@@ -91,6 +92,7 @@ export async function handleAddMoney(message: Message, args: string[]) {
             prisma.wallet.update({ where: { id: target.wallet!.id }, data: { balance: { increment: amount } } })
           ]);
         }
+        await invalidateUserCache(target.discordId, "");
         count++;
       } catch (e) {
         console.error(`Failed to add money to ${member.user.tag}:`, e);
@@ -110,7 +112,12 @@ export async function handleAddMoney(message: Message, args: string[]) {
   }
 
   // --- SINGLE USER HANDLING ---
+  // ensureUserAndWallet creates whatever id it is given, so a typo would
+  // otherwise mint a junk account and pay it.
   const discordId = mention.replace(/[<@!>]/g, "");
+  if (!/^\d{17,20}$/.test(discordId)) {
+    return message.reply(v2Reply(errorContainer("Invalid User", "Mention a user or give their numeric user ID.")));
+  }
   const target = await ensureUserAndWallet(discordId, message.guildId!, "Unknown");
 
   if (targetType === "bank") {
@@ -138,6 +145,7 @@ export async function handleAddMoney(message: Message, args: string[]) {
         }
       })
     ]);
+    await invalidateUserCache(target.discordId, "");
     await logToChannel(message.client, {
       guild: message.guild!,
       type: "ADMIN",
@@ -171,6 +179,7 @@ export async function handleAddMoney(message: Message, args: string[]) {
         }
       })
     ]);
+    await invalidateUserCache(target.discordId, "");
     if (updatedWallet) {
       await logToChannel(message.client, {
         guild: message.guild!,
