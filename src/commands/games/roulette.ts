@@ -16,7 +16,7 @@ import { placeBetWithTransaction } from "../../services/gameService";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { errorContainer, plainContainer, v2Reply } from "../../utils/componentsV2";
 import { nextStepHint } from "../../config/nextSteps";
-import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage } from "../../services/casinoCooldownService";
+import { checkCasinoCooldown, setCasinoCooldown, formatCasinoCooldownMessage, acquireActiveGameLock, releaseActiveGameLock } from "../../services/casinoCooldownService";
 import { formatDuration } from "../../utils/format";
 import { emojiInline } from "../../utils/emojiRegistry";
 import { Mascot } from "../../config/branding";
@@ -105,6 +105,34 @@ export async function handleRouletteMenu(message: Message) {
   });
 }
 
+type RouletteBet = { multiplier: number; wins: (spin: number) => boolean };
+
+const RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+
+// Null for anything that isn't a bet on the table.
+function resolveRouletteBet(choiceRaw: string): RouletteBet | null {
+  const isRed = (spin: number) => RED_NUMBERS.has(spin);
+  switch (choiceRaw) {
+    case "red": return { multiplier: 2, wins: isRed };
+    case "black": return { multiplier: 2, wins: (spin) => !isRed(spin) && spin !== 0 };
+    case "odd": return { multiplier: 2, wins: (spin) => spin !== 0 && spin % 2 !== 0 };
+    case "even": return { multiplier: 2, wins: (spin) => spin !== 0 && spin % 2 === 0 };
+    case "1-12": return { multiplier: 3, wins: (spin) => spin >= 1 && spin <= 12 };
+    case "13-24": return { multiplier: 3, wins: (spin) => spin >= 13 && spin <= 24 };
+    case "25-36": return { multiplier: 3, wins: (spin) => spin >= 25 && spin <= 36 };
+    case "1st": return { multiplier: 3, wins: (spin) => spin !== 0 && spin % 3 === 1 }; // 1, 4, 7...
+    case "2nd": return { multiplier: 3, wins: (spin) => spin !== 0 && spin % 3 === 2 }; // 2, 5, 8...
+    case "3rd": return { multiplier: 3, wins: (spin) => spin !== 0 && spin % 3 === 0 }; // 3, 6, 9...
+    case "1-18": return { multiplier: 2, wins: (spin) => spin >= 1 && spin <= 18 };
+    case "19-36": return { multiplier: 2, wins: (spin) => spin >= 19 && spin <= 36 };
+  }
+  const numChoice = parseInt(choiceRaw);
+  if (!isNaN(numChoice) && numChoice >= 0 && numChoice <= 36) {
+    return { multiplier: 36, wins: (spin) => spin === numChoice };
+  }
+  return null;
+}
+
 export async function handleBet(message: Message, args: string[]) {
   const user = await ensureUserAndWallet(message.author.id, message.guildId!, message.author.tag);
   let amount = parseBetAmount(args[0], user.wallet!.balance);
@@ -128,6 +156,12 @@ export async function handleBet(message: Message, args: string[]) {
   if (amount > max) {
     return message.reply(v2Reply(errorContainer("Bet Too High", `The maximum bet for Roulette is **${fmtCurrency(max)}**.`)));
   }
+  // Validated before anything is spent: an invalid choice used to be caught
+  // only after the spin, having already burned a Lucky Coin.
+  const bet = resolveRouletteBet(choiceRaw);
+  if (!bet) {
+    return message.reply(v2Reply(errorContainer("Invalid Choice", "Bet on `red`, `black`, `odd`, `even`, `1-12`, `13-24`, `25-36`, `1st`, `2nd`, `3rd`, `1-18`, `19-36`, or a number `0-36`.")));
+  }
   const cd = await checkCasinoCooldown("roulette", message.author.id);
   if (cd.active) {
     const msg = cd.unavailable
@@ -142,6 +176,23 @@ export async function handleBet(message: Message, args: string[]) {
     return message.reply(v2Reply(errorContainer("Insufficient Funds", "You don't have enough money in your wallet.")));
   }
 
+  // The cooldown is only set once the ball lands, so every bet sent during the
+  // spin passed the check above. The lock (SET NX) lets exactly one through.
+  if (!await acquireActiveGameLock("roulette", message.author.id)) {
+    return message.reply(v2Reply(errorContainer("Game In Progress", "Your last spin is still rolling.")));
+  }
+  return spinRoulette(message, user, amount, choiceRaw, bet, prefix)
+    .finally(() => releaseActiveGameLock("roulette", message.author.id));
+}
+
+async function spinRoulette(
+  message: Message,
+  user: Awaited<ReturnType<typeof ensureUserAndWallet>>,
+  amount: number,
+  choiceRaw: string,
+  bet: RouletteBet,
+  prefix: string,
+) {
   const luckyCoinMult = await checkLuckyCoin(message.author.id);
 
   // SPIN ANIMATION
@@ -161,58 +212,10 @@ export async function handleBet(message: Message, args: string[]) {
   await new Promise(resolve => setTimeout(resolve, spinTime * 1000));
 
   const spin = Math.floor(Math.random() * 37);
-  const redNumbers = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
-  const isRed = redNumbers.has(spin);
+  const isRed = RED_NUMBERS.has(spin);
   const isBlack = !isRed && spin !== 0;
-  let didWin = false;
-  let multiplier = 0;
-  if (choiceRaw === "red") {
-    didWin = isRed;
-    multiplier = 2;
-  } else if (choiceRaw === "black") {
-    didWin = isBlack;
-    multiplier = 2;
-  } else if (choiceRaw === "odd") {
-    didWin = (spin !== 0 && spin % 2 !== 0);
-    multiplier = 2;
-  } else if (choiceRaw === "even") {
-    didWin = (spin !== 0 && spin % 2 === 0);
-    multiplier = 2;
-  } else if (choiceRaw === "1-12") {
-    didWin = (spin >= 1 && spin <= 12);
-    multiplier = 3;
-  } else if (choiceRaw === "13-24") {
-    didWin = (spin >= 13 && spin <= 24);
-    multiplier = 3;
-  } else if (choiceRaw === "25-36") {
-    didWin = (spin >= 25 && spin <= 36);
-    multiplier = 3;
-  } else if (choiceRaw === "1st") { // 1st Column: 1, 4, 7... (n%3 == 1)
-    didWin = (spin !== 0 && spin % 3 === 1);
-    multiplier = 3;
-  } else if (choiceRaw === "2nd") { // 2nd Column: 2, 5, 8... (n%3 == 2)
-    didWin = (spin !== 0 && spin % 3 === 2);
-    multiplier = 3;
-  } else if (choiceRaw === "3rd") { // 3rd Column: 3, 6, 9... (n%3 == 0)
-    didWin = (spin !== 0 && spin % 3 === 0);
-    multiplier = 3;
-  } else if (choiceRaw === "1-18") {
-    didWin = (spin >= 1 && spin <= 18);
-    multiplier = 2;
-  } else if (choiceRaw === "19-36") {
-    didWin = (spin >= 19 && spin <= 36);
-    multiplier = 2;
-  } else {
-    const numChoice = parseInt(choiceRaw);
-    if (!isNaN(numChoice) && numChoice >= 0 && numChoice <= 36) {
-      didWin = (spin === numChoice);
-      multiplier = 36;
-    } else {
-      // Clean up if error
-      await spinMsg.delete().catch(() => { });
-      return message.reply(v2Reply(errorContainer("Invalid Choice", "Bet on `red`, `black`, `odd`, `even`, `1-12`, `13-24`, `25-36`, `1st`, `2nd`, `3rd`, `1-18`, `19-36`, or a number `0-36`.")));
-    }
-  }
+  const didWin = bet.wins(spin);
+  const multiplier = bet.multiplier;
   let payout = await placeBetWithTransaction(
     user.discordId,
     user.wallet!.id,
