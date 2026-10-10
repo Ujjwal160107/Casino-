@@ -1,6 +1,7 @@
 import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ButtonInteraction, ContainerBuilder, SectionBuilder, SeparatorBuilder, SeparatorSpacingSize, TextDisplayBuilder, ThumbnailBuilder, MessageFlags } from "discord.js";
 import { ensureUserAndWallet } from "../../services/walletService";
-import { placeBetWithTransaction } from "../../services/gameService";
+import { creditGamePayout, debitGameBet } from "../../services/gameService";
+import prisma from "../../utils/prisma";
 import { fmtCurrency, parseBetAmount } from "../../utils/format";
 import { errorContainer, v2Reply } from "../../utils/componentsV2";
 import { nextStepHint } from "../../config/nextSteps";
@@ -172,6 +173,16 @@ export async function handleBlackjack(message: Message, args: string[]) {
         return;
     }
 
+    // The stake is taken when the hand is dealt. Charging it only at resolution
+    // let a player empty their wallet mid-hand, so a lost hand could never be collected.
+    const betMeta = { game: "blackjack", guildId: message.guildId!, channelId: message.channelId };
+    try {
+        await debitGameBet(user.wallet!.id, amount, { ...betMeta, betAmount: amount, choice: "deal" });
+    } catch {
+        await releaseActiveGameLock("blackjack", message.author.id);
+        return message.reply(v2Reply(errorContainer("Insufficient Funds", "You don't have enough money.")));
+    }
+
     const luckyCoinMultiplier = await checkLuckyCoin(message.author.id);
     const hasLuckyCoin = luckyCoinMultiplier > 1;
     const crownMult = await checkCrownOfGreed(message.author.id);
@@ -191,6 +202,27 @@ export async function handleBlackjack(message: Message, args: string[]) {
         const adjustedStake = Math.min(Math.floor(stake * crownMult), user.wallet!.balance);
         return { adjustedStake, adjustedPayout: 0 };
       }
+    }
+
+    // Stakes are already debited, so settling credits the gross payout; a loss
+    // only adds Crown of Greed's extra stake, capped at what is left in the wallet.
+    async function settle(): Promise<number> {
+      const { adjustedStake, adjustedPayout } = applyCrown(currentBet, payout);
+      if (adjustedPayout === 0 && currentBet > 300_000) await recordPotentialSoulLedgerLoss(user.discordId, adjustedStake);
+      const meta = { ...betMeta, betAmount: currentBet, payout: adjustedPayout, choice: "blackjack" };
+      if (adjustedPayout > currentBet) {
+        await creditGamePayout(user.wallet!.id, adjustedPayout, "game_win", { ...meta, result: "win" });
+      } else if (adjustedPayout > 0) {
+        await creditGamePayout(user.wallet!.id, adjustedPayout, "game_refund", { ...meta, result: "push" });
+      } else {
+        await creditGamePayout(user.wallet!.id, 0, "game_loss", { ...meta, result: "loss" });
+        const wallet = await prisma.wallet.findUnique({ where: { id: user.wallet!.id } });
+        const crownExtra = Math.min(adjustedStake - currentBet, wallet?.balance ?? 0);
+        if (crownExtra > 0) {
+          await debitGameBet(user.wallet!.id, crownExtra, { ...betMeta, betAmount: crownExtra, choice: "crown_of_greed", result: "loss" }).catch(() => { });
+        }
+      }
+      return adjustedPayout;
     }
 
     const deck = createDeck();
@@ -271,10 +303,7 @@ export async function handleBlackjack(message: Message, args: string[]) {
 
     if (gameOver) {
         try {
-            const { adjustedStake: cs1, adjustedPayout: cp1 } = applyCrown(currentBet, payout);
-            if (cp1 === 0 && currentBet > 300_000) await recordPotentialSoulLedgerLoss(user.discordId, cs1);
-            const actualPayout = await placeBetWithTransaction(user.discordId, user.wallet!.id, "blackjack", cs1, "blackjack", cp1 > cs1, cp1, message.guildId!);
-            payout = actualPayout;
+            payout = await settle();
             await releaseActiveGameLock("blackjack", user.discordId);
             await setCasinoCooldown("blackjack", user.discordId, message.guildId!);
             questBus.emit("casino:play", { discordId: user.discordId, bet: amount });
@@ -295,6 +324,10 @@ export async function handleBlackjack(message: Message, args: string[]) {
             await i.reply({ content: "This game isn't yours.", ephemeral: true });
             return;
         }
+        if (gameOver) {
+            await i.deferUpdate().catch(() => { });
+            return;
+        }
 
         const action = i.customId.split(":").pop();
         if (action === "hit") {
@@ -310,7 +343,12 @@ export async function handleBlackjack(message: Message, args: string[]) {
             gameOver = true;
             collector.stop();
         } else if (action === "double") {
-            if (user.wallet!.balance < currentBet * 2) {
+            // Claim the hand before awaiting the debit, so a Stand clicked meanwhile can't settle it first.
+            gameOver = true;
+            try {
+                await debitGameBet(user.wallet!.id, currentBet, { ...betMeta, betAmount: currentBet, choice: "double" });
+            } catch {
+                gameOver = false;
                 await i.reply({ content: "Insufficient funds to double.", ephemeral: true });
                 return;
             }
@@ -352,16 +390,12 @@ export async function handleBlackjack(message: Message, args: string[]) {
 
             await i.deferUpdate();
 
-            let actualPayout;
             try {
-                const { adjustedStake: cs2, adjustedPayout: cp2 } = applyCrown(currentBet, payout);
-                if (cp2 === 0 && currentBet > 300_000) await recordPotentialSoulLedgerLoss(user.discordId, cs2);
-                actualPayout = await placeBetWithTransaction(user.discordId, user.wallet!.id, "blackjack", cs2, "blackjack", cp2 > cs2, cp2, message.guildId!);
+                payout = await settle();
             } catch (e) {
                 await msg.edit(v2Reply(errorContainer("Transaction Failed", (e as Error).message)));
                 return;
             }
-            payout = actualPayout;
             await releaseActiveGameLock("blackjack", user.discordId);
             await setCasinoCooldown("blackjack", user.discordId, message.guildId!);
             questBus.emit("casino:play", { discordId: user.discordId, bet: amount });
@@ -388,16 +422,12 @@ export async function handleBlackjack(message: Message, args: string[]) {
             result = "Game timed out. You surrendered.";
             payout = 0;
 
-            let actualPayout;
             try {
-                const { adjustedStake: cs3, adjustedPayout: cp3 } = applyCrown(currentBet, payout);
-                if (cp3 === 0 && currentBet > 300_000) await recordPotentialSoulLedgerLoss(user.discordId, cs3);
-                actualPayout = await placeBetWithTransaction(user.discordId, user.wallet!.id, "blackjack", cs3, "blackjack", cp3 > cs3, cp3, message.guildId!);
+                payout = await settle();
             } catch (e) {
                 await msg.edit(v2Reply(errorContainer("Transaction Failed", (e as Error).message)));
                 return;
             }
-            payout = actualPayout;
             await releaseActiveGameLock("blackjack", user.discordId);
             await setCasinoCooldown("blackjack", user.discordId, message.guildId!);
             questBus.emit("casino:play", { discordId: user.discordId, bet: amount });
