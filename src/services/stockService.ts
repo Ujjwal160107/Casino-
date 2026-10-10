@@ -189,6 +189,21 @@ export async function sellStock(discordId: string, symbol: string, quantity: num
 // --- MARKET TICK ENGINE ---
 
 export async function marketTick(): Promise<void> {
+  // A stock is marked DELISTED before its holders are paid out. If that
+  // payout failed part-way, the stock is excluded from the ticks below and
+  // its holders can no longer sell -- so finish any interrupted liquidation
+  // first. Each holder's payout is atomic with removing their holding, so a
+  // retry only pays the holders still waiting.
+  const stranded = await prisma.stock.findMany({ where: { status: "DELISTED" } });
+  for (const stock of stranded) {
+    try {
+      await liquidateAndRelist(stock);
+    } catch (err) {
+      console.error(`Delisting retry failed for ${stock.symbol}:`, err);
+    }
+  }
+  if (stranded.length > 0) await invalidateMarketCache();
+
   const cutoff = new Date(Date.now() - TICK_INTERVAL_MS);
   const stocks = await prisma.stock.findMany({
     where: { status: { not: "DELISTED" }, lastUpdate: { lt: cutoff } },
