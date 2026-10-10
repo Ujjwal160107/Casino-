@@ -26,11 +26,12 @@ async function cleanCard() {
 }
 
 /** A card whose last statement is OPEN and past due, with `paid` already applied. */
-async function seedOverdueStatement(opts: { balance: number; paid: number; missStreak?: number }) {
+async function seedOverdueStatement(opts: { balance: number; paid: number; missStreak?: number; status?: string }) {
   const weekAgo = new Date(Date.now() - 8 * DAY);
   const card = await testPrisma.creditCard.create({
     data: {
       ...baseCard,
+      status: opts.status ?? baseCard.status,
       currentBalance: opts.balance - opts.paid,
       statementBalance: opts.balance,
       missStreak: opts.missStreak ?? 0,
@@ -110,6 +111,23 @@ describe("settleDueStatements outcomes", () => {
     await seedOverdueStatement({ balance: 500_000, paid: 0, missStreak: 2 });
     const [o] = await settleMine();
     expect(o).toMatchObject({ status: "MISSED", scoreDelta: CARD_SCORE_RULES.repeatMiss, cardStatus: "LOCKED" });
+  });
+
+  it("a LOCKED card stays LOCKED when a statement settles paid — only rehabilitation unlocks it", async () => {
+    const min = calculateMinimumDue(500_000, tier);
+    await seedOverdueStatement({ balance: 500_000, paid: min, missStreak: 3, status: "LOCKED" });
+    const [o] = await settleMine();
+    expect(o).toMatchObject({ status: "PAID_MINIMUM", cardStatus: "LOCKED" });
+    const card = await testPrisma.creditCard.findUniqueOrThrow({ where: { userId: id } });
+    expect(card.status).toBe("LOCKED");
+  });
+
+  it("a CLOSED card is not reopened by settling its last statement", async () => {
+    await seedOverdueStatement({ balance: 500_000, paid: 500_000, status: "CLOSED" });
+    const [o] = await settleMine();
+    expect(o).toMatchObject({ status: "PAID_FULL", cardStatus: "CLOSED" });
+    const card = await testPrisma.creditCard.findUniqueOrThrow({ where: { userId: id } });
+    expect(card.status).toBe("CLOSED");
   });
 
   it("an already-settled statement is not reported again", async () => {

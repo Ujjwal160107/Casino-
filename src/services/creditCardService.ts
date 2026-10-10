@@ -641,6 +641,13 @@ async function settleStatement(statementId: string): Promise<StatementSettled | 
         interestCharged = Math.floor(unpaid * (tier.weeklyInterestPct / 100));
       }
 
+      // Settlement only moves cards between ACTIVE and DELINQUENT (or into
+      // LOCKED). A LOCKED card unlocks only via rehabilitateCard (full payoff),
+      // and a CLOSED card stays closed until the player reapplies.
+      if (statement.card.status === "LOCKED" || statement.card.status === "CLOSED") {
+        cardStatus = statement.card.status;
+      }
+
       await trx.cardStatement.update({
         where: { id: statement.id },
         data: {
