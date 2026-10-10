@@ -26,7 +26,7 @@ async function cleanCard() {
 }
 
 /** A card whose last statement is OPEN and past due, with `paid` already applied. */
-async function seedOverdueStatement(opts: { balance: number; paid: number; missStreak?: number; status?: string }) {
+async function seedOverdueStatement(opts: { balance: number; paid: number; missStreak?: number; status?: string; dueAt?: Date }) {
   const weekAgo = new Date(Date.now() - 8 * DAY);
   const card = await testPrisma.creditCard.create({
     data: {
@@ -44,7 +44,7 @@ async function seedOverdueStatement(opts: { balance: number; paid: number; missS
       cardId: card.id,
       cycleKey: getCycleKey(weekAgo),
       statementAt: weekAgo,
-      dueAt: new Date(Date.now() - 60_000),
+      dueAt: opts.dueAt ?? new Date(Date.now() - 60_000),
       statementBalance: opts.balance,
       minimumDue: calculateMinimumDue(opts.balance, tier),
       amountPaid: opts.paid,
@@ -130,6 +130,13 @@ describe("settleDueStatements outcomes", () => {
     expect(card.status).toBe("CLOSED");
   });
 
+  it("settles a statement due moments after the weekly run fires (cron jitter / DST)", async () => {
+    // dueAt is last run's `now` + 7d; this run's `now` can land a little earlier (1h = a DST shift).
+    await seedOverdueStatement({ balance: 500_000, paid: 500_000, dueAt: new Date(Date.now() + 60 * 60_000) });
+    const results = await settleMine();
+    expect(results).toHaveLength(1);
+  });
+
   it("an already-settled statement is not reported again", async () => {
     await seedOverdueStatement({ balance: 500_000, paid: 500_000 });
     await settleMine();
@@ -159,6 +166,14 @@ describe("generateWeeklyStatements", () => {
       minimumDue: calculateMinimumDue(250_000, tier),
     });
     expect(issued[0].dueAt.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it("issues a statement whose nextStatementAt is moments after the weekly run fires (cron jitter / DST)", async () => {
+    await testPrisma.creditCard.create({
+      data: { ...baseCard, currentBalance: 250_000, nextStatementAt: new Date(Date.now() + 60 * 60_000) },
+    });
+    const issued = (await generateWeeklyStatements()).filter((s) => s.userId === id);
+    expect(issued).toHaveLength(1);
   });
 
   it("reports a zero statement for a card with no balance (the notifier decides whether to DM)", async () => {

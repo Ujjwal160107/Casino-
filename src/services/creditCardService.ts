@@ -17,6 +17,15 @@ import { getUserCareerTier } from "./jobService";
 import { fmtCurrency } from "../utils/format";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+// Next statement/due dates are the previous run's `now` + 7d, but the weekly
+// cron's next `now` can land slightly earlier (start jitter, a DST hour). A
+// strict `lte: now` would then skip the card for a whole week, so anything
+// due within this window counts as due. Far below a week, so still once/week.
+const SCHEDULE_TOLERANCE_MS = 12 * 60 * 60 * 1000;
+
+function dueBy(now: Date) {
+  return new Date(now.getTime() + SCHEDULE_TOLERANCE_MS);
+}
 
 function nextWeek(date = new Date()) {
   return new Date(date.getTime() + WEEK_MS);
@@ -504,7 +513,7 @@ export async function generateWeeklyStatements(now = new Date()): Promise<Statem
   const cards = await prisma.creditCard.findMany({
     where: {
       status: { in: ["ACTIVE", "DELINQUENT"] },
-      OR: [{ nextStatementAt: null }, { nextStatementAt: { lte: now } }]
+      OR: [{ nextStatementAt: null }, { nextStatementAt: { lte: dueBy(now) } }]
     }
   });
 
@@ -581,7 +590,7 @@ export async function settleDueStatements(now = new Date()): Promise<StatementSe
   const statements = await prisma.cardStatement.findMany({
     where: {
       status: "OPEN",
-      dueAt: { lte: now },
+      dueAt: { lte: dueBy(now) },
       scoreDeltaApplied: false
     },
     select: { id: true }
