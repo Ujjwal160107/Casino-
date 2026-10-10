@@ -1,3 +1,7 @@
+// lifeInteractionHandler lazily require()s most of its services, which bypasses
+// vite's transform; register ts-node so Node can load those .ts files too.
+import "ts-node/register/transpile-only";
+
 // A stand-in for a discord.js ButtonInteraction that is good enough for the
 // real interactionHelpers (safeReply/safeUpdate/defer*) to drive. Every reply
 // is recorded so tests can assert what the player was shown.

@@ -253,14 +253,11 @@ async function handleButton(interaction: ButtonInteraction) {
             return safeEditReply(interaction, { content: "You don't have a job to promote from." });
         }
 
-        const { checkPromotion: _checkPromo, getJob: _getJob } = require("../services/jobService");
+        const { checkPromotion: _checkPromo, getJob: _getJob, promotionGapText: _gapText } = require("../services/jobService");
         const promoCheck = await _checkPromo(freshUser, guild.id);
 
         if (!promoCheck.eligible || !promoCheck.nextJob) {
-            const missing = promoCheck.missingShifts > 0
-                ? `**${promoCheck.missingShifts} more lifetime shifts**`
-                : "requirements not met";
-            return safeEditReply(interaction, { content: `You need ${missing} before you can be promoted.` });
+            return safeEditReply(interaction, { content: `You need **${_gapText(promoCheck)}** before you can be promoted.` });
         }
 
         if (promoCheck.nextJob.id !== requestedNextJobId) {
@@ -373,7 +370,7 @@ async function handleButton(interaction: ButtonInteraction) {
 
         if (!userData || !userData.jobId) return;
 
-        const { getJob, getJobPay, checkPromotion, checkDemotion } = require("../services/jobService");
+        const { getJob, getJobPay, checkPromotion, checkDemotion, promotionGapText } = require("../services/jobService");
         const job = getJob(userData.jobId);
         const basePay = await getJobPay(job, guild.id);
 
@@ -524,7 +521,7 @@ async function handleButton(interaction: ButtonInteraction) {
                 // Let's just note it for now, implementation plan says Celebration later
                 footerText = `Promotion Available: ${promoCheck.nextJob.title}`;
             } else if (promoCheck.nextJob) {
-                footerText = `Next Job: ${promoCheck.nextJob.title} (${promoCheck.missingShifts} shifts to go)`;
+                footerText = `Next Job: ${promoCheck.nextJob.title} (needs ${promotionGapText(promoCheck)})`;
             }
         }
 
@@ -563,7 +560,7 @@ async function handleButton(interaction: ButtonInteraction) {
                         .setEmoji(Mascot.Emotes.JobPromotion)
                 ));
             } else if (promoCheck.nextJob) {
-                resBody += `\n\nProgress to ${promoCheck.nextJob.title}: need ${promoCheck.missingShifts} more shifts`;
+                resBody += `\n\nProgress to ${promoCheck.nextJob.title}: need ${promotionGapText(promoCheck)}`;
             }
         } else if (footerText) {
             resBody += `\n\n${footerText}`;
@@ -643,7 +640,7 @@ async function handleButton(interaction: ButtonInteraction) {
         if (!await safeDeferReply(interaction)) return;
 
         // Import here to avoid circular dependencies if any
-        const { getJob, getJobPay, checkPromotion, checkDemotion, getWorkEvent } = require("../services/jobService");
+        const { getJob, getJobPay, checkPromotion, checkDemotion, getWorkEvent, promotionGapText } = require("../services/jobService");
         const { getWorkGame, getWorkGameForUser } = require("../services/minigameService");
         const { getRecentIds, recordRecentId } = require("../services/jobAntiRepeat");
 
@@ -1134,7 +1131,7 @@ async function handleButton(interaction: ButtonInteraction) {
                         .setEmoji(Mascot.Emotes.JobPromotion)
                 ));
             } else if (promoCheck.nextJob) {
-                winBody += `\n\nProgress to ${promoCheck.nextJob.title}: need ${promoCheck.missingShifts} more shifts`;
+                winBody += `\n\nProgress to ${promoCheck.nextJob.title}: need ${promotionGapText(promoCheck)}`;
             }
 
             // Disable buttons on the original game embed
