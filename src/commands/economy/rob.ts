@@ -112,6 +112,13 @@ export async function handleRob(message: Message, args: string[]) {
         );
     }
 
+    // Checked before the cooldown is reserved: an empty wallet has nothing to
+    // steal, and finding that out mid-robbery burned the cooldown on an error.
+    const targetWallet = await prisma.wallet.findUnique({ where: { userId: target.id } });
+    if (!targetWallet || targetWallet.balance <= 0) {
+        return message.reply(v2Reply(errorContainer("Nothing to Steal", `**${target.name}** has nothing in their wallet.`)));
+    }
+
     const cooldown = await checkCooldown(message.author.id, "rob");
     if (cooldown.active && cooldown.expiresAt) {
         return message.reply(
@@ -189,12 +196,22 @@ export async function handleRob(message: Message, args: string[]) {
             ]);
 
             if (!robber?.wallet) throw new Error("Robber wallet not found.");
-            if (!victim?.wallet || victim.wallet.balance <= 0) throw new Error("Target has no money.");
+            // The victim can empty their wallet after the pre-check: an
+            // expected outcome, so reply with it instead of throwing.
+            if (!victim?.wallet || victim.wallet.balance <= 0) {
+                return { blocked: `**${target.name}** emptied their wallet before you could grab anything.` };
+            }
 
             const requestedSteal = Math.floor(victim.wallet.balance * percent * robMult);
             const availableSpace = Math.max(0, MAX_SAFE_BALANCE - robber.wallet.balance);
             const robAmount = Math.min(requestedSteal, availableSpace);
-            if (robAmount <= 0) throw new Error("Your wallet is at the maximum balance limit.");
+            if (robAmount <= 0) {
+                return {
+                    blocked: availableSpace <= 0
+                        ? "Your wallet is at the maximum balance limit."
+                        : `**${target.name}** had too little in their wallet to steal.`,
+                };
+            }
 
             await tx.wallet.update({ where: { id: victim.wallet.id }, data: { balance: { decrement: robAmount } } });
             await tx.transaction.create({ data: { walletId: victim.wallet.id, amount: -robAmount, type: "robbed_by", meta: { robber: robber.discordId, percent } } });
@@ -203,6 +220,10 @@ export async function handleRob(message: Message, args: string[]) {
 
             return { robAmount, updatedWallet, percent };
         });
+
+        if ("blocked" in result) {
+            return message.reply(v2Reply(errorContainer("Nothing to Steal", result.blocked)));
+        }
 
         void notifyRobbed(
             message.client,

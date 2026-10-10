@@ -209,7 +209,9 @@ export function resolveEarlyAckStrategy(interaction: Interaction, customId: stri
   const component = interaction as MessageComponentInteraction;
   if (component.replied || component.deferred) return "skip";
 
+  // These open a modal, and showModal must be the first response.
   if (customId === "invest_type_select") return "skip";
+  if (customId.startsWith("bank:card_pay_custom:")) return "skip";
   if (customId.startsWith("inv2_part_select:")) return "skip";
 
   const ephemeralPrefixes = [

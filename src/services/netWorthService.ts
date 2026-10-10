@@ -11,6 +11,8 @@ export interface NetWorthBreakdown {
   properties: number;
   animals: number;
   items: number;
+  /** Credit-card balance owed; subtracted from total (withdrawals sit in the wallet). */
+  cardDebt: number;
   passiveIncomePerDay: number;
   total: number;
 }
@@ -23,7 +25,7 @@ const cacheKey = (discordId: string) => `networth:${discordId}`;
 async function computeNetWorth(discordId: string): Promise<NetWorthBreakdown> {
   const breakdown: NetWorthBreakdown = {
     wallet: 0, bank: 0, investments: 0, stocks: 0,
-    properties: 0, animals: 0, items: 0,
+    properties: 0, animals: 0, items: 0, cardDebt: 0,
     passiveIncomePerDay: 0, total: 0,
   };
 
@@ -89,11 +91,16 @@ async function computeNetWorth(discordId: string): Promise<NetWorthBreakdown> {
       });
       breakdown.items = inv.reduce((s, i) => s + i.amount * (i.shopItem?.price ?? 0), 0);
     }),
+    safely("cardDebt", async () => {
+      const card = await prisma.creditCard.findUnique({ where: { userId: discordId } });
+      breakdown.cardDebt = Math.max(0, card?.currentBalance ?? 0);
+    }),
   ]);
 
   breakdown.total =
     breakdown.wallet + breakdown.bank + breakdown.investments +
-    breakdown.stocks + breakdown.properties + breakdown.animals + breakdown.items;
+    breakdown.stocks + breakdown.properties + breakdown.animals + breakdown.items -
+    breakdown.cardDebt;
   return breakdown;
 }
 
