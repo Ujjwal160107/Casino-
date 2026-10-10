@@ -111,7 +111,7 @@ export async function handleSpecialItemUse(
     case "tutor_pass":
       return handleTutorPass(discordId);
     case "scholarship_letter":
-      return handleScholarshipLetter(discordId);
+      return withBuffCooldown("scholarship_letter", discordId, () => handleScholarshipLetter(discordId));
     // Cock Store items
     case "basic_feed":
     case "protein_feed":
@@ -145,6 +145,66 @@ export async function handleSpecialItemUse(
     default:
       return null;
   }
+}
+
+const NOTHING_LEFT: ShopItemUseResult = {
+  success: false,
+  shouldConsume: false,
+  message: "You don't have any of that item left.",
+};
+
+/**
+ * Uses one unit of an owned inventory row through its catalog handler — the one
+ * path every `use` entry point goes through. The unit is claimed atomically
+ * BEFORE the handler runs, so two concurrent uses of the last unit can never
+ * both resolve; it is given back when the use didn't happen (success:false,
+ * shouldConsume:false, no handler, or a throw). The emptied row is only deleted
+ * once the use is final, so a give-back normally keeps the row; if a concurrent
+ * use already swept it, the give-back recreates it by (user, item).
+ */
+export async function useInventoryItem(
+  slot: { id: string; shopItemId: string },
+  itemKey: string,
+  discordId: string,
+  guildId: string,
+  member?: GuildMember,
+  targetId?: string,
+  extraArg?: string,
+): Promise<ShopItemUseResult | null> {
+  const claimed = await prisma.inventory.updateMany({
+    where: { id: slot.id, userId: discordId, amount: { gte: 1 } },
+    data: { amount: { decrement: 1 } },
+  });
+  if (claimed.count !== 1) return NOTHING_LEFT;
+
+  let result: ShopItemUseResult | null;
+  try {
+    result = await handleSpecialItemUse(itemKey, discordId, guildId, member, targetId, extraArg);
+  } catch (err) {
+    await returnInventoryUnit(slot, discordId);
+    throw err;
+  }
+
+  if (result?.success && result.shouldConsume !== false) {
+    await prisma.inventory.deleteMany({ where: { id: slot.id, amount: { lte: 0 } } });
+  } else {
+    await returnInventoryUnit(slot, discordId);
+  }
+  return result;
+}
+
+async function returnInventoryUnit(slot: { id: string; shopItemId: string }, discordId: string): Promise<void> {
+  const back = await prisma.inventory.updateMany({
+    where: { id: slot.id },
+    data: { amount: { increment: 1 } },
+  });
+  if (back.count === 1) return;
+  // A concurrent use consumed its own unit and swept the emptied row; recreate it.
+  await prisma.inventory.upsert({
+    where: { userId_shopItemId: { userId: discordId, shopItemId: slot.shopItemId } },
+    create: { userId: discordId, shopItemId: slot.shopItemId, amount: 1 },
+    update: { amount: { increment: 1 } },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -521,6 +581,7 @@ const BUFF_ITEM_COOLDOWN_SECONDS: Record<string, number> = {
   tax_shield: 6 * 3600,          // bypasses transaction taxes
   blackmarket_resume: 24 * 3600, // skips lifetime-shift career gates
   coffee_thermos: 4 * 3600,      // clears the 30-min study cooldown — rate-limit the clear
+  scholarship_letter: 3600,      // cash/XP roll — its old get-then-set cooldown let two letters both resolve
 };
 
 export function isBuffCooldownItem(itemKey: string): boolean {
@@ -1036,12 +1097,7 @@ async function handleTutorPass(discordId: string): Promise<ShopItemUseResult> {
 }
 
 async function handleScholarshipLetter(discordId: string): Promise<ShopItemUseResult> {
-  const cdKey = `scholarship_letter_cd:${discordId}`;
-  const cd = await redisService.get<{ used: boolean }>(cdKey);
-  if (cd && !isTester(discordId)) {
-    return { success: false, shouldConsume: false, message: `You must wait before submitting another scholarship application.` };
-  }
-
+  // One application per hour: the atomic claim lives in withBuffCooldown.
   const roll = Math.random();
   let resultMsg: string;
 
@@ -1077,9 +1133,6 @@ async function handleScholarshipLetter(discordId: string): Promise<ShopItemUseRe
     resultMsg = `**Scholarship Rejected.**\n\nYour application was not accepted this time.${eduReject ? " The rejection stings (**+5 stress**)." : ""} Better luck next time.`;
   }
 
-  if (!isTester(discordId)) {
-    await redisService.set(cdKey, { used: true }, 3600);
-  }
   return { success: true, message: resultMsg };
 }
 
@@ -1087,21 +1140,51 @@ async function handleScholarshipLetter(discordId: string): Promise<ShopItemUseRe
 // Cock Store Handlers
 // ---------------------------------------------------------------------------
 
-async function getChickenMeta(discordId: string, _guildId: string) {
-  const chickenItem = await prisma.shopItem.findFirst({
+type DbClient = Pick<typeof prisma, "shopItem" | "inventory">;
+
+async function getChickenMeta(discordId: string, _guildId: string, client: DbClient = prisma) {
+  const chickenItem = await client.shopItem.findFirst({
     where: globalCatalogGuildFilter({
       name: { equals: "Chicken", mode: "insensitive" },
     }),
   });
   if (!chickenItem) return { chickenInv: null, meta: {} as any };
 
-  const chickenInv = await prisma.inventory.findUnique({
+  const chickenInv = await client.inventory.findUnique({
     where: { userId_shopItemId: { userId: discordId, shopItemId: chickenItem.id } },
   });
   if (!chickenInv) return { chickenInv: null, meta: {} as any };
 
   const meta = (chickenInv.meta as any) || {};
   return { chickenInv, meta };
+}
+
+/**
+ * Takes an item off the chicken once its owner no longer has it. Equipping
+ * never consumes the item and cockfights read only the chicken's meta, so gear
+ * sold or listed away would otherwise keep fighting for free. Pass the
+ * transaction client so the unequip commits with the sale.
+ */
+export async function unequipChickenGear(
+  discordId: string,
+  gear: { id: string; name: string },
+  client: DbClient = prisma,
+): Promise<void> {
+  const { chickenInv, meta } = await getChickenMeta(discordId, "", client);
+  if (!chickenInv) return;
+
+  const isGear = (e: any) => e?.id === gear.id || e?.name?.toLowerCase() === gear.name.toLowerCase();
+  const equipment = meta.equipment ?? {};
+  const kept = Object.fromEntries(Object.entries(equipment).filter(([, e]) => !isGear(e)));
+  const legacy = meta.equippedItemName?.toLowerCase() === gear.name.toLowerCase();
+  if (Object.keys(kept).length === Object.keys(equipment).length && !legacy) return;
+
+  const next = { ...meta, equipment: kept };
+  if (legacy) {
+    delete next.equippedItem;
+    delete next.equippedItemName;
+  }
+  await client.inventory.update({ where: { id: chickenInv.id }, data: { meta: next } });
 }
 
 const FEED_XP: Record<string, number> = {

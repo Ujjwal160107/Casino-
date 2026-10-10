@@ -393,6 +393,31 @@ export async function buyItem(guildId: string, userId: string, identifier: strin
   };
 }
 
+/**
+ * Resolves a `use` query to an owned inventory row: 1-based inventory index,
+ * then exact name, then name prefix. Null when nothing matches.
+ */
+export async function findOwnedItemForUse(userId: string, query: string) {
+  const inventoryItems = await prisma.inventory.findMany({
+    where: { userId },
+    include: { shopItem: true },
+    orderBy: { shopItem: { name: 'asc' } }
+  }) as any[];
+
+  // Use by Index
+  const index = parseInt(query);
+  if (!isNaN(index) && index > 0 && index <= inventoryItems.length) {
+    return inventoryItems[index - 1] ?? null;
+  }
+
+  // Search by Name (Exact -> StartsWith/Partial)
+  const normalize = (str: string) => str.trim().toLowerCase().replace(/\s+/g, " ");
+  const search = normalize(query);
+  return inventoryItems.find(i => normalize(i.shopItem.name) === search && i.amount > 0)
+    ?? inventoryItems.find(i => normalize(i.shopItem.name).startsWith(search) && i.amount > 0)
+    ?? null;
+}
+
 export async function useItem(userId: string, guildId: string, itemName: string, member?: GuildMember) {
   const user = await (prisma.user.findUnique as any)({
     where: { discordId: userId }
@@ -400,32 +425,7 @@ export async function useItem(userId: string, guildId: string, itemName: string,
 
   if (!user) throw new Error("User not found.");
 
-  const inventoryItems = await prisma.inventory.findMany({
-    where: { userId: user.discordId },
-    include: { shopItem: true },
-    orderBy: { shopItem: { name: 'asc' } }
-  }) as any[];
-
-  let targetInvItem;
-
-  // 2. CHECK: Is input a Number? (Use by Index)
-  const index = parseInt(itemName);
-  if (!isNaN(index) && index > 0 && index <= inventoryItems.length) {
-    // 1-based index
-    targetInvItem = inventoryItems[index - 1];
-  } else {
-    // 3. Search by Name (Exact -> StartsWith/Partial)
-    const normalize = (str: string) => str.trim().toLowerCase().replace(/\s+/g, " ");
-    const search = normalize(itemName);
-
-    // A. Exact Match
-    targetInvItem = inventoryItems.find(i => normalize(i.shopItem.name) === search && i.amount > 0);
-
-    // B. Partial Match (Starts With) - if no exact match
-    if (!targetInvItem) {
-      targetInvItem = inventoryItems.find(i => normalize(i.shopItem.name).startsWith(search) && i.amount > 0);
-    }
-  }
+  const targetInvItem = await findOwnedItemForUse(user.discordId, itemName);
 
   if (!targetInvItem) {
     throw new Error(`You don't own an item matching "**${itemName}**".`);
@@ -435,6 +435,14 @@ export async function useItem(userId: string, guildId: string, itemName: string,
 
   if (item.catalogKey === LOADED_DICE_ITEM_KEY || item.name.toLowerCase() === "loaded dice of ruin") {
     throw new Error("The Loaded Dice of Ruin is rolled with the `roll` command, not `use`.");
+  }
+
+  // Catalog items resolve through their code handler (handleSpecialItemUse),
+  // which owns their cooldowns and caps. Their DB effects here are display text
+  // or legacy rows: applying them raw stacks PAY_MULTIPLIER uncapped and
+  // destroys CUSTOM_MESSAGE-only items for nothing.
+  if (findCatalogEntry(item)) {
+    throw new Error(`**${item.name}** can't be used this way. Try \`use ${item.name}\`.`);
   }
 
   // 4. STRICT CONSUMABLE CHECK

@@ -159,6 +159,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
       return;
     }
 
+    // Other Black Market components mostly sit on ephemeral replies, out of reach
+    // of a collector on the hub message; market.ts routes them by customId.
+    if (id.startsWith("bm_") && (interaction.isButton() || interaction.isStringSelectMenu())) {
+      const { handleBlackMarketInteraction } = require("./commands/economy/market");
+      if (await handleBlackMarketInteraction(interaction)) return;
+    }
+
     if (id.startsWith("market_") || id.startsWith("sell_") || id.startsWith("buy_property_") || id.startsWith("property_page_") || id === "cancel_property_buy") {
       return await handleMarketInteraction(interaction);
     }

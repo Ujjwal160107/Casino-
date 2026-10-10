@@ -22,7 +22,7 @@ import { refreshMessageComponent, ensureDeferredEphemeralReply, ensureDeferredUp
 import { ensureUserAndWallet } from "../../services/walletService";
 import { fmtCurrency } from "../../utils/format";
 import { Mascot } from "../../config/branding";
-import { handleSpecialItemUse } from "../../services/shopItemEffects";
+import { unequipChickenGear, useInventoryItem } from "../../services/shopItemEffects";
 import {
   COCK_SHOP_CATALOG,
   GENERAL_SHOP_CATALOG,
@@ -35,7 +35,7 @@ import { useItem } from "../../services/shopService";
 import { buildHuntCraftPayload } from "../../services/huntCraftService";
 import { getHuntParts, listPartFromInventory } from "../../services/huntPartService";
 import { getInventoryAnimals } from "../../services/huntService";
-import { listItem } from "../../services/marketService";
+import { listItem, listingBlockReason, resaleBlockReason } from "../../services/marketService";
 import { nextStepHint } from "../../config/nextSteps";
 
 const ITEMS_PER_PAGE = 4;
@@ -403,6 +403,8 @@ function buildItemDetailPayload(slot: InventorySlot, ownerId: string, canAct: bo
   }
 
   if (canAct) {
+    // sellOne / listItem refuse these server-side; don't offer the buttons either.
+    const resaleBlocked = resaleBlockReason(slot) !== null;
     buttons.push(
       new ButtonBuilder()
         .setCustomId(`inv2_use:${slot.id}:${ownerId}`)
@@ -412,11 +414,13 @@ function buildItemDetailPayload(slot: InventorySlot, ownerId: string, canAct: bo
       new ButtonBuilder()
         .setCustomId(`inv2_sell:${slot.id}:${ownerId}`)
         .setLabel("Quick Sell")
-        .setStyle(ButtonStyle.Danger),
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(resaleBlocked || Number(item.price || 0) <= 0),
       new ButtonBuilder()
         .setCustomId(`inv2_market:${slot.id}:${ownerId}`)
         .setLabel("Black Market")
-        .setStyle(ButtonStyle.Secondary),
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(listingBlockReason(slot) !== null),
     );
   }
 
@@ -473,28 +477,26 @@ function buildHuntPartMarketPayload(
   return { components, flags: MessageFlags.IsComponentsV2 } as any;
 }
 
-async function consumeSlot(slotId: string) {
-  const fresh = await prisma.inventory.findUnique({ where: { id: slotId } });
-  if (!fresh) return;
-
-  if (fresh.amount <= 1) {
-    await prisma.inventory.delete({ where: { id: fresh.id } });
-  } else {
-    await prisma.inventory.update({ where: { id: fresh.id }, data: { amount: { decrement: 1 } } });
-  }
-}
-
-async function sellOne(slotId: string, discordId: string) {
+export async function sellOne(slotId: string, discordId: string) {
   const slot = await prisma.inventory.findUnique({ where: { id: slotId }, include: { shopItem: true } });
   if (!slot || slot.userId !== discordId || slot.amount <= 0) throw new Error("Item not found in your inventory.");
+  const blocked = resaleBlockReason(slot);
+  if (blocked) throw new Error(blocked);
+  // A price-0 item would sell for nothing; the sale would only destroy it.
+  if (Number(slot.shopItem.price || 0) <= 0) throw new Error(`**${slot.shopItem.name}** has no resale value.`);
 
   const { value: sellValue, rate } = getQuickSellValue(Number(slot.shopItem.price || 0));
-  await prisma.$transaction([
-    slot.amount <= 1
-      ? prisma.inventory.delete({ where: { id: slot.id } })
-      : prisma.inventory.update({ where: { id: slot.id }, data: { amount: { decrement: 1 } } }),
-    prisma.wallet.update({ where: { userId: discordId }, data: { balance: { increment: sellValue } } }),
-  ]);
+  await prisma.$transaction(async (tx) => {
+    const taken = await tx.inventory.updateMany({
+      where: { id: slot.id, amount: { gte: 1 } },
+      data: { amount: { decrement: 1 } },
+    });
+    if (taken.count !== 1) throw new Error("Item not found in your inventory.");
+    const emptied = await tx.inventory.deleteMany({ where: { id: slot.id, amount: { lte: 0 } } });
+    // Sold the last one: it can't stay on the chicken.
+    if (emptied.count > 0) await unequipChickenGear(discordId, slot.shopItem, tx);
+    await tx.wallet.update({ where: { userId: discordId }, data: { balance: { increment: sellValue } } });
+  });
 
   return { itemName: slot.shopItem.name, sellValue, rate };
 }
@@ -506,13 +508,10 @@ async function useInventorySlot(slotId: string, discordId: string, guildId: stri
 
   const catalog = findCatalogByName(slot.shopItem.name);
   if (catalog) {
-    const result = await handleSpecialItemUse(catalog.key, discordId, guildId, member);
-    if (result) {
-      if (result.success && result.shouldConsume !== false && slot.shopItem.consumable) {
-        await consumeSlot(slot.id);
-      }
-      return result.message;
-    }
+    // Claims one unit before the handler runs; gives it back if the use didn't
+    // happen. Non-consumable usables (compass, chicken gear) return shouldConsume:false.
+    const result = await useInventoryItem(slot, catalog.key, discordId, guildId, member);
+    if (result) return result.message;
   }
 
   const used = await useItem(discordId, guildId, slot.shopItem.name, member);

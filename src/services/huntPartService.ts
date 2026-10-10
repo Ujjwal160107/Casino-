@@ -122,13 +122,17 @@ export async function storeSpeciesPartsFromAnimals(userId: string, animalKey: st
   if (counts.size === 0) throw new Error("No harvestable parts are left on this animal group.");
 
   await prisma.$transaction(async (tx) => {
+    // Claim exactly the animals the parts were counted from, before paying out.
+    // A double-click or a concurrent sell that already took any of them leaves
+    // the count short and rolls this back, so the parts are never paid twice.
+    const claimed = await tx.caughtAnimal.deleteMany({
+      where: { id: { in: caught.map((row) => row.id) }, discordId: userId, inZoo: false },
+    });
+    if (claimed.count !== caught.length) throw new Error("Those animals were already stored or sold. Try again.");
+
     for (const [partKey, amount] of counts.entries()) {
       await addHuntParts(userId, partKey, amount, tx);
     }
-
-    await tx.caughtAnimal.deleteMany({
-      where: { discordId: userId, animalKey, inZoo: false },
-    });
   });
 
   return {
@@ -157,14 +161,14 @@ export async function listPartFromInventory(userId: string, partKey: string, amo
   if (!inv || inv.amount < amount) throw new Error(`You don't have enough **${formatPartName(partKey)}**.`);
 
   await prisma.$transaction(async (tx) => {
-    if (inv.amount === amount) {
-      await tx.huntPartInventory.delete({ where: { id: inv.id } });
-    } else {
-      await tx.huntPartInventory.update({
-        where: { id: inv.id },
-        data: { amount: { decrement: amount } },
-      });
-    }
+    // The amount read above is stale by now (a concurrent listing or craft may
+    // have taken parts), so the decrement itself must be guarded.
+    const taken = await tx.huntPartInventory.updateMany({
+      where: { id: inv.id, amount: { gte: amount } },
+      data: { amount: { decrement: amount } },
+    });
+    if (taken.count !== 1) throw new Error(`You don't have enough **${formatPartName(partKey)}**.`);
+    await tx.huntPartInventory.deleteMany({ where: { id: inv.id, amount: { lte: 0 } } });
 
     await tx.huntPartListing.create({
       data: {
@@ -367,10 +371,13 @@ export async function buyHuntPartListing(buyerId: string, listingId: string) {
     const deleted = await tx.huntPartListing.deleteMany({ where: { id: listingId } });
     if (deleted.count === 0) throw new Error("Listing was already purchased or cancelled.");
 
-    await tx.wallet.update({
-      where: { id: buyerWallet.id },
+    // The balance read above is stale by now, so the debit itself is guarded;
+    // a miss rolls the sale back.
+    const debited = await tx.wallet.updateMany({
+      where: { id: buyerWallet.id, balance: { gte: fees.buyerTotal } },
       data: { balance: { decrement: fees.buyerTotal } },
     });
+    if (debited.count !== 1) throw new Error(`Insufficient funds. Need **${fees.buyerTotal.toLocaleString()}** coins.`);
     await tx.transaction.create({
       data: {
         walletId: buyerWallet.id,

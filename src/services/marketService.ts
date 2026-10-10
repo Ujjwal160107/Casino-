@@ -3,6 +3,7 @@ import { addBalance } from "./walletService";
 import { applyGarnishment } from "./creditCardService";
 import { questBus } from "./questEvents";
 import { findCatalogEntry } from "./shopService";
+import { unequipChickenGear } from "./shopItemEffects";
 
 const SELLER_FEE_PCT = 10;
 const BUYER_FEE_PCT = 5;
@@ -24,6 +25,44 @@ export function calculateFees(listedPrice: number) {
   };
 }
 
+type ResaleRow = { meta: unknown; shopItem: { name: string; catalogKey?: string | null } };
+
+/**
+ * Why an owned row can't be resold — listed on the Black Market or quick sold
+ * for wallet cash — or null. One rule for both exits so they can't drift apart.
+ */
+export function resaleBlockReason(row: ResaleRow): string | null {
+  // Card-exclusive items are earned on credit; reselling them for wallet coins
+  // would hand them to players with no card at all, or turn credit into cash.
+  if (findCatalogEntry(row.shopItem)?.requiresCardTier) {
+    return `**${row.shopItem.name}** is card-exclusive and cannot be resold.`;
+  }
+  // Unique rows (the chicken: level/trait meta) are non-transferable. Selling
+  // one destroys it, and the starter chicken is then regranted with a new trait.
+  const meta = row.meta as any;
+  if (meta?.level !== undefined || meta?.trait !== undefined) {
+    return `**${row.shopItem.name}** is unique and cannot be resold.`;
+  }
+  return null;
+}
+
+/**
+ * Why an owned row can't be listed on the Black Market, or null: the resale
+ * rule plus per-row state. A listing carries no meta, and buy/cancel/expire
+ * recreate the row without it, so listing worn gear (durability) or a rolled
+ * Loaded Dice (rollCount) would reset that state for free. Only rows with no
+ * state can be listed; Quick Sell destroys the row, so it doesn't need this.
+ */
+export function listingBlockReason(row: ResaleRow): string | null {
+  const resale = resaleBlockReason(row);
+  if (resale) return resale;
+  const meta = row.meta;
+  if (meta && typeof meta === "object" && Object.keys(meta).length > 0) {
+    return `**${row.shopItem.name}** has been used (wear, rolls or charges) and cannot be listed.`;
+  }
+  return null;
+}
+
 export async function listItem(discordId: string, shopItemId: string, amount: number, totalPrice: number) {
   if (amount <= 0) throw new Error("Amount must be positive.");
   if (!Number.isInteger(totalPrice) || totalPrice < MIN_PRICE) throw new Error(`Minimum listing price is **${MIN_PRICE.toLocaleString()}** coins.`);
@@ -43,28 +82,22 @@ export async function listItem(discordId: string, shopItemId: string, amount: nu
     throw new Error("You don't have enough of this item.");
   }
 
-  const meta = inventoryItem.meta as any;
-  if (meta?.level !== undefined || meta?.trait !== undefined) {
-    throw new Error("This item cannot be listed on the black market (unique/meta items are non-transferable).");
-  }
-
-  // Card-exclusive items are earned on credit; reselling them for wallet coins
-  // would hand them to players with no card at all.
-  if (findCatalogEntry(inventoryItem.shopItem)?.requiresCardTier) {
-    throw new Error(`**${inventoryItem.shopItem.name}** is card-exclusive and cannot be listed on the black market.`);
-  }
+  const blocked = listingBlockReason(inventoryItem);
+  if (blocked) throw new Error(blocked);
 
   const itemName = inventoryItem.shopItem?.name ?? "Unknown";
 
   await prisma.$transaction(async (tx) => {
-    if (inventoryItem.amount === amount) {
-      await tx.inventory.delete({ where: { id: inventoryItem.id } });
-    } else {
-      await tx.inventory.update({
-        where: { id: inventoryItem.id },
-        data: { amount: { decrement: amount } },
-      });
-    }
+    // The amount read above is stale by now (a concurrent listing, sale or use
+    // may have taken units), so the decrement itself must be guarded.
+    const taken = await tx.inventory.updateMany({
+      where: { id: inventoryItem.id, amount: { gte: amount } },
+      data: { amount: { decrement: amount } },
+    });
+    if (taken.count !== 1) throw new Error("You don't have enough of this item.");
+    const emptied = await tx.inventory.deleteMany({ where: { id: inventoryItem.id, amount: { lte: 0 } } });
+    // Listed the last one: it can't stay on the chicken.
+    if (emptied.count > 0) await unequipChickenGear(discordId, inventoryItem.shopItem, tx);
 
     await tx.marketListing.create({
       data: {
@@ -107,11 +140,13 @@ export async function buyListing(buyerDiscordId: string, listingId: string) {
     });
     if (deleted.count === 0) throw new Error("Listing was already purchased or cancelled.");
 
-    // Deduct from buyer (full price + buyer fee)
-    await tx.wallet.update({
-      where: { id: buyerWallet.id },
+    // Deduct from buyer (full price + buyer fee). The balance read above is
+    // stale by now, so the debit itself is guarded; a miss rolls the sale back.
+    const debited = await tx.wallet.updateMany({
+      where: { id: buyerWallet.id, balance: { gte: fees.buyerTotal } },
       data: { balance: { decrement: fees.buyerTotal } },
     });
+    if (debited.count !== 1) throw new Error(`Insufficient funds. Need **${fees.buyerTotal.toLocaleString()}** coins.`);
 
     await tx.transaction.create({
       data: {
@@ -233,11 +268,8 @@ export async function getUserInventoryForSale(discordId: string) {
     where: { userId: discordId, amount: { gte: 1 } },
     include: { shopItem: true },
   });
-  // Filter out meta-bearing items (chickens, etc.)
-  return items.filter((i) => {
-    const meta = i.meta as any;
-    return !(meta?.level !== undefined || meta?.trait !== undefined);
-  });
+  // Leave out anything listItem would refuse (chickens, card-exclusives, ...)
+  return items.filter((i) => !listingBlockReason(i));
 }
 
 export async function expireOldListings(): Promise<number> {
