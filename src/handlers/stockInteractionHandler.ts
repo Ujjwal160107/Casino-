@@ -8,7 +8,9 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from "discord.js";
+import prisma from "../utils/prisma";
 import { getStock, buyStock } from "../services/stockService";
+import { checkJailStatus } from "../services/jailService";
 import { fmtCurrency } from "../utils/format";
 import { ensureDeferredEphemeralReply, safeEditReply, safeReply } from "../utils/interactionHelpers";
 
@@ -60,6 +62,26 @@ async function showBuyModal(interaction: ButtonInteraction, symbol: string): Pro
   await interaction.showModal(modal);
 }
 
+/**
+ * The Buy button comes straight from index.ts, not through routeMessage, so
+ * the router's ban and jail gates never ran for it. Re-apply both here before
+ * any money moves.
+ */
+async function tradingBlockedReason(discordId: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({
+    where: { discordId },
+    select: { isBanned: true, banExpiresAt: true },
+  });
+  // Same rule as the router's getUserRecord: a ban is active until it expires,
+  // and one without an expiry is permanent.
+  if (user?.isBanned && (!user.banExpiresAt || user.banExpiresAt > new Date())) {
+    return "You are banned from the casino.";
+  }
+  const { isJailed } = await checkJailStatus(discordId);
+  if (isJailed) return "You cannot trade stocks while in jail.";
+  return null;
+}
+
 async function submitBuy(interaction: ModalSubmitInteraction, symbol: string): Promise<void> {
   const raw = interaction.fields.getTextInputValue("quantity").trim();
   const qty = Number(raw);
@@ -69,6 +91,12 @@ async function submitBuy(interaction: ModalSubmitInteraction, symbol: string): P
   }
 
   if (!await ensureDeferredEphemeralReply(interaction, MessageFlags.Ephemeral)) return;
+
+  const blocked = await tradingBlockedReason(interaction.user.id);
+  if (blocked) {
+    await safeEditReply(interaction, { content: blocked });
+    return;
+  }
 
   try {
     const res = await buyStock(interaction.user.id, symbol, qty);
