@@ -281,7 +281,12 @@ export async function claimQuestReward(discordId: string): Promise<{ totalReward
 
 const REROLL_COST = 50_000;
 
-export async function rerollQuest(discordId: string, taskIndex: number): Promise<QuestTask> {
+/**
+ * Rerolls the first task that is still incomplete, chosen from the quest as
+ * it is now: the quest card's buttons outlive the task list they were drawn
+ * from, and a task completed since then can no longer be rerolled.
+ */
+export async function rerollQuest(discordId: string): Promise<{ index: number; task: QuestTask }> {
   // The reroll rewrites the whole tasks JSON, so it takes the same updatedAt
   // CAS as updateQuestProgress: a plain update erased progress an event wrote
   // meanwhile, and two rerolls could both spend the same free one.
@@ -294,8 +299,8 @@ export async function rerollQuest(discordId: string, taskIndex: number): Promise
 
     if (!quest) throw new Error("No active quest.");
     const tasks = quest.tasks as unknown as QuestTask[];
-    if (taskIndex < 0 || taskIndex >= tasks.length) throw new Error("Invalid quest index.");
-    if (tasks[taskIndex].completed) throw new Error("Cannot reroll a completed quest.");
+    const taskIndex = tasks.findIndex(t => !t.completed);
+    if (taskIndex === -1) throw new Error("All quests are complete!");
 
     const rerolls = quest.rerollsUsed ?? 0;
     if (rerolls >= 3) throw new Error("Max rerolls reached (1 free + 2 paid).");
@@ -358,7 +363,7 @@ export async function rerollQuest(discordId: string, taskIndex: number): Promise
     }));
     if (applied) {
       if (paid) await invalidateUserCache(discordId, "");
-      return newTask;
+      return { index: taskIndex, task: newTask };
     }
   }
   throw new Error("Your quests changed while rerolling. Try again.");

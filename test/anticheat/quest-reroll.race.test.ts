@@ -32,7 +32,7 @@ async function withProgressAfterFirstRead<T>(fn: () => Promise<T>): Promise<T> {
       const t = quest.tasks as QuestTask[];
       await testPrisma.dailyQuest.update({
         where: { id: quest.id },
-        data: { tasks: t.map((x, i) => (i === 0 ? { ...x, progress: 3 } : x)) as any },
+        data: { tasks: t.map((x, i) => (i === t.length - 1 ? { ...x, progress: 3 } : x)) as any },
       });
     }
     return quest;
@@ -53,7 +53,7 @@ describe("rerollQuest", () => {
       data: {
         userId: id,
         dayKey: "qr-race",
-        tasks: [task("GAMBLE_ANY", 10), task("WIN_COINFLIP", 5)] as any,
+        tasks: [{ ...task("GAMBLE_ANY", 1), progress: 1, completed: true }, task("WIN_COINFLIP", 5), task("CASINO_GRIND", 10)] as any,
         expiresAt: new Date(Date.now() + 86_400_000),
       },
     });
@@ -61,21 +61,37 @@ describe("rerollQuest", () => {
   afterAll(() => resetUser(id));
 
   it("keeps progress written between its read and its write", async () => {
-    await withProgressAfterFirstRead(() => rerollQuest(id, 1));
+    await withProgressAfterFirstRead(() => rerollQuest(id));
 
     const after = await tasks();
-    expect(after[0].progress).toBe(3);
+    expect(after[2].progress).toBe(3);
     expect(after[1].key).not.toBe("WIN_COINFLIP");
   });
 
   it("charges a paid reroll once even when it has to retry", async () => {
     await testPrisma.dailyQuest.updateMany({ where: { userId: id }, data: { rerollsUsed: 1 } });
 
-    await withProgressAfterFirstRead(() => rerollQuest(id, 1));
+    await withProgressAfterFirstRead(() => rerollQuest(id));
 
     expect((await testPrisma.wallet.findUnique({ where: { userId: id } }))!.balance).toBe(0);
     const quest = await testPrisma.dailyQuest.findFirst({ where: { userId: id } });
     expect(quest!.rerollsUsed).toBe(2);
-    expect((quest!.tasks as unknown as QuestTask[])[0].progress).toBe(3);
+    expect((quest!.tasks as unknown as QuestTask[])[2].progress).toBe(3);
+  });
+
+  it("rerolls the first task incomplete now, not one that finished since the card was posted", async () => {
+    // The card showed WIN_COINFLIP as the first open task; it completes before the click.
+    const before = await tasks();
+    await testPrisma.dailyQuest.updateMany({
+      where: { userId: id },
+      data: { tasks: before.map((t, i) => (i === 1 ? { ...t, progress: 5, completed: true } : t)) as any },
+    });
+
+    const { index } = await rerollQuest(id);
+
+    expect(index).toBe(2);
+    const after = await tasks();
+    expect(after[1]).toMatchObject({ key: "WIN_COINFLIP", completed: true });
+    expect(after[2].key).not.toBe("CASINO_GRIND");
   });
 });
