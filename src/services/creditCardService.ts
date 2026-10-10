@@ -445,19 +445,37 @@ export async function applyGarnishment(discordId: string, incomeAmount: number):
 
   if (garnishAmount <= 0) return { garnished: 0, netIncome: incomeAmount };
 
-  await prisma.creditCard.update({
-    where: { id: card.id },
-    data: { currentBalance: { decrement: garnishAmount } }
-  });
+  await prisma.$transaction(async (trx) => {
+    await trx.creditCard.update({
+      where: { id: card.id },
+      data: { currentBalance: { decrement: garnishAmount } }
+    });
 
-  await prisma.cardTransaction.create({
-    data: {
-      cardId: card.id,
-      type: "GARNISHMENT",
-      amount: garnishAmount,
-      cycleKey: card.currentCycleKey,
-      meta: { source: "income_garnishment", originalIncome: incomeAmount }
+    // Garnishment is a payment: credit the open statement like payCard does,
+    // or settlement still sees it unpaid and charges MISSED + interest.
+    const openStatement = await trx.cardStatement.findFirst({
+      where: { cardId: card.id, status: "OPEN" },
+      orderBy: { statementAt: "asc" }
+    });
+    const statementPaid = openStatement
+      ? Math.min(garnishAmount, Math.max(0, openStatement.statementBalance - openStatement.amountPaid))
+      : 0;
+    if (openStatement && statementPaid > 0) {
+      await trx.cardStatement.update({
+        where: { id: openStatement.id },
+        data: { amountPaid: { increment: statementPaid } }
+      });
     }
+
+    await trx.cardTransaction.create({
+      data: {
+        cardId: card.id,
+        type: "GARNISHMENT",
+        amount: garnishAmount,
+        cycleKey: card.currentCycleKey,
+        meta: { source: "income_garnishment", originalIncome: incomeAmount, statementPaid }
+      }
+    });
   });
 
   return { garnished: garnishAmount, netIncome: incomeAmount - garnishAmount };
@@ -614,7 +632,12 @@ async function settleStatement(statementId: string): Promise<StatementSettled | 
         missStreak += 1;
         scoreDelta = missStreak > 1 ? CARD_SCORE_RULES.repeatMiss : CARD_SCORE_RULES.missPayment;
         cardStatus = missStreak >= 3 ? "LOCKED" : "DELINQUENT";
-        const unpaid = Math.max(0, statement.statementBalance - statement.amountPaid);
+        // Interest follows what is still owed: debt cleared outside this
+        // statement (older uncredited garnishments) must not accrue interest.
+        const unpaid = Math.min(
+          Math.max(0, statement.statementBalance - statement.amountPaid),
+          Math.max(0, statement.card.currentBalance),
+        );
         interestCharged = Math.floor(unpaid * (tier.weeklyInterestPct / 100));
       }
 
