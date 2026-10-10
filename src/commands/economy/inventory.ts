@@ -35,7 +35,7 @@ import { useItem } from "../../services/shopService";
 import { buildHuntCraftPayload } from "../../services/huntCraftService";
 import { getHuntParts, listPartFromInventory } from "../../services/huntPartService";
 import { getInventoryAnimals } from "../../services/huntService";
-import { listItem } from "../../services/marketService";
+import { listItem, resaleBlockReason } from "../../services/marketService";
 import { nextStepHint } from "../../config/nextSteps";
 
 const ITEMS_PER_PAGE = 4;
@@ -403,6 +403,8 @@ function buildItemDetailPayload(slot: InventorySlot, ownerId: string, canAct: bo
   }
 
   if (canAct) {
+    // sellOne / listItem refuse these server-side; don't offer the buttons either.
+    const resaleBlocked = resaleBlockReason(slot) !== null;
     buttons.push(
       new ButtonBuilder()
         .setCustomId(`inv2_use:${slot.id}:${ownerId}`)
@@ -412,11 +414,13 @@ function buildItemDetailPayload(slot: InventorySlot, ownerId: string, canAct: bo
       new ButtonBuilder()
         .setCustomId(`inv2_sell:${slot.id}:${ownerId}`)
         .setLabel("Quick Sell")
-        .setStyle(ButtonStyle.Danger),
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(resaleBlocked),
       new ButtonBuilder()
         .setCustomId(`inv2_market:${slot.id}:${ownerId}`)
         .setLabel("Black Market")
-        .setStyle(ButtonStyle.Secondary),
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(resaleBlocked),
     );
   }
 
@@ -473,9 +477,11 @@ function buildHuntPartMarketPayload(
   return { components, flags: MessageFlags.IsComponentsV2 } as any;
 }
 
-async function sellOne(slotId: string, discordId: string) {
+export async function sellOne(slotId: string, discordId: string) {
   const slot = await prisma.inventory.findUnique({ where: { id: slotId }, include: { shopItem: true } });
   if (!slot || slot.userId !== discordId || slot.amount <= 0) throw new Error("Item not found in your inventory.");
+  const blocked = resaleBlockReason(slot);
+  if (blocked) throw new Error(blocked);
 
   const { value: sellValue, rate } = getQuickSellValue(Number(slot.shopItem.price || 0));
   await prisma.$transaction([

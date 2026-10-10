@@ -24,6 +24,21 @@ export function calculateFees(listedPrice: number) {
   };
 }
 
+type ResaleRow = { meta: unknown; shopItem: { name: string; catalogKey?: string | null } };
+
+/**
+ * Why an owned row can't be resold — listed on the Black Market or quick sold
+ * for wallet cash — or null. One rule for both exits so they can't drift apart.
+ */
+export function resaleBlockReason(row: ResaleRow): string | null {
+  // Card-exclusive items are earned on credit; reselling them for wallet coins
+  // would hand them to players with no card at all, or turn credit into cash.
+  if (findCatalogEntry(row.shopItem)?.requiresCardTier) {
+    return `**${row.shopItem.name}** is card-exclusive and cannot be resold.`;
+  }
+  return null;
+}
+
 export async function listItem(discordId: string, shopItemId: string, amount: number, totalPrice: number) {
   if (amount <= 0) throw new Error("Amount must be positive.");
   if (!Number.isInteger(totalPrice) || totalPrice < MIN_PRICE) throw new Error(`Minimum listing price is **${MIN_PRICE.toLocaleString()}** coins.`);
@@ -48,11 +63,8 @@ export async function listItem(discordId: string, shopItemId: string, amount: nu
     throw new Error("This item cannot be listed on the black market (unique/meta items are non-transferable).");
   }
 
-  // Card-exclusive items are earned on credit; reselling them for wallet coins
-  // would hand them to players with no card at all.
-  if (findCatalogEntry(inventoryItem.shopItem)?.requiresCardTier) {
-    throw new Error(`**${inventoryItem.shopItem.name}** is card-exclusive and cannot be listed on the black market.`);
-  }
+  const blocked = resaleBlockReason(inventoryItem);
+  if (blocked) throw new Error(blocked);
 
   const itemName = inventoryItem.shopItem?.name ?? "Unknown";
 
@@ -240,10 +252,10 @@ export async function getUserInventoryForSale(discordId: string) {
     where: { userId: discordId, amount: { gte: 1 } },
     include: { shopItem: true },
   });
-  // Filter out meta-bearing items (chickens, etc.)
+  // Filter out meta-bearing items (chickens, etc.) and anything listItem would refuse
   return items.filter((i) => {
     const meta = i.meta as any;
-    return !(meta?.level !== undefined || meta?.trait !== undefined);
+    return !(meta?.level !== undefined || meta?.trait !== undefined) && !resaleBlockReason(i);
   });
 }
 
