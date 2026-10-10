@@ -303,9 +303,11 @@ async function handleButton(interaction: ButtonInteraction) {
     else if (customId === "work_resign_confirm") {
         if (!await ensureDeferredUpdate(interaction)) return;
         try {
+            // lastShift is kept: clearing it let resign -> re-apply skip the
+            // shift cooldown and work again immediately.
             await prisma.user.update({
                 where: { discordId: user.id },
-                data: { jobId: null, lastShift: null }
+                data: { jobId: null }
             });
 
             const container = plainContainer(
