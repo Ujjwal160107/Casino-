@@ -161,7 +161,7 @@ export type InvestmentReturns = Awaited<ReturnType<typeof getInvestmentReturns>>
 export async function getFinancialSummary(discordId: string) {
     const user = await prisma.user.findUnique({
         where: { discordId },
-        include: { bank: true, wallet: true }
+        include: { bank: true, wallet: true, creditCard: true }
     });
 
     if (!user) {
@@ -182,9 +182,11 @@ export async function getFinancialSummary(discordId: string) {
     const investmentValue = investments.reduce((sum, investment) => sum + investment.amount, 0);
     const walletBalance = user.wallet?.balance || 0;
     const bankBalance = user.bank?.balance || 0;
+    // Card withdrawals sit in the wallet; count the debt against them (as the profile does).
+    const cardDebt = Math.max(0, user.creditCard?.currentBalance ?? 0);
 
     return {
-        netWorth: bankBalance + walletBalance + investmentValue,
+        netWorth: bankBalance + walletBalance + investmentValue - cardDebt,
         walletBalance,
         bankBalance,
         creditScore: user.creditScore,
