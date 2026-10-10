@@ -64,7 +64,7 @@ const LEGACY_REMOVED_COMMANDS = new Set([
   "collect",
   "setincome", "set-income",
   "set-income-cooldown", "setincomecooldown", "set-income-cd", "setincomecd",
-  "setrob", "set-rob", "config-rob",
+  "config-rob",
   "setcurrencyemoji", "set-currency-emoji", "setemoji", "set-emoji",
   "set-currency", "setcurrency",
   "set-start-money", "setstartmoney", "set-start", "setstart",

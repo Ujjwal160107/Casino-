@@ -1,6 +1,11 @@
 import { vi } from "vitest";
 import type { Message } from "discord.js";
 
+// The router loads many handlers with a lazy CommonJS require(), which goes
+// through Node rather than vitest's transformer and so cannot read .ts. Let
+// Node transpile them too, so those cases are reachable from a test.
+require("ts-node").register({ transpileOnly: true });
+
 /** The slice of a Message that routeMessage's gates read before dispatch. */
 export function fakeMessage(content: string, opts: { authorId: string; guildId: string | null }) {
   const reply = vi.fn(async (_payload: unknown) => ({}) as Message);
