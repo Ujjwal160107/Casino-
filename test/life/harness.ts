@@ -5,7 +5,7 @@ import "ts-node/register/transpile-only";
 // A stand-in for a discord.js ButtonInteraction that is good enough for the
 // real interactionHelpers (safeReply/safeUpdate/defer*) to drive. Every reply
 // is recorded so tests can assert what the player was shown.
-export function fakeButton(customId: string, userId: string) {
+export function fakeButton(customId: string, userId: string, reply: Record<string, unknown> = {}) {
   const calls: { method: string; payload: unknown }[] = [];
   const record = (method: string) => async (payload?: unknown) => {
     calls.push({ method, payload });
@@ -30,7 +30,8 @@ export function fakeButton(customId: string, userId: string) {
     editReply: record("editReply"),
     followUp: record("followUp"),
     deleteReply: record("deleteReply"),
-    fetchReply: async () => ({}),
+    // `reply` stands in for the fetched reply message (e.g. awaitMessageComponent).
+    fetchReply: async () => reply,
   };
   return { interaction, calls, shown: () => JSON.stringify(calls) };
 }

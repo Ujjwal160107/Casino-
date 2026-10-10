@@ -794,7 +794,7 @@ async function handleButton(interaction: ButtonInteraction) {
                     where: { discordId: userData.discordId },
                     data: {
                         lastShift: new Date(),
-                        jobStress: { increment: 5 } // Even more stress
+                        jobStress: Math.min(100, (userData.jobStress || 0) + 5) // Even more stress, capped at 100
                     }
                 });
                 void enqueueWorkReminder(userData.discordId);
@@ -1014,8 +1014,7 @@ async function handleButton(interaction: ButtonInteraction) {
                     jobEffectNotes.push(`Corporate Blessing: Massive payout! (${mult.toFixed(1)}x)`);
                 } else {
                     // Failure: +25 stress, amount unchanged, plus durability damage below
-                    corporateBlessingFailed = true;
-                    await prisma.user.update({ where: { discordId: user.id }, data: { jobStress: { increment: 25 } } });
+                    corporateBlessingFailed = true; // +25 stress is added (capped) with the shift update below
                     jobEffectNotes.push(`Corporate Blessing: Failed — +25 stress and extra gear wear`);
                 }
             }
@@ -1040,7 +1039,8 @@ async function handleButton(interaction: ButtonInteraction) {
                 data: {
                     wallet: { update: { balance: { increment: amount } } },
                     shiftsWorked: { increment: 1 },
-                    jobStress: { increment: Math.max(0, 5 - repStressReduction) }, // +5 base, reduced by rep tier
+                    // +5 base (reduced by rep tier), +25 on a failed Corporate Blessing, capped at 100
+                    jobStress: Math.min(100, (userData.jobStress || 0) + Math.max(0, 5 - repStressReduction) + (corporateBlessingFailed ? 25 : 0)),
                     jobStreak: newStreak,
                     lastShift: new Date(),
                     jobFailStreak: 0 // Reset fail streak on success
