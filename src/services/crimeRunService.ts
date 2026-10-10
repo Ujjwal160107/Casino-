@@ -30,10 +30,6 @@ export async function getCrimeRun(userId: string): Promise<CrimeRun | null> {
   return redisService.get<CrimeRun>(RUN_KEY(userId));
 }
 
-export async function clearCrimeRun(userId: string): Promise<void> {
-  await redisService.del(RUN_KEY(userId));
-}
-
 export function getCurrentStageForRun(run: CrimeRun): CrimeMinigameStage | undefined {
   const stages = getStagesForCrime(run.crimeKey);
   return stages?.[run.stageIndex];
@@ -49,6 +45,22 @@ function correctOptionLabel(stageDef: CrimeMinigameStage): string {
 
 async function persistRun(run: CrimeRun): Promise<void> {
   await redisService.set(RUN_KEY(run.ownerId), run, RUN_TTL);
+}
+
+// Compare-and-swap on the raw stored run: replace (or delete, when ARGV[2] is
+// empty) only if the key still holds exactly the value this caller read. Two
+// clicks racing on the same stage both read the same run; only one may move it
+// on, so a run can never resolve twice (double payout, or success + fine).
+const RUN_CAS_SCRIPT = `
+if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
+if ARGV[2] == '' then redis.call('DEL', KEYS[1]) else redis.call('SET', KEYS[1], ARGV[2], 'EX', ARGV[3]) end
+return 1`;
+
+async function swapRun(ownerId: string, expectedRaw: string, next: CrimeRun | null): Promise<boolean> {
+  const won = await redisService
+    .getInstance()
+    .eval(RUN_CAS_SCRIPT, 1, RUN_KEY(ownerId), expectedRaw, next ? JSON.stringify(next) : "", RUN_TTL);
+  return won === 1;
 }
 
 export async function startCrimeRun(
@@ -75,14 +87,22 @@ export async function startCrimeRun(
   return { run, stage: stages[0] };
 }
 
+/**
+ * Terminal outcomes ("wrong", "expired", final "correct") have already removed
+ * the run atomically: the caller that receives one is the only one allowed to
+ * resolve it. A losing concurrent click gets "invalid".
+ */
 export async function submitStageAnswer(
   userId: string,
   runId: string,
   stageIndex: number,
   optionIndex: number,
 ): Promise<StageAnswerResult> {
-  const run = await getCrimeRun(userId);
-  if (!run || run.runId !== runId) return { outcome: "invalid" };
+  // Read the raw value: the CAS below compares against exactly what we saw.
+  const raw = await redisService.getInstance().get(RUN_KEY(userId));
+  if (!raw) return { outcome: "invalid" };
+  const run = JSON.parse(raw) as CrimeRun;
+  if (run.runId !== runId) return { outcome: "invalid" };
   if (run.stageIndex !== stageIndex) return { outcome: "invalid" };
 
   const stages = getStagesForCrime(run.crimeKey);
@@ -90,6 +110,7 @@ export async function submitStageAnswer(
   if (!stageDef) return { outcome: "invalid" };
 
   if (isStageTimedOut(run, stageDef)) {
+    if (!await swapRun(userId, raw, null)) return { outcome: "invalid" };
     return {
       outcome: "expired",
       correctLabel: correctOptionLabel(stageDef),
@@ -102,6 +123,7 @@ export async function submitStageAnswer(
   if (!option) return { outcome: "invalid" };
 
   if (!option.correct) {
+    if (!await swapRun(userId, raw, null)) return { outcome: "invalid" };
     return {
       outcome: "wrong",
       correctLabel: correctOptionLabel(stageDef),
@@ -112,6 +134,7 @@ export async function submitStageAnswer(
 
   const nextIndex = stageIndex + 1;
   if (nextIndex >= stages!.length) {
+    if (!await swapRun(userId, raw, null)) return { outcome: "invalid" };
     return { outcome: "correct", nextStageIndex: null, run };
   }
 
@@ -120,6 +143,6 @@ export async function submitStageAnswer(
     stageIndex: nextIndex,
     stageStartedAt: Date.now(),
   };
-  await persistRun(updated);
+  if (!await swapRun(userId, raw, updated)) return { outcome: "invalid" };
   return { outcome: "correct", nextStageIndex: nextIndex, run: updated };
 }
