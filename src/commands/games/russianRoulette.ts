@@ -162,6 +162,27 @@ export async function handleRussianRoulette(message: Message, args: string[]) {
             choice: "join"
         });
 
+        // The lobby can start, time out, fill up or see this player join twice
+        // while the debit awaits the database. Only a still-open seat takes the
+        // stake; otherwise hand it back rather than strand it outside the game.
+        if (
+            waitingLobbies.get(message.channelId) !== lobby ||
+            lobby.status !== "WAITING" ||
+            lobby.players.length >= MAX_PLAYERS ||
+            lobby.players.some(p => p.id === message.author.id)
+        ) {
+            await creditGamePayout(user.wallet!.id, lobby.betAmount, "game_refund", {
+                game: "russian_roulette",
+                betAmount: lobby.betAmount,
+                payout: lobby.betAmount,
+                result: "join_refused",
+                guildId: message.guildId!,
+                channelId: message.channelId,
+                messageId: lobby.message?.id
+            });
+            return message.reply(v2Reply(errorContainer("Lobby Closed", "The lobby closed before you got a seat. Your bet was refunded.")));
+        }
+
         lobby.players.push({ id: message.author.id, username: message.author.username, walletId: user.wallet!.id });
 
         // Update lobby frame from state
