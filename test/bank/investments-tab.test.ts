@@ -41,6 +41,20 @@ describe("buildBankInvestmentsContainer", () => {
     expect(json.components).toHaveLength(6);
   });
 
+  it("packs active investments into one text block, capped, so many deposits stay under 40 components", () => {
+    const now = new Date();
+    const investments = Array.from({ length: 45 }, (_, i) => ({
+      id: `a${i}`, userId: "u", type: "FD", amount: 1_000 + i, interestRate: 10,
+      startDate: now, maturityDate: now, status: "ACTIVE",
+    }));
+    const json = buildBankInvestmentsContainer("Yash", AVATAR, { ...summary, investments }, "u", { recent: [], lifetimeInterest: 0 }).toJSON() as any;
+    const text = JSON.stringify(json);
+    // header section, separator, active investments, separator, recent returns, nav row
+    expect(json.components).toHaveLength(6);
+    expect(text).toContain("1,000");
+    expect(text).toContain("more active");
+  });
+
   it("flags a bank-cap shortfall on the line", () => {
     const { text } = render({ recent: [completed({ payout: 100_500 })], lifetimeInterest: 1000 });
     expect(text).toContain("bank full, −500");

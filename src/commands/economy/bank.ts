@@ -578,17 +578,9 @@ export function buildBankInvestmentsContainer(
                 .setSpacing(SeparatorSpacingSize.Small),
         );
 
-    if (summary.investments.length > 0) {
-        summary.investments.forEach((investment) => {
-            container.addTextDisplayComponents(
-                new TextDisplayBuilder().setContent(
-                    `### ${investment.type}\nPrincipal: **${fmtCurrency(investment.amount)}**\nRate: **${investment.interestRate}% APR**\nMatures: <t:${Math.floor(investment.maturityDate.getTime() / 1000)}:R>`,
-                ),
-            );
-        });
-    } else {
-        container.addTextDisplayComponents(new TextDisplayBuilder().setContent("No active investments."));
-    }
+    container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(formatActiveInvestments(summary.investments)),
+    );
 
     container
         .addSeparatorComponents(
@@ -601,6 +593,23 @@ export function buildBankInvestmentsContainer(
         );
 
     return container.addActionRowComponents(buildBankSectionNavRow(ownerId));
+}
+
+// Investment count is uncapped: one TextDisplay per deposit blew the
+// 40-component cap (silent 50035), so pack them into one block and stop after
+// MAX_LISTED_INVESTMENTS (soonest maturity first) to stay under the text cap.
+const MAX_LISTED_INVESTMENTS = 15;
+
+function formatActiveInvestments(investments: FinancialSummary["investments"]): string {
+    if (investments.length === 0) return "No active investments.";
+    const lines = investments
+        .slice(0, MAX_LISTED_INVESTMENTS)
+        .map((investment) =>
+            `**${investment.type}** · **${fmtCurrency(investment.amount)}** at **${investment.interestRate}% APR** · matures <t:${Math.floor(investment.maturityDate.getTime() / 1000)}:R>`,
+        );
+    const hidden = investments.length - MAX_LISTED_INVESTMENTS;
+    if (hidden > 0) lines.push(`-# +${hidden} more active investment${hidden === 1 ? "" : "s"}`);
+    return `### Active investments\n${lines.join("\n")}`;
 }
 
 // One line per matured deposit, packed into a single TextDisplay so a long
