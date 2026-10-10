@@ -187,7 +187,24 @@ async function handleButton(interaction: ButtonInteraction) {
     else if (customId === "cancel_stress") {
         await safeUpdate(interaction, { content: `${Mascot.Emotes.Decline} Activity cancelled.`, components: [] });
     }
-    else if (customId === "dropout_confirm") {
+    else if (customId.startsWith("dropout_confirm") || customId.startsWith("dropout_cancel")) {
+        // The prompt is public and dropout acts on the CLICKER's degree, so the
+        // button must carry its owner: otherwise anyone clicking someone else's
+        // prompt dropped out of their own program. Legacy owner-less buttons
+        // are treated as expired.
+        const [action, ownerId] = customId.split(":");
+        if (ownerId !== user.id) {
+            return safeReply(interaction, {
+                content: ownerId
+                    ? `${Mascot.Emotes.Fail} This dropout prompt is not for you.`
+                    : `${Mascot.Emotes.Fail} This dropout prompt expired. Run dropout again.`,
+                flags: MessageFlags.Ephemeral,
+            });
+        }
+        if (action === "dropout_cancel") {
+            return safeUpdate(interaction, v2Reply(plainContainer(`${Mascot.Emotes.Decline} Dropout cancelled. Phew!`)));
+        }
+
         if (!await ensureDeferredUpdate(interaction)) return;
         try {
             const res = await dropout(user.id, guild.id);
@@ -205,9 +222,6 @@ async function handleButton(interaction: ButtonInteraction) {
         } catch (err: any) {
             await safeEditReply(interaction, v2Reply(errorContainer("Dropout Failed", err.message)));
         }
-    }
-    else if (customId === "dropout_cancel") {
-        await safeUpdate(interaction, v2Reply(plainContainer(`${Mascot.Emotes.Decline} Dropout cancelled. Phew!`)));
     }
     // JOB HANDLERS
     else if (customId === "work_resign") {
