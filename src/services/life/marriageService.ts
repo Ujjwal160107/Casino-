@@ -1,4 +1,4 @@
-import prisma from "../../utils/prisma";
+import prisma, { runWithRetry } from "../../utils/prisma";
 import { globalCatalogGuildFilter } from "../../utils/globalCatalog";
 import { ensureUserAndWallet } from "../walletService";
 import { isTester } from "../../utils/developerAccess";
@@ -284,6 +284,9 @@ export async function createVaultWithdrawRequest(discordId: string, amount: numb
   });
 }
 
+/** Rolls back an approval whose vault debit found too little money. */
+class VaultShortError extends Error {}
+
 export async function resolveVaultWithdrawRequest(requestId: string, resolverId: string, approve: boolean) {
   const request = await prisma.marriageVaultRequest.findUnique({
     where: { id: requestId },
@@ -318,30 +321,49 @@ export async function resolveVaultWithdrawRequest(requestId: string, resolverId:
     throw new Error("The Couple Vault no longer has enough money.");
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    const wallet = await tx.wallet.findUnique({ where: { userId: request.requesterId } });
-    if (!wallet) throw new Error("Requester has no wallet.");
+  // The checks above are a fast path only: a second approval can read PENDING
+  // before the first commits. Claim the request and debit the vault with
+  // guarded writes inside the transaction so exactly one approval pays.
+  let result;
+  try {
+    result = await runWithRetry(() => prisma.$transaction(async (tx) => {
+      const wallet = await tx.wallet.findUnique({ where: { userId: request.requesterId } });
+      if (!wallet) throw new Error("Requester has no wallet.");
 
-    const marriage = await tx.marriage.update({
-      where: { id: request.marriageId },
-      data: {
-        jointBalance: { decrement: request.amount },
-        lastDrama: "A vault withdrawal was approved. Trust issues postponed.",
-      },
+      const claimed = await tx.marriageVaultRequest.updateMany({
+        where: { id: request.id, status: "PENDING" },
+        data: { status: "APPROVED", resolvedAt: now },
+      });
+      if (claimed.count !== 1) throw new Error("This request is no longer pending.");
+
+      const debited = await tx.marriage.updateMany({
+        where: { id: request.marriageId, jointBalance: { gte: request.amount } },
+        data: {
+          jointBalance: { decrement: request.amount },
+          lastDrama: "A vault withdrawal was approved. Trust issues postponed.",
+        },
+      });
+      if (debited.count !== 1) throw new VaultShortError();
+
+      await tx.wallet.update({
+        where: { id: wallet.id },
+        data: { balance: { increment: request.amount } },
+      });
+      await tx.transaction.create({
+        data: { walletId: wallet.id, amount: request.amount, type: "marriage_vault_withdraw", meta: { marriageId: request.marriageId }, isEarned: false },
+      });
+      const marriage = await tx.marriage.findUniqueOrThrow({ where: { id: request.marriageId } });
+      const updatedRequest = await tx.marriageVaultRequest.findUniqueOrThrow({ where: { id: request.id } });
+      return { request: updatedRequest, newBalance: marriage.jointBalance, approved: true };
+    }));
+  } catch (err) {
+    if (!(err instanceof VaultShortError)) throw err;
+    await prisma.marriageVaultRequest.updateMany({
+      where: { id: request.id, status: "PENDING" },
+      data: { status: "EXPIRED", resolvedAt: now },
     });
-    await tx.wallet.update({
-      where: { id: wallet.id },
-      data: { balance: { increment: request.amount } },
-    });
-    await tx.transaction.create({
-      data: { walletId: wallet.id, amount: request.amount, type: "marriage_vault_withdraw", meta: { marriageId: request.marriageId }, isEarned: false },
-    });
-    const updatedRequest = await tx.marriageVaultRequest.update({
-      where: { id: request.id },
-      data: { status: "APPROVED", resolvedAt: now },
-    });
-    return { request: updatedRequest, newBalance: marriage.jointBalance, approved: true };
-  });
+    throw new Error("The Couple Vault no longer has enough money.");
+  }
 
   return result;
 }
