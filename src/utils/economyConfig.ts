@@ -61,17 +61,17 @@ export const DEGREE_PRICES = {
 } as const;
 
 export const DEFAULT_JOB_PAYS = {
-  deliveryDriver: 30_000,
-  waiter: 32_000,
-  freelanceWriter: 35_000,
-  streamer: 35_000,
-  sousChef: 45_000,
-  apprenticeMechanic: 50_000,
-  masterMechanic: 90_000,
-  salesIntern: 35_000,
+  deliveryDriver: 50_000,
+  waiter: 55_000,
+  freelanceWriter: 55_000,
+  streamer: 55_000,
+  sousChef: 75_000,
+  apprenticeMechanic: 80_000,
+  masterMechanic: 120_000,
+  salesIntern: 65_000,
   financialAnalyst: 120_000,
   salesManager: 180_000,
-  itIntern: 45_000,
+  itIntern: 70_000,
   juniorDeveloper: 130_000,
   seniorDeveloper: 210_000,
   leadEngineer: 280_000,
@@ -87,10 +87,10 @@ export const DEFAULT_JOB_PAYS = {
 export const GRINDING_COMMANDS = {
   beg: {
     commandName: "beg",
-    cooldownSeconds: 45,
+    cooldownSeconds: 60,
     winRate: 0.7,
-    payoutMin: 8_000,
-    payoutMax: 15_000
+    payoutMin: 5_000,
+    payoutMax: 10_000
   },
   slut: {
     commandName: "slut",

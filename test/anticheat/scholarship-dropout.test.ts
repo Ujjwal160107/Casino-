@@ -34,7 +34,7 @@ afterAll(async () => {
 describe("scholarship milestones survive dropout", () => {
   it("cannot re-claim a milestone after dropping out and re-enrolling", async () => {
     await enrollAtXp(600);
-    expect(await claimScholarship(id, "g1", 75)).toBe(TUITION * 1.5);
+    expect(await claimScholarship(id, "g1", 75)).toBe(TUITION * 0.5);
     await dropout(id, "g1");
 
     await enrollAtXp(600);
@@ -43,7 +43,7 @@ describe("scholarship milestones survive dropout", () => {
     expect(await wallet()).toBe(before);
 
     // The 100% milestone was never claimed, so it is still available.
-    expect(await claimScholarship(id, "g1", 100)).toBe(TUITION * 2);
+    expect(await claimScholarship(id, "g1", 100)).toBe(TUITION * 1);
   });
 
   it("re-enrolling starts with the milestones already claimed for that degree", async () => {
@@ -61,7 +61,7 @@ describe("scholarship milestones survive dropout", () => {
       updates: [{ q: { _id: id }, u: { $unset: { scholarshipClaims: "" } } }],
     });
     await enrollAtXp(600);
-    expect(await claimScholarship(id, "g1", 75)).toBe(TUITION * 1.5);
+    expect(await claimScholarship(id, "g1", 75)).toBe(TUITION * 0.5);
     await dropout(id, "g1");
     await enrollAtXp(600);
     await expect(claimScholarship(id, "g1", 75)).rejects.toThrow(/already claimed/i);
@@ -72,7 +72,7 @@ describe("scholarship milestones survive dropout", () => {
     const before = await wallet();
     const results = await Promise.allSettled([claimScholarship(id, "g1", 75), claimScholarship(id, "g1", 75)]);
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-    expect(await wallet()).toBe(before + TUITION * 1.5);
+    expect(await wallet()).toBe(before + TUITION * 0.5);
   });
 
   it("a pre-fix enrollment's claims are carried over on dropout", async () => {

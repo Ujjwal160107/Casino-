@@ -118,14 +118,14 @@ export async function handleCoinflip(message: Message, args: string[]) {
     return;
   }
 
-  const luckyWinChance = await applyLuckToChance(message.author.id, 0.5, 0.03);
+  // 49% base, luck moves it ±1%, so even max Luck only breaks even.
+  const luckyWinChance = await applyLuckToChance(message.author.id, 0.49, 0.005);
   const crownMult = await checkCrownOfGreed(message.author.id);
 
   async function settle(choice: "heads" | "tails") {
     // Lucky Coin consumed here — only if the game actually settles
     const luckyCoinMult = await checkLuckyCoin(message.author.id);
 
-    // Luck slightly adjusts win probability (max ±3% from 50% base)
     const didWin = Math.random() < luckyWinChance;
     // For display: if won, show the choice as result; if lost, show opposite
     const result: "heads" | "tails" = didWin ? choice : (choice === "heads" ? "tails" : "heads");

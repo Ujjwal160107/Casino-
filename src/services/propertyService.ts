@@ -15,18 +15,38 @@ function invalidatePropertiesCache() {
 }
 
 // --- Regular property catalog ---
+// Rent pays a property back in 20 (Shack) to 40 (Island) days. It used to be
+// 0.67%/day, a 150-day payback that made every property worse than working.
 export const REGULAR_PROPERTY_CATALOG: {
   key: string; name: string; description: string;
   price: number; incomePerCycle: number; incomeCycleHours: number;
 }[] = [
-  { key: "shack",     name: "Shack",          description: "A humble shack. Everyone starts somewhere.",           price: 1_800_000,   incomePerCycle: 12_000,  incomeCycleHours: 24 },
-  { key: "apartment", name: "Apartment",      description: "A cozy apartment in the city.",                        price: 5_400_000,   incomePerCycle: 36_000,  incomeCycleHours: 24 },
-  { key: "house",     name: "House",          description: "A comfortable suburban house.",                         price: 16_000_000,  incomePerCycle: 108_000, incomeCycleHours: 24 },
-  { key: "mansion",   name: "Mansion",        description: "A grand mansion with staff quarters.",                 price: 47_000_000,  incomePerCycle: 312_000, incomeCycleHours: 24 },
-  { key: "island",    name: "Private Island", description: "A secluded private island. Truly endgame wealth.",     price: 126_000_000, incomePerCycle: 840_000, incomeCycleHours: 24 },
+  { key: "shack",     name: "Shack",          description: "A humble shack. Everyone starts somewhere.",           price: 1_800_000,   incomePerCycle: 90_000,  incomeCycleHours: 24 },
+  { key: "apartment", name: "Apartment",      description: "A cozy apartment in the city.",                        price: 5_400_000,   incomePerCycle: 225_000, incomeCycleHours: 24 },
+  { key: "house",     name: "House",          description: "A comfortable suburban house.",                         price: 16_000_000,  incomePerCycle: 570_000, incomeCycleHours: 24 },
+  { key: "mansion",   name: "Mansion",        description: "A grand mansion with staff quarters.",                 price: 47_000_000,  incomePerCycle: 1_380_000, incomeCycleHours: 24 },
+  { key: "island",    name: "Private Island", description: "A secluded private island. Truly endgame wealth.",     price: 126_000_000, incomePerCycle: 3_150_000, incomeCycleHours: 24 },
 ];
 
 export const ZOO_KEYS = new Set(Object.keys(ZOO_CAPACITY));
+
+/** Each sale raises a property's price 5%, up to this multiple of its base price. */
+export const MAX_PRICE_MULTIPLIER = 1.5;
+
+/** Uncollected rent piles up for at most this many cycles, so missing a day or two costs nothing. */
+export const MAX_BANKED_RENT_CYCLES = 3;
+
+/**
+ * Whole rent cycles owed since `lastCollected`, and where the clock restarts.
+ * Within the cap the clock advances by whole cycles, keeping the partial one;
+ * once the cap is hit it restarts at `now`, so the excess is forfeited.
+ */
+export function rentCyclesDue(lastCollected: Date, now: Date, cycleHours: number): { cycles: number; nextCollected: Date } {
+  const cycleMs = cycleHours * 3_600_000;
+  const elapsed = Math.floor((now.getTime() - lastCollected.getTime()) / cycleMs);
+  if (elapsed >= MAX_BANKED_RENT_CYCLES) return { cycles: MAX_BANKED_RENT_CYCLES, nextCollected: now };
+  return { cycles: Math.max(0, elapsed), nextCollected: new Date(lastCollected.getTime() + elapsed * cycleMs) };
+}
 
 export class PropertyService {
 
@@ -56,14 +76,14 @@ export class PropertyService {
   }
 
   static calculateDynamicPrice(basePrice: number, totalSold: number): number {
-    return Math.floor(basePrice * (1 + totalSold * 0.05));
+    return Math.floor(basePrice * Math.min(MAX_PRICE_MULTIPLIER, 1 + totalSold * 0.05));
   }
 
   static async buyProperty(discordId: string, guildId: string, key: string): Promise<{ success: boolean; message: string }> {
     const property = await this.getPropertyByKey(guildId, key);
     if (!property) return { success: false, message: "Property not found." };
 
-    // Zoos are a single-slot upgrade ladder (Mini 5 < City 10 < World 16): a
+    // Zoos are a single-slot upgrade ladder (Mini 5 < City 10 < World 14): a
     // player holds at most one zoo, and buying a bigger tier REPLACES the old
     // one. Animals are user-scoped (CaughtAnimal.inZoo, no relation to the
     // zoo), so removing the old OwnedProperty row cannot lose any animal — the
@@ -214,7 +234,7 @@ export async function seedGlobalProperties(_guildId?: string): Promise<void> {
   ];
 
   for (const def of allDefs) {
-    await prisma.property.upsert({
+    const row = await prisma.property.upsert({
       where: { key: def.key },
       create: {
         guildId: GLOBAL_CATALOG_GUILD_ID,
@@ -235,6 +255,9 @@ export async function seedGlobalProperties(_guildId?: string): Promise<void> {
         incomeCycleHours: def.incomeCycleHours,
       },
     });
+    // Reprice from the sale count, so a base-price or cap change reaches live rows.
+    const price = PropertyService.calculateDynamicPrice(row.basePrice, row.totalSold);
+    if (row.price !== price) await prisma.property.update({ where: { id: row.id }, data: { price } });
   }
 
   globalPropertiesSeeded = true;
@@ -293,16 +316,19 @@ export async function collectIncome(discordId: string, _guildId: string): Promis
   }
 
   for (const op of collectable) {
-    // Reserve each property's cycle atomically BEFORE counting its income: only
-    // the collect that advances lastCollected from the value we read may pay it.
+    const due = isTester(discordId)
+      ? { cycles: 1, nextCollected: now }
+      : rentCyclesDue(op.lastCollected, now, op.property.incomeCycleHours);
+    // Reserve each property's cycles atomically BEFORE counting its income: only
+    // the collect that advances lastCollected from the value we read may pay them.
     const claimed = await conditionalClaim(() =>
       prisma.ownedProperty.updateMany({
         where: { id: op.id, lastCollected: op.lastCollected },
-        data: { lastCollected: now },
+        data: { lastCollected: due.nextCollected },
       })
     );
     if (!claimed) continue; // a concurrent collect already took this property's cycle
-    const income = op.property.incomePerCycle;
+    const income = op.property.incomePerCycle * due.cycles;
     result.propertyBreakdown.push({ name: op.property.name, income });
     result.propertyTotal += income;
   }

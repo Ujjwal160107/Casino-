@@ -32,15 +32,20 @@ export function getSpinResult(): { reels: string[], win: boolean, multiplier: nu
   return getSpinResultWithLuck(50);
 }
 
+// Luck moves odds into or out of the 2x tier only, by up to this much at Luck
+// 0 or 100. The table returns 96%, so returns span 93-99% and never beat the
+// house. Shifting the whole roll used to grow the 20x tier and paid 121% at
+// Luck 75, which a Celestial Harp turned into a money printer.
+export const SLOTS_LUCK_SWING = 0.015;
+
 export function getSpinResultWithLuck(luck: number): { reels: string[], win: boolean, multiplier: number, payout: number } {
   const roll = Math.random();
-  const bias = ((luck - 50) / 100) * 0.05;
-  const adjustedRoll = Math.max(0, Math.min(1, roll - bias));
+  const luckShift = ((Math.min(100, Math.max(0, luck)) - 50) / 50) * SLOTS_LUCK_SWING;
 
   let cumulative = 0;
   for (const tier of SLOTS_PAYOUT_TABLE) {
-    cumulative += tier.chance;
-    if (adjustedRoll < cumulative) {
+    cumulative += tier.chance + (tier.multiplier === 2 ? luckShift : 0);
+    if (roll < cumulative) {
       const symbol = tier.symbols[Math.floor(Math.random() * tier.symbols.length)];
       return {
         reels: [symbol, symbol, symbol],

@@ -90,7 +90,7 @@ export interface ZooTier {
 export const ZOO_TIERS: Record<ZooTierKey, ZooTier> = {
   mini_zoo:  { key: "mini_zoo",  types: 5,  mix: { Common: 3, Uncommon: 2, Rare: 0, Legendary: 0 } },
   city_zoo:  { key: "city_zoo",  types: 10, mix: { Common: 4, Uncommon: 4, Rare: 2, Legendary: 0 } },
-  world_zoo: { key: "world_zoo", types: 12, mix: { Common: 4, Uncommon: 4, Rare: 3, Legendary: 1 } },
+  world_zoo: { key: "world_zoo", types: 14, mix: { Common: 4, Uncommon: 4, Rare: 4, Legendary: 2 } },
 };
 
 /** Copies of the same species a zoo may hold. Falls as rarity rises. */
@@ -137,7 +137,7 @@ export const ZOO_CAPACITY: Record<string, number> = Object.fromEntries(
 export const ZOO_PROPERTY_DEFS: { key: string; name: string; description: string; price: number }[] = [
   { key: "mini_zoo",  name: "Mini Zoo",  description: "A small zoo: 3 common and 2 uncommon species, up to 18 animals.",                     price: 800_000    },
   { key: "city_zoo",  name: "City Zoo",  description: "A city zoo: 4 common, 4 uncommon and 2 rare species, up to 34 animals.",              price: 5_000_000  },
-  { key: "world_zoo", name: "World Zoo", description: "A world-class zoo: 4 common, 4 uncommon, 3 rare and 1 legendary species, up to 38 animals. The only zoo that can house a Legendary.", price: 18_000_000 },
+  { key: "world_zoo", name: "World Zoo", description: "A world-class zoo: 4 common, 4 uncommon, 4 rare and 2 legendary species, up to 42 animals. The only zoo that can house a Legendary.", price: 18_000_000 },
 ];
 
 export const PART_VALUES: Record<string, number> = {
@@ -165,11 +165,12 @@ export const PART_VALUES: Record<string, number> = {
 };
 
 export const ANIMAL_CATALOG: AnimalDefinition[] = [
-  // Common — zoo: 4,000/day fed (RARITY_INCOME_PER_DAY). Sell value is ~2 days of income.
-  { key: "rabbit",       name: "Rabbit",       rarity: "Common",    sellValue: 8_000,    parts: ["meat", "fur"],               emojiKey: "rabbit",       emoji: "🐰", asset: "rabbit" },
-  { key: "squirrel",     name: "Squirrel",     rarity: "Common",    sellValue: 6_000,    parts: ["fur"],                       emojiKey: "squirrel",     emoji: "🐿️", asset: "squirel" },
-  { key: "fox",          name: "Fox",          rarity: "Common",    sellValue: 10_000,    parts: ["fur", "tail"],               emojiKey: "fox",          emoji: "🦊", asset: "fox" },
-  { key: "duck",         name: "Duck",         rarity: "Common",    sellValue: 7_000,    parts: ["feathers", "meat"],          emojiKey: "duck",         emoji: "🦆", asset: "duck" },
+  // Common — zoo: 4,000/day fed (RARITY_INCOME_PER_DAY). Sell value is ~5 days of income,
+  // in line with the other rarities, so a Wooden Rifle hunt is worth taking.
+  { key: "rabbit",       name: "Rabbit",       rarity: "Common",    sellValue: 20_000,   parts: ["meat", "fur"],               emojiKey: "rabbit",       emoji: "🐰", asset: "rabbit" },
+  { key: "squirrel",     name: "Squirrel",     rarity: "Common",    sellValue: 16_000,   parts: ["fur"],                       emojiKey: "squirrel",     emoji: "🐿️", asset: "squirel" },
+  { key: "fox",          name: "Fox",          rarity: "Common",    sellValue: 24_000,    parts: ["fur", "tail"],               emojiKey: "fox",          emoji: "🦊", asset: "fox" },
+  { key: "duck",         name: "Duck",         rarity: "Common",    sellValue: 18_000,   parts: ["feathers", "meat"],          emojiKey: "duck",         emoji: "🦆", asset: "duck" },
   // Uncommon — zoo: 16,000/day fed. Sell value is ~4 days of income.
   { key: "deer",         name: "Deer",         rarity: "Uncommon",  sellValue: 60_000,  parts: ["venison", "antlers", "hide"], emojiKey: "deer",         emoji: "🦌", asset: "deer" },
   { key: "boar",         name: "Boar",         rarity: "Uncommon",  sellValue: 65_000,  parts: ["tusk", "meat"],              emojiKey: "boar",         emoji: "🐗", asset: "boar" },

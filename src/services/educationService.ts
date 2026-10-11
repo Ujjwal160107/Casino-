@@ -405,11 +405,9 @@ export async function study(userId: string, guildId: string, modifiers: StudyMod
     let scholarship: { milestone: number, amount: number } | null = null;
     const pct = newXp / edu.degree.xpRequired;
     if (pct >= 1.0 && !edu.scholarshipsClaimed.includes(100)) {
-        const amount = edu.degree.tuitionPerSem * edu.currentSemester * 2;
-        scholarship = { milestone: 100, amount };
+        scholarship = { milestone: 100, amount: scholarshipAmount(edu.degree.tuitionPerSem, edu.currentSemester, 100) };
     } else if (pct >= 0.75 && !edu.scholarshipsClaimed.includes(75)) {
-        const amount = edu.degree.tuitionPerSem * edu.currentSemester * 1.5;
-        scholarship = { milestone: 75, amount };
+        scholarship = { milestone: 75, amount: scholarshipAmount(edu.degree.tuitionPerSem, edu.currentSemester, 75) };
     }
 
     return { msg, newXp, newStress, scholarship };
@@ -515,6 +513,17 @@ export async function takeExam(userId: string, guildId: string): Promise<{ succe
     return { success: true, msg: `You have completed your **${deg.name}**! Final XP: **${finalXp}/${deg.xpRequired}**${bonusText}`, finalXp };
 }
 
+/**
+ * Share of tuition each milestone pays back. Finishing returns 1.5x tuition in
+ * total: a degree is profitable once finished, but no longer prints money (it
+ * used to return 3.5x, ~62M across the eight degrees).
+ */
+export const SCHOLARSHIP_TUITION_SHARE: Record<number, number> = { 75: 0.5, 100: 1 };
+
+export function scholarshipAmount(tuitionPerSem: number, semester: number, milestone: number): number {
+    return Math.floor(tuitionPerSem * semester * (SCHOLARSHIP_TUITION_SHARE[milestone] ?? 0));
+}
+
 function scholarshipClaimKey(degreeId: string, milestone: number) {
     return `${degreeId}:${milestone}`;
 }
@@ -546,10 +555,7 @@ export async function claimScholarship(userId: string, guildId: string, mileston
     if (pct < requiredPct) throw new Error("XP requirement not met.");
     if (edu.scholarshipsClaimed.includes(milestone)) throw new Error("Scholarship already claimed.");
 
-    let multiplier = 1.5;
-    if (milestone === 100) multiplier = 2;
-
-    const amount = edu.degree.tuitionPerSem * edu.currentSemester * multiplier;
+    const amount = scholarshipAmount(edu.degree.tuitionPerSem, edu.currentSemester, milestone);
 
     // Reserve the milestone atomically BEFORE crediting. The guard lives on the
     // User row, keyed by degree: UserEducation (and its scholarshipsClaimed) is

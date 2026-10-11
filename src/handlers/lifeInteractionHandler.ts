@@ -1075,8 +1075,9 @@ async function handleButton(interaction: ButtonInteraction) {
             if (gearInvRow && gearCatalogName) {
                 const currentDurability = (gearInvRow.meta as any)?.durability ?? 100;
 
-                // Base wear: 5-12 per successful shift, reduced by rep tier
-                let totalWear = Math.max(0, (5 + Math.floor(Math.random() * 8)) - repGearWearReduction);
+                // Base wear: 2-6 per successful shift, reduced by rep tier. At
+                // 5-12 a Repair Coupon cost more per shift than entry jobs paid.
+                let totalWear = Math.max(0, (2 + Math.floor(Math.random() * 5)) - repGearWearReduction);
 
                 // Overtime Contract: extra 15-30 wear
                 if (overtimeData?.gearRisk) {

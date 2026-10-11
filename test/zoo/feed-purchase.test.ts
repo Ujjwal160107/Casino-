@@ -88,7 +88,7 @@ describe("buying feed in bulk", () => {
   afterAll(() => resetUser(id));
 
   it("buys a full World Zoo's daily feed bill in one command", async () => {
-    // The spec's §7 World Zoo line: 4x4 Common + 4x3 Uncommon + 3x3 Rare + 1 Legendary.
+    // World Zoo: 4x4 Common + 4x3 Uncommon + 4x3 Rare + 2x1 Legendary.
     const mix = ZOO_TIERS.world_zoo.mix;
     const units = {
       Common: mix.Common * RARITY_STACK_LIMIT.Common,
@@ -96,7 +96,7 @@ describe("buying feed in bulk", () => {
       Rare: mix.Rare * RARITY_STACK_LIMIT.Rare,
       Legendary: mix.Legendary * RARITY_STACK_LIMIT.Legendary,
     };
-    expect(units.Common + units.Uncommon + units.Rare + units.Legendary).toBe(38);
+    expect(units.Common + units.Uncommon + units.Rare + units.Legendary).toBe(42);
 
     let commands = 0;
     let spent = 0;
@@ -111,9 +111,9 @@ describe("buying feed in bulk", () => {
 
     // Four commands for a whole day of upkeep, not thirty-eight.
     expect(commands).toBe(4);
-    expect(spent).toBe(369_000); // spec §7 World Zoo feed/day
+    expect(spent).toBe(510_000); // World Zoo feed/day
     const wallet = await testPrisma.wallet.findUnique({ where: { userId: id } });
-    expect(wallet!.balance).toBe(5_000_000 - 369_000);
+    expect(wallet!.balance).toBe(5_000_000 - 510_000);
   });
 
   it("lands the whole stack in one inventory row and records the real total", async () => {

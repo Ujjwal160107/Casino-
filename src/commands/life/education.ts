@@ -11,7 +11,7 @@ import {
     SeparatorSpacingSize,
     TextDisplayBuilder,
 } from "discord.js";
-import { getDegrees } from "../../services/educationService";
+import { getDegrees, SCHOLARSHIP_TUITION_SHARE } from "../../services/educationService";
 import { fmtCurrency } from "../../utils/format";
 import { errorContainer, v2Reply } from "../../utils/componentsV2";
 import { nextStepHint } from "../../config/nextSteps";
@@ -64,8 +64,8 @@ export async function handleEducation(message: Message, args: string[]) {
             const intProgress = `${EMOJI_XP.repeat(filledBars)}${EMOJI_XP_EMPTY.repeat(Math.max(0, emptyBars))}`;
 
             const scholarshipMilestones = [
-                { level: 75, desc: "1.5x Refund" },
-                { level: 100, desc: "2x Refund" },
+                { level: 75, desc: `${SCHOLARSHIP_TUITION_SHARE[75]}x Refund` },
+                { level: 100, desc: `${SCHOLARSHIP_TUITION_SHARE[100]}x Refund` },
             ];
 
             const pct = edu.educationXp / deg.xpRequired;
