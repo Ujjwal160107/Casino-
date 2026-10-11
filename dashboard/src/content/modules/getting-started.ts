@@ -34,8 +34,8 @@ const gettingStarted: ModuleDoc = {
     {
       heading: "Your first 10 minutes",
       body: [
-        "The fastest honest start: claim !daily for 100,000 Fortunes, then !apply waiter — no degree, no interview prep needed, 32,000 a shift once you pass five easy questions. Work shifts with !work every hour.",
-        "Once you have 10,000 or more in your wallet, the casino opens up. !coinflip 10000 is the cheapest lesson in probability you'll ever buy — and at neutral luck it's a genuinely fair coin.",
+        "The fastest honest start: claim !daily for 100,000 Fortunes, then !apply waiter — no degree, no interview prep needed, 55,000 a shift once you pass five easy questions. Work shifts with !work every hour.",
+        "Once you have 10,000 or more in your wallet, the casino opens up. !coinflip 10000 is the cheapest lesson in probability you'll ever buy — a 49% shot at double, the smallest house edge in the building.",
       ],
       table: {
         title: "The starter path",
@@ -90,7 +90,7 @@ const gettingStarted: ModuleDoc = {
     "Deposit what you don't plan to bet — !deposit all. Robbers can only touch your wallet, never your bank.",
     "Claim !daily, !weekly, and !monthly on cooldown even when you're broke. Especially when you're broke.",
     "Open !quests before you play, not after — most of the board completes itself while you work and gamble anyway.",
-    "Read a game's real odds in the Casino docs before you bet. Coinflip is fair; slots keeps 4%. Knowing that is worth more than any starter grind.",
+    "Read a game's real odds in the Casino docs before you bet. Coinflip keeps 2%; slots keeps 4%. Knowing that is worth more than any starter grind.",
     "Fortuna DMs you when your daily, work, crime, and other long cooldowns lift. Too chatty? !settings lets you pick exactly which alarms you get.",
   ],
 };

@@ -66,13 +66,14 @@ const itemsAndShop: ModuleDoc = {
       heading: "The Luck system",
       body: [
         "Luck is a hidden 0–100 meter, base 50, moved by items and crafts: Celestial Harp +25, Pandora Box ±15, Demonic Harp −25 (on a target), Komodo Venom Flask −20 (on a target), crafted Rabbit Foot Charm +3, crafted Arctic Wolf Spirit Charm +15. Modifiers from different sources stack.",
-        "Where it bites: coinflip win chance runs 44%–56% across the luck range, slots' win threshold shifts ±2.5%, blackjack quietly rigs the dealer's draws up to 4% in your favor (or against you), and robbery success moves about ±5%. Roulette and Russian Roulette ignore luck entirely.",
+        "Where it bites: coinflip win chance runs 48%–50% across the luck range (49% at the base 50), slots move odds into or out of the 2× tier by up to ±1.5 percentage points (a 93%–99% return), blackjack quietly rigs the dealer's draws up to 4% in your favor (or against you), and robbery success moves up to ±10 points around its 40% base. Roulette and Russian Roulette ignore luck entirely.",
+        "What Luck can't do is make a casino game profitable. Maxed Luck turns coinflip into a fair 50/50 and leaves slots a 1% house edge — buy Luck to trim losses or to rob, not to print money at the tables.",
       ],
     },
     {
       heading: "Job store: gear and shift boosters",
       body: [
-        "Page one is required equipment — every job sector demands its gear before you can work a shift, and gear wears down (5–12 durability per shift) until it breaks: Work Laptop 800,000 (tech), Medical Kit 1,200,000 (medical), Business Briefcase 600,000 (business), Legal Case File 700,000 (legal), Service Uniform 250,000 (service), Mechanic Toolkit 950,000 (trade), Freelance Starter Pack 350,000 (freelance).",
+        "Page one is required equipment — every job sector demands its gear before you can work a shift, and gear wears down (2–6 durability per successful shift, more on failed events and overtime) until it breaks: Work Laptop 800,000 (tech), Medical Kit 1,200,000 (medical), Business Briefcase 600,000 (business), Legal Case File 700,000 (legal), Service Uniform 250,000 (service), Mechanic Toolkit 950,000 (trade), Freelance Starter Pack 350,000 (freelance).",
         "Page two is the consumables that make shifts pay:",
       ],
       table: {
@@ -136,7 +137,7 @@ const itemsAndShop: ModuleDoc = {
         "Buy timing, not inventory. Almost every buff is a short window — Lucky Coin lasts 5 minutes, Counterfeit Kit 2 hours, Crown of Greed 1 hour. Buy immediately before the action they boost, never in advance.",
         "Learn the stacking rule: income multipliers compound. Counterfeit Kit (×1.25) + Crown of Greed (×1.25) on a !monthly claim turns 4,000,000 into ~6,250,000 before tax — the two cost 1,050,000 combined. That's the single best item play in the game, once per month.",
         "Respect the two-way items. Crown of Greed inflates your casino losses and crime fines by the same 25% it adds to wins. Eclipse Mask's backlash can cost more than three successful robs earn. Devil Contract's 3-claim income penalty applies even when the devil short-changes you — never sign right before a weekly/monthly claim.",
-        "Padlock is the cheapest peace of mind in Fortuna — 175,000 to void a robbery that could take 250,000. Re-buy it whenever it breaks and your wallet is worth robbing.",
+        "Padlock is cheap insurance — 175,000 to void a robbery that takes 8–20% of your wallet with no ceiling. Once you're holding 2,000,000+ in the wallet, even the smallest possible steal costs about what the lock does. !deposit all is still free and protects more; the Padlock is for when you need the cash on hand.",
       ],
     },
   ],

@@ -8,7 +8,7 @@ const casino: ModuleDoc = {
   forBeginners: {
     what: "Fortuna runs six table games plus the Loaded Dice of Ruin. Every bet is wallet cash only, while !roll requires the 2,500,000 shop relic and runs once per day. Cooldowns follow your account across every server. The odds below are the real ones from the bot's code, not marketing.",
     firstCommands: ["!casino", "!coinflip 10000", "!blackjack 10000"],
-    tip: "Coinflip at neutral luck is a genuinely fair 50/50 for 2× — the only zero-house-edge table in the building. Raise your Luck and it's better than fair.",
+    tip: "Coinflip is the lowest house edge in the building: 49% for 2× at neutral luck, a 2% edge. Luck can bend it, but even maxed Luck only gets it to 50/50. No amount of Luck makes any table pay you to play.",
   },
   screenshot: {
     src: "/cards/card_casino.png",
@@ -40,9 +40,10 @@ const casino: ModuleDoc = {
       note: "Bets take smart amounts: all, 250k, 1m. !cf is the shorthand for coinflip; !bj for blackjack.",
     },
     {
-      heading: "Coinflip: the fair coin (mostly)",
+      heading: "Coinflip: the smallest edge",
       body: [
-        "Call heads or tails (h/t work) for a 2× payout. The base chance is a true 50% — but your hidden Luck stat bends it, from 44% at rock-bottom luck to 56% at maxed luck. That makes coinflip the only game where item buffs literally change the coin: a Celestial Harp (+25 luck) pushes you to ~53%, which at 2× payout is a player-edge game.",
+        "Call heads or tails (h/t work) for a 2× payout. The base chance at neutral luck (50) is 49% — a 2% house edge, the smallest in the casino. Your hidden Luck stat bends it by 0.2 percentage points per 10 Luck: 48% at Luck 0, 49.5% with a Celestial Harp (+25, Luck 75), and exactly 50% at maxed Luck 100.",
+        "That ceiling is the point: the best Luck in the game turns coinflip into a fair coin, never a favorable one. Luck shrinks the edge; it can't flip it.",
       ],
     },
     {
@@ -62,7 +63,7 @@ const casino: ModuleDoc = {
           ["Any win", "28.0%", "—", "96% RTP"],
         ],
       },
-      note: "96% return-to-player at neutral luck — a 4% house edge. Luck shifts the win threshold by up to ±2.5 percentage points, so maxed luck pushes slots to roughly break-even.",
+      note: "96% return-to-player at neutral luck — a 4% house edge. Luck only moves odds into or out of the 2× Cherry/Banana tier, by up to ±1.5 percentage points (13.5% at Luck 0, 15.75% at Luck 75, 16.5% at Luck 100). The jackpot tiers never move, so the return spans 93% (Luck 0) to 99% (Luck 100): maxed Luck still leaves a 1% house edge.",
     },
     {
       heading: "Blackjack: best odds if you play it straight",
@@ -116,16 +117,16 @@ const casino: ModuleDoc = {
       body: [
         "Lucky Coin (75,000): +50% on your next game payout within 5 minutes — works on coinflip, slots, blackjack, and roulette. Used on a won 1,000,000 blackjack hand, that's an extra million.",
         "Crown of Greed (1,000,000): for an hour, winning profits pay +25% — and losing stakes cost +25%. Applies to coinflip, slots, and blackjack; roulette is exempt.",
-        "Soul Ledger (1,500,000): arms a watcher on your next loss of 300,000+. Twenty-four hours later, resolve it for a 50/50 shot at a refund of 1.5× the loss. Luck items (Celestial Harp +25, Pandora Box ±15) move coinflip, slots, and blackjack as described above.",
+        "Soul Ledger (1,500,000): arms a watcher on your next loss of 300,000+. Twenty-four hours later, resolve it for a 50/50 shot at a refund of 1.5× the loss. Luck items (Celestial Harp +25, Pandora Box ±15) move coinflip, slots, and blackjack as described above — on coinflip and slots that trims the house edge but never erases it.",
       ],
     },
     {
       heading: "Getting better at the casino",
       body: [
-        "Play the edges, not the vibes. Ranked by house edge at neutral luck: coinflip 0%, roulette outside bets ~2.7%, slots ~4%. Blackjack depends on your play — near coin-flip if you hit and stand sensibly, terrible if you don't. Everything gets better with Luck except roulette and RR, which ignore it.",
+        "Play the edges, not the vibes. Ranked by house edge at neutral luck: coinflip 2%, roulette ~2.7% on every bet, slots 4%. Blackjack depends on your play — close to even if you hit and stand sensibly, terrible if you don't. Even at maxed Luck 100, coinflip only reaches break-even and slots still keep 1%; roulette and RR ignore Luck entirely. Luck is damage control, not an income source.",
         "Rotate the floor. Six separate cooldowns mean a full circuit — coinflip, slots, blackjack, roulette, cockfight — is available roughly every half hour. Waiting on one cooldown to replay one game is leaving turns on the table.",
-        "Size bets to survive variance: max-bet coinflip at 56% luck is still a 44% chance to lose half a million. The buffed-play pattern that works is Lucky Coin + luck buff + a single planned max bet on coinflip or blackjack — a one-shot, positive-EV strike, with Soul Ledger armed underneath in case it goes wrong.",
-        "The stack that matters: Celestial Harp (6 hours) covers a dozen casino cooldown cycles; Lucky Coins are one payout each. Buy the harp once, then spend coins only on your biggest planned bet of each cycle.",
+        "Size bets to survive variance: a max-bet coinflip is a 51% chance to lose half a million at neutral luck, and still 50% at maxed Luck. The only thing at the tables that tips one bet in your favor is the Lucky Coin — +50% on the next payout turns a 49% shot at 2× into a 49% shot at 3×. It has a 6-hour use cooldown, so the pattern is one planned max bet per coin on coinflip, with Soul Ledger armed underneath in case it goes wrong.",
+        "Don't buy Luck for the casino. A Celestial Harp (450,000, 6 hours) moves coinflip from 49% to 49.5% and slots from 96% to 97.5% — on a 500,000 coinflip that's worth about 5,000 a flip, so the harp would need ninety max bets to pay for itself, and it still can't make you a winner. Buy it for robbery or blackjack if you want it, and treat any casino benefit as a rounding error.",
       ],
     },
   ],
@@ -141,7 +142,7 @@ const casino: ModuleDoc = {
     "cockfight",
   ],
   proTips: [
-    "Coinflip with a luck buff is mathematically the best bet in Fortuna — a 53%+ chance at 2× has positive expected value.",
+    "No Luck level makes coinflip or slots profitable: maxed Luck gets coinflip to an exact 50/50 and slots to 99%. The only positive-EV bet at the tables is one carrying a Lucky Coin.",
     "Blackjack's 60-second timer auto-surrenders your whole bet. Never start a hand you can't finish.",
     "The 36× single number is the same house edge as red/black — but the variance will end your bankroll first. Outside bets last; straight-up numbers are lottery tickets.",
     "Russian roulette is the only zero-edge multiplayer game: no cooldown, no cut. It's also the fastest way to lose a full buy-in in one click. Both facts are true.",

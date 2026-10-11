@@ -3,12 +3,12 @@ import type { ModuleDoc } from "../types";
 const education: ModuleDoc = {
   slug: "education",
   title: "Education",
-  tagline: "Eight degrees, an XP bar, and a scholarship system that pays back double if you finish.",
+  tagline: "Eight degrees, an XP bar, and a scholarship system that pays back 1.5× your tuition if you finish.",
   icon: "GraduationCap",
   forBeginners: {
-    what: "Degrees unlock jobs, which unlock career tiers, which unlock credit cards — school is the bottom of that whole pyramid. You enroll, grind !study minigames every 30 minutes for XP, sit the exam, and graduate with a permanent intelligence boost. Hit the milestones and the scholarships refund double your tuition.",
+    what: "Degrees unlock jobs, which unlock career tiers, which unlock credit cards — school is the bottom of that whole pyramid. You enroll, grind !study minigames every 30 minutes for XP, sit the exam, and graduate with a permanent intelligence boost. Hit both milestones and the scholarships return 1.5× your tuition.",
     firstCommands: ["!education", "!study", "!exam"],
-    tip: "Scholarships pay 1.5× your tuition at 75% progress and 2× at 100% — finish any degree and school literally paid you to attend.",
+    tip: "Scholarships pay back half your tuition at 75% progress and the full tuition again at 100% — finish any degree and you walk out 50% up on what you paid. Quit before 75% and the tuition is simply gone.",
   },
   sections: [
     {
@@ -41,10 +41,11 @@ const education: ModuleDoc = {
       ],
     },
     {
-      heading: "Scholarships: the refund machine",
+      heading: "Scholarships: finish to profit",
       body: [
-        "Two milestones per degree, auto-detected while you study and claimed with a button on !education: reach 75% of the XP bar for a payout of 1.5× your tuition, and 100% for another 2× tuition. Claim both and every degree in the game is net-positive before you even count the jobs it unlocks.",
-        "A BS Computer Science costs 1,200,000 — its scholarships return 4,200,000. The MD/PhD's 10,000,000 sticker price hides a 35,000,000 payback. Tuition is not a cost; it's a deposit.",
+        "Two milestones per degree, auto-detected while you study and claimed with a button on !education: reach 75% of the XP bar for a payout of 0.5× your tuition, and 100% for another 1× tuition — 1.5× back in total. Claim both and every degree in the game is net-positive, before you even count the jobs it unlocks.",
+        "A BS Computer Science costs 1,200,000 — its scholarships return 1,800,000, a 600,000 profit. The MD/PhD's 10,000,000 sticker price returns 15,000,000. All eight degrees together cost 25,050,000 and return 37,575,000.",
+        "The profit only exists at the finish line. At the 75% milestone you've recovered half your tuition and are still down the other half; only the 100% payout puts you ahead. Treat tuition as money locked up until you graduate, not as free money.",
       ],
     },
     {
@@ -52,7 +53,7 @@ const education: ModuleDoc = {
       body: [
         "!exam checks one thing: is your education XP at or above the requirement? If yes, you graduate — enrollment closes, the degree and intelligence boost are permanent. If not, nothing bad happens; you're told how far you are and go back to studying. There is no exam-day RNG to fear.",
         "Unless you invite it: a Cheat Sheet (250,000) gambles the clean run — 70% chance it adds +25% of the required XP, 30% chance you're caught: −15% of your XP, +15 stress, and a 10% wallet fine.",
-        "!dropout abandons the enrollment after a confirmation — tuition is not refunded, so it's almost always worth pushing to 75% for the first scholarship before quitting a degree you regret.",
+        "!dropout abandons the enrollment after a confirmation — tuition is not refunded. Dropping out before 75% loses the whole tuition; pushing to 75% first at least claws back half of it, and the last quarter of the bar is worth the full tuition again.",
       ],
     },
     {
@@ -65,15 +66,15 @@ const education: ModuleDoc = {
       heading: "Getting better at school",
       body: [
         "Study between everything. The 30-minute cooldown nests inside every other timer in Fortuna — casino cooldowns, the work hour, hunt timers. A degree is ~12–100 successful sessions depending on tier; the players who finish fast are the ones studying while waiting on something else anyway.",
-        "Enroll on credit, repay with scholarships. Tuition on the Fortuna Card + the 75% milestone paying 1.5× tuition means the degree finances itself mid-way through — just clear the card before Monday's statement bites.",
+        "Enroll on credit only if you'll finish fast. The 75% milestone repays just half the tuition, so a degree on the Fortuna Card only clears itself at 100% — if that won't happen before Monday's statement, pay at least the minimum from your wallet or bank, or enroll with cash instead.",
         "Stack multipliers on burst days: Study Laptop + Focus Notes + a Duck Feather Quill turns a 50-XP session into 125+. With the 2× multiplier cap, don't run Tutor Pass and Textbook Bundle simultaneously — sequence them.",
-        "Order matters: High School → BS Computer Science is the best early ROI (cheap, unlocks the smooth Tech ladder). LLB → LLM is the cheapest path to career tier 4. MBBS → MD/PhD costs the most and pays the most — endgame, funded by your scholarship refunds along the way.",
+        "Order matters: High School → BS Computer Science is the best early ROI (cheap, unlocks the smooth Tech ladder). LLB → LLM is the cheapest path to career tier 4. MBBS → MD/PhD costs the most and pays the most — endgame. The earlier degrees' scholarship profits cover only a slice of the 10,000,000, so budget the rest from work and claims.",
       ],
     },
   ],
   commandIds: ["education", "enroll", "study", "exam", "dropout", "degrees", "relax"],
   proTips: [
-    "Claim scholarships the moment they unlock — 75% pays 1.5× tuition and 100% pays 2× more. Forgetting them is leaving triple tuition on the table.",
+    "Claim scholarships the moment they unlock — 75% pays 0.5× tuition and 100% pays 1× more. Forgetting them is leaving 1.5× your tuition on the table.",
     "The exam has no RNG — it's just an XP check. The Cheat Sheet is the only way to fail dramatically; skip it unless you enjoy 30% odds of a wallet fine.",
     "Watch education stress separately from job stress: past 90, one in four study sessions torches 100 XP. Meditation Retreat covers both meters at −35.",
     "Intelligence gates enrollment (LLM and MD/PhD need 8) and only degrees raise it — the ladder is self-locking, so plan the sequence, not just the next degree.",

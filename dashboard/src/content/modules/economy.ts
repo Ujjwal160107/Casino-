@@ -45,8 +45,8 @@ const economy: ModuleDoc = {
     {
       heading: "The grind commands",
       body: [
-        "When everything else is on cooldown, !beg and !slut turn seconds into pocket money: beg succeeds 70% of the time for 8,000–15,000 on a 45-second cooldown; slut hits 55% for 12,000–22,000 every 2 minutes. Failure costs nothing but the cooldown — no fines, no risk. A Lucky Coin multiplies either payout ×1.5.",
-        "The serious money in this family — the crime board, robbery, jail, and the heat meter — has its own full page: Crime & Heat. Short version: crime is a skill minigame paying up to 1,200,000, robbery takes 8–20% of a wallet (capped 250,000), and both are exactly why the bank exists.",
+        "When everything else is on cooldown, !beg and !slut turn seconds into pocket money: beg succeeds 70% of the time for 5,000–10,000 on a 60-second cooldown (about 5,250 a minute on average); slut hits 55% for 12,000–22,000 every 2 minutes. Failure costs nothing but the cooldown — no fines, no risk. A Lucky Coin multiplies either payout ×1.5.",
+        "The serious money in this family — the crime board, robbery, jail, and the heat meter — has its own full page: Crime & Heat. Short version: crime is a skill minigame paying up to 1,200,000, robbery takes 8–20% of a wallet with no upper limit — the fatter the wallet, the bigger the haul — and both are exactly why the bank exists.",
       ],
     },
     {

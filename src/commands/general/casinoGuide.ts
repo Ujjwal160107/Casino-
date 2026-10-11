@@ -378,15 +378,15 @@ export async function handleCasinoGuide(message: Message) {
                         `${Mascot.Emotes.Dices} The coin flips!\n` +
                         `${Mascot.Emotes.Success} If you guessed correctly, you win 2x your bet\n\n` +
                         `**Odds:**\n` +
-                        `${Mascot.Emotes.Graph} **50/50** chance to win\n` +
+                        `${Mascot.Emotes.Graph} **49%** chance to win (48–50% depending on your Luck)\n` +
                         `${Mascot.Emotes.GraphUp} **2x payout** when you win\n\n` +
                         `**Commands:**\n` +
                         `${Mascot.Emotes.Cards} \`,coinflip <amount> h\` - Bet on Heads\n` +
                         `${Mascot.Emotes.Cards} \`,coinflip <amount> t\` - Bet on Tails\n` +
                         `${Mascot.Emotes.Cards} \`,cf <amount> h/t\` - Short version\n\n` +
                         `**Tips:**\n` +
-                        `${Mascot.Emotes.Think} Simple 50/50 odds - perfect for beginners\n` +
-                        `${Mascot.Emotes.Think} Quick and easy way to double your money\n` +
+                        `${Mascot.Emotes.Think} Near-even odds with the smallest house edge (2%) - perfect for beginners\n` +
+                        `${Mascot.Emotes.Think} Even maxed Luck only makes it a fair 50/50 - bet what you can lose\n` +
                         `${Mascot.Emotes.Think} Past flips don't affect future results!\n\n` +
                         `**Command:** \`${prefix}coinflip <amount> <h|t>\` or \`${prefix}cf <amount> <h|t>\``
                 );

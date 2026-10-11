@@ -197,10 +197,10 @@ export const COMMANDS: Command[] = [
     short: "Low-risk, low-reward. Dignity not included, but the odds are kind.",
     usage: "!beg",
     examples: ["!beg"],
-    cooldown: "45 sec",
+    cooldown: "60 sec",
     keyNumbers: [
       { label: "Win rate", value: "70%" },
-      { label: "Payout", value: "8,000 – 15,000" },
+      { label: "Payout", value: "5,000 – 10,000" },
     ],
     jailBlocked: true,
   },
@@ -315,12 +315,11 @@ export const COMMANDS: Command[] = [
       },
     ],
     examples: ["!rob @Someone", "!rob riko"],
-    cooldown: "5 min",
+    cooldown: "1 hour",
     keyNumbers: [
-      { label: "Base success", value: "45% (clamped 5–85%)" },
-      { label: "Steal amount", value: "8–20% of victim wallet" },
-      { label: "Steal cap", value: "250,000" },
-      { label: "Fail penalty", value: "60,000 – 120,000" },
+      { label: "Base success", value: "40% (clamped 5–85%)" },
+      { label: "Steal amount", value: "8–20% of victim wallet, no cap" },
+      { label: "Fail penalty", value: "1.5× what you'd have stolen (min 60,000) + jail" },
     ],
     jailBlocked: true,
   },
@@ -586,6 +585,10 @@ export const COMMANDS: Command[] = [
     short: "Sweeps accumulated rent from every property you own straight into your wallet.",
     usage: "!collect-rent",
     examples: ["!collect-rent"],
+    keyNumbers: [
+      { label: "Rent cycle", value: "24 hours" },
+      { label: "Banks up to", value: "3 days of rent — the rest is lost" },
+    ],
   },
 
   // ── casino ─────────────────────────────────────────────────
@@ -604,6 +607,7 @@ export const COMMANDS: Command[] = [
     cooldown: "20 min (casino cooldown, per game)",
     keyNumbers: [
       { label: "Win pays", value: "2x" },
+      { label: "Win chance", value: "49% (48–50% with Luck)" },
       { label: "Bets", value: "10,000 – 500,000" },
     ],
     interactive: true,
@@ -624,7 +628,8 @@ export const COMMANDS: Command[] = [
       { label: "💎 pays", value: "10x (1.5% odds)" },
       { label: "🔔 pays", value: "5x (4% odds)" },
       { label: "Grapes/Melon pays", value: "3x (7% odds)" },
-      { label: "Cherry/Banana pays", value: "2x (15% odds)" },
+      { label: "Cherry/Banana pays", value: "2x (15% odds, 13.5–16.5% with Luck)" },
+      { label: "Return", value: "96% (93–99% with Luck)" },
       { label: "Bets", value: "10,000 – 750,000" },
     ],
     jailBlocked: true,
@@ -803,7 +808,7 @@ export const COMMANDS: Command[] = [
     examples: ["!work"],
     keyNumbers: [
       { label: "Income tax", value: "8%" },
-      { label: "Job pay range", value: "30,000 – 450,000 per shift" },
+      { label: "Job pay range", value: "50,000 – 450,000 per shift" },
     ],
     interactive: true,
     jailBlocked: true,
