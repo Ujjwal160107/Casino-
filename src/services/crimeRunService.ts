@@ -6,6 +6,7 @@ import {
   hasMinigameCatalog,
 } from "../data/crimeMinigameCatalog";
 import { getCrimeByKey } from "../data/crimeCatalog";
+import { shuffle } from "../utils/shuffle";
 
 // A run is kept well past the 1h crime cooldown so a run the player walked away
 // from is still there to be settled (fined) the next time they open `crime`.
@@ -20,6 +21,8 @@ export interface CrimeRun {
   stageIndex: number;
   stageStartedAt: number;
   boardSessionId?: string;
+  /** Catalog option index shown at each button position for the current stage. */
+  optionOrder?: number[];
 }
 
 export type StageAnswerResult =
@@ -39,6 +42,24 @@ export function getCurrentStageForRun(run: CrimeRun): CrimeMinigameStage | undef
 
 export function isStageTimedOut(run: CrimeRun, stage: CrimeMinigameStage): boolean {
   return Date.now() > run.stageStartedAt + stage.timeSeconds * 1000;
+}
+
+// The catalog lists every stage's correct option first, so the buttons must not
+// follow catalog order or the left button always wins.
+function shuffledOptionOrder(stage: CrimeMinigameStage): number[] {
+  return shuffle(stage.options.map((_, i) => i));
+}
+
+/**
+ * Catalog option indices in button order. Runs stored before the order existed
+ * fall back to catalog order until they finish.
+ */
+export function stageOptionOrder(run: CrimeRun, stage: CrimeMinigameStage): number[] {
+  const order = run.optionOrder;
+  const n = stage.options.length;
+  const isPermutation =
+    !!order && order.length === n && new Set(order).size === n && order.every((i) => Number.isInteger(i) && i >= 0 && i < n);
+  return isPermutation ? order! : stage.options.map((_, i) => i);
 }
 
 function correctOptionLabel(stageDef: CrimeMinigameStage): string {
@@ -98,6 +119,7 @@ export async function startCrimeRun(
     stageIndex: 0,
     stageStartedAt: Date.now(),
     boardSessionId,
+    optionOrder: shuffledOptionOrder(stages[0]),
   };
   await persistRun(run);
   return { run, stage: stages[0] };
@@ -135,7 +157,7 @@ export async function submitStageAnswer(
     };
   }
 
-  const option = stageDef.options[optionIndex];
+  const option = stageDef.options[stageOptionOrder(run, stageDef)[optionIndex]];
   if (!option) return { outcome: "invalid" };
 
   if (!option.correct) {
@@ -158,6 +180,7 @@ export async function submitStageAnswer(
     ...run,
     stageIndex: nextIndex,
     stageStartedAt: Date.now(),
+    optionOrder: shuffledOptionOrder(stages![nextIndex]),
   };
   if (!await swapRun(userId, raw, updated)) return { outcome: "invalid" };
   return { outcome: "correct", nextStageIndex: nextIndex, run: updated };

@@ -22,7 +22,7 @@ import {
   isCrimePlayableWithKeys,
   tierLabel,
 } from "../../services/crimeService";
-import { CrimeRun } from "../../services/crimeRunService";
+import { CrimeRun, stageOptionOrder } from "../../services/crimeRunService";
 import { CrimeMinigameStage } from "../../data/crimeMinigameCatalog";
 import { fmtCurrency } from "../../utils/format";
 import { formatDiscordRelativeTime } from "../../services/cooldownService";
@@ -215,10 +215,10 @@ export function buildCrimeStagePayload(
     )
     .addSeparatorComponents(separator());
 
-  const buttons = stageDef.options.map((opt, i) =>
+  const buttons = stageOptionOrder(run, stageDef).map((optionIdx, position) =>
     new ButtonBuilder()
-      .setCustomId(crimeMinigameCustomId(run.ownerId, run.runId, stageDef.stageIndex, i))
-      .setLabel(opt.label.slice(0, 80))
+      .setCustomId(crimeMinigameCustomId(run.ownerId, run.runId, stageDef.stageIndex, position))
+      .setLabel(stageDef.options[optionIdx].label.slice(0, 80))
       .setStyle(ButtonStyle.Secondary),
   );
 
