@@ -291,15 +291,16 @@ export async function executeRaid(
     include: { wallet: true },
   });
 
-  if (!user?.wallet || user.wallet.balance <= 0) {
-    await prisma.user.updateMany({ where: { discordId }, data: { crimeHeat: 0 } });
-    return { seized: 0, newBalance: 0 };
-  }
-
+  // Heat clears only when the raid actually takes money. Otherwise banking the
+  // wallet before the scan would wipe heat for free and undercut the Fixer.
+  const balance = Math.max(0, user?.wallet?.balance ?? 0);
   const pct = TAX_CONFIG.raidSeizurePctMin
     + Math.random() * (TAX_CONFIG.raidSeizurePctMax - TAX_CONFIG.raidSeizurePctMin);
-  const seized = Math.floor(user.wallet.balance * pct);
+  const seized = Math.floor(balance * pct);
+  if (seized <= 0) return { seized: 0, newBalance: balance };
+
   const result = await removeBalance(discordId, seized, "tax_raid", { reason: "IRS audit" });
+  if (result.removedAmount <= 0) return { seized: 0, newBalance: result.newBalance };
   await prisma.user.update({ where: { discordId }, data: { crimeHeat: 0 } });
 
   await notifyTaxRaid(client, discordId, result.removedAmount, result.newBalance);
