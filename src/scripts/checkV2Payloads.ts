@@ -13,7 +13,7 @@ import type { HuntGroup } from "../services/huntService";
 import type { ZooSlot } from "../services/zooService";
 import { statusContainer, plainContainer } from "../utils/componentsV2";
 import { nextStepHint } from "../config/nextSteps";
-import { setPersistedEmoji } from "../utils/emojiRegistry";
+import { setEmojiRecord } from "../utils/emojiRegistry";
 
 // Seed the emoji registry before building anything.
 //
@@ -22,13 +22,14 @@ import { setPersistedEmoji } from "../utils/emojiRegistry";
 // of characters -- a custom emoji serialises as <:name:19-digit-id>, roughly
 // 30 characters each. A zoo full of animals plus hunger bars is the exact case
 // where that gap decides whether Discord accepts the message, so the numbers
-// printed below have to reflect what production actually sends.
+// printed below have to reflect what production actually sends. Seed in
+// memory only: persisting would write these fake ids into src/data/emojis.json.
 const FAKE_EMOJI_ID = "1456569047758929931"; // a real id, for a realistic length
 for (const def of ANIMAL_CATALOG) {
-    setPersistedEmoji(def.emojiKey, { id: FAKE_EMOJI_ID, name: def.emojiKey });
+    setEmojiRecord(def.emojiKey, { id: FAKE_EMOJI_ID, name: def.emojiKey });
 }
 for (const key of ["xp_full", "xp_empty"]) {
-    setPersistedEmoji(key, { id: FAKE_EMOJI_ID, name: key });
+    setEmojiRecord(key, { id: FAKE_EMOJI_ID, name: key });
 }
 
 let failures = 0;

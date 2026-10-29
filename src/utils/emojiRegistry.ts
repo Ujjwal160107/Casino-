@@ -99,12 +99,17 @@ export async function initEmojiRegistry(client: Client): Promise<void> {
   }
 }
 
+/** In-memory only: nothing touches the tracked emojis.json. */
+export function setEmojiRecord(key: string, rec: EmojiRecord) {
+  registry.set(key, rec);
+}
+
 export function setPersistedEmoji(key: string, rec: EmojiRecord) {
   try {
     const obj = readPersisted();
     obj[key] = rec;
     writePersisted(obj);
-    registry.set(key, rec);
+    setEmojiRecord(key, rec);
   } catch (e) {
     console.error("emojiRegistry: failed to persist emoji mapping:", e);
   }
