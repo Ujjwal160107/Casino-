@@ -1,5 +1,6 @@
 import { Client, Message } from "discord.js";
 import prisma from "./utils/prisma";
+import { banMessage, isBanActive } from "./services/banService";
 import { checkJailStatus } from "./services/jailService";
 import { handleHelp } from "./commands/general/help";
 import { handleCasinoGuide } from "./commands/general/casinoGuide";
@@ -204,25 +205,15 @@ async function getUserRecord(message: Message) {
 
   if (!user?.isBanned) return user;
 
-  if (user.banExpiresAt) {
-    if (new Date() > user.banExpiresAt) {
-      await prisma.user.update({
-        where: { discordId: user.discordId },
-        data: { isBanned: false, banExpiresAt: null }
-      });
-      return { ...user, isBanned: false, banExpiresAt: null };
-    }
-
-    await message.reply(
-      v2Reply(errorContainer(
-        "Banned",
-        `You are banned from the casino until <t:${Math.floor(user.banExpiresAt.getTime() / 1000)}:R>.`
-      ))
-    );
-    return "blocked";
+  if (!isBanActive(user)) {
+    await prisma.user.update({
+      where: { discordId: user.discordId },
+      data: { isBanned: false, banExpiresAt: null }
+    });
+    return { ...user, isBanned: false, banExpiresAt: null };
   }
 
-  await message.reply(v2Reply(errorContainer("Banned", "You are permanently banned from the casino.")));
+  await message.reply(v2Reply(errorContainer("Banned", banMessage(user.banExpiresAt))));
   return "blocked";
 }
 

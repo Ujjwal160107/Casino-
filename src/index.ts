@@ -31,6 +31,7 @@ import { backfillStarterChickens } from "./services/starterChickenService";
 import { handleSlashCommand } from "./slash/handle";
 import { buildCommand, SPECS } from "./slash/registry";
 import { notifyMarketSale } from "./services/dmNoticeService";
+import { activeBanMessage } from "./services/banService";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -109,6 +110,16 @@ client.on("interactionCreate", async (interaction: Interaction) => {
   try {
     if (interaction.isChatInputCommand()) {
       return await handleSlashCommand(client, interaction as ChatInputCommandInteraction);
+    }
+
+    // Buttons, menus and modals skip the command router and its ban gate, so a
+    // banned user could still press panels posted before the ban.
+    if (interaction.isMessageComponent() || interaction.isModalSubmit()) {
+      const banned = await activeBanMessage(interaction.user.id);
+      if (banned) {
+        await safeReply(interaction, { content: banned, flags: MessageFlags.Ephemeral });
+        return;
+      }
     }
 
     const id = (interaction as any).customId || "";
