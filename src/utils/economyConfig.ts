@@ -194,6 +194,67 @@ export const TAX_CONFIG = {
   heatTtlSeconds: 72 * 3600,    // Redis key expires after 72h of no crime
 } as const;
 
+// Crime Families (spec 19.2). Declared after TAX_CONFIG because it reads
+// transferTaxRate. Tiers, roles, rackets, levels and gates live in
+// src/data/crimeFamilyCatalog.ts.
+export const CRIME_FAMILY_CONFIG = {
+  enabled: false,
+  turfEnabled: false,
+  allowGuildIds: null as string[] | null, // null = every guild
+  createFee: 10_000_000,
+  renameFee: 2_000_000,
+  duesPerLevel: 40_000,
+  depositMin: 10_000,
+  depositDailyCap: 25_000_000,
+  vaultTaxRate: TAX_CONFIG.transferTaxRate, // 0.05, applied inline on deposit and payday
+  paydayMinEarnings: 500_000,
+  paydayGrossCap: 1_000_000,
+  paydayIntervalSeconds: 604_800,
+  autoPaydayGraceSeconds: 86_400,
+  inviteTtlSeconds: 86_400,
+  lobbySeconds: 600,
+  goSeconds: 120,
+  leakAtSecondsLeft: 30,
+  heatPenaltyPerPoint: 0.002,
+  patrolCap: 0.60,
+  seatsPer24h: 2,
+  capersPerFamilyPer24h: 4,
+  cancelledLobbyCooldownSeconds: 1_800,
+  lobbyDmsPer24h: 3,
+  lobbyDmQuietAfterCancelSeconds: 7_200,
+  bidFloorDays: 7,
+  warLateCancelSeconds: 600,
+  hitCost: 25_000,
+  hitCooldownSeconds: 600,
+  hitsPerWar: 6,
+  hitAnswerSeconds: 20,
+  scoutSlotSeconds: 300,
+  warMinutes: 60,
+  blackoutSeconds: 600,
+  renameCooldownSeconds: 2_592_000,
+  maxPendingInvites: 5,
+  acceptedInvitesPerInviterPer7d: 3,
+  joinsPerFamilyPer7d: 5,
+  associateSeconds: 259_200,
+  claimChairAfterSeconds: 604_800,
+  autoHandoverAfterSeconds: 1_209_600,
+  hopCooldownSeconds: { LEFT: 259_200, KICKED: 86_400, DISBANDED: 86_400 },
+  refoundAfterBossDisbandSeconds: 604_800,
+  rejoinSameFamilySeconds: 1_209_600,
+  activityThrottleSeconds: 3_600,
+  ledgerPageSize: 15,
+  vaultLedgerLines: 10,
+  underInvestigationHeat: 100,
+  underInvestigationMembers: 3,
+  maxLevel: 10,
+} as const;
+
+/** Whether !crew, creation and invites are open in this guild (sweepers and payouts ignore it). */
+export function isCrimeFamilyOpen(guildId: string | null | undefined): boolean {
+  const { enabled, allowGuildIds } = CRIME_FAMILY_CONFIG;
+  return enabled && !!guildId && (allowGuildIds === null || allowGuildIds.includes(guildId));
+}
+
 export const BANKING_CONFIG = {
   fdInterestRate: 10,
   rdInterestRate: 8

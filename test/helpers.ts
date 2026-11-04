@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import { PrismaClient, Prisma, User } from "@prisma/client";
+import { CRIME_FAMILY_CONFIG } from "../src/utils/economyConfig";
 
 let _redis: Redis | null = null;
 export function testRedis(): Redis {
@@ -42,4 +43,35 @@ export async function flushTestKeys(pattern: string): Promise<void> {
   const redis = testRedis();
   const keys = await redis.keys(pattern);
   if (keys.length) await redis.del(...keys);
+}
+
+type CfConfigKey = keyof typeof CRIME_FAMILY_CONFIG;
+type CfConfigOverrides = Partial<Record<CfConfigKey, unknown>>;
+
+/**
+ * The CRIME_FAMILY_CONFIG copy a lazy `require()` sees. Under vitest a lazy
+ * require goes through Node (with ts-node), not vitest, and loads a second
+ * copy of every module it reaches (test/router/fakeMessage.ts), so
+ * routeMessage's lazy require of crew.ts reads this object, not the import.
+ */
+function nodeCfConfig(): Record<string, unknown> {
+  if (!(process as any)[Symbol.for("ts-node.register.instance")]) {
+    require("ts-node").register({ transpileOnly: true });
+  }
+  return require("../src/utils/economyConfig").CRIME_FAMILY_CONFIG;
+}
+
+/** Runs fn with CRIME_FAMILY_CONFIG patched in both module copies, then restores every key. */
+export async function withCfConfig<T>(overrides: CfConfigOverrides, fn: () => Promise<T>): Promise<T> {
+  const targets = [...new Set([CRIME_FAMILY_CONFIG as unknown as Record<string, unknown>, nodeCfConfig()])];
+  const saved = targets.map((t) => ({ ...t }));
+  try {
+    for (const t of targets) Object.assign(t, overrides);
+    return await fn();
+  } finally {
+    targets.forEach((t, i) => {
+      for (const k of Object.keys(t)) if (!(k in saved[i])) delete t[k];
+      Object.assign(t, saved[i]);
+    });
+  }
 }
