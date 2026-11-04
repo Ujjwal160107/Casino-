@@ -9,6 +9,7 @@ import type { FamilyRole } from "../../data/crimeFamilyCatalog";
 import { debitWalletInTx } from "../walletService";
 import { assertNotJailed, requireMembership } from "./familyQueries";
 import { readLedgerPage, writeLedger, type LedgerType } from "./ledger";
+import { previewPayday } from "./paydayService";
 import { can } from "./permissions";
 import { FamilyError, runFamilyTx, VaultBusy, VaultShort } from "./tx";
 import type { VaultView } from "./views";
@@ -194,9 +195,10 @@ export async function chargeDues(familyId: string, now: Date): Promise<{ status:
 export async function getVaultView(familyId: string, viewerId: string, now: Date): Promise<VaultView> {
   const family = await prisma.family.findUnique({ where: { id: familyId } });
   if (!family) throw new FamilyError("That family no longer exists.");
-  const [viewer, ledger] = await Promise.all([
+  const [viewer, ledger, payday] = await Promise.all([
     prisma.familyMember.findUnique({ where: { userId: viewerId } }),
     readLedgerPage(familyId, 0, CRIME_FAMILY_CONFIG.vaultLedgerLines),
+    previewPayday(familyId, now),
   ]);
   const officer = !!viewer && viewer.familyId === familyId
     && can({ role: viewer.role as FamilyRole, joinedAt: viewer.joinedAt }, "payday", now);
@@ -213,5 +215,6 @@ export async function getVaultView(familyId: string, viewerId: string, now: Date
     nextPaydayAt: new Date(family.lastPaydayAt.getTime() + CRIME_FAMILY_CONFIG.paydayIntervalSeconds * 1000),
     ledger: ledger.rows,
     canOfficer: officer,
+    payday,
   };
 }

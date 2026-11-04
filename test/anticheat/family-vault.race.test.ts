@@ -4,6 +4,12 @@ import { spendFromVault, creditEarnings, depositToVault, depositMaxFor, resolveD
 import { renameFamily } from "../../src/services/crimeFamily/familyService";
 import { runFamilyTx, VaultShort } from "../../src/services/crimeFamily/tx";
 import { testPrisma, testRedis, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
+import { vi, afterEach } from "vitest";
+import { splitPayday, previewPayday, executePayday } from "../../src/services/crimeFamily/paydayService";
+import { leaveFamily } from "../../src/services/crimeFamily/membershipService";
+import { ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
+import { questBus } from "../../src/services/questEvents";
+import { MAX_SAFE_BALANCE } from "../../src/utils/economyConfig";
 
 const fam = (id: string) => testPrisma.family.findUnique({ where: { id } });
 const wallet = async (id: string) => (await testPrisma.wallet.findUnique({ where: { userId: id } }))!.balance;
@@ -134,5 +140,111 @@ describe("renameFamily (6.2)", () => {
     await expect(renameFamily(boss, "taken name")).rejects.toThrow("Name taken.");
     expect((await fam(f.id))!.earnings).toBe(3_000_000);
     expect(a.name).toBe("Taken Name");
+  });
+});
+
+const active = new Set<string>();
+const rule = { key: "test", label: "test seats", need: 2, count: async (uid: string) => (active.has(uid) ? 2 : 0) };
+async function payFam(earnings: number, o: { lastPaydayAt?: Date; newbie?: boolean; underboss?: boolean } = {}) {
+  const bossId = await seedEligibleUser();
+  const soldiers = [await seedEligibleUser(), await seedEligibleUser()];
+  const newbie = o.newbie ? await seedEligibleUser() : null;
+  const ub = o.underboss ? await seedEligibleUser() : null;
+  for (const u of [bossId, ...soldiers, ...(ub ? [ub] : [])]) active.add(u);
+  const members = [
+    ...soldiers.map((userId) => ({ userId, role: "SOLDIER" as const, joinedAt: daysAgo(10) })),
+    ...(newbie ? [{ userId: newbie, role: "SOLDIER" as const, joinedAt: daysAgo(3) }] : []),
+    ...(ub ? [{ userId: ub, role: "UNDERBOSS" as const, joinedAt: daysAgo(10) }] : []),
+  ];
+  const family = await seedFamily({ bossId, earnings, lastPaydayAt: o.lastPaydayAt ?? daysAgo(8), members });
+  return { family, bossId, soldiers, newbie, ub };
+}
+const expect3 = { earnings: 3_000_000, count: 3 };
+
+describe("payday (7.3)", () => {
+  beforeEach(() => { active.clear(); ACTIVITY_RULES.push(rule); });
+  afterEach(() => { ACTIVITY_RULES.splice(ACTIVITY_RULES.indexOf(rule), 1); });
+
+  it("splits as 11.1 computes", () => {
+    expect(splitPayday(4_081_532, 8)).toEqual({ gross: 510_191, tax: 25_509, net: 484_682 });
+    expect(splitPayday(23_751_252, 12)).toEqual({ gross: 1_000_000, tax: 50_000, net: 950_000 });
+  });
+
+  it("pays eligible members equally, taxes inline and names the ineligible", async () => {
+    const { family, bossId, soldiers, newbie } = await payFam(3_000_000, { newbie: true });
+    const r = await executePayday(family.id, bossId, expect3);
+    expect(r).toMatchObject({ status: "paid", split: { gross: 1_000_000, tax: 50_000, net: 950_000 }, clampedBack: 0 });
+    for (const id of [bossId, ...soldiers]) expect(await wallet(id)).toBe(950_000);
+    expect(await wallet(newbie!)).toBe(0);
+    expect((r as any).ineligible).toEqual([{ userId: newbie, reason: expect.stringMatching(/7 days/) }]);
+    const after = (await fam(family.id))!;
+    expect(after.earnings).toBe(0);
+    expect(Math.abs(+after.lastPaydayAt - Date.now())).toBeLessThan(60_000);
+    expect(await testPrisma.familyLedger.findFirst({ where: { familyId: family.id, type: "payday" } })).toMatchObject({ amount: -3_000_000 });
+    expect(await testPrisma.familyLedger.findFirst({ where: { familyId: family.id, type: "payday_tax" } })).toMatchObject({ amount: 0, meta: { burned: 150_000 } });
+    const w = await testPrisma.wallet.findUnique({ where: { userId: soldiers[0] } });
+    expect(await testPrisma.transaction.findFirst({ where: { walletId: w!.id, type: "family_payday" } })).toMatchObject({ amount: 950_000, isEarned: true });
+  });
+
+  it("locks below 500,000 and with nobody eligible", async () => {
+    const low = await payFam(499_999);
+    expect((await previewPayday(low.family.id)).lockedReason).toBe("Earnings must reach 500,000.");
+    await expect(executePayday(low.family.id, low.bossId, { earnings: 499_999, count: 3 })).rejects.toThrow("Earnings must reach 500,000.");
+    const idle = await payFam(3_000_000);
+    active.clear();
+    expect((await previewPayday(idle.family.id)).lockedReason).toBe("Payday locked: nobody qualifies yet.");
+    expect((await fam(idle.family.id))!.earnings).toBe(3_000_000);
+  });
+
+  it("is not due for 7 days after the last payday", async () => {
+    const { family, bossId } = await payFam(3_000_000, { lastPaydayAt: daysAgo(6) });
+    expect(await executePayday(family.id, bossId, expect3)).toMatchObject({ status: "changed", reason: "Payday is not due yet." });
+    expect((await fam(family.id))!.earnings).toBe(3_000_000);
+  });
+
+  it("a double press pays once", async () => {
+    const { family, bossId, soldiers } = await payFam(3_000_000);
+    const rs = await Promise.allSettled([executePayday(family.id, bossId, expect3), executePayday(family.id, bossId, expect3)]);
+    expect(rs.filter((r) => r.status === "fulfilled" && r.value.status === "paid")).toHaveLength(1);
+    for (const id of [bossId, ...soldiers]) expect(await wallet(id)).toBe(950_000);
+  });
+
+  it("an earnings change between preview and confirm re-previews", async () => {
+    const { family, bossId } = await payFam(3_000_000);
+    await runFamilyTx((tx) => spendFromVault(tx, family.id, 1, "level_fee", "x", {}, { earningsOnly: true }));
+    expect(await executePayday(family.id, bossId, expect3)).toMatchObject({ status: "changed", reason: "Earnings changed." });
+    expect(await wallet(bossId)).toBe(0);
+  });
+
+  it("a member leaving between preview and confirm re-previews and is not paid", async () => {
+    const { family, bossId, soldiers } = await payFam(3_000_000);
+    await leaveFamily(soldiers[0]);
+    expect(await executePayday(family.id, bossId, expect3)).toMatchObject({ status: "changed", reason: "Members changed." });
+    expect(await wallet(soldiers[0])).toBe(0);
+  });
+
+  it("returns a clamped excess to earnings", async () => {
+    const { family, bossId, soldiers } = await payFam(3_000_000);
+    await testPrisma.wallet.update({ where: { userId: soldiers[0] }, data: { balance: MAX_SAFE_BALANCE - 100 } });
+    expect(await executePayday(family.id, bossId, expect3)).toMatchObject({ status: "paid", clampedBack: 949_900 });
+    expect((await fam(family.id))!.earnings).toBe(949_900);
+  });
+
+  it("refuses a Soldier and a demoted Underboss", async () => {
+    const { family, soldiers, ub } = await payFam(3_000_000, { underboss: true });
+    const exp4 = { earnings: 3_000_000, count: 4 };
+    await expect(executePayday(family.id, soldiers[0], exp4)).rejects.toThrow("Only the Boss or Underboss can run payday.");
+    await testPrisma.familyMember.update({ where: { userId: ub! }, data: { role: "SOLDIER", roleSlot: ub! } });
+    await expect(executePayday(family.id, ub!, exp4)).rejects.toThrow("Only the Boss or Underboss can run payday.");
+    expect((await fam(family.id))!.earnings).toBe(3_000_000);
+  });
+
+  it("emits economy:earn per paid member", async () => {
+    const { family, bossId, soldiers } = await payFam(3_000_000);
+    const emit = vi.spyOn(questBus, "emit");
+    try {
+      await executePayday(family.id, bossId, expect3);
+      for (const id of [bossId, ...soldiers]) expect(emit).toHaveBeenCalledWith("economy:earn", { discordId: id, amount: 950_000 });
+    } finally { emit.mockRestore(); }
   });
 });

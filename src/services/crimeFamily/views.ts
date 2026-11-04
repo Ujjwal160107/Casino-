@@ -42,4 +42,20 @@ export interface VaultView {
   ledger: LedgerLine[];
   /** Whether the viewer may run Payday and Level up (Boss or Underboss). */
   canOfficer: boolean;
+  payday: PaydayPreview;
+}
+
+/** S7, and the S6 Payday button and rules hint. */
+export interface PaydayPreview {
+  familyId: string;
+  earnings: number;
+  /** Eligible members (N). */
+  count: number;
+  split: { gross: number; tax: number; net: number };
+  eligible: string[];
+  /** Each ineligible member's first failing payday gate, e.g. "≥ 7 days in the family (you have 3 days)". */
+  ineligible: { userId: string; reason: string }[];
+  dueAt: Date;
+  /** "Earnings must reach 500,000." | "Payday locked: nobody qualifies yet." | null. */
+  lockedReason: string | null;
 }
