@@ -1,17 +1,22 @@
-// The caper lobby (spec 8.4 steps 1-3): plan, join, leave and cancel. Every
-// refusal is a FamilyError thrown before any write or one that rolls the whole
-// transaction back. Joins, leaves and cancels all write the caper document
-// (seatsVersion), so concurrent seat changes conflict and retry.
-import type { Caper, CaperCrew, Family } from "@prisma/client";
+// The caper lobby (spec 8.4 steps 1-5): plan, join, leave, cancel and start.
+// Every refusal is a FamilyError thrown before any write or one that rolls the
+// whole transaction back. Joins, leaves, cancels and starts all write the caper
+// document (seatsVersion), so concurrent seat changes conflict and retry.
+import type { Caper, CaperCrew, Family, Prisma } from "@prisma/client";
+import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
-import { caperRole, caperTier, CAPER_TIERS, type CaperRoleKey, type CaperTierDef, type FamilyRole } from "../../data/crimeFamilyCatalog";
+import { caperRole, caperTier, CAPER_TIERS, levelDef, type CaperRoleKey, type CaperTierDef, type FamilyRole } from "../../data/crimeFamilyCatalog";
 import { CRIME_PREP_WHITELIST } from "../../data/crimePrepWhitelist";
 import { debitWalletInTx } from "../walletService";
-import { getCaper, getLiveCaper, liveSeatOf, startedCapersSince, startedSeatsSince } from "./caperQueries";
+import { computeNetWorth } from "../netWorthService";
+import { getOwnedPrepKeys } from "../crimeService";
+import { getCaper, getLiveCaper, listCrew, liveSeatOf, startedCapersSince, startedSeatsSince } from "./caperQueries";
 import { cancelCaperInTx, removeSeatInTx } from "./caperRefunds";
+import { bestRoleBonus, crewEdge } from "./caperMath";
 import { checkMemberEligibility, eligibilityError } from "./eligibility";
 import { isUnderInvestigation, requireMembership } from "./familyQueries";
-import { ringOrder } from "./intelRing";
+import { buildAnswers, ringOrder } from "./intelRing";
+import { cryptoRng, type Rng } from "./random";
 import { can } from "./permissions";
 import { FamilyError, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
 
@@ -176,5 +181,121 @@ export async function cancelCaper(caperId: string, actorId: string | null, now: 
       if (family?.bossId !== actorId) throw new FamilyError("Only the planner or the Boss can cancel this caper.");
     }
     return cancelCaperInTx(tx, caperId, now);
+  });
+}
+
+export type StartBy = { kind: "press"; uid: string } | { kind: "auto" } | { kind: "sweeper" };
+export type StartResult = {
+  status: "started" | "pinched" | "waiting" | "closed" | "cancelled";
+  pinched: { userId: string; role: CaperRoleKey }[];
+  reason: string | null;
+};
+
+const mention = (id: string) => `<@${id}>`;
+
+/** The tier's required roles no seat holds, as role names in ring order. */
+function missingRequired(tier: CaperTierDef, rows: readonly { role: string }[]): string[] {
+  const filled = new Set(rows.map((r) => r.role));
+  return ringOrder(tier.required).filter((r) => !filled.has(r)).map((r) => caperRole(r).name);
+}
+
+/**
+ * Whether a lobby seat still qualifies at Start (8.4 step 5.1): the tier gate
+ * minus its net worth row, which C2 re-checks counting the stake already paid,
+ * the role's prep item, membership in the caper's family and the rolling seat
+ * cap. Returns the owned prep keys so the seat's item bonus reads the same set.
+ */
+async function seatHolds(
+  tx: Prisma.TransactionClient, row: CaperCrew, caper: Caper, tier: CaperTierDef, now: Date,
+): Promise<{ ok: boolean; owned: Set<string> }> {
+  const role = row.role as CaperRoleKey;
+  const [gate, worth, owned, member, seats] = await Promise.all([
+    checkMemberEligibility(row.userId, `caper_t${tier.tier}`, { now }),
+    computeNetWorth(row.userId),
+    getOwnedPrepKeys(row.userId),
+    tx.familyMember.findUnique({ where: { userId: row.userId }, select: { familyId: true } }),
+    startedSeatsSince(row.userId, windowStart(now)),
+  ]);
+  const ok = gate.failures.every((f) => f.gate === "net_worth")
+    && worth.total + row.stake >= tier.seatGate.netWorth
+    && caperRole(role).prepKeys.some((k) => owned.has(k))
+    && member?.familyId === caper.familyId
+    && seats.length < CRIME_FAMILY_CONFIG.seatsPer24h;
+  return { ok, owned };
+}
+
+/**
+ * Spec 8.4 steps 4-5: re-validate every seat, pinch the ones that fail, then
+ * LOBBY → RUNNING with the brief's answers, the crew edge and the heat snapshot
+ * stored, and the family cooldown started. Every check runs inside the
+ * transaction so a retry re-checks it. A pinched planner cancels the caper.
+ */
+export async function startCaper(caperId: string, by: StartBy, now: Date = new Date(), rng: Rng = cryptoRng): Promise<StartResult> {
+  const closed: StartResult = { status: "closed", pinched: [], reason: LOBBY_CLOSED };
+  if (by.kind === "press") {
+    const snapshot = await getCaper(caperId);
+    if (!snapshot || snapshot.status !== "LOBBY") return closed;
+    if (by.uid !== snapshot.plannerId) {
+      const family = await prisma.family.findUnique({ where: { id: snapshot.familyId }, select: { bossId: true } });
+      if (family?.bossId !== by.uid) throw new FamilyError("Only the planner or the Boss can start this caper.");
+    }
+    const missing = missingRequired(caperTier(snapshot.tier), await listCrew(caperId));
+    if (missing.length > 0) return { status: "waiting", pinched: [], reason: `Fill the required roles first: ${missing.join(", ")}.` };
+  }
+
+  return runFamilyTx(async (tx): Promise<StartResult> => {
+    const caper = await tx.caper.findUnique({ where: { id: caperId } });
+    if (!caper || caper.status !== "LOBBY") return closed;
+    const tier = caperTier(caper.tier);
+    const rows = await tx.caperCrew.findMany({ where: { caperId } });
+
+    const checked: { ok: boolean; owned: Set<string> }[] = [];
+    for (const row of rows) checked.push(await seatHolds(tx, row, caper, tier, now));
+    const failing = rows.filter((_, i) => !checked[i].ok);
+    const planner = failing.find((r) => r.role === "MASTERMIND");
+    if (planner) {
+      await cancelCaperInTx(tx, caperId, now);
+      return {
+        status: "cancelled", pinched: [{ userId: planner.userId, role: "MASTERMIND" }],
+        reason: `${mention(planner.userId)} got pinched; the caper was cancelled and every stake refunded.`,
+      };
+    }
+    for (const row of failing) await removeSeatInTx(tx, row, "pinched");
+    const pinched = failing.map((r) => ({ userId: r.userId, role: r.role as CaperRoleKey }));
+    const kept = rows.filter((_, i) => checked[i].ok);
+    const owned = checked.filter((c) => c.ok).map((c) => c.owned);
+
+    const missing = missingRequired(tier, kept);
+    if (missing.length > 0) {
+      if (pinched.length > 0) {
+        return { status: "pinched", pinched, reason: `${pinched.map((p) => mention(p.userId)).join(", ")} got pinched (stake refunded). Fill the required roles before the lobby closes.` };
+      }
+      return { status: "waiting", pinched, reason: `Fill the required roles first: ${missing.join(", ")}.` };
+    }
+
+    const family = await tx.family.findUniqueOrThrow({ where: { id: caper.familyId } });
+    const blocked = await familyCaperBlock(family, now);
+    if (blocked) return { status: "waiting", pinched, reason: blocked };
+
+    const roles = kept.map((r) => r.role as CaperRoleKey);
+    const bonuses = kept.map((r, i) => bestRoleBonus(r.role as CaperRoleKey, owned[i]));
+    const users = await tx.user.findMany({ where: { discordId: { in: kept.map((r) => r.userId) } }, select: { crimeHeat: true } });
+    const { count } = await tx.caper.updateMany({
+      where: { id: caperId, status: "LOBBY" },
+      data: {
+        status: "RUNNING", startedAt: now, goEndsAt: new Date(now.getTime() + CRIME_FAMILY_CONFIG.goSeconds * 1000),
+        answers: buildAnswers(roles, rng), edge: crewEdge(bonuses), heatSnapshot: Math.max(0, ...users.map((u) => u.crimeHeat)),
+        seatsVersion: { increment: 1 },
+      },
+    });
+    if (count === 0) return closed;
+    for (const [i, row] of kept.entries()) {
+      await tx.caperCrew.update({ where: { id: row.id }, data: { started: true, startedAt: now, itemBonus: bonuses[i] } });
+    }
+    await tx.family.update({
+      where: { id: family.id },
+      data: { nextCaperAt: new Date(now.getTime() + levelDef(family.level).caperCooldownSeconds * 1000) },
+    });
+    return { status: "started", pinched, reason: null };
   });
 }

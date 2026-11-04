@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import prisma from "../../src/utils/prisma";
-import { planCaper, joinCaper, leaveCaper, cancelCaper } from "../../src/services/crimeFamily/caperLobbyService";
+import { planCaper, joinCaper, leaveCaper, cancelCaper, startCaper } from "../../src/services/crimeFamily/caperLobbyService";
 import { questBus } from "../../src/services/questEvents";
 import { disbandFamily } from "../../src/services/crimeFamily/disbandService";
+import { computeNetWorth } from "../../src/services/netWorthService";
+import { caperTier } from "../../src/data/crimeFamilyCatalog";
 import { testPrisma, resetFamilies, ensureUniqueIndexes, seedEligibleUser } from "../helpers";
 import { caperCrew, txCount, G, CH } from "../crimeFamily/caperFixtures";
 
@@ -192,5 +194,133 @@ describe("join (8.4 steps 2-3)", () => {
     expect(await txCount("caper_stake_refund", [ids.MASTERMIND, ids.LOOKOUT])).toBe(2);
     await expect(cancelCaper(c.id, bossId)).rejects.toThrow("Lobby closed.");
     expect(await txCount("caper_stake_refund", [ids.MASTERMIND, ids.LOOKOUT])).toBe(2);
+  });
+});
+
+// Sets uid's wallet so that net worth + the paid stake lands exactly on `target`, whatever else (prep items at their
+// ShopItem price, bank) the seed left in the net worth (src/services/netWorthService.ts:94-99 counts inventory).
+async function walletForStartNetWorth(uid: string, target: number) {
+  const nw = await computeNetWorth(uid);
+  const stake = caperTier(1).stake;
+  await testPrisma.wallet.update({ where: { userId: uid }, data: { balance: target - stake - (nw.total - nw.wallet) } });
+}
+
+async function fullLobby(roles: readonly string[] = T1, now = new Date()) {
+  const f = await caperCrew({ tier: 1, roles: [...roles] as any });
+  const c = await plan(f.ids.MASTERMIND, 1, now);
+  for (const r of roles) if (r !== "MASTERMIND") await join(c.id, f.ids[r as keyof typeof f.ids], r, now);
+  return { ...f, caper: c };
+}
+
+describe("start (8.4 step 5)", () => {
+  it("starts with every seat filled: stakes locked, the draw stored, heat snapshot, edge and the family cooldown", async () => {
+    const now = new Date();
+    const { family, ids, caper } = await fullLobby(T1, now);
+    await testPrisma.user.update({ where: { discordId: ids.LOOKOUT }, data: { crimeHeat: 30 } });
+    expect(await startCaper(caper.id, { kind: "auto" }, now)).toEqual({ status: "started", pinched: [], reason: null });
+    const c = (await testPrisma.caper.findUnique({ where: { id: caper.id } }))!;
+    expect(c).toMatchObject({ status: "RUNNING", startedAt: now, goEndsAt: new Date(+now + 120_000), heatSnapshot: 30, roll: -1, outcome: "" });
+    expect(c.edge).toBeCloseTo((0.10 + 0.09 + 0.08 + 0.10) / 4, 10);    // first prep key of each role
+    expect((c.answers as any).order).toEqual(["MASTERMIND", "LOOKOUT", "SAFECRACKER", "DRIVER"]);
+    expect((await crew(caper.id)).every((r) => r.started && +r.startedAt === +now && r.liveSlot === "LIVE")).toBe(true);
+    expect(+(await testPrisma.family.findUnique({ where: { id: family.id } }))!.nextCaperAt).toBe(+now + 10_800_000);
+  });
+
+  it("only the planner or the current Boss may press Start; required roles first", async () => {
+    const { ids, caper } = await fullLobby(["MASTERMIND", "LOOKOUT"]);
+    await expect(startCaper(caper.id, { kind: "press", uid: ids.LOOKOUT })).rejects.toThrow("Only the planner or the Boss can start this caper.");
+    expect(await startCaper(caper.id, { kind: "press", uid: ids.MASTERMIND })).toEqual({ status: "waiting", pinched: [], reason: "Fill the required roles first: Safecracker." });
+  });
+
+  it("pinches a member jailed during the lobby, refunds them and starts with the rest", async () => {
+    const { ids, caper } = await fullLobby();
+    await testPrisma.user.update({ where: { discordId: ids.DRIVER }, data: { isJailed: true, jailReleaseTime: new Date(Date.now() + 3_600_000) } });
+    const before = await wallet(ids.DRIVER);
+    expect(await startCaper(caper.id, { kind: "auto" })).toMatchObject({ status: "started", pinched: [{ userId: ids.DRIVER, role: "DRIVER" }] });
+    expect(await wallet(ids.DRIVER)).toBe(before + 50_000);
+    expect((await crew(caper.id)).map((r) => r.role).sort()).toEqual(["LOOKOUT", "MASTERMIND", "SAFECRACKER"]);
+  });
+
+  it("a member who used up their only prep item is pinched; a broken required role keeps the lobby open", async () => {
+    const { ids, caper } = await fullLobby();
+    await testPrisma.inventory.deleteMany({ where: { userId: ids.LOOKOUT } });
+    expect(await startCaper(caper.id, { kind: "auto" })).toMatchObject({ status: "pinched", pinched: [{ userId: ids.LOOKOUT, role: "LOOKOUT" }] });
+    expect((await testPrisma.caper.findUnique({ where: { id: caper.id } }))!.status).toBe("LOBBY");
+  });
+
+  it("net worth at Start counts the stake already paid (C2, Review Focus 1)", async () => {
+    const gate = caperTier(1).seatGate.netWorth;                                   // 2,000,000
+    const { ids, caper } = await fullLobby(["MASTERMIND", "LOOKOUT", "SAFECRACKER"]);
+    await walletForStartNetWorth(ids.SAFECRACKER, gate);                           // net worth + stake = gate exactly
+    expect(await startCaper(caper.id, { kind: "press", uid: ids.MASTERMIND })).toMatchObject({ status: "started", pinched: [] });
+    await resetFamilies();
+    const again = await fullLobby(["MASTERMIND", "LOOKOUT", "SAFECRACKER"]);
+    await walletForStartNetWorth(again.ids.SAFECRACKER, gate - 1);                 // one Fortune short
+    expect(await startCaper(again.caper.id, { kind: "auto" })).toMatchObject({ status: "pinched", pinched: [{ userId: again.ids.SAFECRACKER, role: "SAFECRACKER" }] });
+  });
+
+  it("a pinched planner cancels the caper: every stake refunded once and the 30-minute cooldown (spec 8.4 step 4, edge 3)", async () => {
+    const now = new Date();
+    const { family, ids, caper } = await fullLobby(T1, now);
+    await testPrisma.user.update({ where: { discordId: ids.MASTERMIND }, data: { isJailed: true, jailReleaseTime: new Date(+now + 3_600_000) } });
+    const before = await Promise.all(Object.values(ids).map(wallet));
+    expect(await startCaper(caper.id, { kind: "auto" }, now)).toEqual({
+      status: "cancelled", pinched: [{ userId: ids.MASTERMIND, role: "MASTERMIND" }],
+      reason: `<@${ids.MASTERMIND}> got pinched; the caper was cancelled and every stake refunded.`,
+    });
+    expect(await testPrisma.caper.findUnique({ where: { id: caper.id } })).toMatchObject({ status: "CANCELLED", outcome: "CANCELLED", liveSlot: caper.id });
+    expect(await Promise.all(Object.values(ids).map(wallet))).toEqual(before.map((b) => b + 50_000));
+    expect(await txCount("caper_stake_refund", Object.values(ids))).toBe(4);
+    expect(+(await testPrisma.family.findUnique({ where: { id: family.id } }))!.nextCaperAt).toBe(+now + 1_800_000);
+  });
+
+  it("after a chair handover the current Boss can Start a Capo's caper (edge 2)", async () => {
+    const f = await caperCrew({ tier: 1, roles: [...T1], plannerRank: "CAPO" });
+    const c = await plan(f.ids.MASTERMIND);
+    await join(c.id, f.ids.LOOKOUT, "LOOKOUT"); await join(c.id, f.ids.SAFECRACKER, "SAFECRACKER");
+    expect(await startCaper(c.id, { kind: "press", uid: f.bossId })).toMatchObject({ status: "started" });
+  });
+
+  it("waits while the family cooldown is running (edge 71)", async () => {
+    const { family, caper } = await fullLobby();
+    await testPrisma.family.update({ where: { id: family.id }, data: { nextCaperAt: new Date(Date.now() + 600_000) } });
+    expect(await startCaper(caper.id, { kind: "auto" })).toMatchObject({ status: "waiting", reason: expect.stringMatching(/^Family caper cooldown: ready <t:\d+:R>\.$/) });
+    expect((await testPrisma.caper.findUnique({ where: { id: caper.id } }))!.status).toBe("LOBBY");
+  });
+
+  it("Start pressed twice and racing the auto-start: exactly one run (Review Focus 5)", async () => {
+    const { ids, caper } = await fullLobby();
+    const rs = await Promise.all([startCaper(caper.id, { kind: "press", uid: ids.MASTERMIND }), startCaper(caper.id, { kind: "auto" }), startCaper(caper.id, { kind: "press", uid: ids.MASTERMIND })].map((p) => p.catch((e) => ({ status: e.message }))));
+    expect(rs.filter((r) => r.status === "started")).toHaveLength(1);
+    for (const r of rs) expect(r.status).toMatch(/^(started|closed|Vault busy, try again\.)$/);
+  });
+
+  it("join vs auto-start (interleave): the joiner has no orphan row and keeps their stake", async () => {
+    const f = await caperCrew({ tier: 1, roles: [...T1] });
+    const c = await plan(f.ids.MASTERMIND);
+    await join(c.id, f.ids.LOOKOUT, "LOOKOUT"); await join(c.id, f.ids.SAFECRACKER, "SAFECRACKER");
+    const before = await wallet(f.ids.DRIVER);
+    const delegate = prisma.caper as any; const original = delegate.findUnique; let first = true;
+    delegate.findUnique = async (args: any) => {
+      const snapshot = await original.call(delegate, args);
+      if (first && args?.where?.id === c.id) { first = false; await startCaper(c.id, { kind: "press", uid: f.ids.MASTERMIND }); }
+      return snapshot;
+    };
+    try { await expect(join(c.id, f.ids.DRIVER, "DRIVER")).rejects.toThrow("Lobby closed."); } finally { delegate.findUnique = original; }
+    expect(await testPrisma.caperCrew.count({ where: { userId: f.ids.DRIVER } })).toBe(0);
+    expect(await wallet(f.ids.DRIVER)).toBe(before);
+  });
+
+  it("join racing start for real: a committed join is always part of the started crew or refunded, never orphaned", async () => {
+    for (let k = 0; k < 5; k++) {
+      await resetFamilies();
+      const f = await caperCrew({ tier: 1, roles: [...T1] });
+      const c = await plan(f.ids.MASTERMIND);
+      await join(c.id, f.ids.LOOKOUT, "LOOKOUT"); await join(c.id, f.ids.SAFECRACKER, "SAFECRACKER");
+      const [j] = await Promise.allSettled([join(c.id, f.ids.DRIVER, "DRIVER"), startCaper(c.id, { kind: "press", uid: f.ids.MASTERMIND })]);
+      const row = await testPrisma.caperCrew.findFirst({ where: { caperId: c.id, userId: f.ids.DRIVER } });
+      if (j.status === "fulfilled") expect(row?.started).toBe(true);
+      else expect(row).toBeNull();
+    }
   });
 });
