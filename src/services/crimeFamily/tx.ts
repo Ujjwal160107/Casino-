@@ -42,9 +42,15 @@ export async function runFamilyTx<T>(fn: (tx: Prisma.TransactionClient) => Promi
   }
 }
 
-/** Writes the family document so concurrent writers that both touch it conflict. */
+/**
+ * Writes the family document so concurrent writers that both touch it conflict.
+ * The new updatedAt is always later than the one this transaction reads: Mongo
+ * skips a $set to the value already stored, and a skipped write conflicts with
+ * nothing, so two writers in the same millisecond would otherwise both commit.
+ */
 export async function touchFamily(tx: Prisma.TransactionClient, familyId: string, now: Date): Promise<void> {
-  await tx.family.update({ where: { id: familyId }, data: { updatedAt: now } });
+  const { updatedAt } = await tx.family.findUniqueOrThrow({ where: { id: familyId }, select: { updatedAt: true } });
+  await tx.family.update({ where: { id: familyId }, data: { updatedAt: new Date(Math.max(now.getTime(), updatedAt.getTime() + 1)) } });
 }
 
 /** A P2002, optionally on the named unique index (Prisma's `<Model>_<fields>_key`). Never catch it inside a transaction. */

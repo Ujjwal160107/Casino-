@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { createFamily, forceRenameFamily } from "../../src/services/crimeFamily/familyService";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes } from "../helpers";
+import { inviteMember, acceptInvite, declineInvite, leaveFamily, kickMember, expireInvites } from "../../src/services/crimeFamily/membershipService";
+import { FAMILY_HOOKS } from "../../src/services/crimeFamily/extensions";
+import { FamilyError, VaultBusy } from "../../src/services/crimeFamily/tx";
+import type { FamilyRole } from "../../src/data/crimeFamilyCatalog";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
 
@@ -48,5 +52,203 @@ describe("createFamily (6.1)", () => {
     const rs = await Promise.allSettled([create(a, "Velvet Ante", "VLA"), create(b, "velvet ante", "VLB")]);
     expect(rs.filter((r) => r.status === "rejected").map((r: any) => r.reason.message)).toEqual(["Name or tag taken."]);
     expect([await wallet(a), await wallet(b)].sort((x, y) => x - y)).toEqual([5_000_000, 15_000_000]);
+  });
+});
+
+const invite = (inviterId: string, inviteeId: string, now?: Date) => inviteMember({ inviterId, inviteeId, guildId: "g1", channelId: "c1", now });
+const joiner = () => seedEligibleUser({ wallet: 2_000_000 });          // passes family_join
+async function famWith(members: { role: FamilyRole; joinedAt?: Date }[] = []) {
+  const bossId = await seedEligibleUser();
+  const rows = [];
+  for (const m of members) rows.push({ userId: await joiner(), joinedAt: daysAgo(10), ...m });
+  const family = await seedFamily({ bossId, members: rows });
+  return { family, bossId, ids: rows.map((r) => r.userId) };
+}
+const pending = (familyId: string) => testPrisma.familyInvite.count({ where: { familyId, status: "PENDING" } });
+const inviteRow = (id: string) => testPrisma.familyInvite.findUnique({ where: { id } });
+const BUSY_OR = (m: string) => new RegExp(`^(${m.replace(/[.()]/g, "\\$&")}|Vault busy, try again\\.)$`);
+
+describe("invites (6.4)", () => {
+  it("creates a 24 h PENDING invite; Soldiers cannot invite", async () => {
+    const now = new Date();
+    const { family, bossId, ids: [soldier] } = await famWith([{ role: "SOLDIER" }]);
+    const t = await joiner();
+    const inv = await invite(bossId, t, now);
+    expect(inv).toMatchObject({ familyId: family.id, inviterId: bossId, inviteeId: t, status: "PENDING", slot: "PENDING", guildId: "g1", channelId: "c1" });
+    expect(+inv.expiresAt).toBe(+now + 86_400_000);
+    await expect(invite(soldier, await joiner())).rejects.toThrow("You don't have permission to do that.");
+  });
+
+  it("a Boss who founded a minute ago can invite at once (P20)", async () => {
+    const founder = await seedEligibleUser({ wallet: 15_000_000 });
+    await createFamily({ uid: founder, username: "f", name: "Fresh Crew", tag: "FRS", guildId: "g1", channelId: "c1" });
+    await expect(invite(founder, await joiner())).resolves.toMatchObject({ status: "PENDING" });
+  });
+
+  it("refuses self, a member of this family and a member of another family, with no row", async () => {
+    const { bossId, ids: [mine] } = await famWith([{ role: "SOLDIER" }]);
+    const other = await famWith();
+    await expect(invite(bossId, bossId)).rejects.toThrow("You can't invite yourself.");
+    await expect(invite(bossId, mine)).rejects.toThrow(`<@${mine}> is already in your family.`);
+    await expect(invite(bossId, other.bossId)).rejects.toThrow(`<@${other.bossId}> is already in a crime family.`);
+    expect(await testPrisma.familyInvite.count()).toBe(0);
+  });
+
+  it("refuses a second pending invite to the same player", async () => {
+    const { bossId } = await famWith();
+    const t = await joiner();
+    await invite(bossId, t);
+    await expect(invite(bossId, t)).rejects.toThrow("Already invited.");
+    expect(await testPrisma.familyInvite.count()).toBe(1);
+  });
+
+  it("holds the pending cap of 5 under 6 concurrent invites", async () => {
+    const { family, bossId } = await famWith();
+    const targets = await Promise.all(Array.from({ length: 6 }, joiner));
+    const rs = await Promise.allSettled(targets.map((t) => invite(bossId, t)));
+    const n = await pending(family.id);
+    expect(n).toBeLessThanOrEqual(5);
+    expect(rs.filter((r) => r.status === "fulfilled")).toHaveLength(n);
+    for (const r of rs) if (r.status === "rejected") expect(r.reason.message).toMatch(BUSY_OR("Too many pending invites (max 5)."));
+    while ((await pending(family.id)) < 5) await invite(bossId, await joiner());
+    await expect(invite(bossId, await joiner())).rejects.toThrow("Too many pending invites (max 5).");
+  });
+
+  it("holds the inviter's 3-per-7-days and the family's 5-per-7-days accepted caps", async () => {
+    const { family, bossId, ids: [capo] } = await famWith([{ role: "CAPO", joinedAt: daysAgo(30) }]);
+    const accepted = (inviterId: string, n: number, at: Date) => testPrisma.familyInvite.createMany({ data: Array.from({ length: n }, (_, k) => ({
+      familyId: family.id, inviterId, inviteeId: `old-${inviterId}-${k}`, status: "ACCEPTED", slot: `s-${inviterId}-${k}`, guildId: "g1", channelId: "c1", expiresAt: at, resolvedAt: at })) });
+    await accepted(capo, 3, daysAgo(6));
+    await expect(invite(capo, await joiner())).rejects.toThrow("You can bring in 3 members per 7 days.");
+    await accepted(bossId, 2, daysAgo(6));
+    await expect(invite(bossId, await joiner())).rejects.toThrow("Your family can take 5 new members per 7 days.");
+    await testPrisma.familyInvite.updateMany({ where: { familyId: family.id, status: "ACCEPTED" }, data: { resolvedAt: daysAgo(8) } });
+    await expect(invite(capo, await joiner())).resolves.toMatchObject({ status: "PENDING" });
+  });
+});
+
+describe("accept (6.4)", () => {
+  it("seats the invitee as a Soldier in the lowest free seat", async () => {
+    const { family, bossId } = await famWith();
+    const u = await joiner();
+    const inv = await invite(bossId, u);
+    expect((await acceptInvite(inv.id, u)).member).toMatchObject({ familyId: family.id, role: "SOLDIER", roleSlot: u, seat: 2 });
+    expect(await inviteRow(inv.id)).toMatchObject({ status: "ACCEPTED", slot: inv.id });
+  });
+
+  it("only the invitee may accept", async () => {
+    const { bossId } = await famWith();
+    const inv = await invite(bossId, await joiner());
+    await expect(acceptInvite(inv.id, await joiner())).rejects.toThrow("This invite is not for you.");
+  });
+
+  it("an expired invite is refused and stays PENDING for the sweeper", async () => {
+    const now = new Date();
+    const { bossId } = await famWith();
+    const u = await joiner();
+    const inv = await invite(bossId, u, daysAgo(2, now));
+    await expect(acceptInvite(inv.id, u, now)).rejects.toThrow("Invite expired.");
+    expect((await inviteRow(inv.id))!.status).toBe("PENDING");
+  });
+
+  it("a failing join gate rolls the invite back to PENDING and names the gate", async () => {
+    const { bossId } = await famWith();
+    const u = await seedEligibleUser({ wallet: 2_000_000, shifts: 19 });
+    const inv = await invite(bossId, u);
+    await expect(acceptInvite(inv.id, u)).rejects.toThrow("Not eligible: ≥ 20 shifts (you have 19 shifts)");
+    expect((await inviteRow(inv.id))!.status).toBe("PENDING");
+    expect(await testPrisma.familyMember.findUnique({ where: { userId: u } })).toBeNull();
+  });
+
+  it("accepting two families at once yields one membership; the other invite stays PENDING", async () => {
+    const a = await famWith(); const b = await famWith();
+    const u = await joiner();
+    const ia = await invite(a.bossId, u); const ib = await invite(b.bossId, u);
+    const rs = await Promise.allSettled([acceptInvite(ia.id, u), acceptInvite(ib.id, u)]);
+    expect(rs.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    for (const r of rs) if (r.status === "rejected") expect(r.reason.message).toMatch(BUSY_OR("You are already in a family."));
+    expect(await testPrisma.familyMember.count({ where: { userId: u } })).toBe(1);
+    expect((await testPrisma.familyInvite.findMany({ where: { inviteeId: u } })).map((i) => i.status).sort()).toEqual(["ACCEPTED", "PENDING"]);
+  });
+
+  it("two invitees racing for the last seat: one joins, the other gets 'Family is full.'", async () => {
+    const { family, bossId } = await famWith([{ role: "SOLDIER" }, { role: "SOLDIER" }, { role: "SOLDIER" }, { role: "SOLDIER" }]); // 5 of 6
+    const a = await joiner(); const b = await joiner();
+    const invs = [await invite(bossId, a), await invite(bossId, b)];
+    const rs = await Promise.allSettled([acceptInvite(invs[0].id, a), acceptInvite(invs[1].id, b)]);
+    expect(await testPrisma.familyMember.count({ where: { familyId: family.id } })).toBe(6);
+    const lost = rs.findIndex((r) => r.status === "rejected");
+    expect((rs[lost] as PromiseRejectedResult).reason.message).toBe("Family is full.");
+    expect((await inviteRow(invs[lost].id))!.status).toBe("PENDING");
+  });
+
+  it("decline marks DECLINED with slot = id, once", async () => {
+    const { bossId } = await famWith();
+    const u = await joiner();
+    const inv = await invite(bossId, u);
+    expect(await declineInvite(inv.id, u)).toMatchObject({ status: "DECLINED", slot: inv.id });
+    await expect(declineInvite(inv.id, u)).rejects.toThrow("Invite expired.");
+  });
+});
+
+describe("leave and kick (6.4)", () => {
+  it("leave deletes the row, writes FamilyExit LEFT and deletes the leaver's pending invites", async () => {
+    const { family, ids: [capo] } = await famWith([{ role: "CAPO" }]);
+    await invite(capo, await joiner());
+    await leaveFamily(capo);
+    expect(await testPrisma.familyMember.findUnique({ where: { userId: capo } })).toBeNull();
+    expect(await testPrisma.familyExit.findFirst({ where: { userId: capo } })).toMatchObject({ familyId: family.id, reason: "LEFT", wasBoss: false });
+    expect(await testPrisma.familyInvite.count({ where: { inviterId: capo } })).toBe(0);
+  });
+
+  it("a Boss with members cannot leave; a solo Boss is pointed to disband", async () => {
+    const { bossId } = await famWith([{ role: "SOLDIER" }]);
+    await expect(leaveFamily(bossId)).rejects.toThrow("Hand over the chair first (`!crew handover <user>`).");
+    const solo = await famWith();
+    await expect(leaveFamily(solo.bossId)).rejects.toThrow("You're the only member. Leaving would disband the family: use `!crew disband`.");
+  });
+
+  it("a hook's memberExitBlock refuses leave and kick, inside the transaction", async () => {
+    const { bossId, ids: [s] } = await famWith([{ role: "SOLDIER" }]);
+    const kinds: string[] = [];
+    FAMILY_HOOKS.push({ key: "t", memberExitBlock: async (tx, ctx) => { await tx.family.findUnique({ where: { id: ctx.familyId } }); kinds.push(ctx.kind); return "You are seated in a live caper."; } });
+    try {
+      await expect(leaveFamily(s)).rejects.toThrow("You are seated in a live caper.");
+      await expect(kickMember(bossId, s)).rejects.toThrow("You are seated in a live caper.");
+    } finally { FAMILY_HOOKS.pop(); }
+    expect(kinds).toEqual(["LEFT", "KICKED"]);
+    expect(await testPrisma.familyMember.findUnique({ where: { userId: s } })).not.toBeNull();
+  });
+
+  it("a retried leave re-runs the block", async () => {
+    const { ids: [s] } = await famWith([{ role: "SOLDIER" }]);
+    let calls = 0;
+    FAMILY_HOOKS.push({ key: "t", memberExitBlock: async () => { if (++calls === 1) throw new VaultBusy(); return "Blocked now."; } });
+    try { await expect(leaveFamily(s)).rejects.toThrow("Blocked now."); } finally { FAMILY_HOOKS.pop(); }
+    expect(calls).toBe(2);
+  });
+
+  it("kick follows the rank table, writes FamilyExit KICKED and runs onMemberExit inside the transaction", async () => {
+    const { ids: [capo, capo2, s1, s2] } = await famWith([{ role: "CAPO" }, { role: "CAPO" }, { role: "SOLDIER" }, { role: "SOLDIER" }]);
+    const kinds: string[] = [];
+    FAMILY_HOOKS.push({ key: "t", onMemberExit: async (_tx, ctx) => { kinds.push(ctx.kind); } });
+    try {
+      await expect(kickMember(capo, capo2)).rejects.toThrow("You don't have permission to do that.");
+      await kickMember(capo, s1);
+    } finally { FAMILY_HOOKS.pop(); }
+    expect(kinds).toEqual(["KICKED"]);
+    expect(await testPrisma.familyExit.findFirst({ where: { userId: s1 } })).toMatchObject({ reason: "KICKED" });
+    FAMILY_HOOKS.push({ key: "t", onMemberExit: async () => { throw new FamilyError("hook failed"); } });
+    try { await expect(kickMember(capo, s2)).rejects.toThrow("hook failed"); } finally { FAMILY_HOOKS.pop(); }
+    expect(await testPrisma.familyMember.findUnique({ where: { userId: s2 } })).not.toBeNull();
+  });
+
+  it("expireInvites moves past-due PENDING to EXPIRED with slot = id, once", async () => {
+    const now = new Date();
+    const { bossId } = await famWith();
+    const inv = await invite(bossId, await joiner(), daysAgo(2, now));
+    const [a, b] = await Promise.all([expireInvites(now), expireInvites(now)]);
+    expect(a.length + b.length).toBe(1);
+    expect(await inviteRow(inv.id)).toMatchObject({ status: "EXPIRED", slot: inv.id });
   });
 });

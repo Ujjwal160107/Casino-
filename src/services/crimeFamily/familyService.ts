@@ -8,12 +8,10 @@ import { checkMemberEligibility, eligibilityError } from "./eligibility";
 import { getFamilyByTag, requireMembership } from "./familyQueries";
 import { writeLedger } from "./ledger";
 import { checkFamilyName, checkFamilyTag } from "./names";
-import { can } from "./permissions";
+import { can, NO_PERMISSION } from "./permissions";
 import { FamilyError, isUniqueViolation, runFamilyTx } from "./tx";
 import { utcDayKey } from "./vaultService";
 import type { FamilyRole } from "../../data/crimeFamilyCatalog";
-
-const NO_PERMISSION = "You don't have permission to do that.";
 
 /**
  * Spec 6.1: burns the creation fee and seats the founder as Boss in one

@@ -1,6 +1,6 @@
 // Read seams for families: membership lookup, roster, investigation status
 // and the dashboard view. No writes.
-import type { Family, FamilyMember } from "@prisma/client";
+import type { Family, FamilyMember, Prisma } from "@prisma/client";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { FAMILY_LEVELS, levelDef, type FamilyRole } from "../../data/crimeFamilyCatalog";
@@ -21,6 +21,21 @@ export async function requireMembership(uid: string): Promise<{ family: Family; 
   const membership = await getMembership(uid);
   if (!membership) throw new FamilyError("You are not in a crime family.");
   return membership;
+}
+
+/**
+ * Inside a family transaction: re-reads the actor (who must still be in
+ * familyId) and the target (who must be in the same family), so every retry
+ * re-checks both rows.
+ */
+export async function readActorAndTarget(
+  tx: Prisma.TransactionClient, familyId: string, actorId: string, targetId: string,
+): Promise<{ actor: FamilyMember; target: FamilyMember }> {
+  const actor = await tx.familyMember.findUnique({ where: { userId: actorId } });
+  if (!actor || actor.familyId !== familyId) throw new FamilyError("You are not in a crime family.");
+  const target = await tx.familyMember.findUnique({ where: { userId: targetId } });
+  if (!target || target.familyId !== familyId) throw new FamilyError(`<@${targetId}> is not in your family.`);
+  return { actor, target };
 }
 
 /** Members by rank (Boss first), then by who joined first. */

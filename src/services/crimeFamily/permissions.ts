@@ -8,6 +8,9 @@ export type FamilyAction =
   | "view" | "deposit" | "invite" | "kick" | "promote" | "demote" | "handover" | "plan_caper" | "take_seat"
   | "payday" | "level_up" | "bid" | "war_act" | "set_home" | "rename" | "disband" | "claim_chair" | "manage";
 
+/** The one permission refusal every family service uses. */
+export const NO_PERMISSION = "You don't have permission to do that.";
+
 export const ROLE_RANK: Readonly<Record<FamilyRole, number>> = { BOSS: 4, UNDERBOSS: 3, CAPO: 2, SOLDIER: 1 };
 
 const ALL: readonly FamilyRole[] = ["BOSS", "UNDERBOSS", "CAPO", "SOLDIER"];
