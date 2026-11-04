@@ -22,7 +22,7 @@ const COMPUTE_CHUNK = 10;
 
 const cacheKey = (discordId: string) => `networth:${discordId}`;
 
-async function computeNetWorth(discordId: string): Promise<NetWorthBreakdown> {
+export async function computeNetWorth(discordId: string): Promise<NetWorthBreakdown> {
   const breakdown: NetWorthBreakdown = {
     wallet: 0, bank: 0, investments: 0, stocks: 0,
     properties: 0, animals: 0, items: 0, cardDebt: 0,

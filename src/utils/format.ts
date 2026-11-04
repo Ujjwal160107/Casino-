@@ -73,4 +73,17 @@ export const parseSmartAmount = (input: string, maxBalance: number = Infinity): 
   return Math.floor(parseFloat(lower));
 };
 
+/** Strict positive amount for typed inputs ("250k", "5m", "1,000,000", "all"): null unless a whole number > 0. */
+export function parsePositiveAmount(raw: string, maxBalance: number): number | null {
+  const input = raw.trim();
+  if (!/^\d[\d,]*(\.\d+)?[kmb]?$|^(all|max|allin)$/i.test(input)) return null;
+  const amount = parseSmartAmount(input, maxBalance);
+  return Number.isInteger(amount) && amount > 0 ? amount : null;
+}
+
+/** Fortunes as a plain grouped number, never "∞" (fmtAmount prints it from 2,147,483,647 up). */
+export function fmtFortunes(n: number): string {
+  return Math.floor(n).toLocaleString("en-US");
+}
+
 export const parseBetAmount = parseSmartAmount;

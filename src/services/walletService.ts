@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import prisma from "../utils/prisma";
 import { MAX_SAFE_BALANCE, STARTING_WALLET_BALANCE } from "../utils/economyConfig";
 import { questBus } from "./questEvents";
@@ -109,65 +110,94 @@ export async function removeMoneyFromWallet(walletId: string, amount: number) {
   return wallet.balance - amount;
 }
 
-export async function addBalance(discordId: string, username: string, amount: number, type = "income", meta: any = {}, earned = true) {
-  if (amount <= 0) throw new Error("Amount must be positive.");
+export class InsufficientFundsError extends Error {
+  constructor() {
+    super("Insufficient funds.");
+    this.name = "InsufficientFundsError";
+  }
+}
 
-  const result = await withTransactionRetry(() => prisma.$transaction(async (tx) => {
-    let user = await tx.user.findUnique({
-      where: { discordId },
+export type CreditResult = {
+  walletId: string;
+  previousBalance: number;
+  newBalance: number;
+  requestedAmount: number;
+  appliedAmount: number;
+  capped: boolean;
+  garnished?: number;
+};
+
+/**
+ * The wallet half of a credit, inside the caller's transaction: creates the
+ * user/wallet if missing, clamps at MAX_SAFE_BALANCE and writes the
+ * Transaction row. Run afterEarnedCredit once the transaction commits.
+ */
+export async function creditWalletInTx(
+  tx: Prisma.TransactionClient,
+  discordId: string,
+  username: string,
+  amount: number,
+  type: string,
+  meta: Record<string, unknown>,
+  earned: boolean
+): Promise<CreditResult> {
+  let user = await tx.user.findUnique({
+    where: { discordId },
+    include: { wallet: true }
+  });
+
+  if (!user) {
+    user = await tx.user.create({
+      data: {
+        discordId,
+        username,
+        wallet: { create: { balance: 0 } }
+      },
       include: { wallet: true }
     });
+  }
 
-    if (!user) {
-      user = await tx.user.create({
-        data: {
-          discordId,
-          username,
-          wallet: { create: { balance: 0 } }
-        },
-        include: { wallet: true }
-      });
-    }
+  if (!user.wallet) {
+    user = await tx.user.update({
+      where: { discordId },
+      data: { wallet: { create: { balance: 0 } } },
+      include: { wallet: true }
+    });
+  }
 
-    if (!user.wallet) {
-      user = await tx.user.update({
-        where: { discordId },
-        data: { wallet: { create: { balance: 0 } } },
-        include: { wallet: true }
-      });
-    }
+  const availableSpace = Math.max(0, MAX_SAFE_BALANCE - user.wallet!.balance);
+  const appliedAmount = Math.min(amount, availableSpace);
+  const capped = appliedAmount < amount;
 
-    const availableSpace = Math.max(0, MAX_SAFE_BALANCE - user.wallet!.balance);
-    const appliedAmount = Math.min(amount, availableSpace);
-    const capped = appliedAmount < amount;
+  if (appliedAmount > 0) {
+    await tx.wallet.update({
+      where: { id: user.wallet!.id },
+      data: { balance: { increment: appliedAmount } }
+    });
 
-    if (appliedAmount > 0) {
-      await tx.wallet.update({
-        where: { id: user.wallet!.id },
-        data: { balance: { increment: appliedAmount } }
-      });
+    await tx.transaction.create({
+      data: {
+        walletId: user.wallet!.id,
+        amount: appliedAmount,
+        type,
+        meta: { ...meta, requestedAmount: amount, capped } as Prisma.InputJsonObject,
+        isEarned: earned
+      }
+    });
+  }
 
-      await tx.transaction.create({
-        data: {
-          walletId: user.wallet!.id,
-          amount: appliedAmount,
-          type,
-          meta: { ...meta, requestedAmount: amount, capped },
-          isEarned: earned
-        }
-      });
-    }
+  return {
+    walletId: user.wallet!.id,
+    previousBalance: user.wallet!.balance,
+    newBalance: user.wallet!.balance + appliedAmount,
+    requestedAmount: amount,
+    appliedAmount,
+    capped
+  };
+}
 
-    return {
-      walletId: user.wallet!.id,
-      previousBalance: user.wallet!.balance,
-      newBalance: user.wallet!.balance + appliedAmount,
-      requestedAmount: amount,
-      appliedAmount,
-      capped
-    };
-  }));
-
+/** Post-commit side effects of a credit: garnishment and the earn event (earned only), cache invalidation. */
+export async function afterEarnedCredit(discordId: string, result: CreditResult, earned: boolean): Promise<CreditResult> {
   // Garnishment: deduct 25% of earned income toward delinquent/locked card debt
   // (applyGarnishment debits the wallet itself, atomically with the card).
   if (earned && result.appliedAmount > 0) {
@@ -176,7 +206,7 @@ export async function addBalance(discordId: string, username: string, amount: nu
       const { garnished } = await applyGarnishment(discordId, result.appliedAmount);
       if (garnished > 0) {
         result.newBalance -= garnished;
-        (result as any).garnished = garnished;
+        result.garnished = garnished;
       }
     } catch { /* Garnishment rolled back as a whole — income stays intact */ }
   }
@@ -188,6 +218,39 @@ export async function addBalance(discordId: string, username: string, amount: nu
   if (result.appliedAmount > 0) await invalidateUserCache(discordId, "");
 
   return result;
+}
+
+export async function addBalance(discordId: string, username: string, amount: number, type = "income", meta: any = {}, earned = true) {
+  if (amount <= 0) throw new Error("Amount must be positive.");
+
+  const result = await withTransactionRetry(() =>
+    prisma.$transaction((tx) => creditWalletInTx(tx, discordId, username, amount, type, meta, earned))
+  );
+  return afterEarnedCredit(discordId, result, earned);
+}
+
+/**
+ * Guarded wallet debit inside the caller's transaction: refuses an overdraft
+ * with InsufficientFundsError (nothing written) and records one Transaction.
+ */
+export async function debitWalletInTx(
+  tx: Prisma.TransactionClient,
+  discordId: string,
+  amount: number,
+  type: string,
+  meta: Record<string, unknown>
+): Promise<{ walletId: string }> {
+  const { count } = await tx.wallet.updateMany({
+    where: { userId: discordId, balance: { gte: amount } },
+    data: { balance: { decrement: amount } }
+  });
+  if (count === 0) throw new InsufficientFundsError();
+
+  const wallet = await tx.wallet.findUniqueOrThrow({ where: { userId: discordId }, select: { id: true } });
+  await tx.transaction.create({
+    data: { walletId: wallet.id, amount: -amount, type, meta: meta as Prisma.InputJsonObject, isEarned: false }
+  });
+  return { walletId: wallet.id };
 }
 
 export async function removeBalance(discordId: string, amount: number, type = "remove", meta: any = {}) {
