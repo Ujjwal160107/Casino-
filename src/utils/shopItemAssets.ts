@@ -1,26 +1,13 @@
-import fs from "fs";
-import path from "path";
-import { findAsset } from "./assetPaths";
+import { applicationEmojiName, resolveTableAsset, SHOP_APPLICATION_EMOJI_PREFIX } from "./applicationEmojiNames";
 
-export const SHOP_APPLICATION_EMOJI_PREFIX = "shop_";
+export { SHOP_APPLICATION_EMOJI_PREFIX };
 
 /**
  * Stable Discord application-emoji name for a shop item.
  * Discord emoji names support lowercase letters, numbers, and underscores.
  */
 export function getShopApplicationEmojiName(itemKey: string): string {
-  const normalizedKey = itemKey
-    .toLowerCase()
-    .replace(/[^a-z0-9_]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  const name = `${SHOP_APPLICATION_EMOJI_PREFIX}${normalizedKey}`.slice(0, 32).replace(/_+$/g, "");
-
-  if (!normalizedKey || name.length < 2) {
-    throw new Error(`Cannot create a valid application emoji name for shop item "${itemKey}".`);
-  }
-
-  return name;
+  return applicationEmojiName(SHOP_APPLICATION_EMOJI_PREFIX, itemKey);
 }
 
 /**
@@ -103,16 +90,6 @@ export type ShopItemThumbnailAsset = {
 export function resolveShopItemThumbnailAsset(
   itemKey: string,
 ): ShopItemThumbnailAsset | null {
-  const fileName = SHOP_ITEM_THUMBNAIL_ASSETS[itemKey];
-  if (!fileName) return null;
-
-  const filePath = findAsset(fileName);
-  if (!filePath || !fs.statSync(filePath).isFile()) return null;
-
-  return {
-    itemKey,
-    fileName,
-    filePath,
-    attachmentName: fileName.replace(/\s+/g, "_"),
-  };
+  const asset = resolveTableAsset(SHOP_ITEM_THUMBNAIL_ASSETS, itemKey);
+  return asset && { itemKey, ...asset };
 }

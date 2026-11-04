@@ -7,30 +7,41 @@ import {
   GatewayIntentBits,
 } from "discord.js";
 import dotenv from "dotenv";
-import { SHOP_CATALOG } from "../utils/shopCatalog";
+import { applicationEmojiName, resolveTableAsset } from "../utils/applicationEmojiNames";
 import {
-  getShopApplicationEmojiName,
-  resolveShopItemThumbnailAsset,
-  SHOP_APPLICATION_EMOJI_PREFIX,
-  SHOP_ITEM_THUMBNAIL_ASSETS,
-} from "../utils/shopItemAssets";
+  APPLICATION_EMOJI_FAMILIES,
+  ApplicationEmojiFamily,
+  assertFamilyRegistry,
+  pruneCandidates,
+  selectFamilies,
+} from "../utils/applicationEmojiFamilies";
 
-dotenv.config({ quiet: true });
+// One sync for every managed application emoji family (spec 20.4). Families
+// live in APPLICATION_EMOJI_FAMILIES; this script never branches on one.
+// `--dry-run` never reads .env or contacts Discord.
+
+assertFamilyRegistry(APPLICATION_EMOJI_FAMILIES);
 
 const EMOJI_SIZE = 128;
 const IMAGE_PADDING = 8;
+/** Pixel-grid families: art at an integer scale, 4 px from each edge (D39). */
+const PIXEL_GRID_PADDING = 4;
 const MAX_IMAGE_BYTES = 256 * 1024;
 const MAX_APPLICATION_EMOJIS = 2_000;
 
 type Options = {
   dryRun: boolean;
+  plan: boolean;
   replace: boolean;
   prune: boolean;
+  /** `--family` ids; null means every family. */
+  families: string[] | null;
 };
 
-type PreparedEmoji = {
-  itemKey: string;
-  itemName: string;
+export type PreparedEmoji = {
+  familyId: ApplicationEmojiFamily["id"];
+  prefix: string;
+  key: string;
   emojiName: string;
   image: Buffer;
 };
@@ -45,22 +56,38 @@ type SyncSummary = {
 };
 
 function printUsage(): void {
+  const families = APPLICATION_EMOJI_FAMILIES.map((f) => `${f.id} (${f.prefix}*)`).join(", ");
   console.log([
-    "Shop application emoji sync",
+    "Application emoji sync",
     "",
-    "Usage: npm run sync:shop-emojis -- [options]",
+    "Usage: npm run sync:app-emojis -- [options]",
+    "",
+    `Families: ${families}`,
     "",
     "Options:",
-    "  --dry-run  Validate and render every current shop thumbnail without contacting Discord.",
-    "  --replace  Safely replace images for existing shop_* application emojis.",
-    "  --prune    Remove stale shop_* application emojis after a fully successful sync.",
-    "  --help     Show this help.",
+    "  --family <ids>  Only these families, comma-separated (default: all).",
+    "  --dry-run       Validate and render every selected emoji without contacting Discord.",
+    "  --plan          Log in and print what a sync would create, replace and prune, changing nothing.",
+    "  --replace       Safely replace images for existing managed application emojis.",
+    "  --prune         Remove stale emojis in each selected family's prefix after a fully successful sync.",
+    "  --help          Show this help.",
   ].join("\n"));
 }
 
 function parseOptions(args: string[]): Options | null {
-  const allowed = new Set(["--dry-run", "--replace", "--prune", "--help"]);
-  const unknown = args.filter((arg) => !allowed.has(arg));
+  const flags = new Set(["--dry-run", "--plan", "--replace", "--prune", "--help"]);
+  const unknown: string[] = [];
+  let families: string[] | null = null;
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === "--family") {
+      const value = args[i + 1];
+      if (!value || value.startsWith("--")) throw new Error("--family needs a value, e.g. --family shop,cf");
+      families = value.split(",").map((id) => id.trim()).filter(Boolean);
+      i += 1;
+    } else if (!flags.has(args[i])) {
+      unknown.push(args[i]);
+    }
+  }
   if (unknown.length > 0) {
     throw new Error(`Unknown option${unknown.length === 1 ? "" : "s"}: ${unknown.join(", ")}`);
   }
@@ -70,12 +97,19 @@ function parseOptions(args: string[]): Options | null {
   }
   return {
     dryRun: args.includes("--dry-run"),
+    plan: args.includes("--plan"),
     replace: args.includes("--replace"),
     prune: args.includes("--prune"),
+    families,
   };
 }
 
-async function renderApplicationEmoji(filePath: string): Promise<Buffer> {
+/**
+ * A 128x128 emoji PNG. Families without a pixel grid are scaled smoothly into
+ * 8 px of padding; a pixel-grid family is drawn nearest-neighbour at an
+ * integer cell size, so 160 px art (40 cells of 4 px) lands as 120 px at offset 4.
+ */
+export async function renderApplicationEmoji(filePath: string, family: ApplicationEmojiFamily): Promise<Buffer> {
   const source = await loadImage(filePath);
   if (source.width <= 0 || source.height <= 0) {
     throw new Error("The source image has invalid dimensions.");
@@ -84,15 +118,27 @@ async function renderApplicationEmoji(filePath: string): Promise<Buffer> {
   const canvas = createCanvas(EMOJI_SIZE, EMOJI_SIZE);
   const context = canvas.getContext("2d");
   context.clearRect(0, 0, EMOJI_SIZE, EMOJI_SIZE);
-  context.imageSmoothingEnabled = true;
 
-  const availableSize = EMOJI_SIZE - IMAGE_PADDING * 2;
-  const scale = Math.min(availableSize / source.width, availableSize / source.height);
-  const width = Math.max(1, Math.round(source.width * scale));
-  const height = Math.max(1, Math.round(source.height * scale));
-  const x = Math.round((EMOJI_SIZE - width) / 2);
-  const y = Math.round((EMOJI_SIZE - height) / 2);
-  context.drawImage(source, x, y, width, height);
+  if (family.pixelGrid) {
+    const grid = family.pixelGrid;
+    if (source.width !== source.height || source.width % grid !== 0) {
+      throw new Error(`Expected a square image divisible by the ${grid}-cell grid, got ${source.width}x${source.height}.`);
+    }
+    const cell = Math.floor((EMOJI_SIZE - PIXEL_GRID_PADDING * 2) / grid);
+    const size = cell * grid;
+    const offset = Math.floor((EMOJI_SIZE - size) / 2);
+    context.imageSmoothingEnabled = false;
+    context.drawImage(source, offset, offset, size, size);
+  } else {
+    context.imageSmoothingEnabled = true;
+    const availableSize = EMOJI_SIZE - IMAGE_PADDING * 2;
+    const scale = Math.min(availableSize / source.width, availableSize / source.height);
+    const width = Math.max(1, Math.round(source.width * scale));
+    const height = Math.max(1, Math.round(source.height * scale));
+    const x = Math.round((EMOJI_SIZE - width) / 2);
+    const y = Math.round((EMOJI_SIZE - height) / 2);
+    context.drawImage(source, x, y, width, height);
+  }
 
   const image = canvas.toBuffer("image/png", { compressionLevel: 9 });
   if (image.length > MAX_IMAGE_BYTES) {
@@ -101,58 +147,61 @@ async function renderApplicationEmoji(filePath: string): Promise<Buffer> {
   return image;
 }
 
-async function prepareEmojis(projectRoot = process.cwd()): Promise<PreparedEmoji[]> {
-  const catalogByKey = new Map(SHOP_CATALOG.map((item) => [item.key, item]));
+/** Validates and renders every emoji of the given families; throws listing every problem. */
+export async function prepareEmojis(families: readonly ApplicationEmojiFamily[]): Promise<PreparedEmoji[]> {
   const seenNames = new Map<string, string>();
   const prepared: PreparedEmoji[] = [];
   const errors: string[] = [];
 
-  for (const itemKey of Object.keys(SHOP_ITEM_THUMBNAIL_ASSETS).sort()) {
-    const catalogItem = catalogByKey.get(itemKey);
-    if (!catalogItem) {
-      errors.push(`${itemKey}: mapped thumbnail does not belong to a current shop item.`);
-      continue;
-    }
+  for (const family of families) {
+    for (const key of Object.keys(family.assets).sort()) {
+      const label = `${family.id}:${key}`;
+      if (!family.validKeys.has(key)) {
+        errors.push(`${label}: mapped asset does not belong to a current ${family.id} key.`);
+        continue;
+      }
 
-    let emojiName: string;
-    try {
-      emojiName = getShopApplicationEmojiName(itemKey);
-    } catch (error) {
-      errors.push(`${itemKey}: ${describeError(error)}`);
-      continue;
-    }
+      let emojiName: string;
+      try {
+        emojiName = applicationEmojiName(family.prefix, key);
+      } catch (error) {
+        errors.push(`${label}: ${describeError(error)}`);
+        continue;
+      }
 
-    if (!/^[a-z0-9_]{2,32}$/.test(emojiName)) {
-      errors.push(`${itemKey}: generated emoji name "${emojiName}" is invalid.`);
-      continue;
-    }
-    const duplicateItemKey = seenNames.get(emojiName);
-    if (duplicateItemKey) {
-      errors.push(`${itemKey}: emoji name collides with ${duplicateItemKey} as "${emojiName}".`);
-      continue;
-    }
-    seenNames.set(emojiName, itemKey);
+      if (!/^[a-z0-9_]{2,32}$/.test(emojiName)) {
+        errors.push(`${label}: generated emoji name "${emojiName}" is invalid.`);
+        continue;
+      }
+      const duplicate = seenNames.get(emojiName);
+      if (duplicate) {
+        errors.push(`${label}: emoji name collides with ${duplicate} as "${emojiName}".`);
+        continue;
+      }
+      seenNames.set(emojiName, label);
 
-    const asset = resolveShopItemThumbnailAsset(itemKey);
-    if (!asset) {
-      errors.push(`${itemKey}: thumbnail file "${SHOP_ITEM_THUMBNAIL_ASSETS[itemKey]}" is missing.`);
-      continue;
-    }
+      const asset = resolveTableAsset(family.assets, key);
+      if (!asset) {
+        errors.push(`${label}: asset file "${family.assets[key]}" is missing.`);
+        continue;
+      }
 
-    try {
-      prepared.push({
-        itemKey,
-        itemName: catalogItem.name,
-        emojiName,
-        image: await renderApplicationEmoji(asset.filePath),
-      });
-    } catch (error) {
-      errors.push(`${itemKey}: could not render thumbnail (${describeError(error)}).`);
+      try {
+        prepared.push({
+          familyId: family.id,
+          prefix: family.prefix,
+          key,
+          emojiName,
+          image: await renderApplicationEmoji(asset.filePath, family),
+        });
+      } catch (error) {
+        errors.push(`${label}: could not render (${describeError(error)}).`);
+      }
     }
   }
 
   if (errors.length > 0) {
-    throw new Error(`Shop emoji validation failed:\n- ${errors.join("\n- ")}`);
+    throw new Error(`Application emoji validation failed:\n- ${errors.join("\n- ")}`);
   }
   return prepared;
 }
@@ -166,14 +215,14 @@ function emojisNamed(
 
 function temporaryEmojiName(target: PreparedEmoji, existingNames: Set<string>): string {
   const digest = createHash("sha256")
-    .update(target.itemKey)
+    .update(target.key)
     .update(target.image)
     .digest("hex")
     .slice(0, 16);
-  let name = `shop_tmp_${digest}`;
+  let name = `${target.prefix}tmp_${digest}`;
   let suffix = 1;
   while (existingNames.has(name)) {
-    name = `shop_tmp_${digest}_${suffix}`.slice(0, 32);
+    name = `${target.prefix}tmp_${digest}_${suffix}`.slice(0, 32);
     suffix += 1;
   }
   return name;
@@ -219,13 +268,62 @@ async function safelyReplaceEmoji(
   }
 }
 
-async function syncEmojis(options: Options, prepared: PreparedEmoji[]): Promise<SyncSummary> {
+/** The live bot, logged in. The only place .env is read, so --dry-run never touches it (P19). */
+async function loginClient(): Promise<Client> {
+  dotenv.config({ quiet: true });
   const token = process.env.TOKEN || process.env.DISCORD_TOKEN || process.env.BOT_TOKEN;
   if (!token) {
     throw new Error("Missing bot token. Set TOKEN, DISCORD_TOKEN, or BOT_TOKEN.");
   }
-
   const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+  try {
+    await client.login(token);
+    if (!client.application) throw new Error("Discord application was not available after login.");
+    await client.application.fetch();
+  } catch (error) {
+    client.destroy();
+    throw error;
+  }
+  return client;
+}
+
+function existingNamesOf(emojis: Collection<string, ApplicationEmoji>): string[] {
+  return [...emojis.values()].map((emoji) => emoji.name).filter((name): name is string => !!name);
+}
+
+function desiredNamesOf(prepared: readonly PreparedEmoji[], family: ApplicationEmojiFamily): Set<string> {
+  return new Set(prepared.filter((target) => target.familyId === family.id).map((target) => target.emojiName));
+}
+
+/** --plan: what a sync would create, replace (with --replace) and prune (with --prune), per family. Changes nothing. */
+async function planEmojis(families: readonly ApplicationEmojiFamily[], prepared: PreparedEmoji[]): Promise<void> {
+  const client = await loginClient();
+  try {
+    const existing = await client.application!.emojis.fetch();
+    const existingNames = existingNamesOf(existing);
+    console.log(`Connected as ${client.user?.tag ?? "the configured bot"}. ${existing.size} application emojis exist.`);
+    for (const family of families) {
+      const desired = desiredNamesOf(prepared, family);
+      const create = [...desired].filter((name) => emojisNamed(existing, name).length === 0);
+      const replace = [...desired].filter((name) => emojisNamed(existing, name).length > 0);
+      const prune = pruneCandidates(existingNames, family, desired);
+      console.log(`[${family.id}] ${desired.size} desired`);
+      console.log(`  would create (${create.length}): ${create.join(", ") || "none"}`);
+      console.log(`  would replace with --replace (${replace.length}): ${replace.join(", ") || "none"}`);
+      console.log(`  would prune with --prune (${prune.length}): ${prune.join(", ") || "none"}`);
+    }
+    console.log("Plan complete. No emojis were changed.");
+  } finally {
+    client.destroy();
+  }
+}
+
+async function syncEmojis(
+  options: Options,
+  families: readonly ApplicationEmojiFamily[],
+  prepared: PreparedEmoji[],
+): Promise<SyncSummary> {
+  const client = await loginClient();
   const summary: SyncSummary = {
     desired: prepared.length,
     created: 0,
@@ -236,15 +334,10 @@ async function syncEmojis(options: Options, prepared: PreparedEmoji[]): Promise<
   };
 
   try {
-    await client.login(token);
-    if (!client.application) throw new Error("Discord application was not available after login.");
-    const application = client.application;
-    await application.fetch();
+    const application = client.application!;
     let existing = await application.emojis.fetch();
     const desiredNames = new Set(prepared.map((target) => target.emojiName));
-    const existingNames = new Set(
-      [...existing.values()].map((emoji) => emoji.name).filter((name): name is string => !!name),
-    );
+    const existingNames = new Set(existingNamesOf(existing));
 
     const duplicateManagedNames = [...desiredNames].filter(
       (name) => emojisNamed(existing, name).length > 1,
@@ -264,7 +357,7 @@ async function syncEmojis(options: Options, prepared: PreparedEmoji[]): Promise<
     }
 
     console.log(`Connected as ${client.user?.tag ?? "the configured bot"}.`);
-    console.log(`Synchronizing ${prepared.length} shop item emojis...`);
+    console.log(`Synchronizing ${prepared.length} application emojis (${families.map((f) => f.id).join(", ")})...`);
 
     for (const target of prepared) {
       const current = emojisNamed(existing, target.emojiName)[0];
@@ -277,12 +370,12 @@ async function syncEmojis(options: Options, prepared: PreparedEmoji[]): Promise<
           existing.set(created.id, created);
           existingNames.add(target.emojiName);
           summary.created += 1;
-          console.log(`Created ${target.emojiName} (${target.itemName}).`);
+          console.log(`Created ${target.emojiName} (${target.familyId}:${target.key}).`);
         } else if (options.replace) {
           await safelyReplaceEmoji(application, current, target, existingNames);
           existing = await application.emojis.fetch();
           summary.replaced += 1;
-          console.log(`Replaced ${target.emojiName} (${target.itemName}).`);
+          console.log(`Replaced ${target.emojiName} (${target.familyId}:${target.key}).`);
         } else {
           summary.skipped += 1;
         }
@@ -294,12 +387,10 @@ async function syncEmojis(options: Options, prepared: PreparedEmoji[]): Promise<
 
     if (options.prune && summary.failed === 0) {
       existing = await application.emojis.fetch();
-      const stale = [...existing.values()].filter(
-        (emoji) =>
-          !!emoji.name &&
-          emoji.name.startsWith(SHOP_APPLICATION_EMOJI_PREFIX) &&
-          !desiredNames.has(emoji.name),
+      const staleNames = new Set(
+        families.flatMap((family) => pruneCandidates(existingNamesOf(existing), family, desiredNamesOf(prepared, family))),
       );
+      const stale = [...existing.values()].filter((emoji) => !!emoji.name && staleNames.has(emoji.name));
       for (const emoji of stale) {
         try {
           await emoji.delete();
@@ -315,10 +406,12 @@ async function syncEmojis(options: Options, prepared: PreparedEmoji[]): Promise<
     }
 
     const verified = await application.emojis.fetch();
-    const missingAfterSync = [...desiredNames].filter((name) => emojisNamed(verified, name).length !== 1);
-    if (missingAfterSync.length > 0) {
-      summary.failed += missingAfterSync.length;
-      console.error(`Verification failed for: ${missingAfterSync.join(", ")}`);
+    for (const family of families) {
+      const missingAfterSync = [...desiredNamesOf(prepared, family)].filter((name) => emojisNamed(verified, name).length !== 1);
+      if (missingAfterSync.length > 0) {
+        summary.failed += missingAfterSync.length;
+        console.error(`[${family.id}] verification failed for: ${missingAfterSync.join(", ")}`);
+      }
     }
 
     return summary;
@@ -336,9 +429,13 @@ async function main(): Promise<void> {
   const options = parseOptions(process.argv.slice(2));
   if (!options) return;
 
-  console.log("Validating and rendering the current shop item-info thumbnails...");
-  const prepared = await prepareEmojis();
+  const families = selectFamilies(options.families);
+  console.log(`Validating and rendering application emojis for ${families.map((f) => f.id).join(", ")}...`);
+  const prepared = await prepareEmojis(families);
   const totalBytes = prepared.reduce((sum, target) => sum + target.image.length, 0);
+  for (const family of families) {
+    console.log(`  ${family.id}: ${prepared.filter((target) => target.familyId === family.id).length} emojis (${family.prefix}*)`);
+  }
   console.log(
     `Validated ${prepared.length} transparent ${EMOJI_SIZE}x${EMOJI_SIZE} PNG emojis (${Math.ceil(totalBytes / 1024)} KiB total).`,
   );
@@ -348,7 +445,12 @@ async function main(): Promise<void> {
     return;
   }
 
-  const summary = await syncEmojis(options, prepared);
+  if (options.plan) {
+    await planEmojis(families, prepared);
+    return;
+  }
+
+  const summary = await syncEmojis(options, families, prepared);
   console.log(
     `Sync complete: ${summary.desired} desired, ${summary.created} created, ${summary.replaced} replaced, ` +
       `${summary.skipped} unchanged, ${summary.pruned} pruned, ${summary.failed} failed.`,
@@ -356,7 +458,9 @@ async function main(): Promise<void> {
   if (summary.failed > 0) process.exitCode = 1;
 }
 
-main().catch((error) => {
-  console.error(describeError(error));
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(describeError(error));
+    process.exitCode = 1;
+  });
+}

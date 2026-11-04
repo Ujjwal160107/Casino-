@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { Client, Guild } from "discord.js";
+import { RUNTIME_MANAGED_PREFIXES } from "./applicationEmojiNames";
 
 let APP_EMOJIS: Record<string, { id: string; name?: string; animated?: boolean }> = {};
 try {
@@ -31,6 +32,21 @@ function writePersisted(obj: Record<string, EmojiRecord>) {
     fs.writeFileSync(DATA_PATH, JSON.stringify(obj, null, 2), "utf8");
   } catch (e) {
     console.error("emojiRegistry: Failed to write persisted emojis:", e);
+  }
+}
+
+/**
+ * Names the sync script uploads as application emojis (step 3). A server's
+ * emoji with the same name must never stand in for one (steps 4 and 5).
+ */
+function isManagedName(name: string): boolean {
+  return RUNTIME_MANAGED_PREFIXES.some((p) => name.startsWith(p));
+}
+
+/** Steps 4 and 5: fill a name not yet loaded from a guild emoji, never a managed one. */
+function fillFromGuild(e: { id: string; name: string | null; animated: boolean | null }): void {
+  if (e.name && !registry.has(e.name) && !isManagedName(e.name)) {
+    registry.set(e.name, { id: e.id, name: e.name, animated: !!e.animated });
   }
 }
 
@@ -75,9 +91,7 @@ export async function initEmojiRegistry(client: Client): Promise<void> {
 
   // 4. Guild emoji cache
   try {
-    client.emojis.cache.forEach((e) => {
-      if (e.name && !registry.has(e.name)) registry.set(e.name, { id: e.id, name: e.name, animated: e.animated });
-    });
+    client.emojis.cache.forEach(fillFromGuild);
   } catch (e) {
     console.warn("emojiRegistry: error discovering client emoji cache", e);
   }
@@ -89,9 +103,7 @@ export async function initEmojiRegistry(client: Client): Promise<void> {
       const guild = client.guilds.cache.get(storGuildId) ?? (await client.guilds.fetch(storGuildId).catch(() => null));
       if (guild) {
         await (guild as Guild).emojis.fetch().catch(() => null);
-        (guild as Guild).emojis.cache.forEach((e) => {
-          if (e.name && !registry.has(e.name)) registry.set(e.name, { id: e.id, name: e.name, animated: e.animated });
-        });
+        (guild as Guild).emojis.cache.forEach(fillFromGuild);
       }
     } catch (e) {
       console.warn("emojiRegistry: failed to fetch emojis from storage guild:", e);

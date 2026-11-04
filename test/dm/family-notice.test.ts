@@ -3,6 +3,7 @@ import { DM_NOTICE_TYPES, isCooldownReminderType } from "../../src/services/dmPr
 import { familyInviteNotice, notifyMany } from "../../src/services/dmNoticeService";
 import { containerText, containerThumb, fakeDmClient } from "./helpers";
 import { seedUser } from "../helpers";
+import { setEmojiRecord } from "../../src/utils/emojiRegistry";
 
 describe("family DM notices (13.4)", () => {
   it("family is an account notice with no command", () => {
@@ -23,5 +24,9 @@ describe("family DM notices (13.4)", () => {
     const dm = fakeDmClient();
     await notifyMany(dm.client, "family", ["fam-dm-off", "fam-dm-on"], () => familyInviteNotice({ familyLabel: "x", inviterId: "1", tag: "VLA", expiresAt: new Date(), jumpUrl: null }));
     expect([...dm.sent.keys()]).toEqual(["fam-dm-on"]);
+  });
+  it("uses the cf_crest_1 emoji as the thumbnail once it is loaded", () => {
+    setEmojiRecord("cf_crest_1", { id: "1234567890123456789", name: "cf_crest_1" });
+    expect(containerThumb(familyInviteNotice({ familyLabel: "x", inviterId: "1", tag: "VLA", expiresAt: new Date(), jumpUrl: null }))).toContain("1234567890123456789");
   });
 });

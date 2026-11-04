@@ -3,6 +3,7 @@ import { Mascot } from "../config/branding";
 import { noticeContainer, v2Reply } from "../utils/componentsV2";
 import { fmtAmount, fmtCurrency, fmtFortunes } from "../utils/format";
 import { FAMILY_ROLES, type FamilyRole } from "../data/crimeFamilyCatalog";
+import { cfNoticeEmote } from "../utils/crimeFamilyAssets";
 import { isTester } from "../utils/developerAccess";
 import {
   CooldownReminderType,
@@ -330,8 +331,8 @@ export async function notifyMany(
 const FAMILY_HINT = `-# ${SETTINGS_HINT}.`;
 
 /** Titles stay text-only; the thumbnail is the notice's cf_ icon. */
-function familyNotice(_iconKey: string, title: string, body: string): ContainerBuilder {
-  return noticeContainer(Mascot.Emotes.Gun, title, body, FAMILY_HINT);
+function familyNotice(iconKey: string, title: string, body: string): ContainerBuilder {
+  return noticeContainer(cfNoticeEmote(iconKey), title, body, FAMILY_HINT);
 }
 
 export function familyInviteNotice(v: {
