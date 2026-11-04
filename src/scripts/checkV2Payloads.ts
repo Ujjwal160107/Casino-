@@ -14,6 +14,8 @@ import type { ZooSlot } from "../services/zooService";
 import { statusContainer, plainContainer } from "../utils/componentsV2";
 import { nextStepHint } from "../config/nextSteps";
 import { setEmojiRecord } from "../utils/emojiRegistry";
+import { CF_ASSETS } from "../utils/crimeFamilyAssets";
+import { crimeFamilyWorstCases } from "./fixtures/crimeFamilyScreens";
 
 // Seed the emoji registry before building anything.
 //
@@ -30,6 +32,9 @@ for (const def of ANIMAL_CATALOG) {
 }
 for (const key of ["xp_full", "xp_empty"]) {
     setEmojiRecord(key, { id: FAKE_EMOJI_ID, name: key });
+}
+for (const key of Object.keys(CF_ASSETS)) {
+    setEmojiRecord(`cf_${key}`, { id: FAKE_EMOJI_ID, name: `cf_${key}` });
 }
 
 let failures = 0;
@@ -130,6 +135,9 @@ check("hunt store (9 slots + zoo feed shelf)", buildHuntStoreMessage("1234567890
 // tenth item or another button can't push the panel over 40 silently. ---
 check("job store page 1 (9 slots + price shelf)", buildJobStoreMessage(1, "123456789012345678"));
 check("job store page 2 (9 slots + price shelf)", buildJobStoreMessage(2, "123456789012345678"));
+
+// --- Crime Families: every screen and variant at its worst case (spec 13.3). ---
+for (const c of crimeFamilyWorstCases()) check(c.label, c.payload);
 
 if (failures > 0) {
     console.log(`\n${failures} payload(s) exceed Discord limits`);

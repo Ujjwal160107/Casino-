@@ -1,6 +1,6 @@
 // Read seams for families: membership lookup, roster, investigation status
 // and the dashboard view. No writes.
-import type { Family, FamilyMember, Prisma } from "@prisma/client";
+import type { Family, FamilyInvite, FamilyMember, Prisma } from "@prisma/client";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { FAMILY_LEVELS, levelDef, type FamilyRole } from "../../data/crimeFamilyCatalog";
@@ -8,7 +8,7 @@ import { checkJailStatus } from "../jailService";
 import { racketsHeldFor } from "./extensions";
 import { can, isAssociate, ROLE_RANK } from "./permissions";
 import { FamilyError } from "./tx";
-import type { FamilyDashboardView } from "./views";
+import type { FamilyDashboardView, InviteView } from "./views";
 
 /** The user's family and member row, or null when they are in none. */
 export async function getMembership(uid: string): Promise<{ family: Family; member: FamilyMember } | null> {
@@ -107,5 +107,24 @@ export async function buildDashboardView(familyId: string, viewerId: string, now
       canManage: !!viewerActor && can(viewerActor, "manage", now),
       canClaim: !!viewerActor && can(viewerActor, "claim_chair", now) && bossAway,
     },
+  };
+}
+
+/** "[TAG] Name", how cards and DMs name a family. */
+export function familyLabel(family: Pick<Family, "tag" | "name">): string {
+  return `[${family.tag}] ${family.name}`;
+}
+
+export function toInviteView(invite: FamilyInvite & { family: Family }, memberCount: number): InviteView {
+  const level = levelDef(invite.family.level);
+  return {
+    inviteId: invite.id,
+    familyLabel: familyLabel(invite.family),
+    crestKey: level.crestKey,
+    inviterId: invite.inviterId,
+    inviteeId: invite.inviteeId,
+    expiresAt: invite.expiresAt,
+    memberCount,
+    memberCap: level.memberCap,
   };
 }

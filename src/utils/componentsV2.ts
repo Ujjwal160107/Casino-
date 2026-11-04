@@ -98,3 +98,20 @@ export function v2Reply(
         flags: MessageFlags.IsComponentsV2 | extraFlags,
     };
 }
+
+/**
+ * v2Reply that never pings: `allowedMentions.parse` is empty, so a roster or
+ * a mention in text stays silent. `mentionUsers` are the only ids that ping.
+ */
+export function v2Quiet(
+    containers: ContainerBuilder | ContainerBuilder[],
+    files?: AttachmentBuilder[],
+    extraFlags: number = 0,
+    mentionUsers?: string[],
+) {
+    const parse: [] = [];
+    return {
+        ...v2Reply(containers, files, extraFlags),
+        allowedMentions: mentionUsers?.length ? { parse, users: mentionUsers } : { parse },
+    };
+}

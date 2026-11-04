@@ -1,0 +1,99 @@
+import { describe, it, expect, vi } from "vitest";
+import { PermissionFlagsBits } from "discord.js";
+import { CREW_IDS, CPR_IDS, TURF_IDS, cfId, decodeName, encodeName, parseCfId } from "../../src/ui/crimeFamily/ids";
+import { editChannelMessage, jumpLink, missingBotPermissions, sendToChannel } from "../../src/ui/crimeFamily/post";
+import { buildNotice } from "../../src/ui/crimeFamily/kit";
+
+const U = "12345678901234567890"; // 20-digit snowflakes
+const T = "98765432109876543210";
+const O = "65f0000000000000000000ff"; // 24-char ObjectId
+
+describe("customIds", () => {
+  const all = [
+    CREW_IDS.view("invites", U), CREW_IDS.createOpen(U), CREW_IDS.createOk("WXYZ", "x".repeat(24), U), CREW_IDS.createNo(U),
+    CREW_IDS.manageSelect(U), CREW_IDS.manage("promote", T, U), CREW_IDS.manage("demote", T, U), CREW_IDS.manage("kick", T, U),
+    CREW_IDS.manage("chair", T, U), CREW_IDS.confirm("chair", "ok", T, U), CREW_IDS.confirm("leave", "no", "0", U),
+    CREW_IDS.open("payday", U), CREW_IDS.openTarget("kick", T, U), CREW_IDS.openTarget("chair", T, U),
+    CREW_IDS.vault("deposit", U), CREW_IDS.paydayOk(9_000_000_000_000_000, 12, U), CREW_IDS.levelOk(10, U),
+    CREW_IDS.log(999, U), CREW_IDS.top("war", U), CREW_IDS.disband("open", U), CREW_IDS.modal("disband", U),
+    CREW_IDS.inviteSelect(U), CREW_IDS.invite("decline", O), CREW_IDS.claim(O), CPR_IDS.viewPlan(U), TURF_IDS.viewMap(U),
+  ];
+
+  it.each(all)("%s fits in 100 characters and round-trips", (id) => {
+    expect(id.length).toBeLessThanOrEqual(100);
+    const p = parseCfId(id)!;
+    expect(p).not.toBeNull();
+    expect([p.prefix, p.action, ...p.args].join(":")).toBe(id);
+  });
+
+  it("the longest id is create:ok at 73 characters and carries the name in base64url", () => {
+    const id = CREW_IDS.createOk("WXYZ", "x".repeat(24), U);
+    expect(id).toHaveLength(73);
+    expect(decodeName(parseCfId(id)!.args[2])).toBe("x".repeat(24));
+    expect(decodeName(encodeName("Velvet Ante's"))).toBe("Velvet Ante's");
+  });
+
+  it("pins the S2 Caper and Turf ids", () => {
+    expect(CPR_IDS.viewPlan(U)).toBe(`cpr:v:plan:${U}`);
+    expect(TURF_IDS.viewMap(U)).toBe(`turf:v:map:${U}`);
+  });
+
+  it("rejects foreign or bare ids and refuses ids over 100 characters", () => {
+    expect(parseCfId("crime:x")).toBeNull();
+    expect(parseCfId("crew")).toBeNull();
+    expect(() => cfId("crew", "x".repeat(100))).toThrow();
+  });
+});
+
+describe("channel I/O", () => {
+  const payload = buildNotice("Hello");
+  function fake(fail: { fetch?: unknown; send?: unknown; edit?: unknown } = {}) {
+    const channel = {
+      isTextBased: () => true,
+      send: vi.fn(async () => { if (fail.send) throw fail.send; return { id: "m1" }; }),
+      messages: {
+        fetch: vi.fn(),
+        edit: vi.fn(async () => { if (fail.edit) throw fail.edit; return {}; }),
+      },
+    };
+    const client = { channels: { fetch: vi.fn(async () => { if (fail.fetch) throw fail.fetch; return channel; }) } } as any;
+    return { client, channel };
+  }
+
+  it("sends and edits without fetching the message", async () => {
+    const { client, channel } = fake();
+    expect(await sendToChannel(client, "c1", payload)).toBe("m1");
+    expect(await editChannelMessage(client, "c1", "m9", payload)).toBe("ok");
+    expect(channel.messages.edit).toHaveBeenCalledWith("m9", payload);
+    expect(channel.messages.fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([10003, 10008, 50001, 50013])("a dead board (%i) is null / \"dead\" and never throws", async (code) => {
+    const err = Object.assign(new Error("dead"), { code });
+    for (const where of ["fetch", "send", "edit"] as const) {
+      const { client } = fake({ [where]: err });
+      await expect(sendToChannel(client, "c1", payload)).resolves.toBe(where === "edit" ? "m1" : null);
+      await expect(editChannelMessage(client, "c1", "m1", payload)).resolves.toBe(where === "send" ? "ok" : "dead");
+    }
+  });
+
+  it("any other error is null / \"error\" and never throws", async () => {
+    const err = Object.assign(new Error("boom"), { code: 500 });
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { client } = fake({ send: err, edit: err });
+    await expect(sendToChannel(client, "c1", payload)).resolves.toBeNull();
+    await expect(editChannelMessage(client, "c1", "m1", payload)).resolves.toBe("error");
+    spy.mockRestore();
+  });
+
+  it("missingBotPermissions names what the bot lacks", () => {
+    const granted: bigint[] = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages];
+    const channel = { permissionsFor: (id: string) => (id === "bot" ? { has: (bit: bigint) => granted.includes(bit) } : null) } as any;
+    expect(missingBotPermissions(channel, "bot")).toEqual(["Read Message History", "Attach Files"]);
+    expect(missingBotPermissions(channel, "other")).toEqual(["View Channel", "Send Messages", "Read Message History", "Attach Files"]);
+  });
+
+  it("jumpLink points at the message", () => {
+    expect(jumpLink("g", "c", "m")).toBe("https://discord.com/channels/g/c/m");
+  });
+});

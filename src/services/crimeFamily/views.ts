@@ -80,3 +80,15 @@ export interface LeaderboardView {
   }[];
   viewer: { rank: number; value: number } | null;
 }
+
+/** S4 and S24: one pending invite. */
+export interface InviteView {
+  inviteId: string;
+  familyLabel: string;
+  crestKey: string;
+  inviterId: string;
+  inviteeId: string;
+  expiresAt: Date;
+  memberCount: number;
+  memberCap: number;
+}
