@@ -5,10 +5,9 @@ import type { Family, FamilyInvite, FamilyMember, Prisma } from "@prisma/client"
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { levelDef, type FamilyRole } from "../../data/crimeFamilyCatalog";
-import { checkJailStatus } from "../jailService";
 import { checkMemberEligibility, eligibilityError } from "./eligibility";
 import { FAMILY_HOOKS, type MemberExitKind } from "./extensions";
-import { getFamilyByTag, getMembership, readActorAndTarget, requireMembership } from "./familyQueries";
+import { assertNotJailed, getFamilyByTag, getMembership, readActorAndTarget, requireMembership } from "./familyQueries";
 import { can, NO_PERMISSION } from "./permissions";
 import { FamilyError, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
 
@@ -17,11 +16,6 @@ const SEAT_RACE_RUNS = 3;
 const INVITE_EXPIRED = "Invite expired.";
 
 const actorOf = (m: FamilyMember) => ({ role: m.role as FamilyRole, joinedAt: m.joinedAt });
-
-async function assertNotJailed(uid: string): Promise<void> {
-  const { isJailed } = await checkJailStatus(uid);
-  if (isJailed) throw new FamilyError("You can't do that while in jail.");
-}
 
 /**
  * The rolling 7-day accepted-join caps (6.4). `alreadyAccepted` is 1 when the

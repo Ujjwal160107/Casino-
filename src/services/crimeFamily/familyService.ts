@@ -1,5 +1,5 @@
 // Founding a family, moving its home channel and the moderator's force
-// rename. Task 9 adds the Boss's paid rename here.
+// rename, and the Boss's paid rename.
 import type { Family } from "@prisma/client";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
@@ -10,7 +10,7 @@ import { writeLedger } from "./ledger";
 import { checkFamilyName, checkFamilyTag } from "./names";
 import { can, NO_PERMISSION } from "./permissions";
 import { FamilyError, isUniqueViolation, runFamilyTx } from "./tx";
-import { utcDayKey } from "./vaultService";
+import { spendFromVault, utcDayKey } from "./vaultService";
 import type { FamilyRole } from "../../data/crimeFamilyCatalog";
 
 /**
@@ -65,6 +65,35 @@ export async function setHomeChannel(bossId: string, guildId: string, channelId:
   const { count } = await prisma.family.updateMany({ where: { id: family.id, bossId }, data: { homeGuildId: guildId, homeChannelId: channelId } });
   if (count === 0) throw new FamilyError(NO_PERMISSION);
   return prisma.family.findUniqueOrThrow({ where: { id: family.id } });
+}
+
+/**
+ * Spec 6.2: the Boss renames the family once per renameCooldownSeconds,
+ * paying renameFee earnings-first. A taken name aborts the transaction, so
+ * nothing is charged; its P2002 is mapped here, outside.
+ */
+export async function renameFamily(bossId: string, rawName: string, now: Date = new Date()): Promise<Family> {
+  const { family } = await requireMembership(bossId);
+  if (family.bossId !== bossId) throw new FamilyError(NO_PERMISSION);
+  const name = checkFamilyName(rawName);
+  if (!name.ok) throw new FamilyError(name.reason);
+  const renamableBefore = new Date(now.getTime() - CRIME_FAMILY_CONFIG.renameCooldownSeconds * 1000);
+  try {
+    return await runFamilyTx(async (tx) => {
+      const current = await tx.family.findUnique({ where: { id: family.id } });
+      if (!current || current.bossId !== bossId) throw new FamilyError(NO_PERMISSION);
+      const { count } = await tx.family.updateMany({
+        where: { id: family.id, bossId, lastRenamedAt: { lte: renamableBefore } },
+        data: { name: name.name, nameKey: name.nameKey, lastRenamedAt: now },
+      });
+      if (count !== 1) throw new FamilyError("You can rename once every 30 days.");
+      await spendFromVault(tx, family.id, CRIME_FAMILY_CONFIG.renameFee, "rename_fee", bossId, { from: current.name, to: name.name });
+      return tx.family.findUniqueOrThrow({ where: { id: family.id } });
+    });
+  } catch (err) {
+    if (isUniqueViolation(err, "Family_nameKey_key")) throw new FamilyError("Name taken.");
+    throw err;
+  }
 }
 
 /** Moderator rename (`crew-forcerename <TAG> <name>`): the name rules apply; no fee, no cooldown. */

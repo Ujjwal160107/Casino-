@@ -4,6 +4,7 @@ import type { Family, FamilyMember, Prisma } from "@prisma/client";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { FAMILY_LEVELS, levelDef, type FamilyRole } from "../../data/crimeFamilyCatalog";
+import { checkJailStatus } from "../jailService";
 import { racketsHeldFor } from "./extensions";
 import { can, isAssociate, ROLE_RANK } from "./permissions";
 import { FamilyError } from "./tx";
@@ -21,6 +22,12 @@ export async function requireMembership(uid: string): Promise<{ family: Family; 
   const membership = await getMembership(uid);
   if (!membership) throw new FamilyError("You are not in a crime family.");
   return membership;
+}
+
+/** The jail refusal shared by every family action a jailed member may not take. */
+export async function assertNotJailed(uid: string): Promise<void> {
+  const { isJailed } = await checkJailStatus(uid);
+  if (isJailed) throw new FamilyError("You can't do that while in jail.");
 }
 
 /**
