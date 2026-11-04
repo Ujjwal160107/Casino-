@@ -12,9 +12,10 @@ import { testPrisma, seedUser, seedEligibleUser, seedFamily, resetFamilies, ensu
 const CREW_COPY = { verb: "Invite", bot: "Bots can't join a family." };
 
 /** A guild message with the slices `!crew` reads: channel permissions, mentions, a client that DMs, replies with ids. */
-function crewMessage(authorId: string, o: { mention?: { id: string; bot: boolean }; missing?: bigint[] } = {}) {
+function crewMessage(authorId: string, o: { mention?: { id: string; bot: boolean }; missing?: bigint[]; firstReplyFails?: boolean } = {}) {
   const dm = fakeDmClient();
   const reply = vi.fn(async (_p: unknown) => ({ id: `r${reply.mock.calls.length}` }));
+  if (o.firstReplyFails) reply.mockRejectedValueOnce(Object.assign(new Error("Missing Access"), { code: 50001 }));
   const missing = new Set(o.missing ?? []);
   const client = Object.assign(dm.client, { user: { id: "bot" } });
   const message = {
@@ -28,12 +29,12 @@ function crewMessage(authorId: string, o: { mention?: { id: string; bot: boolean
     reply,
   } as unknown as Message;
   const said = (n = 0) => replyText(reply.mock.calls[n][0]);
-  return { message, reply, dm: dm.sent, said };
+  return { message, reply, dm: dm.sent, dmLast: dm.last, said };
 }
 
 const crew = async (uid: string, line: string, o: Parameters<typeof crewMessage>[1] = {}) => {
   const m = crewMessage(uid, o);
-  await withCfConfig({ enabled: true }, () => handleCrew(m.message, line.split(/\s+/).filter(Boolean)));
+  await withCfConfig({ enabled: true }, () => handleCrew(m.message, line.split(/\s+/).filter(Boolean), "!"));
   return m;
 };
 
@@ -71,6 +72,22 @@ describe("!crew", () => {
     expect(m.reply.mock.calls[0][0]).toMatchObject({ allowedMentions: { parse: [], users: [invitee] } });
     expect(await testPrisma.familyInvite.findFirst({ where: { inviteeId: invitee } })).toMatchObject({ messageId: "r1", channelId: "c-new" });
     expect([...m.dm.keys()]).toEqual([invitee]);
+  });
+
+  it("invite still DMs the invitee, without a jump link, when the S4 card could not be posted", async () => {
+    const boss = await seedEligibleUser(); const invitee = await seedEligibleUser();
+    await seedFamily({ bossId: boss });
+    const m = await crew(boss, `invite ${invitee}`, { firstReplyFails: true });
+    expect(await testPrisma.familyInvite.findFirst({ where: { inviteeId: invitee } })).toMatchObject({ status: "PENDING", messageId: "" });
+    expect([...m.dm.keys()]).toEqual([invitee]);
+    expect(JSON.stringify(m.dmLast.get(invitee))).toContain("crew accept");
+    expect(JSON.stringify(m.dmLast.get(invitee))).not.toContain("discord.com/channels");
+  });
+
+  it("usage text uses the router's prefix, so a /crew user sees /crew", async () => {
+    const m = crewMessage("u1");
+    await withCfConfig({ enabled: true }, () => handleCrew(m.message, ["nope"], "/"));
+    expect(m.said()).toContain("Usage: `/crew [");
   });
 
   it("deposit refuses bad amounts; `all` clamps to the day's cap, then the cap refuses (Review Focus 1, P21)", async () => {

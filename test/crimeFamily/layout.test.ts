@@ -12,7 +12,7 @@ vi.mock("../../src/utils/assetPaths", async (orig) => {
   return { ...m, findAsset: (n: string) => (art.present ? m.findAsset(n) : null) };
 });
 const { crimeFamilyWorstCases } = await import("../../src/scripts/fixtures/crimeFamilyScreens");
-const { buildDashboard, buildLeaderboard } = await import("../../src/ui/crimeFamily/familyScreens");
+const { buildDashboard, buildInviteCard, buildInviteResolved, buildLeaderboard } = await import("../../src/ui/crimeFamily/familyScreens");
 
 const count = (n: any): number => 1 + (n.components ?? []).reduce((s: number, c: any) => s + count(c), 0) + (n.accessory ? 1 : 0);
 const chars = (n: any): number => (typeof n.content === "string" ? n.content.length : 0) + (n.components ?? []).reduce((s: number, c: any) => s + chars(c), 0) + (n.accessory ? chars(n.accessory) : 0);
@@ -57,6 +57,17 @@ describe("screen details", () => {
     expect(p.files).toHaveLength(1);
     expect(p.attachments).toEqual([]);
     expect(buildDashboard(view(), { art: false }).files ?? []).toHaveLength(0);
+  });
+
+  it("S4 resolved names no attachment and clears the posted crest, whatever crest the family has now", () => {
+    art.present = true;
+    const invite = { inviteId: "65f000000000000000000009", familyLabel: "[VLA] Velvet Ante", crestKey: "crest_1", inviterId: "1", inviteeId: "2", expiresAt: new Date(), memberCount: 2, memberCap: 6 };
+    expect(text(buildInviteCard(invite))).toContain("attachment://");
+    const resolved = buildInviteResolved({ ...invite, crestKey: "crest_4" }, "Accepted by <@2>");
+    expect(text(resolved)).not.toContain("attachment://");
+    expect(resolved.files ?? []).toHaveLength(0);
+    expect(resolved.attachments).toEqual([]);
+    expect(text(resolved)).toContain("Accepted by <@2>");
   });
 
   it("S2 hides Turf while turfEnabled is false and shows Claim only for a claim-eligible Underboss", () => {

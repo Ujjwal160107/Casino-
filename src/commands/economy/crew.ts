@@ -16,7 +16,6 @@ import {
 } from "../../services/crimeFamily/membershipService";
 import { FamilyError } from "../../services/crimeFamily/tx";
 import { depositToVault, resolveDepositAmount } from "../../services/crimeFamily/vaultService";
-import { getGuildSettings } from "../../services/guildSettingsService";
 import { InsufficientFundsError } from "../../services/walletService";
 import { announceChairChange, announceInvite, announceRoleChange, resolveInviteCard } from "../../ui/crimeFamily/announce";
 import { buildDashboard, buildInviteCard } from "../../ui/crimeFamily/familyScreens";
@@ -70,14 +69,23 @@ function rankChange(action: "promote" | "demote") {
   };
 }
 
-/** S4 in this channel (pinging only the invitee), stored for the sweeper, then the invitee's DM. */
+/**
+ * S4 in this channel (pinging only the invitee), stored for the sweeper, then
+ * the invitee's DM. The invite stands even if the card could not be posted,
+ * so the DM still goes, without a jump link.
+ */
 async function invite(ctx: CrewCtx) {
   const inviteeId = await targetOf(ctx, "Invite");
   const created = await inviteMember({ inviterId: ctx.uid, inviteeId, guildId: ctx.guildId, channelId: ctx.channelId });
-  const card = await show(ctx, buildInviteCard(toInviteView(created, await countMembers(created.familyId))));
-  await setInviteMessage(created.id, card.id);
-  await announceInvite(ctx.message.client, created, card.id);
-  return card;
+  let cardId: string | null = null;
+  try {
+    const card = await show(ctx, buildInviteCard(toInviteView(created, await countMembers(created.familyId))));
+    cardId = card.id;
+    await setInviteMessage(created.id, card.id);
+    return card;
+  } finally {
+    await announceInvite(ctx.message.client, created, cardId);
+  }
 }
 
 async function deposit(ctx: CrewCtx) {
@@ -157,12 +165,12 @@ async function replyOrRefuse(message: Message, run: () => Promise<unknown>): Pro
   }
 }
 
-export async function handleCrew(message: Message, args: string[]): Promise<unknown> {
+/** `prefix` is the router's: the guild's prefix, or "/" for a slash user. */
+export async function handleCrew(message: Message, args: string[], prefix: string): Promise<unknown> {
   if (!isCrimeFamilyOpen(message.guildId)) return message.reply(v2Quiet(errorContainer(TITLE, NOT_OPEN_HERE)));
   const uid = message.author.id;
   void touchActivity(uid);
   const guildId = message.guildId!;
-  const prefix = (await getGuildSettings(guildId)).prefix || "!";
   const sub = args[0]?.toLowerCase() ?? "dashboard";
   const run = CREW_SUBACTIONS[sub];
   if (!run) {

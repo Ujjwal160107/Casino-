@@ -565,7 +565,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
     }
     case "crew": {
       const { handleCrew } = require("./commands/economy/crew");
-      return handleCrew(message, args);
+      return handleCrew(message, args, prefix);
     }
     case "crew-forcerename": {
       const { handleCrewForceRename } = require("./commands/economy/crew");

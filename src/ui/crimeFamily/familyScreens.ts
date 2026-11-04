@@ -130,15 +130,12 @@ export function buildCreateConfirm(ownerId: string, v: { name: string; tag: stri
 
 // ── S4 ───────────────────────────────────────────────────────────────────────
 
-function inviteHeader(container: ContainerBuilder, v: InviteView): AttachmentBuilder | null {
-  return addThumbSection(container,
-    `## ${cfLabel(v.crestKey, `Invite to ${v.familyLabel}`)}\n<@${v.inviteeId}>, <@${v.inviterId}> invited you to the family.`,
-    v.crestKey);
-}
+const inviteHeaderText = (v: InviteView) =>
+  `## ${cfLabel(v.crestKey, `Invite to ${v.familyLabel}`)}\n<@${v.inviteeId}>, <@${v.inviterId}> invited you to the family.`;
 
 export function buildInviteCard(v: InviteView): CfPayload {
   const container = new ContainerBuilder();
-  const file = inviteHeader(container, v);
+  const file = addThumbSection(container, inviteHeaderText(v), v.crestKey);
   const hop = days(CRIME_FAMILY_CONFIG.hopCooldownSeconds.LEFT);
   container
     .addTextDisplayComponents(text(
@@ -152,12 +149,14 @@ export function buildInviteCard(v: InviteView): CfPayload {
   return cfPayload(container, { files: file ? [file] : undefined, mentionUsers: [v.inviteeId] });
 }
 
-/** The S4 card after an answer or expiry: no buttons, no ping; the message already holds the crest. */
+/**
+ * The S4 card after an answer or expiry: no buttons, no ping. A plain header
+ * that drops the posted crest file, so the edit never names an attachment the
+ * message lacks (the family may have moved to another crest tier since).
+ */
 export function buildInviteResolved(v: InviteView, status: string): CfPayload {
-  const container = new ContainerBuilder();
-  inviteHeader(container, v);
-  container.addTextDisplayComponents(text(`**${status}**`));
-  return cfPayload(container);
+  const container = new ContainerBuilder().addTextDisplayComponents(text(inviteHeaderText(v)), text(`**${status}**`));
+  return cfPayload(container, { freshAttachments: true });
 }
 
 // ── S5 ───────────────────────────────────────────────────────────────────────

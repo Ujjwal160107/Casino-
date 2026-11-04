@@ -7,6 +7,9 @@ import { CREW_IDS, CPR_IDS } from "../../src/ui/crimeFamily/ids";
 import { fakeButton, fakeModal, said } from "./fakeInteraction";
 import { inviteMember } from "../../src/services/crimeFamily/membershipService";
 import { ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
+import {
+  announceArrears, announceChairChange, announceDisband, announceInvite, announcePayday, announceRoleChange, resolveInviteCard,
+} from "../../src/ui/crimeFamily/announce";
 import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, withCfConfig } from "../helpers";
 
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "FamilyInvite"]));
@@ -116,5 +119,59 @@ describe("crime family interactions", () => {
     await handleCrimeFamilyInteraction(acc as any);
     expect(said(acc)).toContain("Crime Families are not open yet.");
     expect(await testPrisma.familyMember.findUnique({ where: { userId: invitee } })).toBeNull();
+  });
+});
+
+describe("announcers after a committed action", () => {
+  /** Logs each DM into the interaction's `order`, next to its editReply. */
+  const logDms = (i: any) => { i.client.users.fetch = vi.fn(async () => ({ send: vi.fn(async () => { i.order.push("dm"); return {}; }) })); return i; };
+  const shownBeforeDms = (i: any) => {
+    expect(i.order).toContain("dm");
+    expect(i.order.indexOf("editReply")).toBeLessThan(i.order.indexOf("dm"));
+  };
+
+  it("hand-over shows the result before the members' DMs", async () => {
+    const boss = await seedEligibleUser(); const ub = await seedEligibleUser();
+    await seedFamily({ bossId: boss, members: [{ userId: ub, role: "UNDERBOSS", joinedAt: daysAgo(10) }] });
+    const i = logDms(fakeButton(CREW_IDS.confirm("chair", "ok", ub, boss), { userId: boss, ephemeralSource: true }));
+    await handleCrimeFamilyInteraction(i);
+    expect(said(i)).toContain("is now the Boss");
+    shownBeforeDms(i);
+  });
+
+  it("payday shows the vault before the paid members' DMs", async () => {
+    const boss = await seedEligibleUser(); const ub = await seedEligibleUser();
+    await seedFamily({ bossId: boss, earnings: 1_000_000, lastPaydayAt: daysAgo(8), members: [{ userId: ub, role: "UNDERBOSS", joinedAt: daysAgo(10) }] });
+    ACTIVITY_RULES.push({ key: "all", label: "all", need: 0, count: async () => 1 });
+    try {
+      const i = logDms(fakeButton(CREW_IDS.paydayOk(1_000_000, 2, boss), { userId: boss, ephemeralSource: true }));
+      await handleCrimeFamilyInteraction(i);
+      expect(said(i)).toContain("Paid 2 members.");
+      shownBeforeDms(i);
+    } finally { ACTIVITY_RULES.pop(); }
+  });
+
+  it("disband shows the result before the former members' DMs", async () => {
+    const boss = await seedEligibleUser(); const s = await seedEligibleUser();
+    await seedFamily({ bossId: boss, tag: "VLA", members: [{ userId: s, role: "SOLDIER" }] });
+    const i = logDms(fakeModal(CREW_IDS.modal("disband", boss), { tag: "VLA" }, { userId: boss }));
+    await handleCrimeFamilyInteraction(i);
+    expect(said(i)).toContain("has disbanded.");
+    shownBeforeDms(i);
+  });
+
+  it("every announcer logs its own failure instead of throwing", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const client = {} as any; const bad = null as any;
+      await expect(announcePayday(client, bad)).resolves.toEqual({ cardPosted: false });
+      await expect(announceChairChange(client, bad, "handed", "a", "b")).resolves.toBeUndefined();
+      await expect(announceArrears(client, bad)).resolves.toBeUndefined();
+      await expect(announceRoleChange(client, bad, "kicked", "a", null)).resolves.toBeUndefined();
+      await expect(announceDisband(client, bad)).resolves.toBeUndefined();
+      await expect(announceInvite(client, bad, null)).resolves.toBeUndefined();
+      await expect(resolveInviteCard(client, bad, "Declined")).resolves.toBeUndefined();
+      expect(error).toHaveBeenCalledTimes(7);
+    } finally { error.mockRestore(); }
   });
 });

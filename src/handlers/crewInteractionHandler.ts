@@ -1,6 +1,7 @@
 // CREW_ROUTES: every `crew:` press. The router has already checked the owner
 // and acknowledged; each route re-reads membership and role from the DB,
-// calls one service, runs the matching announcer and renders a screen.
+// calls one service, runs the matching announcer and renders a screen. An
+// announcer that fans out DMs (hand-over, payday, disband) runs after show().
 import {
   ActionRowBuilder,
   ModalBuilder,
@@ -44,6 +45,14 @@ export const BAD_AMOUNT = "Enter a positive amount like 250k or 5m";
 
 const days = (seconds: number) => Math.round(seconds / 86_400);
 const show = async (i: CfInteraction, payload: CfPayload) => { await safeEditReply(i, payload); };
+/** Shows the result, then runs its announcer (which never throws) even if the edit failed: the action has committed. */
+const showThenAnnounce = async (i: CfInteraction, payload: CfPayload | Promise<CfPayload>, announce: () => Promise<unknown>) => {
+  try {
+    await show(i, await payload);
+  } finally {
+    await announce();
+  }
+};
 const notice = (text: string) => buildNotice(text);
 const owner = (args: string[]) => args[args.length - 1];
 
@@ -216,8 +225,8 @@ const confirmRoute: CfRoute = async (i, [kind, answer, target, uid]) => {
     return show(i, notice(`<@${target}> was kicked from **${familyLabel(family)}**.`));
   }
   const move = await handOverChair(uid, target);
-  await announceChairChange(i.client, move.family, "handed", move.oldBossId, move.newBossId);
-  return show(i, notice(`<@${target}> is now the Boss of **${familyLabel(move.family)}**.`));
+  return showThenAnnounce(i, notice(`<@${target}> is now the Boss of **${familyLabel(move.family)}**.`),
+    () => announceChairChange(i.client, move.family, "handed", move.oldBossId, move.newBossId));
 };
 
 /** `crew:pay:ok:<E>:<N>:<owner>` (S7 Confirm): a stale preview re-renders S7 with the reason. */
@@ -225,8 +234,7 @@ const paydayRoute: CfRoute = async (i, [, earnings, count, uid]) => {
   const { family } = await requireMembership(uid);
   const result = await executePayday(family.id, uid, { earnings: Number(earnings), count: Number(count) });
   if (result.status === "changed") return show(i, buildPaydayPreview(uid, result.preview, result.reason));
-  await announcePayday(i.client, result);
-  return show(i, await vaultScreen(uid, `Paid ${result.paid.length} members.`));
+  return showThenAnnounce(i, vaultScreen(uid, `Paid ${result.paid.length} members.`), () => announcePayday(i.client, result));
 };
 
 /** `crew:lvl:ok:<L>:<owner>` (S8 Confirm). */
@@ -303,8 +311,7 @@ const modalRoute: CfRoute = async (i, [kind, uid]) => {
     }
     case "disband": {
       const result = await disbandFamily(uid, field("tag"));
-      await announceDisband(i.client, result);
-      return show(i, notice(`**${familyLabel(result.family)}** has disbanded.`));
+      return showThenAnnounce(i, notice(`**${familyLabel(result.family)}** has disbanded.`), () => announceDisband(i.client, result));
     }
     default:
       throw new FamilyError("This button is no longer active.");
