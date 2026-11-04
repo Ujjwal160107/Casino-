@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { createFamily, forceRenameFamily } from "../../src/services/crimeFamily/familyService";
 import { inviteMember, acceptInvite, declineInvite, leaveFamily, kickMember, expireInvites } from "../../src/services/crimeFamily/membershipService";
+import {
+  promoteMember, demoteMember, handOverChair, claimChair, autoHandover, markClaimNotice, clearClaimNotice,
+} from "../../src/services/crimeFamily/chairService";
 import { FAMILY_HOOKS } from "../../src/services/crimeFamily/extensions";
+import prisma from "../../src/utils/prisma";
 import { FamilyError, VaultBusy } from "../../src/services/crimeFamily/tx";
 import type { FamilyRole } from "../../src/data/crimeFamilyCatalog";
 import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
@@ -250,5 +254,124 @@ describe("leave and kick (6.4)", () => {
     const [a, b] = await Promise.all([expireInvites(now), expireInvites(now)]);
     expect(a.length + b.length).toBe(1);
     expect(await inviteRow(inv.id)).toMatchObject({ status: "EXPIRED", slot: inv.id });
+  });
+});
+
+describe("ranks (6.3)", () => {
+  const member = (userId: string) => testPrisma.familyMember.findUniqueOrThrow({ where: { userId } });
+
+  it("promotions fill CAPO1, CAPO2, CAPO3, then 'Capo seats are full.'", async () => {
+    const { bossId, ids } = await famWith([{ role: "SOLDIER" }, { role: "SOLDIER" }, { role: "SOLDIER" }, { role: "SOLDIER" }]);
+    for (const [k, id] of ids.slice(0, 3).entries()) {
+      expect(await promoteMember(bossId, id)).toMatchObject({ newRole: "CAPO" });
+      expect(await member(id)).toMatchObject({ role: "CAPO", roleSlot: `CAPO${k + 1}` });
+    }
+    await expect(promoteMember(bossId, ids[3])).rejects.toThrow("Capo seats are full.");
+    expect(await member(ids[3])).toMatchObject({ role: "SOLDIER", roleSlot: ids[3] });
+  });
+
+  it("three concurrent Soldier → Capo promotions take CAPO1..3 once each", async () => {
+    const { bossId, ids } = await famWith([{ role: "SOLDIER" }, { role: "SOLDIER" }, { role: "SOLDIER" }]);
+    const rs = await Promise.allSettled(ids.map((id) => promoteMember(bossId, id)));
+    expect(rs.filter((r) => r.status === "fulfilled")).toHaveLength(3);
+    expect((await Promise.all(ids.map(member))).map((r) => r.roleSlot).sort()).toEqual(["CAPO1", "CAPO2", "CAPO3"]);
+  });
+
+  it("two concurrent promotions to Underboss: one wins; the other reads 'The Underboss seat is taken.'", async () => {
+    const { family, bossId, ids } = await famWith([{ role: "CAPO" }, { role: "CAPO" }]);
+    const rs = await Promise.allSettled(ids.map((id) => promoteMember(bossId, id)));
+    expect(rs.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(rs.filter((r) => r.status === "rejected").map((r: any) => r.reason.message)).toEqual(["The Underboss seat is taken."]);
+    expect(await testPrisma.familyMember.count({ where: { familyId: family.id, role: "UNDERBOSS" } })).toBe(1);
+  });
+
+  it("an Underboss can promote Soldier → Capo but not Capo → Underboss", async () => {
+    const { ids: [ub, capo, s] } = await famWith([{ role: "UNDERBOSS" }, { role: "CAPO" }, { role: "SOLDIER" }]);
+    await expect(promoteMember(ub, capo)).rejects.toThrow("You don't have permission to do that.");
+    expect(await promoteMember(ub, s)).toMatchObject({ newRole: "CAPO" });
+    expect(await member(s)).toMatchObject({ role: "CAPO", roleSlot: "CAPO2" });
+    expect(await member(capo)).toMatchObject({ role: "CAPO", roleSlot: "CAPO1" });
+  });
+
+  it("demote Capo → Soldier sets roleSlot to the member's uid", async () => {
+    const { bossId, ids: [capo] } = await famWith([{ role: "CAPO" }]);
+    expect(await demoteMember(bossId, capo)).toMatchObject({ newRole: "SOLDIER" });
+    expect(await member(capo)).toMatchObject({ role: "SOLDIER", roleSlot: capo });
+  });
+});
+
+describe("the chair (6.7)", () => {
+  const member = (userId: string) => testPrisma.familyMember.findUniqueOrThrow({ where: { userId } });
+  const bossOf = async (id: string) => (await testPrisma.family.findUniqueOrThrow({ where: { id } })).bossId;
+
+  it("handover moves bossId and makes the old Boss a Soldier with roleSlot = old uid", async () => {
+    const { family, bossId, ids: [capo] } = await famWith([{ role: "CAPO" }]);
+    expect(await handOverChair(bossId, capo)).toMatchObject({ oldBossId: bossId, newBossId: capo });
+    expect(await bossOf(family.id)).toBe(capo);
+    expect(await member(bossId)).toMatchObject({ role: "SOLDIER", roleSlot: bossId });
+    expect(await member(capo)).toMatchObject({ role: "BOSS", roleSlot: "BOSS" });
+  });
+
+  it("claim works after 7 days of Boss inactivity and is refused at 6 ('The Boss is still active.')", async () => {
+    const { family, bossId, ids: [ub] } = await famWith([{ role: "UNDERBOSS" }]);
+    await testPrisma.familyMember.update({ where: { userId: bossId }, data: { lastActiveAt: daysAgo(6) } });
+    await expect(claimChair(family.id, ub)).rejects.toThrow("The Boss is still active.");
+    await testPrisma.familyMember.update({ where: { userId: bossId }, data: { lastActiveAt: daysAgo(7.01) } });
+    expect(await claimChair(family.id, ub)).toMatchObject({ oldBossId: bossId, newBossId: ub });
+    expect(await member(bossId)).toMatchObject({ role: "SOLDIER", roleSlot: bossId });
+    expect(await member(ub)).toMatchObject({ role: "BOSS", roleSlot: "BOSS" });
+  });
+
+  it("autoHandover at 14 days seats the heir as BOSS; nobody qualified → null and nothing changes", async () => {
+    const now = new Date();
+    const bossId = await seedEligibleUser(); const ub = await seedEligibleUser(); const capo = await seedEligibleUser();
+    const f = await seedFamily({ bossId, members: [
+      { userId: ub, role: "UNDERBOSS", joinedAt: daysAgo(20), lastActiveAt: daysAgo(9) },
+      { userId: capo, role: "CAPO", joinedAt: daysAgo(20), lastActiveAt: daysAgo(1) },
+    ] });
+    await testPrisma.familyMember.update({ where: { userId: bossId }, data: { lastActiveAt: daysAgo(13, now) } });
+    expect(await autoHandover(f.id, now)).toBeNull();
+    await testPrisma.familyMember.update({ where: { userId: bossId }, data: { lastActiveAt: daysAgo(14.01, now) } });
+    expect(await autoHandover(f.id, now)).toMatchObject({ oldBossId: bossId, newBossId: capo });
+    expect(await member(capo)).toMatchObject({ role: "BOSS", roleSlot: "BOSS" });
+    expect(await member(bossId)).toMatchObject({ role: "SOLDIER", roleSlot: bossId });
+
+    const lone = await seedEligibleUser(); const idle = await seedEligibleUser();
+    const g = await seedFamily({ bossId: lone, members: [{ userId: idle, role: "UNDERBOSS", joinedAt: daysAgo(20), lastActiveAt: daysAgo(8) }] });
+    await testPrisma.familyMember.update({ where: { userId: lone }, data: { lastActiveAt: daysAgo(15, now) } });
+    expect(await autoHandover(g.id, now)).toBeNull();
+    expect(await bossOf(g.id)).toBe(lone);
+    expect(await member(idle)).toMatchObject({ role: "UNDERBOSS", roleSlot: "UNDERBOSS" });
+  });
+
+  it("claim vs a returning Boss: the in-transaction re-read sees the return → 'The Boss is back.'", async () => {
+    const bossId = await seedEligibleUser(); const ub = await seedEligibleUser();
+    const f = await seedFamily({ bossId, members: [{ userId: ub, role: "UNDERBOSS", joinedAt: daysAgo(20) }] });
+    await testPrisma.familyMember.update({ where: { userId: bossId }, data: { lastActiveAt: daysAgo(8) } });
+    // claimChair's pre-check reads the Boss with prisma.familyMember.findUnique({ where: { userId: family.bossId } }) on the
+    // global client; the in-transaction re-read uses tx.familyMember.findUnique, a different delegate the patch does not touch.
+    const delegate = prisma.familyMember as any;
+    const original = delegate.findUnique;
+    let first = true;
+    delegate.findUnique = async (args: any) => {
+      const snapshot = await original.call(delegate, args);
+      if (first && args?.where?.userId === bossId) {
+        first = false;
+        await testPrisma.familyMember.update({ where: { userId: bossId }, data: { lastActiveAt: new Date() } });
+      }
+      return snapshot;                                   // stale: still 8 days ago
+    };
+    try { await expect(claimChair(f.id, ub)).rejects.toThrow("The Boss is back."); } finally { delegate.findUnique = original; }
+    expect(first).toBe(false);
+    expect((await testPrisma.family.findUnique({ where: { id: f.id } }))!.bossId).toBe(bossId);
+  });
+
+  it("markClaimNotice is true once per inactivity episode; clearClaimNotice opens the next one", async () => {
+    const f = await seedFamily({ bossId: await seedEligibleUser() });
+    expect(await markClaimNotice(f.id, f.bossId)).toBe(true);
+    expect(await markClaimNotice(f.id, f.bossId)).toBe(false);
+    expect(await clearClaimNotice(f.id, f.bossId)).toBe(true);
+    expect(await clearClaimNotice(f.id, f.bossId)).toBe(false);
+    expect(await markClaimNotice(f.id, f.bossId)).toBe(true);
   });
 });
