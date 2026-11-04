@@ -1,6 +1,6 @@
 // View types passed from the family services to the UI builders (types only).
 // Each later view type is added by the task that first produces it.
-import type { FamilyLevelDef, FamilyRole } from "../../data/crimeFamilyCatalog";
+import type { CaperRoleKey, FamilyLevelDef, FamilyRole } from "../../data/crimeFamilyCatalog";
 import type { LedgerLine } from "./ledger";
 
 /** S2: the family dashboard as one viewer sees it. */
@@ -91,4 +91,22 @@ export interface InviteView {
   expiresAt: Date;
   memberCount: number;
   memberCap: number;
+}
+
+/** S14: one seat's caper brief (spec 8.3). Only the viewer's own seat is ever rendered. */
+export interface BriefView {
+  caperId: string;
+  ownerId: string;
+  role: CaperRoleKey;
+  /** The intel this seat holds: its ring predecessor's correct answer. */
+  tell: { userId: string; label: string };
+  /** This seat's own call; the answer is held by its ring successor. */
+  call: { question: string; options: string[]; fromUserId: string };
+  /** From leakAt, this seat's own correct label when its intel holder is dark. */
+  leaked: string | null;
+  /** From leakAt, whether this seat itself went dark (it cannot lock). */
+  dark: boolean;
+  lockedIndex: number | null;
+  goEndsAt: Date;
+  leakAt: Date;
 }
