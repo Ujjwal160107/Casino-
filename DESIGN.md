@@ -147,7 +147,7 @@ single object centered with 5% empty margin, plain solid [key colour] background
 
 Key colour: `#00FF00` for Lady Fortuna and any subject with purple or magenta in it; `#FF00FF` otherwise. The key must never occur in the subject (a 50/50 blend of the hair ramp and magenta falls outside a 12% fuzz and survives as a pink halo).
 
-Banners: generate at 1536x1024 and compose everything, placard included, inside the middle band that survives the crop to 1536x538 (from y=243 by default); keep the top and bottom 240 px plain wall and floor.
+Banners: ChatGPT's image tool returns a wide render (2172x724 in practice) when asked for a 2.86:1 banner; crop it centred to 2.857:1 (2068x724). If the tool returns 1536x1024 instead, crop the middle 1536x538 band (from y=243 by default), so compose everything, placard included, inside that band.
 
 For Lady Fortuna add: `young woman with long straight purple hair, purple eyes, soft smile, three-quarter view, head to mid-thigh, [outfit], holding [prop], purple black and gold colour scheme`.
 
@@ -156,7 +156,7 @@ Negative terms: `anti-aliasing, blur, soft shadow, drop shadow, glow, bloom, gra
 Post-process every AI render, in order:
 
 1. Key out the background to alpha 0 by flood fill from the four corners (`-fuzz 10% -fill none -draw "color 0,0 floodfill"` per corner), never a global `-transparent`, which also deletes interior pixels near the key. Never trust a "transparent" render: `cheat sheet.png` shipped with a baked-in checkerboard.
-2. Crop to the class aspect (banners: the middle 1536x538 band), then area (box) downscale to the class grid (section 4), then nearest-neighbour upscale by the class factor. A point-sampled, non-integer downscale breaks 1-px outlines and placard letters.
+2. Crop to the class aspect, then area (box) downscale to the class grid (section 4), then nearest-neighbour upscale by the class factor. A point-sampled, non-integer downscale breaks 1-px outlines and placard letters. **Exception, banners:** box-downscale straight to 960x336 and skip steps 3–4 (no grid snap, no colour cap). The shipped banners are smooth downscales with about 70k–120k colours, and a 240x84 grid makes a two-line placard unreadable (measured on the Crime Families banners, 2026-11-04).
 3. Quantise to at most 32 colours, no dithering.
 4. Threshold alpha: below 128 becomes 0, the rest 255.
 5. Crop or pad to the exact class size, object centred.
@@ -171,7 +171,7 @@ For small icons and emoji-first art, author the grid and render it. Start from a
 | Icon | 40x40 | x4 | 160x160 |
 | Small animal | 45x45 | x5 | 225x225 |
 | Large character | 250x250 | x2 | 500x500 |
-| Banner | 240x84 | x4 | 960x336 |
+| Banner | 240x84 (programmatic banners only; AI banners use the 8A exception) | x4 | 960x336 |
 
 Sprite source format: a palette array and one string per row, one character per cell.
 

@@ -25,3 +25,6 @@ coverage/
 # Economy backups written by src/scripts/economyBackup.ts. Contain player
 # balances and holdings -- never commit them.
 backups/
+
+# Raw AI renders; post-processed copies live in src/assets
+art-src/

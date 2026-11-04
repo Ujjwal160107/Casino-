@@ -1636,6 +1636,8 @@ export const CF_SPRITES: readonly PixelSprite[] = [cfCrest1, cfCrest2, /* … 24
 
 **Done 2026-10-29.** All 24 grids are in `src/data/sprites/cf/` and rendered to `src/assets/cf_*.png` (160x160, alpha only 0/255). The references were drawn in code (layered shapes with a top-left light ramp and an auto 1-cell outline), not rendered by an AI model; the owner approved the contact sheet. Emoji upload still waits for the generalised sync script (20.4) and owner approval.
 
+**Path A done 2026-11-04.** The owner's ChatGPT account rendered `cf_fortuna_don` (1254x1254, keyed to alpha, snapped to 250x250 x2) and the 9 banners (2172x724, cropped and downscaled to 960x336). Raw renders are in the gitignored `art-src/cf/`.
+
 ### 20.3 Path A: AI prompt pack
 **Who runs it.** The renders need an image-model account the repo does not have (no OpenAI SDK or key; `@google/generative-ai` in `package.json` is imported nowhere in `src/` and is not part of this pipeline). Who produces them is owner question Q3 (section 22); the default is the owner, delivering raw renders to a gitignored `art-src/cf/`, after which the builder runs the post-process below.
 
@@ -1700,7 +1702,7 @@ export const CF_SPRITES: readonly PixelSprite[] = [cfCrest1, cfCrest2, /* … 24
 | Asset | Command |
 |---|---|
 | Mascot (from 1024x1024, `#00FF00` background) | `magick render.png -alpha set -fuzz 10% -fill none -draw "color 0,0 floodfill" -draw "color 1023,0 floodfill" -draw "color 0,1023 floodfill" -draw "color 1023,1023 floodfill" -filter box -resize 250x250! -channel A -threshold 50% +channel +dither -colors 32 -filter point -resize 500x500! -strip -define png:compression-level=9 src/assets/cf_fortuna_don.png` (corner flood fill, never a global `-transparent`, so interior pixels near the key survive) |
-| Banner (from 1536x1024) | `magick render.png -crop 1536x538+0+${Y} +repage -filter box -resize 240x84! +dither -colors 48 -filter point -resize 960x336! -strip -define png:compression-level=9 src/assets/cf_<key>.png` with `Y=243` by default, adjusted by the producer so the placard sits inside (area downscale, then nearest-neighbour upscale; a point-sampled 6.4x downscale breaks 1-px outlines and letters) |
+| Banner (from the 2172x724 render ChatGPT returned) | `magick render.png -gravity center -crop 2068x724+0+0 +repage -filter box -resize 960x336! -strip -define png:compression-level=9 src/assets/cf_<key>.png` (smooth area downscale like the shipped banners; the 240x84 grid snap first specified here made the second placard line unreadable, see `DESIGN.md` 8A) |
 
 Then run the `DESIGN.md` section 9 checklist: exact size (`magick identify`), alpha 0/255 only (mascot), no opaque pixel within 20 RGB units of the key colour, fully opaque (banners), placard fully inside and at least 16 px from every edge with the text spelled correctly (else stamp it with the pixel font, section 21), ≤ 32 / ≤ 48 colours, no watermark, byte budgets (character ≤ 400 KiB, banner ≤ 700 KiB).
 
