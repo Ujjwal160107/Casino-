@@ -38,7 +38,7 @@ export async function setCaperUpdatedAt(caperId: string, at: Date): Promise<void
 /**
  * One eligible user per role, each owning the role's first prep item; the
  * Mastermind is the Boss, or a Capo under a separate unseated Boss (same
- * wallet, no prep item). Everyone else is a Soldier.
+ * wallet, no prep item). Everyone else is a Soldier. The family is off its caper cooldown.
  */
 export async function caperCrew(o: {
   tier?: Tier; roles: CaperRoleKey[]; plannerRank?: "BOSS" | "CAPO"; plannerId?: string; wallet?: number; joinedDaysAgo?: number;
@@ -58,7 +58,9 @@ export async function caperCrew(o: {
   const members = o.roles
     .filter((role) => ids[role] !== bossId)
     .map((role) => ({ userId: ids[role], role: role === "MASTERMIND" ? ("CAPO" as const) : ("SOLDIER" as const), joinedAt }));
-  const family = await seedFamily({ bossId, level: tier.levelToPlan, homeGuildId: G, homeChannelId: CH, members });
+  const seeded = await seedFamily({ bossId, level: tier.levelToPlan, homeGuildId: G, homeChannelId: CH, members });
+  // nextCaperAt defaults to the insert time, after a `now` the test took before seeding: start the family off cooldown.
+  const family = await testPrisma.family.update({ where: { id: seeded.id }, data: { nextCaperAt: daysAgo(1) } });
   return { family, bossId, ids };
 }
 
