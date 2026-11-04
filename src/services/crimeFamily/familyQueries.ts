@@ -128,3 +128,16 @@ export function toInviteView(invite: FamilyInvite & { family: Family }, memberCo
     memberCap: level.memberCap,
   };
 }
+
+export async function countMembers(familyId: string): Promise<number> {
+  return prisma.familyMember.count({ where: { familyId } });
+}
+
+/** An S4 card: its view and where it was posted (messageId "" when never stored); null when the invite or family is gone. */
+export async function getInviteCard(inviteId: string): Promise<{ view: InviteView; channelId: string; messageId: string } | null> {
+  const invite = await prisma.familyInvite.findUnique({ where: { id: inviteId } });
+  if (!invite) return null;
+  const family = await prisma.family.findUnique({ where: { id: invite.familyId } });
+  if (!family) return null;
+  return { view: toInviteView({ ...invite, family }, await countMembers(family.id)), channelId: invite.channelId, messageId: invite.messageId };
+}

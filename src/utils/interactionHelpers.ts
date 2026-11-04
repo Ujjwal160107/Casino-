@@ -114,6 +114,22 @@ export async function safeFollowUp(
   }
 }
 
+/**
+ * The one way a press is refused, whatever its ack: a deferred ephemeral
+ * edits its placeholder (no V2 flag yet, so plain content is legal), a
+ * deferUpdate or an earlier reply gets an ephemeral follow-up, and an
+ * unacknowledged press an ephemeral reply.
+ */
+export async function rejectPress(interaction: ReplyCapableInteraction, text: string): Promise<void> {
+  if (interaction.deferred && interaction.ephemeral) {
+    await safeEditReply(interaction, { content: text });
+  } else if (interaction.deferred || interaction.replied) {
+    await safeFollowUp(interaction, { content: text, flags: MessageFlags.Ephemeral });
+  } else {
+    await safeReply(interaction, { content: text, flags: MessageFlags.Ephemeral });
+  }
+}
+
 export async function ensureDeferredUpdate(interaction: MessageComponentInteraction): Promise<boolean> {
   return safeDeferUpdate(interaction);
 }

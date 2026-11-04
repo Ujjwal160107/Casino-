@@ -227,6 +227,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
       return await handleCrimeInteraction(interaction);
     }
 
+    if (id.startsWith("crew:") || id.startsWith("cpr:") || id.startsWith("turf:")) {
+      const { handleCrimeFamilyInteraction } = require("./handlers/crimeFamilyRouter");
+      return await handleCrimeFamilyInteraction(interaction);
+    }
+
     if (id.startsWith("heat:")) {
       const { handleHeatInteraction } = require("./handlers/heatInteractionHandler");
       return await handleHeatInteraction(interaction);
