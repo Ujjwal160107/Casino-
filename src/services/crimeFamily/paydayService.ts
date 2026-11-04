@@ -34,7 +34,7 @@ export function splitPayday(earnings: number, count: number): Split {
 }
 
 /** Splits members by the payday gate; an ineligible member's reason is their first failing check. */
-async function evaluateMembers(userIds: string[], now: Date): Promise<{ eligible: string[]; ineligible: PaydayPreview["ineligible"] }> {
+export async function evaluatePaydayMembers(userIds: string[], now: Date): Promise<{ eligible: string[]; ineligible: PaydayPreview["ineligible"] }> {
   const results = await Promise.all(userIds.map((uid) => checkMemberEligibility(uid, "payday", { now })));
   const eligible: string[] = [];
   const ineligible: PaydayPreview["ineligible"] = [];
@@ -54,6 +54,11 @@ function lockedReasonFor(earnings: number, eligibleCount: number): string | null
 
 const dueBefore = (now: Date) => new Date(now.getTime() - CRIME_FAMILY_CONFIG.paydayIntervalSeconds * 1000);
 
+/** Whether paydayIntervalSeconds have passed since the last payday (manual, auto and disband's final payday). */
+export function isPaydayDue(lastPaydayAt: Date, now: Date): boolean {
+  return lastPaydayAt <= dueBefore(now);
+}
+
 /** The actor must still be the family's Boss or Underboss, re-read on every call and every retry. */
 async function assertPaydayActor(db: Prisma.TransactionClient, familyId: string, actorId: string, now: Date): Promise<void> {
   const member = await db.familyMember.findUnique({ where: { userId: actorId } });
@@ -67,7 +72,7 @@ export async function previewPayday(familyId: string, now: Date = new Date()): P
   const family = await prisma.family.findUnique({ where: { id: familyId } });
   if (!family) throw new FamilyError("That family no longer exists.");
   const members = await listMembers(familyId);
-  const { eligible, ineligible } = await evaluateMembers(members.map((m) => m.userId), now);
+  const { eligible, ineligible } = await evaluatePaydayMembers(members.map((m) => m.userId), now);
   return {
     familyId,
     earnings: family.earnings,
@@ -132,7 +137,7 @@ export async function executePayday(
     const family = await tx.family.findUnique({ where: { id: familyId } });
     if (!family) throw new FamilyError("That family no longer exists.");
     const members = await tx.familyMember.findMany({ where: { familyId }, select: { userId: true } });
-    const { eligible, ineligible } = await evaluateMembers(members.map((m) => m.userId), now);
+    const { eligible, ineligible } = await evaluatePaydayMembers(members.map((m) => m.userId), now);
     if (eligible.length === 0 || (expected && eligible.length !== expected.count)) return { changed: "Members changed." };
     const earnings = expected ? expected.earnings : family.earnings;
     if (lockedReasonFor(earnings, eligible.length)) return { changed: "Earnings changed." };
@@ -143,7 +148,7 @@ export async function executePayday(
     });
     if (count !== 1) {
       const fresh = await tx.family.findUniqueOrThrow({ where: { id: familyId }, select: { lastPaydayAt: true } });
-      return { changed: fresh.lastPaydayAt > dueBefore(now) ? "Payday is not due yet." : "Earnings changed." };
+      return { changed: isPaydayDue(fresh.lastPaydayAt, now) ? "Earnings changed." : "Payday is not due yet." };
     }
     const result = await payMembersInTx(tx, family, eligible, earnings, actorId, now);
     return { ...result, ineligible, family: await tx.family.findUniqueOrThrow({ where: { id: familyId } }) };
