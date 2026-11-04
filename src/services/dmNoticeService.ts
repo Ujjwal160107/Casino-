@@ -1,7 +1,8 @@
 import { Client, ContainerBuilder } from "discord.js";
 import { Mascot } from "../config/branding";
 import { noticeContainer, v2Reply } from "../utils/componentsV2";
-import { fmtAmount, fmtCurrency } from "../utils/format";
+import { fmtAmount, fmtCurrency, fmtFortunes } from "../utils/format";
+import { FAMILY_ROLES, type FamilyRole } from "../data/crimeFamilyCatalog";
 import { isTester } from "../utils/developerAccess";
 import {
   CooldownReminderType,
@@ -306,4 +307,98 @@ export async function notifyInvestmentsMatured(client: Client, matured: MaturedI
       console.error(`notifyInvestmentsMatured failed for ${discordId}:`, err);
     }
   }
+}
+
+/** One opt-out DM per id, sent in order, each built for its recipient. Never throws. */
+export async function notifyMany(
+  client: Client,
+  type: DmNoticeType,
+  ids: readonly string[],
+  build: (id: string) => ContainerBuilder,
+): Promise<void> {
+  for (const id of ids) {
+    try {
+      await sendOptOutDm(client, id, type, build(id));
+    } catch (err) {
+      console.error(`notifyMany(${type}) failed for ${id}:`, err);
+    }
+  }
+}
+
+// ---- Crime Families: the `family` account notice (spec 13.4). ----
+
+const FAMILY_HINT = `-# ${SETTINGS_HINT}.`;
+
+/** Titles stay text-only; the thumbnail is the notice's cf_ icon. */
+function familyNotice(_iconKey: string, title: string, body: string): ContainerBuilder {
+  return noticeContainer(Mascot.Emotes.Gun, title, body, FAMILY_HINT);
+}
+
+export function familyInviteNotice(v: {
+  familyLabel: string; inviterId: string; tag: string; expiresAt: Date; jumpUrl: string | null;
+}): ContainerBuilder {
+  const expires = Math.floor(v.expiresAt.getTime() / 1000);
+  let body =
+    `<@${v.inviterId}> invited you to join **${v.familyLabel}**.\n` +
+    `Accept with \`!crew accept ${v.tag}\` or decline with \`!crew decline ${v.tag}\`. The invite expires <t:${expires}:R>.`;
+  if (v.jumpUrl) body += `\n[See the invite](${v.jumpUrl})`;
+  return familyNotice("crest_1", "You're invited to a crime family", body);
+}
+
+export type FamilyRoleNoticeKind = "kicked" | "promoted" | "demoted" | "chair_claimed" | "chair_handed";
+
+export function familyRoleNotice(
+  kind: FamilyRoleNoticeKind,
+  v: { familyLabel: string; role?: FamilyRole; newBossId?: string },
+): ContainerBuilder {
+  const roleName = v.role ? FAMILY_ROLES[v.role].name : "";
+  switch (kind) {
+    case "kicked":
+      return familyNotice("crest_1", "You were kicked from your family", `You are no longer a member of **${v.familyLabel}**.`);
+    case "promoted":
+      return familyNotice("crest_1", "You were promoted", `You are now **${roleName}** of **${v.familyLabel}**.`);
+    case "demoted":
+      return familyNotice("crest_1", "You were demoted", `You are now **${roleName}** of **${v.familyLabel}**.`);
+    case "chair_claimed":
+      return familyNotice(
+        "crest_1",
+        "Your chair was claimed",
+        `<@${v.newBossId}> claimed the Boss's chair of **${v.familyLabel}** while you were away. You are now a Soldier.`,
+      );
+    case "chair_handed":
+      return familyNotice("crest_1", "Your family has a new Boss", `<@${v.newBossId}> is now the Boss of **${v.familyLabel}**.`);
+  }
+}
+
+export function familyPaydayNotice(v: { familyLabel: string; gross: number; tax: number; net: number }): ContainerBuilder {
+  return familyNotice(
+    "vault",
+    "Payday!",
+    `**${v.familyLabel}** paid out.\n` +
+      `**Your share:** ${fmtFortunes(v.gross)}\n` +
+      `**Tax:** ${fmtFortunes(v.tax)}\n` +
+      `**You received:** ${fmtFortunes(v.net)}`,
+  );
+}
+
+export function familyMissedPaydayNotice(v: { familyLabel: string; reason: string }): ContainerBuilder {
+  return familyNotice("vault", "You missed payday", `**${v.familyLabel}** ran payday without you. You need ${v.reason}.`);
+}
+
+export function familyArrearsNotice(v: { familyLabel: string; days: number; owed: number }): ContainerBuilder {
+  return familyNotice(
+    "vault",
+    "Family dues in arrears",
+    `**${v.familyLabel}** could not pay its daily dues.\n` +
+      `**Days in arrears:** ${fmtFortunes(v.days)}\n` +
+      `**Owed:** ${fmtFortunes(v.owed)}\n` +
+      "Clear it with `!crew deposit <amount>`.",
+  );
+}
+
+export function familyDisbandedNotice(v: { familyLabel: string; finalNet: number | null; burned: number }): ContainerBuilder {
+  let body = `**${v.familyLabel}** has disbanded.`;
+  if (v.finalNet !== null) body += `\n**Your final payday:** ${fmtFortunes(v.finalNet)}`;
+  body += `\n**Burned:** ${fmtFortunes(v.burned)}`;
+  return familyNotice("crest_1", "Your crime family disbanded", body);
 }

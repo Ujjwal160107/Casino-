@@ -35,7 +35,7 @@ function matured(
 describe("investment registry entry", () => {
   it("is an account notice with no command, listed after card and market", () => {
     expect(DM_NOTICE_TYPES.investment).toEqual({ label: "Investment payouts", group: "account" });
-    expect(noticeTypesInGroup("account")).toEqual(["card", "market", "investment"]);
+    expect(noticeTypesInGroup("account")).toEqual(["card", "market", "investment", "family"]);
   });
 });
 

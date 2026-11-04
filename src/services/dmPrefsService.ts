@@ -22,6 +22,7 @@ export const DM_NOTICE_TYPES = {
   card: { label: "Card statements", group: "account" },
   market: { label: "Market sales", group: "account" },
   investment: { label: "Investment payouts", group: "account" },
+  family: { label: "Crime family", group: "account" },
 } as const;
 
 export type DmNoticeType = keyof typeof DM_NOTICE_TYPES;
