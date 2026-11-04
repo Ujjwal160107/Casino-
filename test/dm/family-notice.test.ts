@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DM_NOTICE_TYPES, isCooldownReminderType } from "../../src/services/dmPrefsService";
-import { familyInviteNotice, notifyMany } from "../../src/services/dmNoticeService";
+import { familyArrearsNotice, familyInviteNotice, notifyMany } from "../../src/services/dmNoticeService";
 import { containerText, containerThumb, fakeDmClient } from "./helpers";
 import { seedUser } from "../helpers";
 import { setEmojiRecord } from "../../src/utils/emojiRegistry";
@@ -14,6 +14,10 @@ describe("family DM notices (13.4)", () => {
     const c = familyInviteNotice({ familyLabel: "[VLA] Velvet Ante", inviterId: "1", tag: "VLA", expiresAt: new Date(Date.now() + 864e5), jumpUrl: "https://discord.com/channels/1/2/3" });
     expect(containerText(c)).toContain("!crew accept VLA");
     expect(containerText(c)).toContain("https://discord.com/channels/1/2/3");
+  });
+  it("the arrears notice prints days as a plain count, singular or plural", () => {
+    expect(containerText(familyArrearsNotice({ familyLabel: "x", days: 1, owed: 5_000 }))).toContain("**In arrears:** 1 day\n");
+    expect(containerText(familyArrearsNotice({ familyLabel: "x", days: 3, owed: 5_000 }))).toContain("**In arrears:** 3 days\n");
   });
   it("uses the Gun emote as the thumbnail while no cf emoji is loaded", () => {
     expect(containerThumb(familyInviteNotice({ familyLabel: "x", inviterId: "1", tag: "VLA", expiresAt: new Date(), jumpUrl: null }))).toContain("1456729243399753752");

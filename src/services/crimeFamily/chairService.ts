@@ -138,9 +138,15 @@ export async function markClaimNotice(familyId: string, bossId: string): Promise
   return count === 1;
 }
 
-/** CAS (P22): the Boss is back, so the episode ends and the next absence gets its own S23. */
+/**
+ * CAS (P22): the Boss is back, so the episode ends and the next absence gets
+ * its own S23. The S23 pointer goes too, so a later chair change never edits it.
+ */
 export async function clearClaimNotice(familyId: string, bossId: string): Promise<boolean> {
-  const { count } = await prisma.family.updateMany({ where: { id: familyId, claimNoticeFor: bossId }, data: { claimNoticeFor: "" } });
+  const { count } = await prisma.family.updateMany({
+    where: { id: familyId, claimNoticeFor: bossId },
+    data: { claimNoticeFor: "", claimChannelId: "", claimMessageId: "" },
+  });
   return count === 1;
 }
 

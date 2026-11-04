@@ -29,15 +29,18 @@ export class VaultBusy extends Error {
   }
 }
 
+/** A write conflict worth retrying; a FamilyError never is, whatever its message (a family named "Deadlock"). */
+const isTransient = (err: unknown) => !(err instanceof FamilyError) && isTransientWriteConflict(err);
+
 /**
  * Runs fn in one Mongo transaction, retrying transient conflicts (including
  * VaultBusy and P2034). An exhausted retry becomes "Vault busy, try again.".
  */
 export async function runFamilyTx<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>, attempts = 3): Promise<T> {
   try {
-    return await withTransactionRetry(() => prisma.$transaction(fn, { maxWait: 5_000, timeout: 15_000 }), attempts);
+    return await withTransactionRetry(() => prisma.$transaction(fn, { maxWait: 5_000, timeout: 15_000 }), attempts, isTransient);
   } catch (err) {
-    if (isTransientWriteConflict(err)) throw new FamilyError("Vault busy, try again.");
+    if (isTransient(err)) throw new FamilyError("Vault busy, try again.");
     throw err;
   }
 }

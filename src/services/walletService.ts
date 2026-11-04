@@ -14,14 +14,18 @@ export function isTransientWriteConflict(error: any): boolean {
     || message.includes("p2034");
 }
 
-export async function withTransactionRetry<T>(operation: () => Promise<T>, retries = 4): Promise<T> {
+export async function withTransactionRetry<T>(
+  operation: () => Promise<T>,
+  retries = 4,
+  isTransient: (error: any) => boolean = isTransientWriteConflict
+): Promise<T> {
   let lastError: any;
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       return await operation();
     } catch (error: any) {
       lastError = error;
-      if (!isTransientWriteConflict(error) || attempt === retries - 1) break;
+      if (!isTransient(error) || attempt === retries - 1) break;
       await new Promise((resolve) => setTimeout(resolve, 75 + Math.random() * 175 * (attempt + 1)));
     }
   }
@@ -141,6 +145,7 @@ export async function creditWalletInTx(
   meta: Record<string, unknown>,
   earned: boolean
 ): Promise<CreditResult> {
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("Amount must be positive.");
   let user = await tx.user.findUnique({
     where: { discordId },
     include: { wallet: true }
@@ -240,6 +245,7 @@ export async function debitWalletInTx(
   type: string,
   meta: Record<string, unknown>
 ): Promise<{ walletId: string }> {
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("Amount must be positive.");
   const { count } = await tx.wallet.updateMany({
     where: { userId: discordId, balance: { gte: amount } },
     data: { balance: { decrement: amount } }

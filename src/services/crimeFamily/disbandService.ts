@@ -18,6 +18,9 @@ const DISBAND_ATTEMPTS = 5;
 const ONLY_BOSS = "Only the Boss can disband the family.";
 const GONE = "That family no longer exists.";
 
+/** Whether a final payday pays anything: someone qualifies and the gross is not 0 (no minimum, D61). */
+const paysOut = (earnings: number, count: number) => splitPayday(earnings, count).gross > 0;
+
 /** S22: the final payday (null when none is due or nobody qualifies) and the exact burn. */
 export async function previewDisband(
   familyId: string, now: Date = new Date(),
@@ -30,7 +33,7 @@ export async function previewDisband(
   let finalPayday: PaydayPreview | null = null;
   if (isPaydayDue(family.lastPaydayAt, now)) {
     const base = await previewPayday(familyId, now);
-    if (base.count > 0) finalPayday = { ...base, earnings, split: splitPayday(earnings, base.count), lockedReason: null };
+    if (paysOut(earnings, base.count)) finalPayday = { ...base, earnings, split: splitPayday(earnings, base.count), lockedReason: null };
   }
   const paidOut = finalPayday ? finalPayday.split.gross * finalPayday.count : 0;
   return { finalPayday, burnTreasury: family.treasury, burnEarnings: earnings - paidOut };
@@ -59,7 +62,7 @@ export async function disbandFamily(bossId: string, typedTag: string, now: Date 
     let payout: Awaited<ReturnType<typeof payMembersInTx>> | null = null;
     if (isPaydayDue(beforePay.lastPaydayAt, now)) {
       const { eligible } = await evaluatePaydayMembers(members.map((m) => m.userId), now);
-      if (eligible.length > 0) payout = await payMembersInTx(tx, beforePay, eligible, beforePay.earnings, bossId, now);
+      if (paysOut(beforePay.earnings, eligible.length)) payout = await payMembersInTx(tx, beforePay, eligible, beforePay.earnings, bossId, now);
     }
 
     const final = await tx.family.findUniqueOrThrow({ where: { id: family.id } });

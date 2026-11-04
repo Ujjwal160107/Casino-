@@ -71,7 +71,7 @@ describe("crime family jobs (15)", () => {
     await runSuccession(c.client, now);
     expect(c.edits.at(-1)![0]).toBe("m1");
     expect(JSON.stringify(c.edits.at(-1)![1])).toContain("The Boss is back.");
-    expect((await fam(f.id))!.claimNoticeFor).toBe("");
+    expect(await fam(f.id)).toMatchObject({ claimNoticeFor: "", claimChannelId: "", claimMessageId: "" });   // no later edit of the old S23
     const later = new Date(+now + 7 * DAY + 60_000);                      // gone again for 7 days
     await runSuccession(c.client, later);
     expect(c.sent).toHaveLength(2);

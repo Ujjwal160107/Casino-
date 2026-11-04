@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { checkMemberEligibility, eligibilityError } from "../../src/services/crimeFamily/eligibility";
+import { checkMemberEligibility, discordAccountCreatedAt, eligibilityError } from "../../src/services/crimeFamily/eligibility";
 import { ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
-import { testPrisma, testRedis, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
+import { testPrisma, testRedis, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, snowflakeAt } from "../helpers";
 
 const gates = async (uid: string, gate: any, opts?: any) => (await checkMemberEligibility(uid, gate, opts)).failures.map((f) => f.gate);
 const exit = (userId: string, familyId: string, reason: string, leftAt: Date, wasBoss = false) =>
@@ -10,6 +10,14 @@ const FAM = "65f000000000000000000001";
 
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember"]));
 beforeEach(resetFamilies);
+
+describe("discordAccountCreatedAt", () => {
+  it("reads a 17-20 digit snowflake and treats anything shorter as brand new", () => {
+    const old = daysAgo(400);
+    expect(discordAccountCreatedAt(snowflakeAt(old)).getTime()).toBe(old.getTime());
+    for (const id of ["1", "12345", "1234567890123456"]) expect(Date.now() - discordAccountCreatedAt(id).getTime()).toBeLessThan(1_000);
+  });
+});
 
 describe("checkMemberEligibility (12.1)", () => {
   it("passes a qualified founder", async () => {

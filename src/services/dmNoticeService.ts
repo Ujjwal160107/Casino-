@@ -391,7 +391,7 @@ export function familyArrearsNotice(v: { familyLabel: string; days: number; owed
     "vault",
     "Family dues in arrears",
     `**${v.familyLabel}** could not pay its daily dues.\n` +
-      `**Days in arrears:** ${fmtFortunes(v.days)}\n` +
+      `**In arrears:** ${v.days} ${v.days === 1 ? "day" : "days"}\n` +
       `**Owed:** ${fmtFortunes(v.owed)}\n` +
       "Clear it with `!crew deposit <amount>`.",
   );

@@ -27,7 +27,7 @@ const unix = (d: Date) => `<t:${Math.floor(d.getTime() / 1000)}:R>`;
 
 /** When the Discord account was created; an id that is not a snowflake counts as brand new. */
 export function discordAccountCreatedAt(uid: string): Date {
-  if (!/^\d{1,20}$/.test(uid)) return new Date();
+  if (!/^\d{17,20}$/.test(uid)) return new Date();
   return new Date(SnowflakeUtil.timestampFrom(uid));
 }
 

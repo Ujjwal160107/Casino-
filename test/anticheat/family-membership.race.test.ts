@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { createFamily, forceRenameFamily } from "../../src/services/crimeFamily/familyService";
 import { inviteMember, acceptInvite, declineInvite, leaveFamily, kickMember, expireInvites } from "../../src/services/crimeFamily/membershipService";
 import {
@@ -41,6 +41,22 @@ describe("createFamily (6.1)", () => {
     await expect(forceRenameFamily("VLA", "Velvet  Ante", "admin")).rejects.toThrow("No double spaces.");
     await expect(forceRenameFamily("VLA", "taken name", "admin")).rejects.toThrow("Name taken.");
     expect(await forceRenameFamily("vla", "Fresh Name", "admin")).toMatchObject({ id: f.id, name: "Fresh Name", nameKey: "fresh name" });
+  });
+
+  it("forceRenameFamily refuses a family disbanded after the tag read with a FamilyError, not a P2025", async () => {
+    const f = await seedFamily({ bossId: await seedEligibleUser(), tag: "VLA" });
+    const original = prisma.$transaction.bind(prisma);
+    const spy = vi.spyOn(prisma, "$transaction").mockImplementationOnce((async (fn: any, opts: any) => {
+      await testPrisma.familyMember.deleteMany({ where: { familyId: f.id } });   // the disband lands between the read and the write
+      await testPrisma.family.deleteMany({ where: { id: f.id } });
+      return original(fn, opts);
+    }) as any);
+    try {
+      const err = await forceRenameFamily("VLA", "Fresh Name", "admin-race").catch((e) => e);
+      expect(err).toBeInstanceOf(FamilyError);
+      expect(err.message).toBe("No family with that tag.");
+      expect(await testPrisma.audit.count({ where: { userId: "admin-race", type: "family_forcerename" } })).toBe(0);
+    } finally { spy.mockRestore(); }
   });
 
   it("one user double-creating gets one family and one debit", async () => {

@@ -77,7 +77,8 @@ export const parseSmartAmount = (input: string, maxBalance: number = Infinity): 
 export function parsePositiveAmount(raw: string, maxBalance: number): number | null {
   const input = raw.trim();
   if (!/^\d[\d,]*(\.\d+)?[kmb]?$|^(all|max|allin)$/i.test(input)) return null;
-  const amount = parseSmartAmount(input, maxBalance);
+  // "all" is the wallet balance, a Float that may be fractional: take the whole part.
+  const amount = /^(all|max|allin)$/i.test(input) ? Math.floor(maxBalance) : parseSmartAmount(input, maxBalance);
   return Number.isInteger(amount) && amount > 0 ? amount : null;
 }
 

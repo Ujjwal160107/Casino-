@@ -104,11 +104,13 @@ export async function forceRenameFamily(tag: string, rawName: string, adminId: s
   if (!name.ok) throw new FamilyError(name.reason);
   try {
     return await runFamilyTx(async (tx) => {
-      const updated = await tx.family.update({ where: { id: family.id }, data: { name: name.name, nameKey: name.nameKey } });
+      // updateMany: a disband since the tag read is a refusal, not a raw P2025.
+      const { count } = await tx.family.updateMany({ where: { id: family.id }, data: { name: name.name, nameKey: name.nameKey } });
+      if (count === 0) throw new FamilyError("No family with that tag.");
       await tx.audit.create({
         data: { userId: adminId, type: "family_forcerename", meta: { tag: family.tag, from: family.name, to: name.name } },
       });
-      return updated;
+      return tx.family.findUniqueOrThrow({ where: { id: family.id } });
     });
   } catch (err) {
     if (isUniqueViolation(err, "Family_nameKey_key")) throw new FamilyError("Name taken.");

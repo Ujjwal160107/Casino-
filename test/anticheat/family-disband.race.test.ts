@@ -48,6 +48,13 @@ describe("disband (6.4)", () => {
     expect(await burnRow(family.id)).toMatchObject({ amount: -2_300_000 });
   });
 
+  it("a due final payday with a gross of 0 is no final payday: no payday rows, no paid members", async () => {
+    const { family, bossId } = await disbandFam({ earnings: 1, treasury: 500, lastPaydayAt: daysAgo(8) });
+    expect(await previewDisband(family.id)).toMatchObject({ finalPayday: null, burnTreasury: 500, burnEarnings: 1 });
+    expect(await disbandFamily(bossId, "VLA")).toMatchObject({ split: null, paid: [], burned: 501 });
+    expect(await testPrisma.familyLedger.count({ where: { familyId: family.id, type: { in: ["payday", "payday_tax"] } } })).toBe(0);
+  });
+
   it("writes DISBANDED exits (wasBoss for the Boss), expires invites, deletes members and frees the name and tag", async () => {
     const { family, bossId, s } = await disbandFam({ earnings: 0, treasury: 0, lastPaydayAt: daysAgo(1) });
     const inv = await testPrisma.familyInvite.create({ data: { familyId: family.id, inviterId: bossId, inviteeId: "x", guildId: "g1", channelId: "c1", expiresAt: new Date(Date.now() + 864e5) } });

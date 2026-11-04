@@ -36,6 +36,13 @@ describe("family transaction kit", () => {
     expect(calls).toBe(1);
   });
 
+  it("never retries or rewrites a FamilyError whose message looks transient (a family named Deadlock)", async () => {
+    let calls = 0;
+    const err = new FamilyError("[DLK] Deadlock: write conflict, transaction failed");
+    await expect(runFamilyTx(async () => { calls++; throw err; })).rejects.toBe(err);
+    expect(calls).toBe(1);
+  });
+
   it("pages the ledger newest first and clamps the page", async () => {
     const fam = await seedFamily({ bossId: await seedEligibleUser() });
     await runFamilyTx(async (tx) => { for (let i = 0; i < 16; i++) await writeLedger(tx, { familyId: fam.id, actorId: "system", type: "dues", amount: -i, treasuryAfter: 0, earningsAfter: 0 }); });

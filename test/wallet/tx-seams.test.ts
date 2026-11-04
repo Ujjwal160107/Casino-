@@ -36,6 +36,15 @@ describe("wallet tx seams", () => {
     expect(await bal()).toBe(500);
   });
 
+  it.each([-500, 0, Number.NaN, Number.POSITIVE_INFINITY])("debitWalletInTx and creditWalletInTx refuse amount %d and write nothing", async (amount) => {
+    await testPrisma.wallet.update({ where: { userId: A }, data: { balance: 1_000 } });
+    await expect(prisma.$transaction((tx) => debitWalletInTx(tx, A, amount, "t", {}))).rejects.toThrow("Amount must be positive.");
+    await expect(prisma.$transaction((tx) => creditWalletInTx(tx, A, "A", amount, "t", {}, true))).rejects.toThrow("Amount must be positive.");
+    expect(await bal()).toBe(1_000);
+    const w = await testPrisma.wallet.findUnique({ where: { userId: A } });
+    expect(await testPrisma.transaction.count({ where: { walletId: w!.id, type: "t" } })).toBe(0);
+  });
+
   it("two racing debits of 600 on 1,000 pay once", async () => {
     await testPrisma.wallet.update({ where: { userId: A }, data: { balance: 1_000 } });
     const run = () => prisma.$transaction((tx) => debitWalletInTx(tx, A, 600, "family_vault_deposit", { k: 1 }));
@@ -53,7 +62,7 @@ describe("wallet tx seams", () => {
     expect((await computeNetWorth(A)).total).toBe(7_000);
   });
 
-  it.each([["5m", 1e9, 5_000_000], ["1.5b", 9e9, 1_500_000_000], ["2.5k", 1e9, 2_500], ["1,000,000", 1e9, 1_000_000], ["all", 42, 42],
+  it.each([["5m", 1e9, 5_000_000], ["1.5b", 9e9, 1_500_000_000], ["2.5k", 1e9, 2_500], ["1,000,000", 1e9, 1_000_000], ["all", 42, 42], ["all", 42.7, 42], ["max", 42.7, 42], ["all", 0.5, null],
     ["-5m", 1e9, null], ["0", 1e9, null], ["abc", 1e9, null], ["1.5x", 1e9, null], ["all", 0, null]] as const)(
     "parsePositiveAmount(%s, %d) = %s", (raw, max, want) => expect(parsePositiveAmount(raw, max)).toBe(want));
 
