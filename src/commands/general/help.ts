@@ -14,6 +14,7 @@ import {
 } from "discord.js";
 import { getGuildSettings } from "../../services/guildSettingsService";
 import { Mascot } from "../../config/branding";
+import { emojiInline } from "../../utils/emojiRegistry";
 
 interface CommandInfo {
   name: string;
@@ -27,7 +28,7 @@ interface CommandInfo {
   example?: string;
 }
 
-interface CategoryData {
+export interface CategoryData {
   id: string;
   label: string;
   description: string;
@@ -36,7 +37,7 @@ interface CategoryData {
 
 // Every player-facing command + subcommand. Admin/developer commands are intentionally excluded.
 // {p} is replaced with the server prefix at render time.
-const CATEGORIES: CategoryData[] = [
+export const CATEGORIES: CategoryData[] = [
   {
     id: "economy",
     label: "Economy",
@@ -282,6 +283,40 @@ const CATEGORIES: CategoryData[] = [
     ]
   },
   {
+    id: "crimefamilies",
+    label: "Crime Families",
+    description: "Found or join a crime family, fill its vault and climb the family board",
+    commands: [
+      {
+        name: "crew", aliases: ["mob"], description: "Open your family dashboard, or the Create card when you have no family.",
+        usage: "{p}crew [subcommand]",
+        subcommands: [
+          "create — found a family (10,000,000 from your wallet)",
+          "invite <user> — invite a player (Capo and up)",
+          "accept <TAG> — accept an invite from any server",
+          "decline <TAG> — decline an invite",
+          "leave — leave your family",
+          "kick <user> — remove a member below your rank",
+          "promote <user> — move a member up one rank",
+          "demote <user> — move a member down one rank",
+          "handover <user> — hand the Boss chair to a member",
+          "deposit <amount|all> — add wallet money to the vault (5% tax)",
+          "vault — vault balances, dues and recent entries",
+          "payday — pay vault earnings out to active members (Boss, Underboss)",
+          "levelup — spend the level fee to level up (Boss, Underboss)",
+          "log — the family ledger",
+          "top — the family leaderboard",
+          "info <TAG> — look at any family",
+          "home — post family cards in this channel (Boss)",
+          "rename — rename the family (2,000,000 from the vault, Boss)",
+          "disband — close the family for good (Boss)",
+          "claim — take the chair from a Boss inactive 7 days (Underboss)"
+        ],
+        example: "{p}crew deposit 5m"
+      }
+    ]
+  },
+  {
     id: "quests",
     label: "Quests",
     description: "Daily quests and missions",
@@ -339,8 +374,19 @@ const MODULE_EMOTES: Record<string, string> = {
   marriage: Mascot.Emotes.Love,
   quests: Mascot.Emotes.Scroll,
   profile: Mascot.Emotes.MedalGold,
-  general: Mascot.Emotes.Settings
+  general: Mascot.Emotes.Settings,
+  crimefamilies: Mascot.Emotes.Gun
 };
+
+// Application emojis that replace a module's branding emote once the registry has them.
+// Resolved at render time: the registry loads after this module is imported.
+const MODULE_APP_EMOJI: Record<string, string> = {
+  crimefamilies: "cf_crest_1"
+};
+
+function moduleEmote(id: string): string {
+  return (MODULE_APP_EMOJI[id] && emojiInline(MODULE_APP_EMOJI[id])) ?? MODULE_EMOTES[id] ?? "";
+}
 
 const applyPrefix = (text: string, prefix: string) => text.replace(/\{p\}/g, prefix);
 
@@ -368,7 +414,7 @@ function renderCommandBlock(command: CommandInfo, prefix: string): string {
  * right) separated by dividers, with page navigation in a row at the very bottom.
  * Paginated because section+button+separator per module exceeds the 40-component cap.
  */
-function buildMainMenu(prefix: string, page: number, authorId: string): ContainerBuilder {
+export function buildMainMenu(prefix: string, page: number, authorId: string): ContainerBuilder {
   const totalPages = Math.max(1, Math.ceil(CATEGORIES.length / PAGE_SIZE));
   const safePage = Math.min(Math.max(1, page), totalPages);
   const start = (safePage - 1) * PAGE_SIZE;
@@ -385,7 +431,7 @@ function buildMainMenu(prefix: string, page: number, authorId: string): Containe
     .addSeparatorComponents(separator());
 
   for (const category of pageModules) {
-    const emote = MODULE_EMOTES[category.id] ?? "";
+    const emote = moduleEmote(category.id);
     container
       .addSectionComponents(
         new SectionBuilder()
@@ -428,8 +474,8 @@ function buildMainMenu(prefix: string, page: number, authorId: string): Containe
 }
 
 /** Ephemeral submenu for a single module, with separators between each command. */
-function buildModuleView(category: CategoryData, prefix: string): ContainerBuilder {
-  const emote = MODULE_EMOTES[category.id] ?? "";
+export function buildModuleView(category: CategoryData, prefix: string): ContainerBuilder {
+  const emote = moduleEmote(category.id);
   const container = new ContainerBuilder()
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## ${emote} ${category.label}\n${category.description}`)

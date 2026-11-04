@@ -4,6 +4,7 @@ import economy from "./economy";
 import bankAndCredit from "./bank-and-credit";
 import casino from "./casino";
 import crimeAndHeat from "./crime-and-heat";
+import crimeFamilies from "./crime-families";
 import jobsAndCareers from "./jobs-and-careers";
 import education from "./education";
 import itemsAndShop from "./items-and-shop";
@@ -18,6 +19,7 @@ export const MODULE_DOCS: ModuleDoc[] = [
   bankAndCredit,
   casino,
   crimeAndHeat,
+  crimeFamilies,
   jobsAndCareers,
   education,
   itemsAndShop,

@@ -14,6 +14,7 @@ This is the handoff reference for Fortuna's economy: the balance targets, the cu
 | Casino | `src/commands/games/*.ts`, `src/services/shopBuffs.ts` (luck) |
 | Stocks | `src/config/stockConfig.ts`, `src/services/stockEngine.ts` |
 | Shop prices and item effects | `src/utils/shopCatalog.ts`, `src/services/shopItemEffects.ts` |
+| Crime Families | `CRIME_FAMILY_CONFIG` in `src/utils/economyConfig.ts`, `src/data/crimeFamilyCatalog.ts` |
 
 ## Balance Targets
 
@@ -213,6 +214,89 @@ Card notes:
 - Traders who buy on RALLY/BOOM forecasts (65% hit rate) profit, limited by slippage.
 - The offline check is `npx ts-node --transpile-only src/scripts/simulateStockMarket.ts`. It shows a naive trader losing about 36% over 12h, and the simulator's own "informed" trader losing about 9%.
 
+## Crime Families
+
+Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`. Shipped behind `CRIME_FAMILY_CONFIG.enabled` (off by default). Families are global per `discordId`; a player is in at most one.
+
+- **Founding** burns 10,000,000 from the wallet. Gates: net worth ≥ 15M (uncached), ≥ 60 lifetime shifts, Fortuna age ≥ 30 days, Discord age ≥ 180 days, heat < 70, not jailed or banned, hop cooldown clear, 7 days after disbanding as Boss.
+- **Joining** needs net worth ≥ 1M, ≥ 20 shifts, Fortuna ≥ 14 days, Discord ≥ 90 days, not jailed or banned. Invite caps: 5 pending per family, 3 accepted per inviter and 5 joins per family per rolling 7 days.
+- **Vault:** `treasury` (deposits, locked forever, burned on disband) and `earnings` (caper vault cut, racket income, refunded bids). Spends take earnings first. Deposits: wallet only, min 10,000, cap 25,000,000 per member per UTC day, 5% tax burned inline (never `applyTransferTax`), 0 XP.
+- **Dues:** 40,000 × level per UTC day from the vault. A missed day adds a day of arrears, which blocks level-ups and bids until a deposit or earnings credit clears it.
+- **Payday** (the only vault exit): every 7 days, earnings ≥ 500,000, Boss or Underboss (auto 24 h after due). Eligible: 7 days of tenure, an active member (≥ 2 started caper seats or ≥ 3 correct war hits in 7 days), ≥ 20 shifts, Discord ≥ 90 days, Fortuna ≥ 14 days. `gross = min(floor(E / N), 1,000,000)`, 5% tax burned, so at most 950,000 net per member per week.
+- **Disband** burns treasury and earnings after a capped final payday (only if the last payday was ≥ 7 days ago).
+- The vault is excluded from net worth and every leaderboard.
+
+**Family levels** (XP cumulative and never spent; the fee comes from the vault, earnings first, and is burned; fees L2 → L10 total 172,000,000; no level grants a money multiplier):
+
+| Level | XP to reach | Fee | Member cap | Racket cap | Tier unlocked | Family caper cooldown | Crest |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 0 | — | 6 | 1 | T1 | 3h00 | `cf_crest_1` bronze |
+| 2 | 1,000 | 2,000,000 | 7 | 1 | — | 3h00 | `cf_crest_1` |
+| 3 | 3,000 | 4,000,000 | 8 | 1 | T2 | 3h00 | `cf_crest_1` |
+| 4 | 6,000 | 6,000,000 | 8 | 2 | — | 2h45 | `cf_crest_2` silver |
+| 5 | 10,000 | 10,000,000 | 10 | 2 | T3 | 2h45 | `cf_crest_2` |
+| 6 | 16,000 | 14,000,000 | 10 | 2 | — | 2h30 | `cf_crest_2` |
+| 7 | 24,000 | 20,000,000 | 12 | 3 | — | 2h30 | `cf_crest_3` gold |
+| 8 | 34,000 | 28,000,000 | 12 | 3 | T4 | 2h30 | `cf_crest_3` |
+| 9 | 46,000 | 38,000,000 | 12 | 3 | — | 2h00 | `cf_crest_3` |
+| 10 | 60,000 | 50,000,000 | 12 | 3 | — | 2h00 | `cf_crest_4` crowned gold |
+
+**XP sources** (rows marked "with Capers" / "with Turf" pay once those ship):
+
+| Source | XP |
+| --- | --- |
+| Caper Clean / Messy / Bust (with Capers) | T1 150/60/20, T2 225/90/30, T3 300/120/40, T4 375/150/50 |
+| Racket cycle minted (with Turf) | 20 per cycle (none on a neglected cycle) |
+| Correct war hit (with Turf) | 5 |
+| War won (with Turf) | capture 300 × 1 / 1.5 / 2 (Corner / District / Crown); defence the same, only if the attacker scored ≥ 1 correct hit on ≥ 2 blocks |
+| Deposits, payday, scouting | 0 |
+
+**XP pacing** (p = 0.90, edge 0.10, full roster passing each tier's gates, 4 capers a day: T1 n=4 at L1–2, T2 n=5 at L3–4, T3 n=6 at L5–7, T4 n=6 at L8+; XP/day ≈ 447 / 634 / 788 / 964; vault EV/day 403,076 / 746,908 / 1,280,528 / 1,763,036 before dues; no rackets, no payday). A level needs both XP and fee, so the fee sets the pace:
+
+| Level reached | By XP alone (day) | Member deposits needed to keep the XP pace (cumulative) | With no deposits (day) |
+| --- | --- | --- | --- |
+| L3 (T2) | 7 | 3.6M | 18 |
+| L5 (T3) | 18 | 13.0M | 45 |
+| L8 (T4) | 49 | 42.9M | 105 |
+| L10 | 76 | 92.5M | 167 |
+
+**Daily income per member by band** (p = 0.90, edge 0.10; payday is a range because earnings either pay level fees or go out as Payday, never both; share is of the band floor):
+
+| Band | Band income/day | Reachable tiers | Assumed family | Caper net/day (2 seats) | Payday net/day | Feature total/day | Share of band floor |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Week 1 | 1–1.5M | none (14-day Fortuna gate) | — | 0 | 0 | 0 | 0% |
+| Weeks 2–4 | 3–6M | T1 only | L3, 8 members, 4 T1 capers/day (n=4), 1 Corner racket | 287,386 | 0 – 69,240 | 287,386 – 356,626 | 9.6–11.9% |
+| Month 2+ | 8–15M | T3, T4 | L8, 12 members passing the T4 seat gates, 4 T4 capers/day (n=6), 1 District + 1 Crown held | 487,836 (T3) – 551,584 (T4) | 0 – 135,714 (cap) | 487,836 – 687,298 | 6.1–8.6% |
+| Any band, perfect play | — | T4 | as above, p = 1.0, best gear | 1,049,600 | 135,714 | 1,185,314 | 14.8% of the Month 2+ floor |
+
+**Source and sink ledger:**
+
+| # | Flow | Kind | Amount | Bound |
+| --- | --- | --- | --- | --- |
+| S1 | Caper crew cut | mint → wallets | 0.80 × B × n × f | 2 seats/player/rolling 24 h; 4 capers/family/rolling 24 h |
+| S2 | Caper vault cut | mint → earnings | 0.10 × B × n × f | same |
+| S3 | Racket income | mint → earnings | 300k / 650k / 1.3M per cycle | 6,400,000/day bot-wide; needs ≥ 3 eligible members |
+| T1 | Payday | earnings → wallets | gross ≤ 1,000,000 per member per week | once per 7 days; equal split |
+| T2 | Stake refund (before Start, cancel, VOID) | return, `earned = false` | 50k–300k | — |
+| T3 | Bid refund on outbid or a cancelled war | return to earnings | escrow | — |
+| T4 | Deposit | wallet → treasury (locked) | ≥ 10,000 | 25,000,000/member/UTC day |
+| K1 | Creation fee | sink | 10,000,000 | per family |
+| K2 | Rename | sink | 2,000,000 | per 30 days |
+| K3 | Level-up fees | sink | 2M → 50M (172M total) | per level |
+| K4 | Daily dues | sink | 40,000 × level/day | — |
+| K5 | Caper stake | sink | 50k / 100k / 175k / 300k per seat per run | every started run |
+| K6 | Bust fine | sink | 150k / 300k / 500k / 750k per seat | 0.9–5.2% of runs at p = 0.90 |
+| K7 | Deposit tax | sink | 5% | — |
+| K8 | Payday tax | sink | 5% | — |
+| K9 | Winning war bid | sink, burned at settlement | ≥ 2.1M / 4.55M / 9.1M | per racket-week |
+| K10 | War hits | sink | 25,000 each | ≤ 6 per member per war |
+| K11 | Treasury and earnings on disband | sink | full balance after the capped final payday | — |
+| — | Heat → Fixer and raids | not counted | existing code, unchanged | — |
+| N1 | Fence | never minted | 0.10 × pool | — |
+| N2 | Cut rounding remainder | never minted | < n Fortunes per caper | — |
+| N3 | Neglected racket cycles | never minted | full cycle | — |
+| N4 | Wallet overflow on a caper cut | never minted | excess over `MAX_SAFE_BALANCE` | recorded in `meta.capped` |
+
 ## Money Sinks
 
 - Income tax: 8% on shifts, weekly and monthly.
@@ -224,6 +308,7 @@ Card notes:
 - Casino house edge.
 - Card interest on missed payments.
 - Property resale at 75%.
+- Crime Families: creation fee 10,000,000 (K1), rename 2,000,000 per 30 days (K2), level-up fees 2M → 50M, 172M in all (K3), dues 40,000 × level a day (K4), 5% deposit tax (K7), 5% payday tax (K8), treasury and earnings burned on disband (K11).
 
 ## Open Issues (not changed in the 2026-10-11 rebalance)
 

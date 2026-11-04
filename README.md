@@ -91,8 +91,12 @@ For a complete guide on how to use the bot, including a user manual, admin guide
 - **Lint**: `npm run lint`
 - **Validate shop application emojis**: `npm run validate:shop-emojis`
 - **Upload missing shop application emojis**: `npm run sync:shop-emojis`
+- **Validate every application emoji family** (`shop_`, `cf_`) without contacting Discord: `npm run validate:app-emojis`
+- **Preview a family's sync** (logs in, changes nothing): `npm run sync:app-emojis -- --family cf --plan`
+- **Upload a family's missing application emojis**: `npm run sync:app-emojis -- --family cf`
+- **Check the Crime Families pixel sprites**: `npm run gen:pixel-assets -- --set cf --check` (drop `--check` to re-render them into `src/assets`)
 
-The emoji sync uses `DISCORD_TOKEN` (or `TOKEN`/`BOT_TOKEN`) from the environment. It only manages application emojis prefixed with `shop_`. Pass `--replace` to refresh existing images or `--prune` to remove stale managed emojis after a successful sync.
+The emoji sync uses `DISCORD_TOKEN` (or `TOKEN`/`BOT_TOKEN`) from the environment; `--dry-run` never loads it. It only manages application emojis with a registered family prefix (`shop_`, `cf_`), and `--family` limits a run to the listed families. Pass `--replace` to refresh existing images or `--prune` to remove stale managed emojis of the selected families after a successful sync. See `DESIGN.md` section 7.
 
 ## Architecture
 

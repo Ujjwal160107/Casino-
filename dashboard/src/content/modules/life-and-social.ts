@@ -42,6 +42,7 @@ const lifeAndSocial: ModuleDoc = {
       body: [
         "Action rewards land in a joint vault, and either partner can deposit instantly from their own wallet — it's a second bank, equally immune to robbery. Withdrawing is the trust exercise: a withdrawal creates a request your spouse has 10 minutes to approve or decline. Nobody drains the vault solo.",
         "!divorce (with confirmation) ends it cleanly and splits the vault 50/50. There's no fee — the cost is the affection multiplier you grinded.",
+        "!family is your marriage. Crime families are !crew — see Crime Families.",
       ],
     },
     {

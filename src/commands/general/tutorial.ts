@@ -27,7 +27,7 @@ const MODULE_PREFIX = "tut:module:";
 const NAV_PREFIX = "tut:nav:";
 const PAGE_SIZE = 6;
 
-interface SystemLesson {
+export interface SystemLesson {
   id: string;
   label: string;
   emote: string;
@@ -38,9 +38,9 @@ interface SystemLesson {
   next?: string;
 }
 
-// 16 lessons mirroring the help modules, in progression-friendly order.
+// 17 lessons mirroring the help modules, in progression-friendly order.
 // {p} is replaced with the guild prefix at render time.
-const LESSONS: SystemLesson[] = [
+export const LESSONS: SystemLesson[] = [
   {
     id: "economy",
     label: "Economy",
@@ -169,6 +169,16 @@ const LESSONS: SystemLesson[] = [
     howItWorks: "Propose to and marry another player to unlock a joint vault and couple actions.",
     howToUse: ["`{p}marry @user` — propose", "`{p}family` — status & joint vault", "`{p}family deposit <amount>`", "`{p}divorce` — end it"],
     tip: "Use the joint vault to pool savings with a partner you trust.",
+    next: "Full command list: `{p}help`",
+  },
+  {
+    id: "crimefamilies",
+    label: "Crime Families",
+    emote: Mascot.Emotes.Gun,
+    teaser: "Run a crew with a shared vault.",
+    howItWorks: "A crime family is a crew of up to 12 players with ranks, a shared vault and family levels. Deposits are locked in the vault for good; only vault earnings go out, as a weekly payday split between active members.",
+    howToUse: ["`{p}crew` — your family, or the Create card", "`{p}crew create` — found one (10,000,000)", "`{p}crew accept <TAG>` — join after an invite", "`{p}crew deposit <amount>` · `{p}crew top`"],
+    tip: "Founding needs 15,000,000 net worth, 60 shifts and a 30-day-old profile. Joining needs 1,000,000 net worth, 20 shifts and a 14-day-old profile, so most players start as a Soldier.",
     next: "Full command list: `{p}help`",
   },
   {

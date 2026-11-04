@@ -126,7 +126,7 @@ An application emoji is never drawn by hand. It is rendered from the icon file b
 - **One source table per family.** `SHOP_ITEM_THUMBNAIL_ASSETS` maps item key to file and is both the thumbnail source and the emoji source. Crime Families gets one table, `key -> file`, used the same way.
 - **Extend the sync script, do not fork it.** Generalise the script over a list of families (`{ prefix, assets, validKeys }`); the shop family keeps reading `SHOP_CATALOG` read-only for validation. `npm run sync:shop-emojis` keeps working.
 - **Commands:** `npm run validate:app-emojis` renders every family's emojis without contacting Discord. `npm run sync:app-emojis -- --family <id>` uploads missing ones; `--replace` swaps images via a `<prefix>tmp_<sha256>` upload, delete and rename; `--plan` logs in and prints would-create/replace/prune without changing anything (run it before the first `--prune`); `--prune` deletes stale emojis of the selected family only, after a run with zero failures.
-- `src/data/emojis.json` is committed as `{}`. `src/scripts/checkV2Payloads.ts` writes fake ids into it; never run it, and restore the file before committing art.
+- `src/data/emojis.json` is committed as `{}`; restore it before committing art. `src/scripts/checkV2Payloads.ts` seeds its fake ids in memory only (`setEmojiRecord`) and never writes the file. Run it with a dead database URL so it cannot reach live data: `DATABASE_URL=mongodb://127.0.0.1:9/never REDIS_URL=redis://127.0.0.1:6381 npx ts-node --transpile-only src/scripts/checkV2Payloads.ts`.
 - Do not add new `<:name:id>` strings to `branding.ts`. Those ids break on any re-upload; registry lookup by name does not.
 
 ## 8. Production paths
