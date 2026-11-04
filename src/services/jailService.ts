@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import prisma from "../utils/prisma";
 import { DEFAULT_JAIL_FINE, DEFAULT_JAIL_TIME_SECONDS } from "../utils/economyConfig";
 
@@ -15,6 +16,27 @@ export async function jailUser(discordId: string, _guildId: string, durationSeco
     });
 
     return releaseTime;
+}
+
+/**
+ * Jails a user inside the caller's transaction. A longer sentence already
+ * being served is never shortened; an expired one is replaced.
+ */
+export async function jailUserTx(tx: Prisma.TransactionClient, discordId: string, seconds: number, now: Date = new Date()): Promise<Date> {
+    const user = await tx.user.findUnique({
+        where: { discordId },
+        select: { isJailed: true, jailReleaseTime: true }
+    });
+    const fresh = new Date(now.getTime() + seconds * 1000);
+    const serving = user?.isJailed && user.jailReleaseTime && user.jailReleaseTime > now ? user.jailReleaseTime : null;
+    const release = serving && serving > fresh ? serving : fresh;
+
+    await tx.user.update({
+        where: { discordId },
+        data: { isJailed: true, jailReleaseTime: release }
+    });
+
+    return release;
 }
 
 export async function releaseUser(discordId: string) {

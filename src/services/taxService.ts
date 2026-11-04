@@ -1,4 +1,5 @@
 import { Client } from "discord.js";
+import { Prisma } from "@prisma/client";
 import prisma from "../utils/prisma";
 import { notifyTaxRaid } from "./dmNoticeService";
 import { TAX_CONFIG } from "../utils/economyConfig";
@@ -40,7 +41,7 @@ export function getNextHeatDecayAt(now = new Date()): Date {
  * Carries forward heat created by the former Redis-only implementation.
  * It is intentionally best-effort: gameplay no longer depends on Redis.
  */
-async function migrateLegacyHeatForUser(discordId: string): Promise<void> {
+export async function migrateLegacyHeatForUser(discordId: string): Promise<void> {
   if (legacyHeatMigrationUnavailable) return;
   try {
     const redis = redisService.getInstance();
@@ -118,10 +119,18 @@ export async function applyTransferTax(
 // Crime Heat
 export async function addCrimeHeat(discordId: string, amount: number = TAX_CONFIG.crimeHeatGain): Promise<number> {
   await migrateLegacyHeatForUser(discordId);
-  const heatGain = Math.max(0, Math.round(amount));
-  if (heatGain === 0) return getHeatLevel(discordId);
+  return addCrimeHeatTx(prisma, discordId, amount);
+}
 
-  const user = await prisma.user.update({
+/** Adds rounded crime heat inside the caller's transaction and returns the new heat. */
+export async function addCrimeHeatTx(tx: Prisma.TransactionClient, discordId: string, amount: number): Promise<number> {
+  const heatGain = Math.max(0, Math.round(amount));
+  if (heatGain === 0) {
+    const user = await tx.user.findUnique({ where: { discordId }, select: { crimeHeat: true } });
+    return Math.max(0, user?.crimeHeat ?? 0);
+  }
+
+  const user = await tx.user.update({
     where: { discordId },
     data: { crimeHeat: { increment: heatGain } },
     select: { crimeHeat: true },

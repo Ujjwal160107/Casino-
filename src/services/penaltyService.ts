@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import prisma from "../utils/prisma";
 import { MAX_SAFE_BALANCE } from "../utils/economyConfig";
 import { invalidateUserCache } from "./userService";
@@ -56,11 +57,93 @@ export function calculatePenaltyAllocation(
 }
 
 /**
- * Applies an unavoidable economy penalty atomically. Wallet transaction
- * history records only the wallet portion; the audit record captures the
- * complete wallet/bank allocation so the ledger never pretends bank debt was
- * removed from the wallet.
+ * Applies an unavoidable economy penalty inside the caller's transaction.
+ * Wallet transaction history records only the wallet portion; the audit
+ * record captures the complete wallet/bank allocation so the ledger never
+ * pretends bank debt was removed from the wallet. The caller invalidates the
+ * user cache after commit.
  */
+export async function applyEconomyPenaltyTx(
+  tx: Prisma.TransactionClient,
+  discordId: string,
+  username: string,
+  amount: number,
+  type: string,
+  meta: Record<string, unknown> = {},
+  guildId?: string,
+): Promise<PenaltyAllocation> {
+  await tx.user.upsert({
+    where: { discordId },
+    update: {},
+    create: { discordId, username },
+  });
+
+  const [wallet, bank] = await Promise.all([
+    tx.wallet.upsert({
+      where: { userId: discordId },
+      update: {},
+      create: { userId: discordId, balance: 0 },
+    }),
+    tx.bank.upsert({
+      where: { userId: discordId },
+      update: {},
+      create: { userId: discordId, balance: 0 },
+    }),
+  ]);
+
+  const allocation = calculatePenaltyAllocation(amount, wallet.balance, bank.balance);
+
+  if (allocation.walletDebit > 0) {
+    await tx.wallet.update({
+      where: { id: wallet.id },
+      data: { balance: { decrement: allocation.walletDebit } },
+    });
+    await tx.transaction.create({
+      data: {
+        walletId: wallet.id,
+        amount: -allocation.walletDebit,
+        type,
+        meta: {
+          ...meta,
+          totalPenalty: allocation.totalPenalty,
+          walletDebit: allocation.walletDebit,
+          bankDebit: allocation.bankDebit,
+        },
+        isEarned: false,
+      },
+    });
+  }
+
+  if (allocation.bankDebit > 0) {
+    await tx.bank.update({
+      where: { id: bank.id },
+      data: { balance: { decrement: allocation.bankDebit } },
+    });
+  }
+
+  await tx.audit.create({
+    data: {
+      guildId,
+      userId: discordId,
+      type,
+      meta: {
+        ...meta,
+        totalPenalty: allocation.totalPenalty,
+        walletDebit: allocation.walletDebit,
+        bankDebit: allocation.bankDebit,
+        previousWalletBalance: allocation.previousWalletBalance,
+        newWalletBalance: allocation.newWalletBalance,
+        previousBankBalance: allocation.previousBankBalance,
+        newBankBalance: allocation.newBankBalance,
+        debtAdded: allocation.debtAdded,
+      },
+    },
+  });
+
+  return allocation;
+}
+
+/** Applies an unavoidable economy penalty atomically in its own transaction. */
 export async function applyEconomyPenalty(
   discordId: string,
   username: string,
@@ -69,77 +152,8 @@ export async function applyEconomyPenalty(
   meta: Record<string, unknown> = {},
   guildId?: string,
 ): Promise<PenaltyAllocation> {
-  const result = await withTransactionRetry(() => prisma.$transaction(async (tx) => {
-    await tx.user.upsert({
-      where: { discordId },
-      update: {},
-      create: { discordId, username },
-    });
-
-    const [wallet, bank] = await Promise.all([
-      tx.wallet.upsert({
-        where: { userId: discordId },
-        update: {},
-        create: { userId: discordId, balance: 0 },
-      }),
-      tx.bank.upsert({
-        where: { userId: discordId },
-        update: {},
-        create: { userId: discordId, balance: 0 },
-      }),
-    ]);
-
-    const allocation = calculatePenaltyAllocation(amount, wallet.balance, bank.balance);
-
-    if (allocation.walletDebit > 0) {
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { balance: { decrement: allocation.walletDebit } },
-      });
-      await tx.transaction.create({
-        data: {
-          walletId: wallet.id,
-          amount: -allocation.walletDebit,
-          type,
-          meta: {
-            ...meta,
-            totalPenalty: allocation.totalPenalty,
-            walletDebit: allocation.walletDebit,
-            bankDebit: allocation.bankDebit,
-          },
-          isEarned: false,
-        },
-      });
-    }
-
-    if (allocation.bankDebit > 0) {
-      await tx.bank.update({
-        where: { id: bank.id },
-        data: { balance: { decrement: allocation.bankDebit } },
-      });
-    }
-
-    await tx.audit.create({
-      data: {
-        guildId,
-        userId: discordId,
-        type,
-        meta: {
-          ...meta,
-          totalPenalty: allocation.totalPenalty,
-          walletDebit: allocation.walletDebit,
-          bankDebit: allocation.bankDebit,
-          previousWalletBalance: allocation.previousWalletBalance,
-          newWalletBalance: allocation.newWalletBalance,
-          previousBankBalance: allocation.previousBankBalance,
-          newBankBalance: allocation.newBankBalance,
-          debtAdded: allocation.debtAdded,
-        },
-      },
-    });
-
-    return allocation;
-  }));
+  const result = await withTransactionRetry(() => prisma.$transaction((tx) =>
+    applyEconomyPenaltyTx(tx, discordId, username, amount, type, meta, guildId)));
 
   await invalidateUserCache(discordId, "");
   return result;
