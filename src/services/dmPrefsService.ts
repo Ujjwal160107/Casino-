@@ -16,6 +16,7 @@ export const DM_NOTICE_TYPES = {
   weekly: { label: "Weekly reward", command: "!weekly", group: "cooldown" },
   monthly: { label: "Monthly reward", command: "!monthly", group: "cooldown" },
   crime: { label: "Crime board", command: "!crime", group: "cooldown" },
+  caper: { label: "Family caper", command: "!caper", group: "cooldown" },
   hunt: { label: "Hunt", command: "!hunt", group: "cooldown" },
   work: { label: "Work shift", command: "!work", group: "cooldown" },
   vote: { label: "Vote", command: "!vote", group: "cooldown" },
@@ -23,6 +24,7 @@ export const DM_NOTICE_TYPES = {
   market: { label: "Market sales", group: "account" },
   investment: { label: "Investment payouts", group: "account" },
   family: { label: "Crime family", group: "account" },
+  caper_lobby: { label: "Caper lobby calls", group: "account" },
 } as const;
 
 export type DmNoticeType = keyof typeof DM_NOTICE_TYPES;

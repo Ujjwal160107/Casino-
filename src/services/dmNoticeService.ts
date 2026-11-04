@@ -326,7 +326,7 @@ export async function notifyMany(
   }
 }
 
-// ---- Crime Families: the `family` account notice (spec 13.4). ----
+// ---- Crime Families: the `family` and `caper_lobby` account notices (spec 13.4). ----
 
 const FAMILY_HINT = `-# ${SETTINGS_HINT}.`;
 
@@ -402,4 +402,23 @@ export function familyDisbandedNotice(v: { familyLabel: string; finalNet: number
   if (v.finalNet !== null) body += `\n**Your final payday:** ${fmtFortunes(v.finalNet)}`;
   body += `\n**Burned:** ${fmtFortunes(v.burned)}`;
   return familyNotice("crest_1", "Your crime family disbanded", body);
+}
+
+const relTime = (d: Date) => `<t:${Math.floor(d.getTime() / 1000)}:R>`;
+const jumpLine = (url: string | null, label: string) => (url ? `\n[${label}](${url})` : "");
+
+export function caperLobbyNotice(v: {
+  familyLabel: string; tierName: string; stake: number; closesAt: Date; jumpUrl: string | null;
+}): ContainerBuilder {
+  const body =
+    `**${v.familyLabel}** is planning a **${v.tierName}** caper.\n` +
+    `**Stake:** ${fmtFortunes(v.stake)}\n` +
+    `The lobby closes ${relTime(v.closesAt)}.` +
+    jumpLine(v.jumpUrl, "Join the lobby");
+  return familyNotice("caper", "Caper lobby open", body);
+}
+
+export function caperGoNotice(v: { tierName: string; goEndsAt: Date; jumpUrl: string | null }): ContainerBuilder {
+  const body = `The **${v.tierName}** caper is live.\nGO ends ${relTime(v.goEndsAt)}. Open your brief now.` + jumpLine(v.jumpUrl, "Go to the caper");
+  return familyNotice("caper", "Caper GO", body);
 }

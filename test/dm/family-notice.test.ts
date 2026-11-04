@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { DM_NOTICE_TYPES, isCooldownReminderType } from "../../src/services/dmPrefsService";
-import { familyArrearsNotice, familyInviteNotice, notifyMany } from "../../src/services/dmNoticeService";
+import { caperGoNotice, caperLobbyNotice, familyArrearsNotice, familyInviteNotice, notifyMany } from "../../src/services/dmNoticeService";
+import { buildSettingsPayload } from "../../src/commands/general/settings";
 import { containerText, containerThumb, fakeDmClient } from "./helpers";
 import { seedUser } from "../helpers";
 import { setEmojiRecord } from "../../src/utils/emojiRegistry";
@@ -32,5 +33,28 @@ describe("family DM notices (13.4)", () => {
   it("uses the cf_crest_1 emoji as the thumbnail once it is loaded", () => {
     setEmojiRecord("cf_crest_1", { id: "1234567890123456789", name: "cf_crest_1" });
     expect(containerThumb(familyInviteNotice({ familyLabel: "x", inviterId: "1", tag: "VLA", expiresAt: new Date(), jumpUrl: null }))).toContain("1234567890123456789");
+  });
+});
+
+describe("caper DM notices (13.4)", () => {
+  const count = (n: any): number => 1 + (n.components ?? []).reduce((s: number, c: any) => s + count(c), 0) + (n.accessory ? 1 : 0);
+  it("caper is a cooldown reminder for !caper; caper_lobby is an account notice with no command", () => {
+    expect(DM_NOTICE_TYPES.caper).toEqual({ label: "Family caper", command: "!caper", group: "cooldown" });
+    expect(isCooldownReminderType("caper")).toBe(true);
+    expect(DM_NOTICE_TYPES.caper_lobby).toEqual({ label: "Caper lobby calls", group: "account" });
+    expect(isCooldownReminderType("caper_lobby")).toBe(false);
+  });
+  it("the lobby call names the tier, stake and close time and links the card", () => {
+    const t = containerText(caperLobbyNotice({ familyLabel: "[VLA] Velvet Ante", tierName: "Payroll Van", stake: 100_000, closesAt: new Date(1_800_000_000_000), jumpUrl: "https://discord.com/channels/1/2/3" }));
+    for (const s of ["Payroll Van", "100,000", "<t:1800000000:R>", "https://discord.com/channels/1/2/3"]) expect(t).toContain(s);
+  });
+  it("the GO call uses the cf_caper emoji as its thumbnail when loaded, the Gun emote otherwise", () => {
+    expect(containerThumb(caperGoNotice({ tierName: "x", goEndsAt: new Date(), jumpUrl: null }))).toContain("1456729243399753752");
+    setEmojiRecord("cf_caper", { id: "1234567890123456780", name: "cf_caper" });
+    expect(containerThumb(caperGoNotice({ tierName: "x", goEndsAt: new Date(), jumpUrl: null }))).toContain("1234567890123456780");
+  });
+  it("the settings panel is 29 components with DMs on and 30 off", () => {
+    expect(count(buildSettingsPayload("o", { remindersEnabled: true, disabledReminders: [] }).components[0].toJSON())).toBe(29);
+    expect(count(buildSettingsPayload("o", { remindersEnabled: false, disabledReminders: [] }).components[0].toJSON())).toBe(30);
   });
 });
