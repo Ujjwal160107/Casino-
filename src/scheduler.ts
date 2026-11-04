@@ -7,6 +7,7 @@ import { marketTick, initGlobalMarket } from "./services/stockService";
 import { decayAllHeat, runRaidScan } from "./services/taxService";
 import { processDueReminders } from "./services/cooldownReminderService";
 import { notifyCardWeekly, notifyInvestmentsMatured } from "./services/dmNoticeService";
+import { registerCrimeFamilyJobs } from "./services/crimeFamily/scheduler";
 import prisma from "./utils/prisma";
 
 export function initScheduler(client: Client) {
@@ -69,6 +70,8 @@ export function initScheduler(client: Client) {
       console.error("Market listing expiry failed:", err);
     }
   });
+
+  registerCrimeFamilyJobs(client);
 
   console.log("Banking scheduler initialized.");
 }

@@ -13,7 +13,7 @@ import { disbandFamily, previewDisband } from "../services/crimeFamily/disbandSe
 import { checkMemberEligibility, eligibilityError } from "../services/crimeFamily/eligibility";
 import { createFamily, renameFamily } from "../services/crimeFamily/familyService";
 import {
-  buildDashboardView, countMembers, familyLabel, getInviteCard, getMembership, requireMembership, toInviteView,
+  buildDashboardView, countMembers, familyLabel, getMembership, requireMembership, toInviteView,
 } from "../services/crimeFamily/familyQueries";
 import { getLeaderboard, LEADERBOARD_SORTS } from "../services/crimeFamily/leaderboard";
 import { readLedgerPage } from "../services/crimeFamily/ledger";
@@ -24,14 +24,13 @@ import { can } from "../services/crimeFamily/permissions";
 import { levelUp } from "../services/crimeFamily/progression";
 import { FamilyError } from "../services/crimeFamily/tx";
 import { depositToVault, getVaultView, resolveDepositAmount } from "../services/crimeFamily/vaultService";
-import { announceChairChange, announceDisband, announcePayday, announceRoleChange } from "../ui/crimeFamily/announce";
+import { announceChairChange, announceDisband, announcePayday, announceRoleChange, resolveInviteCard } from "../ui/crimeFamily/announce";
 import {
-  buildConfirm, buildCreateConfirm, buildDashboard, buildDisbandConfirm, buildInviteResolved, buildLedgerPage, buildLeaderboard,
+  buildConfirm, buildCreateConfirm, buildDashboard, buildDisbandConfirm, buildLedgerPage, buildLeaderboard,
   buildLevelUpConfirm, buildManagePanel, buildMyInvites, buildNoFamilyCard, buildPaydayPreview, buildVaultPanel,
 } from "../ui/crimeFamily/familyScreens";
 import { CREW_IDS, decodeName, type CrewConfirmKind, type CrewModalKind } from "../ui/crimeFamily/ids";
 import { buildNotice, type CfPayload } from "../ui/crimeFamily/kit";
-import { editChannelMessage } from "../ui/crimeFamily/post";
 import { CRIME_FAMILY_CONFIG, isCrimeFamilyOpen } from "../utils/economyConfig";
 import { fmtFortunes } from "../utils/format";
 import { safeEditReply } from "../utils/interactionHelpers";
@@ -156,12 +155,6 @@ const CONSEQUENCES: Readonly<Record<CrewConfirmKind, (target: string) => string>
 const confirmScreen = (uid: string, kind: CrewConfirmKind, target: string | null) =>
   buildConfirm(uid, kind, target, CONSEQUENCES[kind](target ?? "0"));
 
-/** S4 card edit after an answer; skipped when it was never stored or the family is gone. */
-async function resolveInviteCard(i: CfInteraction, inviteId: string, status: string): Promise<void> {
-  const card = await getInviteCard(inviteId);
-  if (card && card.messageId) await editChannelMessage(i.client, card.channelId, card.messageId, buildInviteResolved(card.view, status));
-}
-
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 /** `crew:v:<screen>:<owner>` (S2/S6 buttons, S5/S6/S24 Back). */
@@ -258,11 +251,11 @@ const inviteRoute: CfRoute = async (i, [answer, inviteId]) => {
   const uid = i.user.id;
   if (answer === "accept") {
     const { family } = await acceptInvite(inviteId, uid);
-    await resolveInviteCard(i, inviteId, `Accepted by <@${uid}>`);
+    await resolveInviteCard(i.client, inviteId, `Accepted by <@${uid}>`);
     return show(i, notice(`You joined **${familyLabel(family)}**. Open it with \`!crew\`.`));
   }
   await declineInvite(inviteId, uid);
-  await resolveInviteCard(i, inviteId, "Declined");
+  await resolveInviteCard(i.client, inviteId, "Declined");
   return show(i, notice("Invite declined."));
 };
 
@@ -272,7 +265,7 @@ const inviteSelectRoute: CfRoute = async (i, [, uid]) => {
   const inviteId = i.isStringSelectMenu() ? i.values[0] : undefined;
   if (!inviteId) throw new FamilyError("Pick an invite.");
   await acceptInvite(inviteId, uid);
-  await resolveInviteCard(i, inviteId, `Accepted by <@${uid}>`);
+  await resolveInviteCard(i.client, inviteId, `Accepted by <@${uid}>`);
   return show(i, await homeScreen(uid));
 };
 

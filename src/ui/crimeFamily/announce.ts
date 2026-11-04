@@ -4,10 +4,12 @@
 import type { Family } from "@prisma/client";
 import type { Client } from "discord.js";
 import type { FamilyRole } from "../../data/crimeFamilyCatalog";
-import { familyLabel, listMembers } from "../../services/crimeFamily/familyQueries";
+import { familyLabel, getInviteCard, listMembers } from "../../services/crimeFamily/familyQueries";
 import type { disbandFamily } from "../../services/crimeFamily/disbandService";
 import type { PaydayPaid } from "../../services/crimeFamily/paydayService";
+import { arrearsOwed } from "../../services/crimeFamily/vaultService";
 import {
+  familyArrearsNotice,
   familyDisbandedNotice,
   familyMissedPaydayNotice,
   familyPaydayNotice,
@@ -16,7 +18,7 @@ import {
   sendOptOutDm,
 } from "../../services/dmNoticeService";
 import { fmtFortunes } from "../../utils/format";
-import { buildClaimResolved } from "./familyScreens";
+import { buildClaimResolved, buildInviteResolved } from "./familyScreens";
 import { buildNotice } from "./kit";
 import { editChannelMessage, sendToChannel } from "./post";
 
@@ -52,6 +54,13 @@ export async function announceChairChange(
   await notifyMany(client, "family", members.map((m) => m.userId), () => familyRoleNotice("chair_handed", { familyLabel: label, newBossId }));
 }
 
+/** The first missed dues day: a DM to the Boss and the Underboss. */
+export async function announceArrears(client: Client, family: Family): Promise<void> {
+  const officers = (await listMembers(family.id)).filter((m) => m.role === "BOSS" || m.role === "UNDERBOSS");
+  const notice = { familyLabel: familyLabel(family), days: family.duesArrears, owed: arrearsOwed(family) };
+  await notifyMany(client, "family", officers.map((m) => m.userId), () => familyArrearsNotice(notice));
+}
+
 /** One DM to the member who was kicked, promoted or demoted. */
 export async function announceRoleChange(
   client: Client, family: Family, kind: "kicked" | "promoted" | "demoted", targetId: string, newRole: FamilyRole | null,
@@ -68,4 +77,10 @@ export async function announceDisband(client: Client, result: Awaited<ReturnType
     finalNet: paid.has(id) && result.split ? result.split.net : null,
     burned: result.burned,
   }));
+}
+
+/** Edits the S4 invite card to its final status; skipped when it was never stored or the family is gone. */
+export async function resolveInviteCard(client: Client, inviteId: string, status: string): Promise<void> {
+  const card = await getInviteCard(inviteId);
+  if (card && card.messageId) await editChannelMessage(client, card.channelId, card.messageId, buildInviteResolved(card.view, status));
 }

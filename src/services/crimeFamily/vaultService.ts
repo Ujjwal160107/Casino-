@@ -24,7 +24,7 @@ export function utcDayKey(d: Date): string {
 }
 
 /** What the family owes for its missed dues days at its current level. */
-function arrearsOwed(family: { duesArrears: number; level: number }): number {
+export function arrearsOwed(family: { duesArrears: number; level: number }): number {
   return family.duesArrears * CRIME_FAMILY_CONFIG.duesPerLevel * family.level;
 }
 
