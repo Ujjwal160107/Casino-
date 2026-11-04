@@ -222,6 +222,13 @@ export const CRIME_FAMILY_CONFIG = {
   cancelledLobbyCooldownSeconds: 1_800,
   lobbyDmsPer24h: 3,
   lobbyDmQuietAfterCancelSeconds: 7_200,
+  caperWindowSeconds: 86_400, // rolling window of the seat and family caper counts
+  caperRenderDebounceSeconds: 2,
+  caperEndedRerenderSeconds: 120,
+  caperDeadResultRepostSeconds: 3_600,
+  caperTradeLogMinPool: 5_000_000,
+  caperSettleDelayMs: 1_000,
+  activeCaperSeats: 2, // 7.3: caper seats in the window that make a member active
   bidFloorDays: 7,
   warLateCancelSeconds: 600,
   hitCost: 25_000,
