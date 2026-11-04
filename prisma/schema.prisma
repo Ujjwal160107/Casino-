@@ -743,3 +743,97 @@ model CooldownReminder {
   @@unique([discordId, type])
   @@index([dueAt])
 }
+
+// ── Crime Families (spec 14.1). User references are bare snowflake strings. ──
+
+model Family {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  nameKey        String   @unique
+  tag            String
+  tagKey         String   @unique
+  bossId         String                       // CAS target for chair moves
+  level          Int      @default(1)
+  xp             Int      @default(0)
+  treasury       Float    @default(0)
+  earnings       Float    @default(0)
+  homeGuildId    String
+  homeChannelId  String
+  nextCaperAt    DateTime @default(now())
+  lastPaydayAt   DateTime @default(now())
+  lastRenamedAt  DateTime @default(now())
+  duesDayKey     String   @default("")        // "YYYY-MM-DD" UTC
+  duesArrears    Int      @default(0)
+  warWins        Int      @default(0)
+  claimNoticeFor String   @default("")        // bossId whose inactivity S23 was posted for (CAS, once per episode)
+  claimChannelId String   @default("")
+  claimMessageId String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt          // touched by create/plan/accept/invite/leave/kick/promote so payday and disband conflict
+  @@index([xp])
+  @@index([warWins])
+}
+
+model FamilyMember {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  familyId       String   @db.ObjectId
+  userId         String   @unique             // one family per account
+  role           String                       // BOSS|UNDERBOSS|CAPO|SOLDIER
+  roleSlot       String                       // "BOSS"|"UNDERBOSS"|"CAPO1".."CAPO3"|userId
+  seat           Int                          // 1..memberCap
+  joinedAt       DateTime @default(now())
+  lastActiveAt   DateTime @default(now())
+  depositDayKey  String   @default("")
+  depositedToday Float    @default(0)
+  deposited      Float    @default(0)         // lifetime, display only
+  capers         Int      @default(0)         // lifetime started seats
+  correctHits    Int      @default(0)         // lifetime
+  @@unique([familyId, roleSlot])
+  @@unique([familyId, seat])
+  @@index([familyId])
+}
+
+model FamilyExit {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId   String
+  familyId String   @db.ObjectId
+  reason   String                             // LEFT|KICKED|DISBANDED
+  wasBoss  Boolean  @default(false)
+  leftAt   DateTime @default(now())
+  @@index([userId, leftAt])
+  @@index([familyId, userId, leftAt])
+}
+
+model FamilyInvite {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  familyId   String   @db.ObjectId
+  inviterId  String
+  inviteeId  String
+  status     String   @default("PENDING")     // PENDING|ACCEPTED|DECLINED|EXPIRED
+  slot       String   @default("PENDING")     // rewritten to id when resolved
+  guildId    String
+  channelId  String
+  messageId  String   @default("")
+  expiresAt  DateTime
+  resolvedAt DateTime @default(now())         // rewritten at resolution; filtered only with status
+  createdAt  DateTime @default(now())
+  @@unique([familyId, inviteeId, slot])
+  @@index([inviteeId, status])
+  @@index([inviterId, status, resolvedAt])
+  @@index([familyId, status, resolvedAt])
+  @@index([status, expiresAt])
+}
+
+model FamilyLedger {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  familyId      String   @db.ObjectId
+  actorId       String                        // discordId or "system"
+  type          String   // create_fee|deposit|deposit_tax|payday|payday_tax|caper_cut|racket_income|racket_neglect|dues|dues_missed|level_fee|rename_fee|bid_escrow|bid_refund|war_bid_burn|disband_burn
+  amount        Float                         // signed, vault perspective
+  treasuryAfter Float
+  earningsAfter Float
+  meta          Json?                         // display only
+  createdAt     DateTime @default(now())
+  @@index([familyId, createdAt])
+  @@index([actorId, createdAt])
+}

@@ -5,7 +5,7 @@ import { questBus } from "./questEvents";
 import { invalidateUserCache } from "./userService";
 import { ensureStarterChicken } from "./starterChickenService";
 
-function isTransientWriteConflict(error: any) {
+export function isTransientWriteConflict(error: any): boolean {
   const message = `${error?.message ?? ""} ${error?.code ?? ""}`.toLowerCase();
   return message.includes("write conflict")
     || message.includes("deadlock")
