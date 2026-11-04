@@ -36,11 +36,11 @@ import { fmtFortunes } from "../utils/format";
 import { safeEditReply } from "../utils/interactionHelpers";
 import type { CfInteraction, CfRoute, CfRouteEntry, CfRouteTable } from "./crimeFamilyRouter";
 
-const NOT_OPEN_HERE = "Crime Families are not open in this server yet.";
+export const NOT_OPEN_HERE = "Crime Families are not open in this server yet.";
 const NOT_OPEN = "Crime Families are not open yet.";
 const ONLY_OFFICERS = "Only the Boss or Underboss can run payday.";
 const ONLY_BOSS_DISBAND = "Only the Boss can disband the family.";
-const BAD_AMOUNT = "Enter a positive amount like 250k or 5m";
+export const BAD_AMOUNT = "Enter a positive amount like 250k or 5m";
 
 const days = (seconds: number) => Math.round(seconds / 86_400);
 const show = async (i: CfInteraction, payload: CfPayload) => { await safeEditReply(i, payload); };
@@ -89,7 +89,7 @@ function modalOpener(kind: CrewModalKind): CfRouteEntry {
 // ── Screens ──────────────────────────────────────────────────────────────────
 
 /** S2 for a member, S1 for anyone else. Always into a message that does not hold the art. */
-async function homeScreen(uid: string): Promise<CfPayload> {
+export async function homeScreen(uid: string): Promise<CfPayload> {
   const now = new Date();
   const membership = await getMembership(uid);
   if (membership) return buildDashboard(await buildDashboardView(membership.family.id, uid, now), { art: true });
@@ -117,7 +117,7 @@ async function logScreen(uid: string, page: number): Promise<CfPayload> {
   return buildLedgerPage(uid, await readLedgerPage(family.id, page, CRIME_FAMILY_CONFIG.ledgerPageSize));
 }
 
-async function topScreen(uid: string, sort: string, art: boolean): Promise<CfPayload> {
+export async function topScreen(uid: string, sort: string, art: boolean): Promise<CfPayload> {
   const membership = await getMembership(uid);
   return buildLeaderboard(uid, await getLeaderboard(sort, membership?.family.id ?? null), { art });
 }

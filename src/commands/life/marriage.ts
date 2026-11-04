@@ -126,6 +126,7 @@ function buildDashboardPayload(
       ? `${Mascot.Emotes.Lock} **Pending Withdraw:** ${fmtCurrency(Math.floor(pendingRequest.amount))} awaiting <@${pendingRequest.spouseId}>.`
       : `${Mascot.Emotes.Lock} Withdrawals require spouse approval.`,
     marriage.lastDrama ? `\n**Last Drama:** ${marriage.lastDrama}` : "",
+    "Crime families are `!crew`.",
   ].filter(Boolean).join("\n");
 
   return payload(`${Mascot.Emotes.FortunaHeart} Marriage Dashboard`, body, LOVE_COLOR, interactive ? actionRows(viewer.id) : []);
@@ -143,7 +144,7 @@ async function sendDashboard(message: Message) {
   if (!decay.marriage) {
     return message.reply(payload(
       `${Mascot.Emotes.Confused} Not Married`,
-      "You are single. Use `!marry @user` when you are ready for chaos with paperwork.",
+      "You are single. Use `!marry @user` when you are ready for chaos with paperwork.\nCrime families are `!crew`.",
       FAIL_COLOR,
     ));
   }

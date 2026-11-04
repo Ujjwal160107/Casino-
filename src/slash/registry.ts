@@ -232,6 +232,21 @@ export const SPECS: Spec[] = [
     { name: "marry", desc: "Propose to another player", opts: [{ kind: "user", name: "user", desc: "Who to propose to", required: true }] },
     { name: "divorce", desc: "End your marriage" },
     { name: "family", desc: "View your marriage and family" },
+
+    // --- crime families ---------------------------------------------------
+    {
+        name: "crew", desc: "Your crime family: dashboard, vault, invites and ranks",
+        opts: [
+            {
+                kind: "str", name: "action", desc: "What to do -- leave blank for your dashboard", required: false,
+                choices: [
+                    "dashboard", "create", "invite", "accept", "decline", "leave", "kick", "promote", "demote", "handover", "deposit",
+                    "vault", "payday", "levelup", "log", "top", "info", "home", "rename", "disband", "claim",
+                ],
+            },
+            { kind: "str", name: "target", desc: "Player, tag or amount, when the action needs one", required: false },
+        ],
+    },
 ];
 
 /** Turn a spec into the Discord command definition. */

@@ -1,7 +1,7 @@
 // Discord side effects of family events, shared by the crew routes, `!crew`
 // and the family jobs: the public cards and the `family` DMs (spec 13.4).
 // A dead home channel never stops the DMs, and nothing here throws.
-import type { Family } from "@prisma/client";
+import type { Family, FamilyInvite } from "@prisma/client";
 import type { Client } from "discord.js";
 import type { FamilyRole } from "../../data/crimeFamilyCatalog";
 import { familyLabel, getInviteCard, listMembers } from "../../services/crimeFamily/familyQueries";
@@ -11,6 +11,7 @@ import { arrearsOwed } from "../../services/crimeFamily/vaultService";
 import {
   familyArrearsNotice,
   familyDisbandedNotice,
+  familyInviteNotice,
   familyMissedPaydayNotice,
   familyPaydayNotice,
   familyRoleNotice,
@@ -20,7 +21,7 @@ import {
 import { fmtFortunes } from "../../utils/format";
 import { buildClaimResolved, buildInviteResolved } from "./familyScreens";
 import { buildNotice } from "./kit";
-import { editChannelMessage, sendToChannel } from "./post";
+import { editChannelMessage, jumpLink, sendToChannel } from "./post";
 
 /** S28 payday card in the home channel, then a DM to each paid and each ineligible member. */
 export async function announcePayday(client: Client, result: PaydayPaid): Promise<{ cardPosted: boolean }> {
@@ -76,6 +77,17 @@ export async function announceDisband(client: Client, result: Awaited<ReturnType
     familyLabel: label,
     finalNet: paid.has(id) && result.split ? result.split.net : null,
     burned: result.burned,
+  }));
+}
+
+/** The invitee's DM for a new invite, linking the S4 card when it was posted. */
+export async function announceInvite(client: Client, invite: FamilyInvite & { family: Family }, messageId: string | null): Promise<void> {
+  await sendOptOutDm(client, invite.inviteeId, "family", familyInviteNotice({
+    familyLabel: familyLabel(invite.family),
+    inviterId: invite.inviterId,
+    tag: invite.family.tag,
+    expiresAt: invite.expiresAt,
+    jumpUrl: messageId ? jumpLink(invite.guildId, invite.channelId, messageId) : null,
   }));
 }
 

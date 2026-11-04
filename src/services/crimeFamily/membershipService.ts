@@ -146,10 +146,12 @@ async function pendingInviteFromTag(uid: string, tag: string): Promise<FamilyInv
   return invite;
 }
 
-/** `!crew accept <TAG>`, from any server. */
-export async function acceptInviteByTag(uid: string, tag: string, now: Date = new Date()): Promise<{ family: Family; member: FamilyMember }> {
+/** `!crew accept <TAG>`, from any server; inviteId lets the caller resolve the S4 card. */
+export async function acceptInviteByTag(
+  uid: string, tag: string, now: Date = new Date(),
+): Promise<{ family: Family; member: FamilyMember; inviteId: string }> {
   const invite = await pendingInviteFromTag(uid, tag);
-  return acceptInvite(invite.id, uid, now);
+  return { ...(await acceptInvite(invite.id, uid, now)), inviteId: invite.id };
 }
 
 /** CAS PENDING → DECLINED with slot = id, so the pair can be invited again. */

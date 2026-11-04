@@ -21,6 +21,7 @@ import { redisService } from "../../services/redisService";
 import { notifyRobbed, notifyPadlockUsed } from "../../services/dmNoticeService";
 import { applyEconomyPenalty } from "../../services/penaltyService";
 import { addCrimeHeat } from "../../services/taxService";
+import { resolvePlayerTarget } from "../../utils/playerTarget";
 
 function randomInt(min: number, max: number) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -28,44 +29,6 @@ function randomInt(min: number, max: number) {
 
 function randomFloat(min: number, max: number) {
     return Math.random() * (max - min) + min;
-}
-
-type RobTarget = { id: string; name: string };
-
-async function resolveRobTarget(
-    message: Message,
-    args: string[],
-): Promise<RobTarget | { error: string }> {
-    const mention = message.mentions.members?.first();
-    if (mention) {
-        if (mention.user.bot) return { error: "Bots are broke." };
-        return { id: mention.id, name: mention.displayName };
-    }
-
-    const raw = args[0]?.replace(/[<@!>]/g, "").trim();
-    if (!raw) {
-        return { error: "Rob who? Mention them, or use their username or user ID." };
-    }
-
-    if (/^\d{17,20}$/.test(raw)) {
-        const target = await prisma.user.findUnique({ where: { discordId: raw } });
-        if (!target) return { error: "No Fortuna player with that ID." };
-        const member = message.guild?.members.cache.get(raw);
-        return { id: target.discordId, name: member?.displayName ?? target.username };
-    }
-
-    const matches = await prisma.user.findMany({
-        where: { username: { equals: raw, mode: "insensitive" } },
-        take: 2,
-    });
-    if (matches.length === 0) {
-        return { error: `No Fortuna player named **${raw}**. Names must match exactly — or use their user ID.` };
-    }
-    if (matches.length > 1) {
-        return { error: "Multiple players share that name — rob them by user ID instead." };
-    }
-    const member = message.guild?.members.cache.get(matches[0].discordId);
-    return { id: matches[0].discordId, name: member?.displayName ?? matches[0].username };
 }
 
 export async function handleRob(message: Message, args: string[]) {
@@ -86,7 +49,7 @@ export async function handleRob(message: Message, args: string[]) {
         )));
     }
 
-    const resolved = await resolveRobTarget(message, args);
+    const resolved = await resolvePlayerTarget(message, args[0], { verb: "Rob", bot: "Bots are broke." });
     if ("error" in resolved) {
         return message.reply(v2Reply(errorContainer("Error", resolved.error)));
     }

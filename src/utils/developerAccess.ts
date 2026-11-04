@@ -56,7 +56,8 @@ const ADMIN_COMMANDS = new Set([
   "setdis", "set-dis", "setdiscipline",
   "resetedu", "reset-edu",
   "grantdegree", "grant-degree",
-  "set-degree-cost", "setdegreecost", "setdegree", "settuition"
+  "set-degree-cost", "setdegreecost", "setdegree", "settuition",
+  "crew-forcerename"
 ]);
 
 export function isBotDeveloper(userId: string) {
