@@ -2,6 +2,7 @@
 // never add a branch to the family services. A hook module must not import
 // membershipService or disbandService (they import this file: a cycle).
 import { Prisma } from "@prisma/client";
+import { CAPER_ACTIVITY_RULE, CAPER_FAMILY_HOOK } from "./caperHooks";
 
 /** One way a member counts as active in the last 7 days (spec 7.3). */
 export interface ActivityRule {
@@ -11,8 +12,8 @@ export interface ActivityRule {
   count(userId: string, since: Date): Promise<number>;
 }
 
-/** Plan 2 adds {caper seats, 2}; plan 3 adds {correct war hits, 3}. */
-export const ACTIVITY_RULES: ActivityRule[] = [];
+/** Plan 3 appends {correct war hits, 3}. */
+export const ACTIVITY_RULES: ActivityRule[] = [CAPER_ACTIVITY_RULE];
 
 export type MemberExitKind = "LEFT" | "KICKED";
 
@@ -30,7 +31,7 @@ export interface FamilyHook {
   racketsHeld?(familyIds: string[]): Promise<Map<string, number>>;
 }
 
-export const FAMILY_HOOKS: FamilyHook[] = [];
+export const FAMILY_HOOKS: FamilyHook[] = [CAPER_FAMILY_HOOK];
 
 /** Rackets held per family from the first hook that provides them, or null when none does. */
 export async function racketsHeldFor(familyIds: string[]): Promise<Map<string, number> | null> {

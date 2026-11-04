@@ -837,3 +837,62 @@ model FamilyLedger {
   @@index([familyId, createdAt])
   @@index([actorId, createdAt])
 }
+
+model Caper {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  familyId      String   @db.ObjectId
+  tier          Int
+  status        String   @default("LOBBY")    // LOBBY|RUNNING|SETTLING|RESOLVED|CANCELLED
+  liveSlot      String   @default("LIVE")     // rewritten to id when RESOLVED/CANCELLED
+  plannerId     String
+  guildId       String
+  channelId     String
+  messageId     String   @default("")
+  lobbyClosesAt DateTime
+  seatsVersion  Int      @default(0)          // written by join/leave/kick/start/cancel so they conflict
+  startedAt     DateTime @default(now())      // rewritten at Start; counted only with a started status
+  goEndsAt      DateTime @default(now())      // rewritten at Start; filtered only with status RUNNING
+  answers       Json?                         // written at Start, read by brief/resolve, never filtered
+  edge          Float    @default(0)
+  heatSnapshot  Int      @default(0)
+  roll          Float    @default(-1)
+  outcome       String   @default("")         // ""|CLEAN|MESSY|BUST|CANCELLED|VOID
+  pool          Float    @default(0)
+  crewShare     Float    @default(0)
+  vaultPaid     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@unique([familyId, liveSlot])
+  @@index([status, lobbyClosesAt])
+  @@index([status, goEndsAt])
+  @@index([familyId, status, startedAt])
+}
+
+model CaperCrew {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  caperId     String   @db.ObjectId
+  familyId    String   @db.ObjectId
+  userId      String
+  role        String                          // MASTERMIND|LOOKOUT|SAFECRACKER|DRIVER|MUSCLE|HACKER
+  liveSlot    String   @default("LIVE")       // rewritten to caperId when resolved/cancelled
+  stake       Float
+  started     Boolean  @default(false)
+  startedAt   DateTime @default(now())        // rewritten at Start; counted only with started:true
+  itemBonus   Float    @default(0)
+  briefOpened Boolean  @default(false)
+  briefOpenedAt DateTime @default(now())      // rewritten at first open; read only with briefOpened:true (8.3 darkness)
+  choice      Int      @default(-1)           // sentinel, CAS target
+  leaked      Boolean  @default(false)        // display only: this seat locked after seeing leaked intel
+  refunded    Boolean  @default(false)        // CAS on cancel/VOID refunds (rows are kept)
+  passed      Boolean  @default(false)
+  cut         Float    @default(0)
+  fine        Float    @default(0)
+  jailed      Boolean  @default(false)
+  settled     Boolean  @default(false)        // CAS: money + heat + jail done
+  joinedAt    DateTime @default(now())
+  @@unique([caperId, role])
+  @@unique([caperId, userId])
+  @@unique([userId, liveSlot])
+  @@index([userId, started, startedAt])
+  @@index([caperId, settled])
+}

@@ -194,6 +194,8 @@ export async function seedFamily(opts: SeedFamilyOpts): Promise<Family> {
 
 /** Empties the family collections (plans 2/3 extend this list). */
 export async function resetFamilies(): Promise<void> {
+  await testPrisma.caperCrew.deleteMany({});
+  await testPrisma.caper.deleteMany({});
   await testPrisma.familyLedger.deleteMany({});
   await testPrisma.familyInvite.deleteMany({});
   await testPrisma.familyExit.deleteMany({});
