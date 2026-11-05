@@ -24,7 +24,8 @@ import { buildNotice } from "./kit";
 import { channelLink, editChannelMessage, sendToChannel } from "./post";
 import { buildWarBoard, buildWarResult, warOutcomeLine } from "./turfScreens";
 
-const boardsOf = (war: War): WarBoardRef[] => (Array.isArray(war.boards) ? (war.boards as unknown as WarBoardRef[]) : []);
+/** The stored board refs of a war (T8); [] before the first post. */
+export const boardsOf = (war: Pick<War, "boards">): WarBoardRef[] => (Array.isArray(war.boards) ? (war.boards as unknown as WarBoardRef[]) : []);
 
 /** The family sides of a war: the attacker, and the defender unless it is the Street. */
 function familySides(war: Pick<War, "attackerFamilyId" | "defenderFamilyId">): [WarSide, string][] {

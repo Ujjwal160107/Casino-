@@ -39,7 +39,7 @@ const BARE_FRACTION = /^[\d,]*\.\d*$/;   // "2.5": parsePositiveAmount floors it
 // "8.03m": parseSmartAmount's float multiply floors it to 8,029,999, so suffixed bids use string digits.
 const SUFFIXED = /^(\d[\d,]*)(?:\.(\d+))?([kmb])$/i;
 const SUFFIX_PLACES: Record<string, number> = { k: 3, m: 6, b: 9 };
-const BAD_AMOUNT = "Enter an amount like 2.1m or 2,100,000.";
+export const BAD_AMOUNT = "Enter an amount like 2.1m or 2,100,000.";
 const EARNINGS_SHORT = "Not enough earnings for this bid (bids never use the treasury). Check `!crew vault`.";
 const CROWN_KEYS = RACKETS.filter((r) => r.class === "CROWN").map((r) => r.key);
 const AFTER_BIDDING = ["ARMED", "ACTIVE", "SETTLING"];

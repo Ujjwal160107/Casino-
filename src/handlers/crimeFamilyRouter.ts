@@ -37,11 +37,7 @@ export type CfRouteTable = Readonly<Record<string, CfRouteEntry>>;
 
 const TABLES: Readonly<Record<CfPrefix, CfRouteTable>> = { crew: CREW_ROUTES, cpr: CAPER_ROUTES, turf: TURF_ROUTES };
 
-const NO_ROUTE: Readonly<Record<CfPrefix, string>> = {
-  crew: "This button is no longer active.",
-  cpr: "This button is no longer active.",
-  turf: "Turf wars open soon.",
-};
+const NO_ROUTE = "This button is no longer active.";
 
 function fromEphemeral(i: CfInteraction): boolean {
   return !i.isModalSubmit() && !!i.message?.flags?.has(MessageFlags.Ephemeral);
@@ -61,7 +57,7 @@ export async function handleCrimeFamilyInteraction(i: CfInteraction): Promise<vo
   if (!parsed) return;
   const table = TABLES[parsed.prefix];
   const entry = table[`${parsed.action}:${parsed.args[0]}`] ?? table[parsed.action];
-  if (!entry) return rejectPress(i, NO_ROUTE[parsed.prefix]);
+  if (!entry) return rejectPress(i, NO_ROUTE);
   if (entry.scope !== "shared" && parsed.args[parsed.args.length - 1] !== i.user.id) return rejectPress(i, "This panel is not yours.");
 
   try {
