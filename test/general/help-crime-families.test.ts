@@ -31,4 +31,12 @@ describe("help and tutorial (19.3)", () => {
     expect(l).toMatchObject({ label: "Crime Families", emote: Mascot.Emotes.Gun });
     expect(l.howToUse.join(" ")).toContain("{p}crew");
   });
+
+  it("the Crime Families category lists !caper with its subcommands", async () => {
+    vi.resetModules();
+    const help = await import("../../src/commands/general/help");
+    const cat = help.CATEGORIES.find((c) => c.id === "crimefamilies")!;
+    expect(cat.commands.find((c) => c.name === "caper")).toMatchObject({ aliases: ["capers"] });
+    expect(JSON.stringify(help.buildModuleView(cat, "!").toJSON())).toContain("!caper join lookout");
+  });
 });

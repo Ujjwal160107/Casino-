@@ -241,11 +241,11 @@ Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`. Shi
 | 9 | 46,000 | 38,000,000 | 12 | 3 | — | 2h00 | `cf_crest_3` |
 | 10 | 60,000 | 50,000,000 | 12 | 3 | — | 2h00 | `cf_crest_4` crowned gold |
 
-**XP sources** (rows marked "with Capers" / "with Turf" pay once those ship):
+**XP sources** (rows marked "with Turf" pay once Turf ships):
 
 | Source | XP |
 | --- | --- |
-| Caper Clean / Messy / Bust (with Capers) | T1 150/60/20, T2 225/90/30, T3 300/120/40, T4 375/150/50 |
+| Caper Clean / Messy / Bust | T1 150/60/20, T2 225/90/30, T3 300/120/40, T4 375/150/50 |
 | Racket cycle minted (with Turf) | 20 per cycle (none on a neglected cycle) |
 | Correct war hit (with Turf) | 5 |
 | War won (with Turf) | capture 300 × 1 / 1.5 / 2 (Corner / District / Crown); defence the same, only if the attacker scored ≥ 1 correct hit on ≥ 2 blocks |
@@ -268,6 +268,67 @@ Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`. Shi
 | Weeks 2–4 | 3–6M | T1 only | L3, 8 members, 4 T1 capers/day (n=4), 1 Corner racket | 287,386 | 0 – 69,240 | 287,386 – 356,626 | 9.6–11.9% |
 | Month 2+ | 8–15M | T3, T4 | L8, 12 members passing the T4 seat gates, 4 T4 capers/day (n=6), 1 District + 1 Crown held | 487,836 (T3) – 551,584 (T4) | 0 – 135,714 (cap) | 487,836 – 687,298 | 6.1–8.6% |
 | Any band, perfect play | — | T4 | as above, p = 1.0, best gear | 1,049,600 | 135,714 | 1,185,314 | 14.8% of the Month 2+ floor |
+
+**Capers** (`!caper`, alias `!capers`, `/caper`; spec section 8). A Capo+ plans a tier; a 600 s lobby fills role seats (each seat pays its stake on join, refunded on leave, cancel or VOID); Start re-validates every seat (the net-worth check counts the stake already paid) and burns the stakes; a 120 s GO follows in which each seat answers one 4-option call whose answer only the next seat in the ring holds. A seat that has not opened its brief before the last 30 s is dark: it is a miss and its partner sees the answer leaked. Misses `k` (wrong, unlocked or dark): BUST at `k ≥ 2` (n ≤ 4) or `k ≥ 3` (n ≥ 5), MESSY at `k ≥ 1`, else MESSY if `roll < q` and CLEAN otherwise, with `q = min(0.60, base × (1 − edge) + 0.002 × H)`, edge = mean best prep bonus over the seats, H = hottest seat's heat at Start, the roll drawn once at settlement. No buff, luck or `applyIncomeModifiers` touches caper money and no income tax applies (the fence replaces it). Limits: 2 started seats per player and 4 started capers per family per rolling 24 h; 1 live seat and 1 live caper; family cooldown from Start 3h00 (L1–3), 2h45 (L4–5), 2h30 (L6–8), 2h00 (L9–10); 30 min after a cancelled or expired lobby. Prep items are checked, never consumed.
+
+| | T1 | T2 | T3 | T4 |
+| --- | --- | --- | --- | --- |
+| Key / name | `pawnshop` Pawnshop Back Room | `payroll` Payroll Van | `racetrack` Racetrack Cashier Cage | `diamond` Diamond Exchange Vault |
+| Family level to plan | 1 | 3 | 5 | 8 |
+| Crew size (min–max) | 3–4 | 4–5 | 5–6 | 5–6 |
+| Required roles | Mastermind, Lookout, Safecracker | + Driver | + Muscle | Mastermind, Lookout, Safecracker, Driver, Muscle |
+| Optional role | Driver | Muscle | Hacker | Hacker |
+| Pool per seat B | 350,000 | 550,000 | 850,000 | 1,200,000 |
+| Stake per seat (burned at Start) | 50,000 | 100,000 | 175,000 | 300,000 |
+| Bust fine per seat | 150,000 | 300,000 | 500,000 | 750,000 |
+| Jail on Bust (per seat roll) | none | 20%, 1,200 s | 35%, 2,700 s | 50%, 3,600 s |
+| Heat added Clean / Messy / Bust | 20 / 30 / 40 | 25 / 35 / 45 | 30 / 40 / 50 | 40 / 50 / 60 |
+| Heat ceiling to join and at Start | < 70 | < 60 | < 50 | < 40 |
+| Patrol base | 0.10 | 0.15 | 0.20 | 0.25 |
+| Seat gate: lifetime shifts | ≥ 20 | ≥ 60 | ≥ 150 | ≥ 300 |
+| Seat gate: Fortuna age | ≥ 14 d | ≥ 30 d | ≥ 30 d | ≥ 45 d |
+| Seat gate: net worth (uncached) | ≥ 2,000,000 | ≥ 8,000,000 | ≥ 20,000,000 | ≥ 40,000,000 |
+| Seat gate: Discord age / family tenure | ≥ 90 d / ≥ 72 h | same | same | same |
+| Family XP Clean / Messy / Bust | 150 / 60 / 20 | 225 / 90 / 30 | 300 / 120 / 40 | 375 / 150 / 50 |
+
+**Caper payout.** `pool = B × n × fPct / 100` (CLEAN 100, MESSY 35, BUST 0; n = seats at Start); `crewShare = floor(pool × 80 / 100)` minted to wallets as `caper_cut` (earned, so garnishment applies); `vaultCut = floor(pool × 10 / 100)` minted to earnings; the last 10% is the fence (N1), never minted. Every seat weighs 1.00: `cut = floor(crewShare / n)` for each seat that locked a choice, 0 for an unlocked or dark seat; that share and the rounding remainder (N2) are never minted. A Bust fines every seat (`caper_fine`, wallet then bank, may go into debt) and rolls jail per seat; every seat takes the outcome's heat. Exact cuts (every seat locked):
+
+| Tier | n | Pool (Clean) | Crew share | Vault cut | Cut, Clean | Pool (Messy) | Vault cut, Messy | Cut, Messy |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| T1 | 3 | 1,050,000 | 840,000 | 105,000 | 280,000 | 367,500 | 36,750 | 98,000 |
+| T1 | 4 | 1,400,000 | 1,120,000 | 140,000 | 280,000 | 490,000 | 49,000 | 98,000 |
+| T2 | 4 | 2,200,000 | 1,760,000 | 220,000 | 440,000 | 770,000 | 77,000 | 154,000 |
+| T2 | 5 | 2,750,000 | 2,200,000 | 275,000 | 440,000 | 962,500 | 96,250 | 154,000 |
+| T3 | 5 | 4,250,000 | 3,400,000 | 425,000 | 680,000 | 1,487,500 | 148,750 | 238,000 |
+| T3 | 6 | 5,100,000 | 4,080,000 | 510,000 | 680,000 | 1,785,000 | 178,500 | 238,000 |
+| T4 | 5 | 6,000,000 | 4,800,000 | 600,000 | 960,000 | 2,100,000 | 210,000 | 336,000 |
+| T4 | 6 | 7,200,000 | 5,760,000 | 720,000 | 960,000 | 2,520,000 | 252,000 | 336,000 |
+
+**Caper expected value per seat** (edge 0.10, heat 0, every seat locks; net = gross cut − stake − expected fine; pinned by `test/crimeFamily/caper-math.test.ts`). Realistic play, per-step pass rate p = 0.90:
+
+| Tier | n | P(Clean) | P(Messy) | P(Bust) | Gross EV/seat | Stake | E[fine] | Net/caper | Net/day (2 seats) | Vault EV/caper |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| T1 | 3 | 66.34% | 30.86% | 2.80% | 215,993 | 50,000 | 4,200 | 161,793 | 323,586 | 80,997 |
+| T1 | 4 | 59.71% | 35.06% | 5.23% | 201,538 | 50,000 | 7,845 | 143,693 | 287,386 | 100,769 |
+| T2 | 4 | 56.75% | 38.02% | 5.23% | 308,258 | 100,000 | 15,690 | 192,568 | 385,137 | 154,129 |
+| T2 | 5 | 51.08% | 48.07% | 0.86% | 298,763 | 100,000 | 2,568 | 196,195 | 392,390 | 186,727 |
+| T3 | 5 | 48.42% | 50.72% | 0.86% | 449,980 | 175,000 | 4,280 | 270,700 | 541,400 | 281,237 |
+| T3 | 6 | 43.58% | 54.84% | 1.58% | 426,843 | 175,000 | 7,925 | 243,918 | 487,836 | 320,132 |
+| T4 | 5 | 45.76% | 53.38% | 0.86% | 618,685 | 300,000 | 6,420 | 312,265 | 624,530 | 386,678 |
+| T4 | 6 | 41.19% | 57.23% | 1.58% | 587,679 | 300,000 | 11,887 | 275,792 | 551,584 | 440,759 |
+
+Strong crew, p = 0.95, net per caper (per day): T1 n=4 179,422 (358,844); T2 n=5 244,900 (489,800); T3 n=6 327,781 (655,562); T4 n=6 389,069 (778,138).
+
+Perfect play, p = 1.0 (only the patrol roll):
+
+| Tier | Edge 0.10: P(Clean) | Net/caper | Net/day | Worst case, best gear: net/day (n, edge) | Mint per caper (crew + vault), max crew, best gear |
+| --- | --- | --- | --- | --- | --- |
+| T1 | 91.0% | 213,620 | 427,240 | 428,453 (n=3, 0.1333) | 1,188,747 (n=4, 0.13) |
+| T2 | 86.5% | 301,390 | 602,780 | 605,526 (n=5, 0.132) | 2,265,541 (n=5, 0.132) |
+| T3 | 82.0% | 425,440 | 850,880 | 856,773 (n=6, 0.1333) | 4,072,860 (n=6, 0.1333) |
+| T4 | 77.5% | 519,600 | 1,039,200 | 1,049,600 (n=6, 0.1333) | 5,567,400 (n=6, 0.1333) |
+
+Every seat is paid the same, so the perfect-play figure is also the planner's ceiling (1,049,600/day at T4). A realistic T4 seat pair (551,584/day) sits below a World Zoo (866,000/day net); perfect T4 play is about a Legendary Rifle (1,459,000/day) minus a third; a T1 seat (287,386/day) is about a City Zoo (388,000) minus a quarter.
 
 **Source and sink ledger:**
 
@@ -308,7 +369,7 @@ Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`. Shi
 - Casino house edge.
 - Card interest on missed payments.
 - Property resale at 75%.
-- Crime Families: creation fee 10,000,000 (K1), rename 2,000,000 per 30 days (K2), level-up fees 2M → 50M, 172M in all (K3), dues 40,000 × level a day (K4), 5% deposit tax (K7), 5% payday tax (K8), treasury and earnings burned on disband (K11).
+- Crime Families: creation fee 10,000,000 (K1), rename 2,000,000 per 30 days (K2), level-up fees 2M → 50M, 172M in all (K3), dues 40,000 × level a day (K4), caper stakes 50,000 / 100,000 / 175,000 / 300,000 per seat per started run (K5), Bust fines 150,000 / 300,000 / 500,000 / 750,000 per seat (K6), 5% deposit tax (K7), 5% payday tax (K8), treasury and earnings burned on disband (K11). Never minted: the 10% caper fence (N1) and the cut rounding remainder (N2).
 
 ## Open Issues (not changed in the 2026-10-11 rebalance)
 

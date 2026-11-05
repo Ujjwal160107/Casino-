@@ -14,6 +14,8 @@ import {
   Swords,
   Dice5,
   Archive,
+  Users,
+  Landmark,
 } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -42,6 +44,99 @@ export default async function ChangelogPage() {
         </p>
 
         <div className="mt-12 space-y-10">
+          {/* v2.1 — Crime Families and Capers */}
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-mono text-sm text-gold">v2.1</span>
+              <span className="font-mono text-sm text-muted">November 5, 2026</span>
+              <Tag color="gold">NEW SYSTEM</Tag>
+            </div>
+
+            <Panel className="mt-4 p-6">
+              <h2 className="font-display text-xl font-bold text-ink">
+                Crime Families and Capers
+              </h2>
+              <p className="mt-2 leading-relaxed text-muted">
+                Fortuna&apos;s first real group play. Found or join a crime
+                family of up to 12 players, fill a shared vault, and run capers
+                that only work when the whole crew talks to each other. Rolling
+                out to servers in stages.
+              </p>
+
+              <div className="mt-8 space-y-8">
+                <div>
+                  <div className="flex items-start gap-4">
+                    <Users className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        Crime families
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        <strong className="text-ink">!crew</strong> opens your
+                        family: ranks from Associate to Boss, invites that work
+                        across servers, ten family levels and a family
+                        leaderboard.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>Founding costs 10,000,000, burned</FeatureItem>
+                    <FeatureItem>Up to 12 members at level 7</FeatureItem>
+                    <FeatureItem>Daily dues of 40,000 × level</FeatureItem>
+                    <FeatureItem>Automatic handover after 14 days away</FeatureItem>
+                  </ul>
+                </div>
+
+                <div className="border-t border-line pt-8">
+                  <div className="flex items-start gap-4">
+                    <Landmark className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        The family vault and Payday
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        Deposits are locked in the treasury for good. Only what
+                        the family earns goes out, as a weekly Payday split
+                        equally between members who played.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>5% tax on deposits and on Payday</FeatureItem>
+                    <FeatureItem>Payday capped at 1,000,000 gross a member</FeatureItem>
+                  </ul>
+                </div>
+
+                <div className="border-t border-line pt-8">
+                  <div className="flex items-start gap-4">
+                    <Swords className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        Capers
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        <strong className="text-ink">!caper</strong> plans a
+                        family heist in four tiers, from the Pawnshop Back Room
+                        to the Diamond Exchange Vault. A 10-minute lobby fills
+                        the roles, then a 120-second GO where every member holds
+                        the answer to a crewmate&apos;s question. Clean, Messy or
+                        Bust depends on how well the crew trades intel.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>Six roles, each with its own prep items</FeatureItem>
+                    <FeatureItem>Stakes from 50,000 to 300,000 a seat</FeatureItem>
+                    <FeatureItem>Cuts up to 960,000 a seat on a Clean Tier 4</FeatureItem>
+                    <FeatureItem>10% of every pool goes to the family vault</FeatureItem>
+                    <FeatureItem>2 seats per player per rolling 24 hours</FeatureItem>
+                    <FeatureItem>An AFK seat leaks its intel instead of sinking the job</FeatureItem>
+                  </ul>
+                </div>
+              </div>
+            </Panel>
+          </div>
+
           {/* v2.0 — Fortuna Global */}
           <div>
             <div className="flex flex-wrap items-center gap-3">
