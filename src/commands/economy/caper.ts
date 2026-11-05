@@ -91,8 +91,13 @@ async function join(ctx: CrewCtx) {
   if (live.status !== "LOBBY") throw new FamilyError(NO_LOBBY);
   const { caper, full } = await joinCaper({ caperId: live.id, uid: ctx.uid, role, guildId: ctx.guildId });
   const jumpUrl = caper.messageId ? jumpLink(caper.guildId, caper.channelId, caper.messageId) : null;
-  await show(ctx, buildCaperSeatCard({ caperId: caper.id, text: `Seated as ${caperRole(role).name}.`, jumpUrl }));
-  await onSeatsChanged(ctx.message.client, caper.id, full);
+  // The seat is committed: a failed reply (deleted message, no Send Messages)
+  // must not skip the auto-start or the roster redraw.
+  try {
+    await show(ctx, buildCaperSeatCard({ caperId: caper.id, text: `Seated as ${caperRole(role).name}.`, jumpUrl }));
+  } finally {
+    await onSeatsChanged(ctx.message.client, caper.id, full);
+  }
 }
 
 async function leave(ctx: CrewCtx) {

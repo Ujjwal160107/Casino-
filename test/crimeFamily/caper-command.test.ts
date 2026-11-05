@@ -13,8 +13,8 @@ const fileNames = (payload: any): string[] => (payload.files ?? []).map((f: any)
 const open = <T>(fn: () => Promise<T>) => withCfConfig({ enabled: true }, fn);
 
 /** Runs `!caper <args>` as uid in channelId; `said()` is every reply payload as JSON. */
-async function run(fc: ReturnType<typeof fakeCaperClient>, uid: string, args: string[], channelId = CH) {
-  const reply = vi.fn(async (_p: unknown) => ({ id: "r1" }));
+async function run(fc: ReturnType<typeof fakeCaperClient>, uid: string, args: string[], channelId = CH,
+  reply = vi.fn(async (_p: unknown) => ({ id: "r1" }))) {
   const message = { client: fc.client, guildId: G, guild: { id: G }, channelId, channel: fc.channel(channelId), author: { id: uid, username: "T", bot: false }, reply } as any;
   await handleCaper(message, args);
   return { reply, said: () => JSON.stringify(reply.mock.calls) };
@@ -66,6 +66,15 @@ describe("!caper", () => {
     const m = await run(fc, ids.LOOKOUT, ["join", "lookout"], "c2");
     expect(m.said()).toContain(`https://discord.com/channels/${G}/${CH}/${mid}`);
     expect(m.said()).toContain(`cpr:brief:${c.id}`);
+  }));
+
+  it("a filling !caper join auto-starts even when its reply throws (Review Focus 5)", () => open(async () => {
+    const { ids, fc, c } = await lobby();
+    await run(fc, ids.LOOKOUT, ["join", "lookout"]);
+    await run(fc, ids.SAFECRACKER, ["join", "safecracker"]);
+    const failing = vi.fn(async (_p: unknown): Promise<{ id: string }> => { throw new Error("Unknown Message"); });
+    await expect(run(fc, ids.DRIVER, ["join", "driver"], CH, failing)).rejects.toThrow("Unknown Message");
+    expect((await testPrisma.caper.findUniqueOrThrow({ where: { id: c.id } })).status).toBe("RUNNING");
   }));
 
   it("!caper with a live lobby in this guild reposts it (Review Focus 4)", () => open(async () => {
