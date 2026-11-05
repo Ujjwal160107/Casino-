@@ -271,9 +271,10 @@ async function safelyReplaceEmoji(
 /** The live bot, logged in. The only place .env is read, so --dry-run never touches it (P19). */
 async function loginClient(): Promise<Client> {
   dotenv.config({ quiet: true });
-  const token = process.env.TOKEN || process.env.DISCORD_TOKEN || process.env.BOT_TOKEN;
+  // DISCORD_TOKEN first: it is what src/index.ts logs in with, and a stale TOKEN may linger for older scripts.
+  const token = process.env.DISCORD_TOKEN || process.env.TOKEN || process.env.BOT_TOKEN;
   if (!token) {
-    throw new Error("Missing bot token. Set TOKEN, DISCORD_TOKEN, or BOT_TOKEN.");
+    throw new Error("Missing bot token. Set DISCORD_TOKEN (or TOKEN, BOT_TOKEN).");
   }
   const client = new Client({ intents: [GatewayIntentBits.Guilds] });
   try {
