@@ -1,6 +1,7 @@
 // customIds for the three Crime Families prefixes (spec 13.2). Owner-scoped
 // ids end with the owner's id; shared cards carry a DB id instead. Plans 2
 // and 3 add their builders to CPR_IDS and TURF_IDS.
+import type { WarBlockKey } from "../../services/crimeFamily/warMath";
 
 export type CfPrefix = "crew" | "cpr" | "turf";
 
@@ -72,7 +73,19 @@ export const CPR_IDS = {
   openBrief: (caperId: string, owner: string) => cfId("cpr", "open", "brief", caperId, owner),
 } as const;
 
-/** The S2 Turf button; plan 3 adds the rest. */
+/** Turf ids (spec 13.2): the map, select, opener and bid ids are owner-scoped; the war cards carry the war or hit id. */
 export const TURF_IDS = {
+  /** The S2 Turf button and S17's Back: S16. */
   viewMap: (owner: string) => cfId("turf", "v", "map", owner),
+  /** S16's War board button (T20). */
+  viewWar: (owner: string) => cfId("turf", "v", "war", owner),
+  select: (owner: string) => cfId("turf", "sel", owner),
+  /** S27 opener for `!turf racket <key>`. */
+  openRacket: (racketKey: string, owner: string) => cfId("turf", "open", "racket", racketKey, owner),
+  /** S17's Bid button: opens the bid modal. */
+  bid: (racketKey: string, owner: string) => cfId("turf", "bid", racketKey, owner),
+  bidModal: (racketKey: string, owner: string) => cfId("turf", "modal", "bid", racketKey, owner),
+  scout: (warId: string) => cfId("turf", "scout", warId),
+  hit: (warId: string, block: WarBlockKey) => cfId("turf", "hit", warId, block),
+  hitAnswer: (hitId: string, index: number) => cfId("turf", "hx", hitId, index),
 } as const;

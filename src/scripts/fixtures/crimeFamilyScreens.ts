@@ -15,6 +15,7 @@ import {
 import { CREW_IDS } from "../../ui/crimeFamily/ids";
 import { buildNotice, buildOpener, type CfPayload } from "../../ui/crimeFamily/kit";
 import { caperWorstCases } from "./caperScreens";
+import { turfWorstCases } from "./turfScreens";
 
 const OWNER = "12345678901234567890";
 const FAMILY_ID = "65f0000000000000000000ff";
@@ -87,7 +88,7 @@ function inviteView(i: number): InviteView {
 function leaderboardView(): LeaderboardView {
   return {
     sort: "xp",
-    sorts: [{ key: "xp", label: "XP" }, { key: "war", label: "War wins" }],
+    sorts: [{ key: "xp", label: "XP" }, { key: "rk", label: "Rackets" }, { key: "war", label: "War wins" }],
     rows: Array.from({ length: 10 }, (_, i) => ({
       rank: i + 1, familyId: FAMILY_ID, tag: `WX${String(i).padStart(2, "0")}`, name: LONG_NAME, level: i === 0 ? 10 : 9,
       crestKey: i === 0 ? "crest_4" : "crest_3", members: 12, rackets: 3, value: BIG,
@@ -111,7 +112,7 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
     { label: "S7 payday preview (12 members)", max: 6, payload: buildPaydayPreview(OWNER, paydayPreview(false), "Members changed.") },
     { label: "S8 level-up confirm", max: 6, payload: buildLevelUpConfirm(OWNER, vaultView(false)) },
     { label: "S9 log (15 lines)", max: 7, payload: buildLedgerPage(OWNER, { rows: ledgerLines(15), page: 98, pages: 999 }) },
-    { label: "S10 leaderboard (2 sorts)", max: 12, payload: buildLeaderboard(OWNER, leaderboardView(), { art: true }) },
+    { label: "S10 leaderboard (3 sorts)", max: 13, payload: buildLeaderboard(OWNER, leaderboardView(), { art: true }) },
     { label: "S22 disband", max: 6, payload: buildDisbandConfirm(OWNER, "WXYZ", { finalPayday: paydayPreview(false), burnTreasury: BIG, burnEarnings: BIG }) },
     { label: "S23 claim notice", max: 4, payload: buildClaimNotice(FAMILY_ID, MEMBERS[1], OWNER) },
     { label: "S23 claim resolved", max: 2, payload: buildClaimResolved(`Chair claimed by <@${MEMBERS[1]}>`) },
@@ -121,5 +122,6 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
     { label: "S28 notice", max: 2, payload: buildNotice(`Payday: 12 members paid 950,000 each\n${MEMBERS.map((m) => `<@${m}>`).join(" ")}`) },
     { label: "S28 notice with button", max: 4, payload: buildNotice("Your family's caper is GO.", { customId: CREW_IDS.view("home", OWNER), label: "Open" }, MEMBERS) },
     ...caperWorstCases(),
+    ...turfWorstCases(),
   ];
 }

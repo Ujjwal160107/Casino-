@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { PermissionFlagsBits } from "discord.js";
 import { CREW_IDS, CPR_IDS, TURF_IDS, cfId, decodeName, encodeName, parseCfId } from "../../src/ui/crimeFamily/ids";
-import { editChannelMessage, jumpLink, missingBotPermissions, sendToChannel } from "../../src/ui/crimeFamily/post";
+import { channelLink, editChannelMessage, jumpLink, missingBotPermissions, sendToChannel } from "../../src/ui/crimeFamily/post";
 import { buildNotice } from "../../src/ui/crimeFamily/kit";
 
 const U = "12345678901234567890"; // 20-digit snowflakes
@@ -17,6 +17,9 @@ describe("customIds", () => {
     CREW_IDS.vault("deposit", U), CREW_IDS.paydayOk(9_000_000_000_000_000, 12, U), CREW_IDS.levelOk(10, U),
     CREW_IDS.log(999, U), CREW_IDS.top("war", U), CREW_IDS.disband("open", U), CREW_IDS.modal("disband", U),
     CREW_IDS.inviteSelect(U), CREW_IDS.invite("decline", O), CREW_IDS.claim(O), CPR_IDS.viewPlan(U), TURF_IDS.viewMap(U),
+    // Turf at max lengths: 16-char racket keys, 20-digit owners, 24-char ObjectIds.
+    TURF_IDS.viewWar(U), TURF_IDS.select(U), TURF_IDS.openRacket("laundromat_front", U), TURF_IDS.bid("laundromat_front", U),
+    TURF_IDS.bidModal("laundromat_front", U), TURF_IDS.scout(O), TURF_IDS.hit(O, "alleys"), TURF_IDS.hitAnswer(O, 3),
   ];
 
   it.each(all)("%s fits in 100 characters and round-trips", (id) => {
@@ -95,5 +98,9 @@ describe("channel I/O", () => {
 
   it("jumpLink points at the message", () => {
     expect(jumpLink("g", "c", "m")).toBe("https://discord.com/channels/g/c/m");
+  });
+
+  it("channelLink points at the channel", () => {
+    expect(channelLink("1", "2")).toBe("https://discord.com/channels/1/2");
   });
 });

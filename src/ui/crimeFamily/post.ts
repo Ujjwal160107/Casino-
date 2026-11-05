@@ -64,3 +64,8 @@ export function missingBotPermissions(channel: GuildBasedChannel, botId: string)
 export function jumpLink(guildId: string, channelId: string, messageId: string): string {
   return `https://discord.com/channels/${guildId}/${channelId}/${messageId}`;
 }
+
+/** The family's home channel, for notices sent before any board exists (T9). */
+export function channelLink(guildId: string, channelId: string): string {
+  return `https://discord.com/channels/${guildId}/${channelId}`;
+}

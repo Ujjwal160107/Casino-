@@ -2,6 +2,8 @@
 // Each later view type is added by the task that first produces it.
 import type { CaperRoleKey, FamilyLevelDef, FamilyRole } from "../../data/crimeFamilyCatalog";
 import type { LedgerLine } from "./ledger";
+import type { WarSettlement, WarStatus } from "./warService";
+import type { BlockScores, RacketClass } from "./warMath";
 
 /** S2: the family dashboard as one viewer sees it. */
 export interface FamilyDashboardView {
@@ -169,3 +171,66 @@ export interface CaperPlannerView {
 
 /** T8: one home-channel war board, stored in `War.boards` so it is edited by id without a fetch. */
 export type WarBoardRef = { side: "ATK" | "DEF"; guildId: string; channelId: string; messageId: string; hasBanner: boolean; dead: boolean };
+
+/** S16, S17: one racket as the map shows it. */
+export interface TurfRacketLine {
+  key: string;
+  name: string;
+  class: RacketClass;
+  income: number;
+  ownerFamilyId: string;
+  /** "[TAG] Name" or "the Street". */
+  ownerLabel: string;
+  strikes: number;
+  /** The racket's latest BIDDING, ARMED or ACTIVE war. */
+  war: { id: string; status: WarStatus; topBid: number; topBidderLabel: string | null; bidClosesAt: Date; startsAt: Date } | null;
+  nextWarAt: Date;
+}
+
+/** S16: the 10 rackets in `RACKETS` order and the soonest war. */
+export interface TurfMapView {
+  rackets: TurfRacketLine[];
+  nextWar: { racketName: string; startsAt: Date };
+}
+
+/** S17: one racket and whether the viewer may bid on it now. */
+export interface RacketDetailView {
+  line: TurfRacketLine;
+  floor: number;
+  minBid: number;
+  minFamilyLevel: number;
+  viewerIsOfficer: boolean;
+  canBid: boolean;
+  blockers: string[];
+}
+
+export interface WarSideView {
+  familyId: string;
+  label: string;
+}
+
+/** S18 (and S21's board half): one war's live board. */
+export interface WarBoardView {
+  warId: string;
+  racketKey: string;
+  racketName: string;
+  racketClass: RacketClass;
+  startsAt: Date;
+  endsAt: Date;
+  attacker: WarSideView;
+  defender: WarSideView;
+  scores: BlockScores;
+  hits: { atk: number; def: number };
+  /** The top 5 scorers per side, most points first. */
+  top: { atk: { userId: string; points: number }[]; def: { userId: string; points: number }[] };
+  blackout: boolean;
+}
+
+/** S21: the settled war. */
+export interface WarResultView {
+  board: WarBoardView;
+  outcome: WarSettlement["outcome"];
+  overCap: boolean;
+  xp: { label: string; xp: number }[];
+  heated: number;
+}
