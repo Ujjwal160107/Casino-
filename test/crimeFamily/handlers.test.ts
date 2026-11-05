@@ -94,10 +94,18 @@ describe("crime family interactions", () => {
       expect(await testPrisma.familyMember.findUnique({ where: { userId: invitee } })).toMatchObject({ familyId: f.id, role: "SOLDIER" });
     });
   });
-  it("the S2 Caper button answers 'Capers open soon.' until plan 2", async () => {
-    const i = fakeButton(CPR_IDS.viewPlan("u1"), { userId: "u1" });
+  it("the S2 Caper button opens the planner; an unknown cpr action is no longer active", async () => {
+    const boss = await seedEligibleUser();
+    await seedFamily({ bossId: boss });
+    const i = fakeButton(CPR_IDS.viewPlan(boss), { userId: boss, guildId: "g1" });
     await handleCrimeFamilyInteraction(i as any);
-    expect(JSON.stringify(i.reply.mock.calls)).toContain("Capers open soon.");
+    expect(i.deferReply).toHaveBeenCalledTimes(1);
+    expect(i.ephemeral).toBe(true);
+    expect(said(i)).toContain("How a caper works");
+    expect(said(i)).toContain(`cpr:plan:${boss}`);
+    const gone = fakeButton("cpr:nope:u1", { userId: "u1" });
+    await handleCrimeFamilyInteraction(gone as any);
+    expect(said(gone)).toContain("This button is no longer active.");
   });
   it("create and invite answers are refused while the feature is closed", async () => {
     const founder = await seedEligibleUser({ wallet: 15_000_000 });

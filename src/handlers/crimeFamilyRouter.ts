@@ -39,7 +39,7 @@ const TABLES: Readonly<Record<CfPrefix, CfRouteTable>> = { crew: CREW_ROUTES, cp
 
 const NO_ROUTE: Readonly<Record<CfPrefix, string>> = {
   crew: "This button is no longer active.",
-  cpr: "Capers open soon.",
+  cpr: "This button is no longer active.",
   turf: "Turf wars open soon.",
 };
 

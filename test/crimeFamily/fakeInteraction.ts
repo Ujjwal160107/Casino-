@@ -5,7 +5,8 @@ import { MessageFlags } from "discord.js";
 // crime family router and routes touch. Each ack updates deferred / replied /
 // ephemeral the way discord.js does, and logs into `order`.
 
-export type FakeOpts = { userId: string; guildId?: string; ephemeralSource?: boolean; channelId?: string };
+/** `client` replaces the fake's own client (caper routes pass `fakeCaperClient(...).client`). */
+export type FakeOpts = { userId: string; guildId?: string; ephemeralSource?: boolean; channelId?: string; client?: unknown };
 type Kind = "button" | "select" | "modal";
 
 const isEphemeral = (options: unknown) =>
@@ -32,7 +33,7 @@ function fakeInteraction(customId: string, kind: Kind, opts: FakeOpts) {
     replied: false,
     ephemeral: null as boolean | null,
     order,
-    client,
+    client: opts.client ?? client,
     channel,
     message: { id: "m-source", flags: { has: (flag: number) => !!opts.ephemeralSource && flag === MessageFlags.Ephemeral } },
     isButton: () => kind === "button",

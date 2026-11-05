@@ -1,0 +1,112 @@
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import prisma from "../../src/utils/prisma";
+import { handleCrimeFamilyInteraction } from "../../src/handlers/crimeFamilyRouter";
+import { planCaper } from "../../src/services/crimeFamily/caperLobbyService";
+import { CPR_IDS } from "../../src/ui/crimeFamily/ids";
+import { fakeButton, fakeSelect, said } from "./fakeInteraction";
+import { testPrisma, resetFamilies, ensureUniqueIndexes, withCfConfig, flushTestKeys } from "../helpers";
+import { caperCrew, seedRunning, fakeCaperClient, G, CH } from "./caperFixtures";
+
+const R3 = ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] as const;
+const T1 = ["MASTERMIND", "LOOKOUT", "SAFECRACKER", "DRIVER"] as const;
+const wallet = async (id: string) => (await testPrisma.wallet.findUnique({ where: { userId: id } }))!.balance;
+const seat = (caperId: string, userId: string) => testPrisma.caperCrew.findFirstOrThrow({ where: { caperId, userId } });
+const press = async <T>(i: T) => { await handleCrimeFamilyInteraction(i as any); return i as any; };
+const open = <T>(fn: () => Promise<T>) => withCfConfig({ enabled: true }, fn);
+
+beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "Caper", "CaperCrew"]));
+beforeEach(async () => { await resetFamilies(); await flushTestKeys("cf:*"); });
+
+describe("cpr: planner routes", () => {
+  it("plan from a Soldier is refused with no caper", () => open(async () => {
+    const { ids } = await caperCrew({ tier: 1, roles: [...R3] });
+    const fc = fakeCaperClient();
+    const i = await press(fakeSelect(CPR_IDS.plan(ids.LOOKOUT), ["1"], { userId: ids.LOOKOUT, guildId: G, channelId: CH, client: fc.client }));
+    expect(said(i)).toContain("Only a Capo or above can plan a caper.");
+    expect(await testPrisma.caper.count()).toBe(0);
+  }));
+
+  it("plan while closed", async () => {
+    const { bossId } = await caperCrew({ tier: 1, roles: [...R3] });
+    const i = await press(fakeSelect(CPR_IDS.plan(bossId), ["1"], { userId: bossId, guildId: G, channelId: CH, client: fakeCaperClient().client }));
+    expect(said(i)).toContain("Crime Families are not open in this server yet.");
+    expect(await testPrisma.caper.count()).toBe(0);
+  });
+
+  it("plan in a channel missing Attach Files outside the home guild", () => open(async () => {
+    const { family, bossId } = await caperCrew({ tier: 1, roles: [...R3] });
+    await testPrisma.family.update({ where: { id: family.id }, data: { homeGuildId: "g9", homeChannelId: "c9" } });
+    const fc = fakeCaperClient({ missingPerms: { [CH]: ["AttachFiles"] } });
+    const before = await wallet(bossId);
+    const i = await press(fakeSelect(CPR_IDS.plan(bossId), ["1"], { userId: bossId, guildId: G, channelId: CH, client: fc.client }));
+    expect(said(i)).toContain("I need Attach Files in this channel to post the lobby.");
+    expect(await testPrisma.caper.count()).toBe(0);
+    expect(await wallet(bossId)).toBe(before);
+    expect(fc.sent).toHaveLength(0);
+  }));
+
+  it("plan posts the card and answers with its jump link", () => open(async () => {
+    const { family, bossId } = await caperCrew({ tier: 1, roles: [...R3] });
+    const fc = fakeCaperClient();
+    const i = await press(fakeSelect(CPR_IDS.plan(bossId), ["1"], { userId: bossId, guildId: G, channelId: CH, client: fc.client }));
+    expect(fc.sent).toHaveLength(1);
+    expect(fc.sent[0].payload.files).toHaveLength(1);
+    expect((await testPrisma.caper.findFirstOrThrow({ where: { familyId: family.id } })).messageId).toBe("m1");
+    expect(said(i)).toContain(`Lobby posted: https://discord.com/channels/${G}/${CH}/m1`);
+  }));
+});
+
+describe("cpr: lobby and GO routes", () => {
+  it("join from another guild", () => open(async () => {
+    const f = await caperCrew({ tier: 1, roles: [...T1] });
+    const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
+    const i = await press(fakeSelect(CPR_IDS.join(c.id), ["LOOKOUT"], { userId: f.ids.LOOKOUT, guildId: "g2", client: fakeCaperClient().client }));
+    expect(i.order[0]).toBe("deferUpdate");
+    expect(said(i)).toContain("This caper is in another server; join that server to play.");
+    expect(await testPrisma.caperCrew.count({ where: { caperId: c.id } })).toBe(1);
+  }));
+
+  it("brief from the public card defers ephemerally; Refresh from the brief defers as an update", async () => {
+    const { caper, ids } = await seedRunning({ tier: 1, roles: [...R3] });
+    const pub = await press(fakeButton(CPR_IDS.brief(caper.id), { userId: ids.LOOKOUT, guildId: G }));
+    expect(pub.deferReply).toHaveBeenCalledTimes(1);
+    expect(pub.ephemeral).toBe(true);
+    expect(said(pub)).toContain("Tell <@");
+    const refresh = await press(fakeButton(CPR_IDS.brief(caper.id), { userId: ids.LOOKOUT, guildId: G, ephemeralSource: true }));
+    expect(refresh.deferUpdate).toHaveBeenCalledTimes(1);
+    expect(refresh.deferReply).not.toHaveBeenCalled();
+  });
+
+  it("a dark seat's option press is refused", async () => {
+    // leakAt = goEndsAt − 30 s is 10 s in the past at press time
+    const goEndsAt = new Date(Date.now() + 20_000);
+    const { caper, ids } = await seedRunning({ tier: 1, roles: [...R3], startedAt: new Date(Date.now() - 100_000), goEndsAt, picks: { LOOKOUT: "none" } });
+    await testPrisma.caperCrew.updateMany({ where: { caperId: caper.id, userId: ids.LOOKOUT }, data: { briefOpened: true, briefOpenedAt: new Date(+goEndsAt - 30_000) } });   // opened exactly at leakAt
+    const i = await press(fakeButton(CPR_IDS.act(caper.id, 0), { userId: ids.LOOKOUT, guildId: G, ephemeralSource: true }));
+    expect(said(i)).toContain("You went dark: this seat counts as a miss.");
+    expect((await seat(caper.id, ids.LOOKOUT)).choice).toBe(-1);
+  });
+
+  it("the last lock resolves the caper", async () => {
+    const { caper, ids, answers } = await seedRunning({ tier: 1, roles: [...R3], picks: { SAFECRACKER: "none" } });
+    await press(fakeButton(CPR_IDS.act(caper.id, answers.seats.SAFECRACKER!.correct), { userId: ids.SAFECRACKER, guildId: G, ephemeralSource: true, client: fakeCaperClient().client }));
+    expect((await testPrisma.caper.findUniqueOrThrow({ where: { id: caper.id } })).status).toBe("RESOLVED");
+  });
+
+  it("a jailed crew member can still open the brief and lock (edge 5)", async () => {
+    const { caper, ids } = await seedRunning({ tier: 1, roles: [...R3], picks: { LOOKOUT: "none" } });
+    await testPrisma.user.update({ where: { discordId: ids.LOOKOUT }, data: { isJailed: true, jailReleaseTime: new Date(Date.now() + 3_600_000) } });
+    const b = await press(fakeButton(CPR_IDS.brief(caper.id), { userId: ids.LOOKOUT, guildId: G }));
+    expect(said(b)).toContain("Tell <@");
+    await press(fakeButton(CPR_IDS.act(caper.id, 1), { userId: ids.LOOKOUT, guildId: G, ephemeralSource: true, client: fakeCaperClient().client }));
+    expect((await seat(caper.id, ids.LOOKOUT)).choice).toBe(1);
+  });
+
+  it("another user's S27 opener is not theirs", async () => {
+    const db = vi.spyOn(prisma.caper, "findUnique");
+    const i = await press(fakeButton(CPR_IDS.openBrief("65f000000000000000000001", "111111111111111111"), { userId: "222222222222222222" }));
+    expect(said(i)).toContain("This panel is not yours.");
+    expect(db).not.toHaveBeenCalled();
+    db.mockRestore();
+  });
+});
