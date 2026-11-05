@@ -166,3 +166,6 @@ export interface CaperPlannerView {
   canPlan: boolean;
   live: { caperId: string; tier: number; status: string; guildId: string; channelId: string; messageId: string } | null;
 }
+
+/** T8: one home-channel war board, stored in `War.boards` so it is edited by id without a fetch. */
+export type WarBoardRef = { side: "ATK" | "DEF"; guildId: string; channelId: string; messageId: string; hasBanner: boolean; dead: boolean };

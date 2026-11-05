@@ -896,3 +896,91 @@ model CaperCrew {
   @@index([userId, started, startedAt])
   @@index([caperId, settled])
 }
+
+model Racket {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  key            String   @unique
+  name           String
+  class          String                       // CORNER|DISTRICT|CROWN
+  incomePerCycle Float
+  baseDefense    Int                          // per-block baseline for any defender (9.1)
+  warDow         Int                          // 0 = Sunday (getUTCDay)
+  warHourUtc     Int
+  ownerFamilyId  String   @default("")        // "" = Street (sentinel, never null)
+  capturedAt     DateTime @default(now())
+  lastPayoutAt   DateTime @default(now())
+  neglectStrikes Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@index([ownerFamilyId])
+}
+
+model War {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  racketId          String   @db.ObjectId
+  racketKey         String
+  periodKey         String                    // ISO week of startsAt, e.g. "2026-W44"
+  status            String   @default("BIDDING") // BIDDING|ARMED|ACTIVE|SETTLING|RESOLVED|CANCELLED
+  bidOpensAt        DateTime
+  bidClosesAt       DateTime
+  startsAt          DateTime
+  endsAt            DateTime
+  topBid            Float    @default(0)      // escrow, always from earnings; burned at settlement
+  topBidderFamilyId String   @default("")
+  attackerFamilyId  String   @default("")
+  defenderFamilyId  String   @default("")     // "" = Street NPC
+  seed              String   @default("")     // set at ACTIVE, never rendered
+  atkDocks          Int      @default(0)
+  atkMain           Int      @default(0)
+  atkAlleys         Int      @default(0)
+  defDocks          Int      @default(0)
+  defMain           Int      @default(0)
+  defAlleys         Int      @default(0)      // def* seeded with the class baseline at ACTIVE
+  winnerFamilyId    String   @default("")
+  warnedSoon        Boolean  @default(false)
+  lastTickAt        DateTime @default(now())  // written by each minute tick while ACTIVE
+  maxTickGapSeconds Int      @default(0)      // > 600 at settlement → CANCELLED, bid refunded
+  boards            Json?                     // the two home-channel boards [{guildId,channelId,messageId,side}], never filtered
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  @@unique([racketId, periodKey])
+  @@index([status, bidClosesAt])
+  @@index([status, startsAt])
+  @@index([status, endsAt])
+  @@index([topBidderFamilyId, status])
+}
+
+model WarContribution {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  warId         String   @db.ObjectId
+  familyId      String   @db.ObjectId
+  userId        String
+  side          String                        // ATK|DEF
+  hits          Int      @default(0)
+  correctHits   Int      @default(0)
+  points        Int      @default(0)
+  nextHitAt     DateTime @default(now())
+  lastScoutSlot Int      @default(-1)
+  createdAt     DateTime @default(now())
+  @@unique([warId, userId])
+  @@index([warId, familyId])
+  @@index([userId, createdAt])
+}
+
+model WarHit {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  warId     String   @db.ObjectId
+  familyId  String   @db.ObjectId
+  userId    String
+  side      String                            // ATK|DEF
+  block     String                            // docks|main|alleys
+  slot      Int
+  deadline  DateTime
+  choice    Int      @default(-1)
+  state     String   @default("ARMED")        // ARMED|HIT|MISS|TIMEOUT
+  points    Int      @default(0)
+  createdAt DateTime @default(now())
+  @@index([state, deadline])
+  @@index([userId, state, createdAt])
+  @@index([warId, userId])
+}

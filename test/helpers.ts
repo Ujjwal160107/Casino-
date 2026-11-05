@@ -1,7 +1,9 @@
 import Redis from "ioredis";
-import { PrismaClient, Prisma, User, Family } from "@prisma/client";
+import { PrismaClient, Prisma, User, Family, Racket, War, WarContribution } from "@prisma/client";
 import { CRIME_FAMILY_CONFIG } from "../src/utils/economyConfig";
-import { CAPO_SLOTS, type FamilyRole } from "../src/data/crimeFamilyCatalog";
+import { CAPO_SLOTS, RACKETS, RACKET_CLASSES, type FamilyRole } from "../src/data/crimeFamilyCatalog";
+import { baselineScores, warWindow, type RacketClass, type ScoreField, type WarSide } from "../src/services/crimeFamily/warMath";
+import type { WarBoardRef } from "../src/services/crimeFamily/views";
 
 let _redis: Redis | null = null;
 export function testRedis(): Redis {
@@ -194,6 +196,10 @@ export async function seedFamily(opts: SeedFamilyOpts): Promise<Family> {
 
 /** Empties the family collections (plans 2/3 extend this list). */
 export async function resetFamilies(): Promise<void> {
+  await testPrisma.warHit.deleteMany({});
+  await testPrisma.warContribution.deleteMany({});
+  await testPrisma.war.deleteMany({});
+  await testPrisma.racket.deleteMany({});
   await testPrisma.caperCrew.deleteMany({});
   await testPrisma.caper.deleteMany({});
   await testPrisma.familyLedger.deleteMany({});
@@ -201,6 +207,95 @@ export async function resetFamilies(): Promise<void> {
   await testPrisma.familyExit.deleteMany({});
   await testPrisma.familyMember.deleteMany({});
   await testPrisma.family.deleteMany({});
+}
+
+// ── Turf (plan 3) ────────────────────────────────────────────────────────────
+
+/** Upserts one racket by key: the definition comes from `RACKETS`; the overrides apply on create and update. */
+export async function seedRacket(
+  key: string,
+  o: Partial<{ ownerFamilyId: string; lastPayoutAt: Date; capturedAt: Date; neglectStrikes: number }> = {},
+): Promise<Racket> {
+  const r = RACKETS.find((d) => d.key === key);
+  if (!r) throw new Error(`seedRacket: unknown racket ${key}`);
+  const data = {
+    name: r.name, class: r.class, incomePerCycle: r.incomePerCycle, baseDefense: RACKET_CLASSES[r.class].baseline,
+    warDow: r.warDow, warHourUtc: r.warHourUtc, ...o,
+  };
+  return testPrisma.racket.upsert({ where: { key }, create: { key, ...data }, update: data });
+}
+
+export interface SeedWarOpts {
+  racketKey: string;
+  status: "BIDDING" | "ARMED" | "ACTIVE" | "SETTLING" | "RESOLVED" | "CANCELLED";
+  startsAt?: Date;
+  topBid?: number;
+  topBidderFamilyId?: string;
+  attackerFamilyId?: string;
+  defenderFamilyId?: string;
+  seed?: string;
+  scores?: Partial<Record<ScoreField, number>>;
+  lastTickAt?: Date;
+  maxTickGapSeconds?: number;
+  warnedSoon?: boolean;
+  boards?: WarBoardRef[];
+}
+
+const MIN_MS = 60_000;
+const WAR_START_OFFSET_MS: Record<SeedWarOpts["status"], number> = {
+  BIDDING: 24 * 60 * MIN_MS, ARMED: 10 * MIN_MS, ACTIVE: -10 * MIN_MS, SETTLING: -61 * MIN_MS, RESOLVED: -61 * MIN_MS, CANCELLED: -61 * MIN_MS,
+};
+
+/** A War row whose window comes from `warWindow(startsAt)`; the racket row is seeded when missing. */
+export async function seedWar(o: SeedWarOpts): Promise<War> {
+  const now = new Date();
+  const racket = (await testPrisma.racket.findUnique({ where: { key: o.racketKey } })) ?? (await seedRacket(o.racketKey));
+  const startsAt = o.startsAt ?? new Date(now.getTime() + WAR_START_OFFSET_MS[o.status]);
+  const live = o.status === "ACTIVE" || o.status === "SETTLING";
+  const topBidderFamilyId = o.topBidderFamilyId ?? "";
+  return testPrisma.war.create({
+    data: {
+      racketId: racket.id,
+      racketKey: racket.key,
+      status: o.status,
+      ...warWindow(startsAt),
+      topBid: o.topBid ?? 0,
+      topBidderFamilyId,
+      attackerFamilyId: o.attackerFamilyId ?? topBidderFamilyId,
+      defenderFamilyId: o.defenderFamilyId ?? "",
+      seed: o.seed ?? (live ? "ab".repeat(16) : ""),
+      ...(live ? baselineScores(racket.class as RacketClass) : {}),
+      ...o.scores,
+      ...(o.lastTickAt ? { lastTickAt: o.lastTickAt } : live ? { lastTickAt: now } : {}),
+      ...(o.maxTickGapSeconds !== undefined ? { maxTickGapSeconds: o.maxTickGapSeconds } : {}),
+      ...(o.warnedSoon !== undefined ? { warnedSoon: o.warnedSoon } : {}),
+      ...(o.boards ? { boards: o.boards } : {}),
+    },
+  });
+}
+
+export async function seedContribution(o: {
+  warId: string; familyId: string; userId: string; side: WarSide;
+  hits?: number; correctHits?: number; points?: number; nextHitAt?: Date; lastScoutSlot?: number;
+}): Promise<WarContribution> {
+  return testPrisma.warContribution.create({
+    data: {
+      warId: o.warId, familyId: o.familyId, userId: o.userId, side: o.side,
+      hits: o.hits ?? 0, correctHits: o.correctHits ?? 0, points: o.points ?? 0,
+      nextHitAt: o.nextHitAt ?? new Date(0), lastScoutSlot: o.lastScoutSlot ?? -1,
+    },
+  });
+}
+
+/** `n` resolved WarHit rows for one member (activity counts, 7.3). */
+export async function seedWarHits(userId: string, familyId: string, n: number, o: { state?: "HIT" | "MISS"; createdAt?: Date } = {}): Promise<void> {
+  const createdAt = o.createdAt ?? new Date();
+  await testPrisma.warHit.createMany({
+    data: Array.from({ length: n }, () => ({
+      warId: "65f0000000000000000000aa", familyId, userId, side: "ATK", block: "docks", slot: 0,
+      deadline: createdAt, state: o.state ?? "HIT", createdAt,
+    })),
+  });
 }
 
 /**
