@@ -5,6 +5,7 @@ import { redisService } from "../../src/services/redisService";
 import { handleCrimeFamilyInteraction } from "../../src/handlers/crimeFamilyRouter";
 import { TURF_IDS } from "../../src/ui/crimeFamily/ids";
 import { weakPoint, slotOf } from "../../src/services/crimeFamily/warMath";
+import { racketDef } from "../../src/data/crimeFamilyCatalog";
 import { fakeButton, fakeModal, said } from "./fakeInteraction";
 import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, withCfConfig } from "../helpers";
 
@@ -68,6 +69,18 @@ describe("turf routes (13.2)", () => {
     const gone = fakeButton("turf:nope:u1", { userId: "u1" });
     await handleCrimeFamilyInteraction(gone as any);
     expect(said(gone)).toContain("This button is no longer active.");
+  });
+
+  it("War board names the family's own ARMED war and its start, not the map's soonest slot", async () => {
+    await withCfConfig(ON, async () => {
+      const boss = await seedEligibleUser();
+      const f = await seedFamily({ bossId: boss, homeGuildId: "g1" });
+      const startsAt = new Date(Math.floor(Date.now() / 1000) * 1000 + 20 * 60_000 + 7_000);   // off any schedule slot
+      await seedWar({ racketKey: "casino_row", status: "ARMED", startsAt, topBid: 2_100_000, topBidderFamilyId: f.id });
+      const i = fakeButton(TURF_IDS.viewWar(boss), { userId: boss, guildId: "g1" });
+      await handleCrimeFamilyInteraction(i as any);
+      expect(said(i)).toContain(`Next war: ${racketDef("casino_row")!.name} <t:${startsAt.getTime() / 1000}:F>.`);
+    });
   });
 
   it("the bid modal places the bid and re-renders S17 with a note", async () => {

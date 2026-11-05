@@ -42,7 +42,9 @@ async function settleAndAnnounce(client: Client, warId: string, now: Date): Prom
  * Spec 15 steps 1–7 in order. Each step reads its own list after the step
  * before it ran, so one tick can carry a war through several states after
  * downtime. A war this tick activated was just drawn with `force`, so step 5
- * only records its tick.
+ * only records its tick. A war whose step-5 tick failed is not settled this
+ * tick: its downtime gap is unrecorded, and settling now would resolve a war
+ * that should cancel (T2). It stays ACTIVE and the next tick records it.
  */
 export async function tickWars(client: Client, now: Date): Promise<void> {
   const allowNew = turfOn();
@@ -68,13 +70,20 @@ export async function tickWars(client: Client, now: Date): Promise<void> {
     await syncWarBoards(client, id, now, { force: true });
   });
 
+  const untracked = new Set<string>();
   await eachWar(await warIds({ status: "ACTIVE" }), async (id) => {
-    await recordWarTick(id, now);
+    try {
+      await recordWarTick(id, now);
+    } catch (err) {
+      untracked.add(id);
+      throw err;
+    }
     const war = await prisma.war.findUnique({ where: { id }, select: { endsAt: true } });
     if (war && war.endsAt > now && !drawn.has(id)) await syncWarBoards(client, id, now);
   });
 
-  await eachWar(await warIds({ status: "ACTIVE", endsAt: { lte: now } }), async (id) => {
+  const ended = (await warIds({ status: "ACTIVE", endsAt: { lte: now } })).filter((id) => !untracked.has(id));
+  await eachWar(ended, async (id) => {
     if (await beginSettle(id, now)) await settleAndAnnounce(client, id, now);
   });
 

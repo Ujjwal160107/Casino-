@@ -1,5 +1,6 @@
 // test/crimeFamily/turf-jobs.test.ts
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import prisma from "../../src/utils/prisma";
 import { CF_SCHEDULES } from "../../src/services/crimeFamily/scheduler";
 import { tickWars, tickRackets } from "../../src/services/crimeFamily/turfJobs";
 import { placeBid } from "../../src/services/crimeFamily/bidService";
@@ -7,7 +8,7 @@ import { seedRackets } from "../../src/services/crimeFamily/racketService";
 import { nextWarStart } from "../../src/services/crimeFamily/warMath";
 import { racketDef } from "../../src/data/crimeFamilyCatalog";
 import { fakeClient } from "./fakeClient";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWarHits, withCfConfig, flushTestKeys } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWarHits, seedWar, withCfConfig, flushTestKeys } from "../helpers";
 
 const H = 3600_000;
 const ON = { enabled: true, turfEnabled: true };
@@ -50,6 +51,30 @@ describe("turf jobs (15)", () => {
       expect(w).toMatchObject({ status: "RESOLVED", winnerFamilyId: owner.f.id, maxTickGapSeconds: 60 });
       expect((await testPrisma.racket.findUnique({ where: { key: "valet_racket" } }))!.ownerFamilyId).toBe(owner.f.id);
       expect(await testPrisma.familyLedger.count({ where: { type: "war_bid_burn" } })).toBe(1);
+    });
+  });
+
+  it("a war whose step-5 tick fails is not settled that tick, so its downtime gap still cancels it (T2)", async () => {
+    await withCfConfig(ON, async () => {
+      const a = await fam("ch-a");
+      const war = await seedWar({ racketKey: "valet_racket", status: "ACTIVE", startsAt: base, lastTickAt: base, topBid: 2_100_000, topBidderFamilyId: a.f.id });
+      const c = fakeClient();
+      const after = new Date(+war.endsAt + 60_000);   // the bot was down for the whole war
+      const updateMany = prisma.war.updateMany;
+      const real = updateMany.bind(prisma.war);
+      const spy = vi.spyOn(prisma.war, "updateMany").mockImplementation(((args: any) =>
+        args?.where?.lastTickAt ? Promise.reject(new Error("Mongo blip")) : real(args)) as any);
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        await tickWars(c.client, after);
+      } finally {
+        spy.mockRestore(); error.mockRestore();
+        Object.assign(prisma.war, { updateMany });   // mockRestore writes undefined back on Prisma's model proxy
+      }
+      expect(await testPrisma.war.findUnique({ where: { id: war.id } })).toMatchObject({ status: "ACTIVE" });
+      await tickWars(c.client, new Date(+after + 60_000));
+      expect(await testPrisma.war.findUnique({ where: { id: war.id } })).toMatchObject({ status: "CANCELLED" });
+      expect((await testPrisma.family.findUnique({ where: { id: a.f.id } }))!.earnings).toBe(2_100_000);
     });
   });
 

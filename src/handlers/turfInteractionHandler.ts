@@ -52,14 +52,15 @@ const racketScreen = async (uid: string, racketKey: string, note?: string) =>
 export async function warCardScreen(uid: string, now: Date): Promise<CfPayload> {
   const membership = await getMembership(uid);
   const war = membership ? await getLiveWarFor(membership.family.id) : null;
+  const racketName = war ? racketDef(war.racketKey)?.name ?? war.racketKey : "";
   if (war?.status === "ACTIVE") {
     const side = war.attackerFamilyId === membership!.family.id ? "ATK" : "DEF";
     const ref = boardsOf(war).find((r) => r.side === side && !r.dead && r.messageId !== "");
-    const racketName = racketDef(war.racketKey)?.name ?? war.racketKey;
     return buildWarCard({ warId: war.id, racketName, endsAt: war.endsAt, jumpUrl: ref ? jumpLink(ref.guildId, ref.channelId, ref.messageId) : null });
   }
-  const { nextWar } = await getTurfMapView(now);
-  return buildNotice(`No turf war is live for your family. Next war: ${nextWar.racketName} <t:${unix(nextWar.startsAt)}:F>.`);
+  // An ARMED war is the family's own next fight; the map's soonest slot may be another racket.
+  const next = war ? { racketName, startsAt: war.startsAt } : (await getTurfMapView(now)).nextWar;
+  return buildNotice(`No turf war is live for your family. Next war: ${next.racketName} <t:${unix(next.startsAt)}:F>.`);
 }
 
 const bidModalRoute: CfRouteEntry = {
