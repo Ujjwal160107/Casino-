@@ -28,6 +28,13 @@ describe("turf views", () => {
     expect(await getRacketDetailView("pawn_row", boss, new Date())).toMatchObject({ minBid: 2_310_000, canBid: true, blockers: [] });
   });
 
+  it("in the hour after a no-bid war is cancelled, the line says bidding closed and points at next week's window", async () => {
+    const now = new Date("2026-11-04T17:30:00Z"); // valet_racket wars Wed 18:00 UTC; bidding closed at 17:00
+    await seedWar({ racketKey: "valet_racket", status: "CANCELLED", startsAt: new Date("2026-11-04T18:00:00Z") });
+    const { line } = await getRacketDetailView("valet_racket", await seedEligibleUser(), now);
+    expect(line).toMatchObject({ war: null, nextWarAt: new Date("2026-11-04T18:00:00Z"), bidding: { phase: "CLOSED", nextOpensAt: new Date("2026-11-08T18:00:00Z") } });
+  });
+
   it("the board view ranks hitters and flags the blackout", async () => {
     const a = await seedFamily({ bossId: await seedEligibleUser() });
     const w = await seedWar({ racketKey: "casino_row", status: "ACTIVE", startsAt: new Date(Date.now() - 51 * 60_000), topBid: 9_100_000, topBidderFamilyId: a.id, defenderFamilyId: "" });

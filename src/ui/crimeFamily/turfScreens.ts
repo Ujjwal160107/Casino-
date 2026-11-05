@@ -95,8 +95,10 @@ function biddingLine(line: TurfRacketLine): string {
   }
   if (war?.status === "ARMED") return `**Bidding closed:** ${war.topBidderLabel ?? "a family"} attacks ${rel(war.startsAt)}`;
   if (war?.status === "ACTIVE") return `**War live:** ${war.topBidderLabel ?? "a family"} is attacking now`;
-  const opensAt = new Date(line.nextWarAt.getTime() - CRIME_FAMILY_CONFIG.bidOpensBeforeSeconds * 1000);
-  return `**Bidding:** opens ${rel(opensAt)}`;
+  const { phase, nextOpensAt } = line.bidding;
+  if (phase === "OPEN") return "**Bidding:** open, no bids yet";
+  if (phase === "CLOSED") return `**Bidding:** closed, no bids this week · next window opens ${rel(nextOpensAt)}`;
+  return `**Bidding:** opens ${rel(nextOpensAt)}`;
 }
 
 /** S17: always sends its class thumbnail and clears old attachments (it opens over S16's map). */

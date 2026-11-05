@@ -26,7 +26,7 @@ function line(i: number): TurfRacketLine {
     key: r.key, name: r.name, class: r.class, income: r.incomePerCycle, ownerFamilyId: `65f00000000000000000000${i}`,
     ownerLabel: label(i), strikes: 2,
     war: { id: WAR_ID, status: "BIDDING", topBid: BIG, topBidderLabel: label(i + 10), bidClosesAt: SOON(), startsAt: SOON() },
-    nextWarAt: SOON(),
+    nextWarAt: SOON(), bidding: { phase: "OPEN", nextOpensAt: SOON() },
   };
 }
 

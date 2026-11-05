@@ -7,7 +7,7 @@ import { bidBlockers, loadBidContext } from "./bidService";
 import { familyLabel } from "./familyQueries";
 import { can } from "./permissions";
 import { FamilyError } from "./tx";
-import { bidFloor, isBlackout, minNextBid, nextWarStart, scoresOf, type WarSide } from "./warMath";
+import { bidFloor, bidPhase, isBlackout, minNextBid, nextWarStart, scoresOf, type WarSide } from "./warMath";
 import type { WarStatus } from "./warService";
 import type { RacketDetailView, TurfMapView, TurfRacketLine, WarBoardView } from "./views";
 
@@ -44,6 +44,7 @@ async function racketLines(now: Date, keys?: string[]): Promise<TurfRacketLine[]
     const row = rows.find((r) => r.key === def.key);
     const owner = row?.ownerFamilyId ?? "";
     const war = latest.get(def.key);
+    const nextWarAt = nextWarStart(def, now);
     return {
       key: def.key, name: def.name, class: def.class, income: def.incomePerCycle,
       ownerFamilyId: owner, ownerLabel: (owner && labels.get(owner)) || STREET, strikes: row?.neglectStrikes ?? 0,
@@ -54,7 +55,8 @@ async function racketLines(now: Date, keys?: string[]): Promise<TurfRacketLine[]
           bidClosesAt: war.bidClosesAt, startsAt: war.startsAt,
         }
         : null,
-      nextWarAt: nextWarStart(def, now),
+      nextWarAt,
+      bidding: bidPhase(nextWarAt, now),
     };
   });
 }

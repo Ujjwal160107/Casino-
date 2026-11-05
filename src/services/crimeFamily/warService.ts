@@ -13,7 +13,7 @@ import { awardFamilyXp } from "./progression";
 import { invalidateUsers, isUniqueViolation, runFamilyTx } from "./tx";
 import { creditEarnings } from "./vaultService";
 import {
-  attackerWins, baselineScores, blockResults, captureXp, defenceEarnsXp, nextWarStart, scoresOf, warWindow, type WarSide,
+  attackerWins, baselineScores, bidPhase, blockResults, captureXp, defenceEarnsXp, nextWarStart, scoresOf, warWindow, type WarSide,
 } from "./warMath";
 
 export type WarStatus = "BIDDING" | "ARMED" | "ACTIVE" | "SETTLING" | "RESOLVED" | "CANCELLED";
@@ -41,8 +41,9 @@ function defOf(racketKey: string): RacketDef {
 export async function openWarPeriods(now: Date): Promise<void> {
   const rackets = await prisma.racket.findMany({ select: { id: true, key: true, warDow: true, warHourUtc: true } });
   for (const r of rackets) {
-    const w = warWindow(nextWarStart(r, now));
-    if (now < w.bidOpensAt || now >= w.bidClosesAt) continue;
+    const startsAt = nextWarStart(r, now);
+    if (bidPhase(startsAt, now).phase !== "OPEN") continue;
+    const w = warWindow(startsAt);
     try {
       await prisma.war.upsert({
         where: { racketId_periodKey: { racketId: r.id, periodKey: w.periodKey } },

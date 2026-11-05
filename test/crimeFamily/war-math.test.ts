@@ -35,6 +35,18 @@ describe("war math (9.1, 9.4, 15)", () => {
     });
   });
 
+  it("bidPhase is upcoming, open, then closed with next week's opening for the last hour", () => {
+    const s = at("2026-11-04T18:00:00Z");
+    expect([at("2026-11-01T17:59:59Z"), at("2026-11-01T18:00:00Z"), at("2026-11-04T16:59:59Z"), at("2026-11-04T17:00:00Z"), at("2026-11-04T17:59:59Z")]
+      .map((now) => M.bidPhase(s, now))).toEqual([
+      { phase: "UPCOMING", nextOpensAt: at("2026-11-01T18:00:00Z") },
+      { phase: "OPEN", nextOpensAt: at("2026-11-01T18:00:00Z") },
+      { phase: "OPEN", nextOpensAt: at("2026-11-01T18:00:00Z") },
+      { phase: "CLOSED", nextOpensAt: at("2026-11-08T18:00:00Z") },
+      { phase: "CLOSED", nextOpensAt: at("2026-11-08T18:00:00Z") },
+    ]);
+  });
+
   it("slots are 5 minutes, 0..11, clamped; blackout is the last 600 s", () => {
     const s = at("2026-11-04T18:00:00Z");
     expect([0, 299_999, 300_000, 3_599_999, 3_600_000, 9e6].map((ms) => M.slotOf(s, new Date(+s + ms)))).toEqual([0, 0, 1, 11, 11, 11]);

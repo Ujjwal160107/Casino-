@@ -3,7 +3,7 @@
 import type { CaperRoleKey, FamilyLevelDef, FamilyRole } from "../../data/crimeFamilyCatalog";
 import type { LedgerLine } from "./ledger";
 import type { WarSettlement, WarStatus } from "./warService";
-import type { BlockScores, RacketClass } from "./warMath";
+import type { BidPhase, BlockScores, RacketClass } from "./warMath";
 
 /** S2: the family dashboard as one viewer sees it. */
 export interface FamilyDashboardView {
@@ -185,6 +185,8 @@ export interface TurfRacketLine {
   /** The racket's latest BIDDING, ARMED or ACTIVE war. */
   war: { id: string; status: WarStatus; topBid: number; topBidderLabel: string | null; bidClosesAt: Date; startsAt: Date } | null;
   nextWarAt: Date;
+  /** The nextWarAt bid window at view time: what S17 shows when there is no live war. */
+  bidding: { phase: BidPhase; nextOpensAt: Date };
 }
 
 /** S16: the 10 rackets in `RACKETS` order and the soonest war. */

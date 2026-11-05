@@ -71,6 +71,18 @@ describe("turf screens (13.3)", () => {
     expect(c.payload.attachments).toEqual([]);
   });
 
+  it("S17 with no live war says whether bidding is upcoming, open, or closed for the week", () => {
+    const at = new Date("2026-11-08T18:00:00Z");
+    const detail = (phase: string) => text(S.buildRacketDetail("1", {
+      line: { key: "valet_racket", name: "Valet Racket", class: "CORNER", income: 1, ownerFamilyId: "", ownerLabel: "the Street", strikes: 0,
+        war: null, nextWarAt: new Date("2026-11-04T18:00:00Z"), bidding: { phase: phase as any, nextOpensAt: at } },
+      floor: 1, minBid: 1, minFamilyLevel: 1, viewerIsOfficer: true, canBid: false, blockers: [],
+    }));
+    expect(detail("UPCOMING")).toContain(`**Bidding:** opens <t:${+at / 1000}:R>`);
+    expect(detail("OPEN")).toContain("**Bidding:** open, no bids yet");
+    expect(detail("CLOSED")).toContain(`**Bidding:** closed, no bids this week · next window opens <t:${+at / 1000}:R>`);
+  });
+
   it("S16 and S21 drop the gallery and send no file when the banner is absent; S16 sends the banner and clears attachments when present (D66, 13.2)", () => {
     art.present = false;
     const mapAbsent = turfWorstCases().find((x) => x.label.startsWith("S16"))!.payload;

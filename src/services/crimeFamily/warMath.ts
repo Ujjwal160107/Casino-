@@ -44,6 +44,20 @@ export function warWindow(startsAt: Date): { periodKey: string; bidOpensAt: Date
   };
 }
 
+export type BidPhase = "UPCOMING" | "OPEN" | "CLOSED";
+
+/**
+ * Where `now` sits in the bid window of the war at `startsAt` (from
+ * nextWarStart, so the war is still ahead), and when the next window opens:
+ * this one while it is upcoming or open, next week's once it has closed.
+ */
+export function bidPhase(startsAt: Date, now: Date): { phase: BidPhase; nextOpensAt: Date } {
+  const w = warWindow(startsAt);
+  if (now < w.bidOpensAt) return { phase: "UPCOMING", nextOpensAt: w.bidOpensAt };
+  if (now < w.bidClosesAt) return { phase: "OPEN", nextOpensAt: w.bidOpensAt };
+  return { phase: "CLOSED", nextOpensAt: warWindow(new Date(startsAt.getTime() + WEEK_MS)).bidOpensAt };
+}
+
 /** The scout slot at `now`, clamped to 0..slots-1. */
 export function slotOf(startsAt: Date, now: Date): number {
   const raw = Math.floor((now.getTime() - startsAt.getTime()) / (CRIME_FAMILY_CONFIG.scoutSlotSeconds * 1000));
