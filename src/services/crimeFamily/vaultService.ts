@@ -12,7 +12,7 @@ import { readLedgerPage, writeLedger, type LedgerType } from "./ledger";
 import { previewPayday } from "./paydayService";
 import { levelUpBlockers, nextLevelDef } from "./progression";
 import { can } from "./permissions";
-import { FamilyError, runFamilyTx, VaultBusy, VaultShort } from "./tx";
+import { FamilyError, invalidateUsers, runFamilyTx, VaultBusy, VaultShort } from "./tx";
 import type { VaultView } from "./views";
 
 const NOT_IN_FAMILY = "You are not in a crime family.";
@@ -167,6 +167,7 @@ export async function depositToVault(
     await retryArrears(tx, family.id, uid);
     return (sameDay ? cap - row.depositedToday : cap) - amount;
   });
+  await invalidateUsers([uid]);
   return { amount, tax, net, leftToday };
 }
 

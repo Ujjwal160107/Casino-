@@ -9,7 +9,7 @@ import { getFamilyByTag, requireMembership } from "./familyQueries";
 import { writeLedger } from "./ledger";
 import { checkFamilyName, checkFamilyTag } from "./names";
 import { can, NO_PERMISSION } from "./permissions";
-import { FamilyError, isUniqueViolation, runFamilyTx } from "./tx";
+import { FamilyError, invalidateUsers, isUniqueViolation, runFamilyTx } from "./tx";
 import { spendFromVault, utcDayKey } from "./vaultService";
 import type { FamilyRole } from "../../data/crimeFamilyCatalog";
 
@@ -31,8 +31,9 @@ export async function createFamily(input: {
   if (!eligibility.ok) throw eligibilityError(eligibility.failures);
 
   const fee = CRIME_FAMILY_CONFIG.createFee;
+  let family: Family;
   try {
-    return await runFamilyTx(async (tx) => {
+    family = await runFamilyTx(async (tx) => {
       await debitWalletInTx(tx, input.uid, fee, "family_create", { tag: tag.tag });
       const family = await tx.family.create({
         data: {
@@ -56,6 +57,8 @@ export async function createFamily(input: {
     if (isUniqueViolation(err, "FamilyMember_userId_key")) throw new FamilyError("You are already in a family.");
     throw err;
   }
+  await invalidateUsers([input.uid]);
+  return family;
 }
 
 /** The Boss moves the family's home channel (`!crew home`). */
