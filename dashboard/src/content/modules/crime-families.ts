@@ -487,7 +487,7 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Rackets",
       body: [
-        "Turf is ten fixed rackets that pay protection money into the owning family's earnings. !turf (aliases !racket and !rackets, or /turf) posts the turf map: every racket with its owner, daily income, weekly war time and the current top bid. Pick a racket from the menu, or type !turf racket <key> or its number 1–10, to open its detail card: owner, income, neglect strikes, bidding status, the floor, the smallest bid that would count now, and the next war.",
+        "Turf is ten fixed rackets that pay protection money into the owning family's earnings. !turf (aliases !racket and !rackets, or /turf) posts the turf map: every racket with its owner, daily income, weekly war time and the current top bid. Pick a racket from the menu to open its detail card: owner, income, neglect strikes, bidding status, the floor, the smallest bid that would count now, and the next war. Typing !turf racket <key> or its number 1–10 posts a short line with an Open racket button for you; pressing it opens that card where only you can see it.",
         "Every racket starts with the Street, the city's unowned turf. There is no way to buy or claim one outright: the only way to take a racket is to win its weekly war. Each racket has one war a week at a fixed time, rotating between 18:00 UTC (EU evening), 01:00 UTC (US evening) and 12:00 UTC (Asia and Oceania evening); both Crown wars fall on the weekend.",
         "Between them the ten rackets pay at most 6,400,000 a day (44,800,000 a week) across the whole bot, however many families play. Neglect only lowers that.",
       ],
@@ -640,7 +640,7 @@ const crimeFamilies: ModuleDoc = {
         "Call weak points in the home channel the moment you see them, with the block and the time it runs out (\"Docks: Pier 4 till :25\"). A hit called from a scout scores 10; a guess scores 2.5 on average and still costs 25,000.",
         "Save hits for the blackout. Your 6 hits are 600 seconds apart, so a member who hits at the start can still land the sixth at the 50-minute mark, right as the scores go dark. The other side can't see where you're pushing, and a defender who thought a block was safe can't react.",
         "Bid late, but before the close. Bidding shuts 1 hour before the war and a raise must beat the top bid by 10%, so an early bid only sets the price for everyone else. Have the Boss or Underboss ready in the last few hours, with the earnings in the vault (bids can't touch the treasury).",
-        "Keep 3 racket-eligible members at all times. A racket you hold pays nothing in a week where fewer than 3 members played 2 caper seats or landed 3 correct war hits, and three such cycles lose it without a fight.",
+        "A cycle pays nothing if, when it falls due, fewer than 3 members are racket-eligible (72 h in the family, 20 shifts, and 2 started caper seats or 3 correct war hits in the last 7 days), and three such cycles lose the racket without a fight.",
         "Defend above the baseline only when the attacker is scoring. Every defender hit costs 25,000; against an attacker who isn't landing hits the baseline holds on its own, and ties go to you. Watch the board and spend your hits on the blocks they are actually taking, before the blackout hides them.",
       ],
     },
