@@ -1,5 +1,6 @@
-// The family jobs (spec 15): invite expiry and the caper sweep every minute; dues, succession and
-// the automatic payday hourly. Each schedule is its own cron task in UTC with
+// The family jobs (spec 15): invite expiry, the caper sweep, the hit timeout
+// and tickWars every minute; dues, succession and the automatic payday hourly;
+// tickRackets at :05. Each schedule is its own cron task in UTC with
 // noOverlap, each job and each family has its own try/catch, and every write
 // is a CAS in the service it calls, so a missed or doubled run is harmless.
 // Plans 2 and 3 add CfJob entries to CF_SCHEDULES, never branches.
@@ -14,8 +15,10 @@ import { SWEEP_CAPERS_JOB } from "./caperSweeper";
 import { autoHandover, clearClaimNotice, markClaimNotice, setClaimMessage } from "./chairService";
 import { expireInvites } from "./membershipService";
 import { executePayday } from "./paydayService";
+import { tickRackets, tickWars } from "./turfJobs";
 import { FamilyError } from "./tx";
 import { chargeDues } from "./vaultService";
+import { sweepWarHits } from "./warActions";
 
 export interface CfJob { name: string; run(client: Client, now: Date): Promise<void> }
 
@@ -110,7 +113,14 @@ export async function autoPayday(client: Client, now: Date): Promise<void> {
 }
 
 export const CF_SCHEDULES: { cron: string; jobs: CfJob[] }[] = [
-  { cron: "* * * * *", jobs: [{ name: "sweepInvites", run: sweepInvites }, SWEEP_CAPERS_JOB] },
+  {
+    cron: "* * * * *",
+    jobs: [
+      { name: "sweepInvites", run: sweepInvites },
+      SWEEP_CAPERS_JOB,
+      { name: "sweepWarHits", run: (_c, now) => sweepWarHits(now).then(() => {}) },
+    ],
+  },
   {
     cron: "10 * * * *",
     jobs: [
@@ -119,6 +129,8 @@ export const CF_SCHEDULES: { cron: string; jobs: CfJob[] }[] = [
       { name: "autoPayday", run: autoPayday },
     ],
   },
+  { cron: "* * * * *", jobs: [{ name: "tickWars", run: tickWars }] },
+  { cron: "5 * * * *", jobs: [{ name: "tickRackets", run: tickRackets }] },
 ];
 
 /** Runs each job in order; one job's failure never stops the next. */
