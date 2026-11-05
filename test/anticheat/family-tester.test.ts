@@ -7,8 +7,11 @@ import { depositToVault } from "../../src/services/crimeFamily/vaultService";
 import { executePayday } from "../../src/services/crimeFamily/paydayService";
 import { ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
 import { planCaper, cancelCaper } from "../../src/services/crimeFamily/caperLobbyService";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, resetUser, ensureUniqueIndexes, daysAgo } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, resetUser, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedContribution } from "../helpers";
 import { caperCrew, G, CH } from "../crimeFamily/caperFixtures";
+import { armHit } from "../../src/services/crimeFamily/warActions";
+import { placeBid } from "../../src/services/crimeFamily/bidService";
+import { collectRacket } from "../../src/services/crimeFamily/racketService";
 
 // D34: testers get no Crime Families bypass. Every fee, tax, cap, interval
 // and gate applies to an allowlisted developer exactly as to anyone else.
@@ -93,5 +96,44 @@ describe("capers treat testers like everyone else", () => {
       ...fs.readdirSync(path.join(src, "ui/crimeFamily")).filter((f) => f.startsWith("caper")).map((f) => path.join(src, "ui/crimeFamily", f)),
     ];
     for (const f of files) expect(fs.readFileSync(f, "utf8"), f).not.toContain("isTester");
+  });
+});
+
+describe("turf gives the tester no shortcut (D34)", () => {
+  const balance = async (id: string) => (await testPrisma.wallet.findUnique({ where: { userId: id } }))!.balance;
+  async function testerAtWar() {
+    await seedEligibleUser({ id: BOT_DEVELOPER_ID, wallet: 1_000_000 });
+    const f = await seedFamily({ bossId: await seedEligibleUser(), level: 1, homeGuildId: "g1", members: [{ userId: BOT_DEVELOPER_ID, role: "SOLDIER", joinedAt: daysAgo(10) }] });
+    await seedRacket("docks_numbers");
+    const w = await seedWar({ racketKey: "docks_numbers", status: "ACTIVE", topBid: 2_100_000, topBidderFamilyId: f.id, defenderFamilyId: "" });
+    return { f, w };
+  }
+  beforeAll(() => ensureUniqueIndexes(["Racket", "War", "WarContribution"]));
+  beforeEach(async () => { await resetFamilies(); await resetUser(BOT_DEVELOPER_ID); });   // resetFamilies keeps users; each test re-seeds the tester
+
+  it("a hit debits 25,000 and the 600 s cooldown applies", async () => {
+    const { w } = await testerAtWar();
+    const now = new Date();
+    await armHit({ warId: w.id, userId: BOT_DEVELOPER_ID, guildId: "g1", block: "docks", now });
+    expect(await balance(BOT_DEVELOPER_ID)).toBe(975_000);
+    await expect(armHit({ warId: w.id, userId: BOT_DEVELOPER_ID, guildId: "g1", block: "main", now: new Date(+now + 599_000) })).rejects.toThrow(/^Next hit <t:\d+:R>\.$/);
+    expect(await balance(BOT_DEVELOPER_ID)).toBe(975_000);
+  });
+
+  it("a seventh hit is refused with nothing debited", async () => {
+    const { f, w } = await testerAtWar();
+    await seedContribution({ warId: w.id, familyId: f.id, userId: BOT_DEVELOPER_ID, side: "ATK", hits: 6 });
+    await expect(armHit({ warId: w.id, userId: BOT_DEVELOPER_ID, guildId: "g1", block: "docks" })).rejects.toThrow("You've used all 6 hits in this war.");
+    expect(await balance(BOT_DEVELOPER_ID)).toBe(1_000_000);
+  });
+
+  it("a tester Boss gets no racket cycle early and no bid below the floor", async () => {
+    await seedEligibleUser({ id: BOT_DEVELOPER_ID, wallet: 1_000_000 });
+    const f = await seedFamily({ bossId: BOT_DEVELOPER_ID, level: 4, earnings: 9_000_000 });   // L4: racketCap 2, so the held racket leaves room to bid
+    const r = await seedRacket("pawn_row", { ownerFamilyId: f.id, lastPayoutAt: new Date(Date.now() - 3600_000) });
+    expect(await collectRacket(r.id, new Date(), 3)).toMatchObject({ status: "skipped", amount: 0 });
+    await seedWar({ racketKey: "valet_racket", status: "BIDDING" });
+    await expect(placeBid({ racketKey: "valet_racket", actorId: BOT_DEVELOPER_ID, amount: 2_099_999 })).rejects.toThrow("Bid at least the floor of 2,100,000.");
+    expect((await testPrisma.family.findUnique({ where: { id: f.id } }))!.earnings).toBe(9_000_000);
   });
 });

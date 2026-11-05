@@ -6,13 +6,19 @@ import { inviteMember, acceptInvite } from "../../src/services/crimeFamily/membe
 import { depositToVault } from "../../src/services/crimeFamily/vaultService";
 import { executePayday } from "../../src/services/crimeFamily/paydayService";
 import { ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
-import { testPrisma, testRedis, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
+import { testPrisma, testRedis, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, withCfConfig } from "../helpers";
 import { planCaper, joinCaper } from "../../src/services/crimeFamily/caperLobbyService";
 import { openBrief, lockChoice } from "../../src/services/crimeFamily/caperPlayService";
 import { parseAnswers } from "../../src/services/crimeFamily/intelRing";
 import { postCaperCard } from "../../src/ui/crimeFamily/caperCard";
 import { onSeatsChanged, resolveAndAnnounce, announceLobby } from "../../src/ui/crimeFamily/caperFlow";
 import { caperCrew, fakeCaperClient, G, CH } from "../crimeFamily/caperFixtures";
+import { scoutWar, armHit, answerHit } from "../../src/services/crimeFamily/warActions";
+import { placeBid } from "../../src/services/crimeFamily/bidService";
+import { collectRacket } from "../../src/services/crimeFamily/racketService";
+import { tickWars, tickRackets } from "../../src/services/crimeFamily/turfJobs";
+import { weakPoint } from "../../src/services/crimeFamily/warMath";
+import { fakeClient } from "../crimeFamily/fakeClient";
 
 // Redis never guards family money or membership (spec 14.3): an outage must
 // not stop a single family write, and the activity throttle writes anyway.
@@ -133,5 +139,73 @@ describe("capers with Redis down", () => {
     const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
     expect(await announceLobby(fc.client, c.id)).toEqual(expect.arrayContaining([f.ids.LOOKOUT, f.ids.SAFECRACKER, f.ids.DRIVER]));
     expect(fc.dms.get(f.ids.LOOKOUT)).toBe(1);
+  });
+});
+
+describe("turf with Redis down (spec 18 shape 4, edge 8)", () => {
+  const H = 3600_000;
+  const balance = async (id: string) => (await testPrisma.wallet.findUnique({ where: { userId: id } }))!.balance;
+  async function turfSides() {
+    const mk = async (ch: string) => {
+      const boss = await seedEligibleUser({ wallet: 200_000 }); const ub = await seedEligibleUser({ wallet: 200_000 }); const s = await seedEligibleUser({ wallet: 200_000 });
+      const f = await seedFamily({ bossId: boss, level: 1, earnings: 5_000_000, homeGuildId: "g1", homeChannelId: ch, members: [{ userId: ub, role: "UNDERBOSS", joinedAt: daysAgo(10) }, { userId: s, role: "SOLDIER", joinedAt: daysAgo(10) }] });
+      return { f, boss, ub, s };
+    };
+    return { a: await mk("ch-a"), d: await mk("ch-d") };
+  }
+  beforeAll(() => ensureUniqueIndexes(["Racket", "War", "WarContribution"]));
+  beforeEach(async () => { await resetFamilies(); vi.spyOn(redisService, "getInstance").mockImplementation(() => { throw new Error("down"); }); });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("scout, arm and answer still work: wallet −25,000, score +10", async () => {
+    const { a, d } = await turfSides();
+    await seedRacket("docks_numbers", { ownerFamilyId: d.f.id });
+    const w = await seedWar({ racketKey: "docks_numbers", status: "ACTIVE", topBid: 2_100_000, topBidderFamilyId: a.f.id, defenderFamilyId: d.f.id });
+    await scoutWar({ warId: w.id, userId: a.s, guildId: "g1" });
+    const h = await armHit({ warId: w.id, userId: a.s, guildId: "g1", block: "docks" });
+    const slot = (await testPrisma.warHit.findUnique({ where: { id: h.hitId } }))!.slot;
+    expect(await answerHit({ hitId: h.hitId, userId: a.s, choice: weakPoint(w.seed, "docks", slot) })).toEqual({ correct: true, points: 10, block: "docks" });
+    expect(await balance(a.s)).toBe(175_000);
+    expect((await testPrisma.war.findUnique({ where: { id: w.id } }))!.atkDocks).toBe(10);
+  });
+
+  it("placeBid moves the escrow out of earnings", async () => {
+    const { a } = await turfSides();
+    await seedWar({ racketKey: "pawn_row", status: "BIDDING" });
+    await placeBid({ racketKey: "pawn_row", actorId: a.boss, amount: 2_100_000 });
+    expect((await testPrisma.family.findUnique({ where: { id: a.f.id } }))!.earnings).toBe(2_900_000);
+    expect(await testPrisma.war.findFirst({ where: { racketKey: "pawn_row" } })).toMatchObject({ topBid: 2_100_000, topBidderFamilyId: a.f.id });
+  });
+
+  it("collectRacket mints one cycle", async () => {
+    const { a } = await turfSides();
+    const r = await seedRacket("pawn_row", { ownerFamilyId: a.f.id, lastPayoutAt: new Date(Date.now() - 25 * H) });
+    expect(await collectRacket(r.id, new Date(), 3)).toMatchObject({ status: "minted", cycles: 1, amount: 300_000 });
+    expect((await testPrisma.family.findUnique({ where: { id: a.f.id } }))!.earnings).toBe(5_300_000);
+  });
+
+  it("tickWars edits both boards on two consecutive minutes, because setNx 'error' renders (T7)", async () => {
+    const { a, d } = await turfSides();
+    await seedRacket("docks_numbers", { ownerFamilyId: d.f.id });
+    await seedWar({ racketKey: "docks_numbers", status: "ACTIVE", topBid: 2_100_000, topBidderFamilyId: a.f.id, defenderFamilyId: d.f.id, boards: [
+      { side: "ATK", guildId: "g1", channelId: "ch-a", messageId: "m-a", hasBanner: true, dead: false },
+      { side: "DEF", guildId: "g1", channelId: "ch-d", messageId: "m-d", hasBanner: true, dead: false },
+    ] });
+    const c = fakeClient();
+    const now = new Date();
+    await tickWars(c.client, now);
+    await tickWars(c.client, new Date(+now + 60_000));
+    const edits = (ch: string) => c.calls.filter((x) => x.op === "edit" && x.channelId === ch).length;
+    expect([edits("ch-a"), edits("ch-d")]).toEqual([2, 2]);
+    expect(c.calls.filter((x) => x.op === "send")).toHaveLength(0);
+  });
+
+  it("tickRackets still sends its neglect DMs", async () => {
+    const { a } = await turfSides();                                  // no war hits: nobody is racket-eligible
+    await seedRacket("pawn_row", { ownerFamilyId: a.f.id, lastPayoutAt: new Date(Date.now() - 25 * H) });
+    const c = fakeClient();
+    await withCfConfig({ enabled: true, turfEnabled: true }, () => tickRackets(c.client, new Date()));
+    expect((await testPrisma.racket.findUnique({ where: { key: "pawn_row" } }))!.neglectStrikes).toBe(1);
+    expect([...c.dm.keys()].sort()).toEqual([a.boss, a.ub, a.s].sort());
   });
 });
