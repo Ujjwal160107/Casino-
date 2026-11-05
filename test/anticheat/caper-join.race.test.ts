@@ -281,6 +281,33 @@ describe("start (8.4 step 5)", () => {
     expect(await startCaper(c.id, { kind: "press", uid: f.bossId })).toMatchObject({ status: "started" });
   });
 
+  it("a press re-checks the Boss inside the transaction: a handover before the retry refuses the old Boss (edge 2)", async () => {
+    const f = await caperCrew({ tier: 1, roles: [...T1], plannerRank: "CAPO" });
+    const c = await plan(f.ids.MASTERMIND);
+    await join(c.id, f.ids.LOOKOUT, "LOOKOUT"); await join(c.id, f.ids.SAFECRACKER, "SAFECRACKER");
+    const original = prisma.$transaction.bind(prisma);
+    let first = true;
+    const spy = vi.spyOn(prisma, "$transaction").mockImplementation((async (...args: unknown[]) => {
+      if (!first) return (original as (...a: unknown[]) => Promise<unknown>)(...args);
+      first = false;
+      await testPrisma.family.update({ where: { id: f.family.id }, data: { bossId: f.ids.LOOKOUT } });   // the chair moves
+      throw new Error("Write conflict");                                                                // and the first attempt retries
+    }) as never);
+    try {
+      await expect(startCaper(c.id, { kind: "press", uid: f.bossId })).rejects.toThrow("Only the planner or the Boss can start this caper.");
+    } finally { spy.mockRestore(); }
+    expect((await testPrisma.caper.findUnique({ where: { id: c.id } }))!.status).toBe("LOBBY");
+  });
+
+  it("a pinch then the family cooldown: the note names the pinched member (edge 71)", async () => {
+    const { family, ids, caper } = await fullLobby();
+    await testPrisma.user.update({ where: { discordId: ids.DRIVER }, data: { isJailed: true, jailReleaseTime: new Date(Date.now() + 3_600_000) } });
+    await testPrisma.family.update({ where: { id: family.id }, data: { nextCaperAt: new Date(Date.now() + 600_000) } });
+    const r = await startCaper(caper.id, { kind: "auto" });
+    expect(r).toMatchObject({ status: "waiting", pinched: [{ userId: ids.DRIVER, role: "DRIVER" }] });
+    expect(r.reason).toMatch(new RegExp(`^<@${ids.DRIVER}> got pinched \\(stake refunded\\)\\. Family caper cooldown: ready <t:\\d+:R>\\.$`));
+  });
+
   it("waits while the family cooldown is running (edge 71)", async () => {
     const { family, caper } = await fullLobby();
     await testPrisma.family.update({ where: { id: family.id }, data: { nextCaperAt: new Date(Date.now() + 600_000) } });

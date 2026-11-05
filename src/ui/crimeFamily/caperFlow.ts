@@ -25,8 +25,8 @@ import { jumpLink, sendToChannel } from "./post";
 const mention = (id: string) => `<@${id}>`;
 const windowStart = (now: Date) => new Date(now.getTime() - CRIME_FAMILY_CONFIG.caperWindowSeconds * 1000);
 
-/** Runs one Discord side effect, logging instead of throwing: the service step already committed. */
-async function safely(name: string, run: () => Promise<unknown>): Promise<void> {
+/** Runs post-commit work (a Discord side effect, a follow-on step), logging instead of throwing: the service step already committed. */
+export async function safely(name: string, run: () => Promise<unknown>): Promise<void> {
   try {
     await run();
   } catch (err) {
@@ -34,14 +34,21 @@ async function safely(name: string, run: () => Promise<unknown>): Promise<void> 
   }
 }
 
-/** One of the member's lobby DMs in the rolling window (14.3); a Redis error grants it. */
+/**
+ * One of the member's lobby DMs in the rolling window (14.3); a Redis error
+ * grants it. The window's TTL is set (SET NX EX) and counted (INCR) in one
+ * MULTI, so the counter can never be left without an expiry.
+ */
 async function takeLobbyDmSlot(uid: string): Promise<boolean> {
   try {
-    const redis = redisService.getInstance();
     const key = `cf:lobbydm:${uid}`;
-    const count = await redis.incr(key);
-    if (count === 1) await redis.expire(key, CRIME_FAMILY_CONFIG.caperWindowSeconds);
-    return count <= CRIME_FAMILY_CONFIG.lobbyDmsPer24h;
+    const replies = await redisService.getInstance().multi()
+      .set(key, 0, "EX", CRIME_FAMILY_CONFIG.caperWindowSeconds, "NX")
+      .incr(key)
+      .exec();
+    const [err, count] = replies?.[1] ?? [new Error("MULTI aborted"), null];
+    if (err) throw err;
+    return Number(count) <= CRIME_FAMILY_CONFIG.lobbyDmsPer24h;
   } catch (err) {
     console.error(`[crimeFamily] lobby DM cap error for ${uid}:`, err);
     return true;
@@ -144,9 +151,13 @@ export async function runStart(client: Client, caperId: string, by: StartBy, now
   return result;
 }
 
-/** After a join, leave or kick: a full lobby starts itself; otherwise the card re-renders (debounced). */
+/**
+ * After a join, leave or kick: a full lobby starts itself; otherwise the card
+ * re-renders (debounced). The seat change already committed, so a failed
+ * auto-start is logged, never thrown: the press or the sweeper starts it later.
+ */
 export async function onSeatsChanged(client: Client, caperId: string, full: boolean, now: Date = new Date()): Promise<void> {
-  if (full) await runStart(client, caperId, { kind: "auto" }, now);
+  if (full) await safely("caper auto-start", () => runStart(client, caperId, { kind: "auto" }, now));
   else await safely("caper roster render", () => requestCaperRender(client, caperId));
 }
 

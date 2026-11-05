@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "../../utils/prisma";
 import { fmtFortunes } from "../../utils/format";
 import { isTransientWriteConflict, withTransactionRetry } from "../walletService";
+import { invalidateUserCache } from "../userService";
 
 /** A refusal whose message is safe to show the player. */
 export class FamilyError extends Error {
@@ -61,4 +62,9 @@ export function isUniqueViolation(err: unknown, indexName?: string): boolean {
   const e = err as { code?: unknown; meta?: { target?: unknown } } | null;
   if (e?.code !== "P2002") return false;
   return indexName === undefined || String(e.meta?.target).includes(indexName);
+}
+
+/** After a commit that wrote these users' wallets: drop their cached getUser rows so no reader shows the old balance. */
+export async function invalidateUsers(userIds: Iterable<string>): Promise<void> {
+  for (const id of new Set(userIds)) await invalidateUserCache(id, "");
 }

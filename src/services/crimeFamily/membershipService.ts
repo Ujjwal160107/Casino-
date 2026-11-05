@@ -9,7 +9,7 @@ import { checkMemberEligibility, eligibilityError } from "./eligibility";
 import { FAMILY_HOOKS, type MemberExitKind } from "./extensions";
 import { assertNotJailed, getFamilyByTag, getMembership, readActorAndTarget, requireMembership } from "./familyQueries";
 import { can, NO_PERMISSION } from "./permissions";
-import { FamilyError, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
+import { FamilyError, invalidateUsers, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
 
 const WEEK_MS = 7 * 86_400_000;
 const SEAT_RACE_RUNS = 3;
@@ -188,9 +188,10 @@ export async function listPendingInvites(uid: string, now: Date = new Date()): P
 
 /**
  * The shared exit: hook blocks (re-run on every retry), delete the member row,
- * record the FamilyExit, drop the leaver's PENDING invites, then hook side effects.
+ * record the FamilyExit, drop the leaver's PENDING invites, then hook side
+ * effects. Returns the users whose wallets a hook wrote (invalidate after commit).
  */
-async function removeMember(tx: Prisma.TransactionClient, familyId: string, userId: string, kind: MemberExitKind, now: Date): Promise<void> {
+async function removeMember(tx: Prisma.TransactionClient, familyId: string, userId: string, kind: MemberExitKind, now: Date): Promise<string[]> {
   for (const hook of FAMILY_HOOKS) {
     const block = await hook.memberExitBlock?.(tx, { familyId, userId, kind });
     if (block) throw new FamilyError(block);
@@ -199,13 +200,15 @@ async function removeMember(tx: Prisma.TransactionClient, familyId: string, user
   if (count !== 1) throw new FamilyError(kind === "LEFT" ? "You are not in a crime family." : `<@${userId}> is not in your family.`);
   await tx.familyExit.create({ data: { userId, familyId, reason: kind, wasBoss: false, leftAt: now } });
   await tx.familyInvite.deleteMany({ where: { inviterId: userId, status: "PENDING" } });
-  for (const hook of FAMILY_HOOKS) await hook.onMemberExit?.(tx, { familyId, userId, kind, now });
+  const wallets: string[] = [];
+  for (const hook of FAMILY_HOOKS) wallets.push(...((await hook.onMemberExit?.(tx, { familyId, userId, kind, now })) ?? []));
+  return wallets;
 }
 
 /** A member leaves. The Boss hands over the chair first; a solo Boss disbands instead (P8). */
 export async function leaveFamily(uid: string, now: Date = new Date()): Promise<{ family: Family }> {
   const { family } = await requireMembership(uid);
-  await runFamilyTx(async (tx) => {
+  const wallets = await runFamilyTx(async (tx) => {
     await touchFamily(tx, family.id, now);
     const member = await tx.familyMember.findUnique({ where: { userId: uid } });
     if (!member || member.familyId !== family.id) throw new FamilyError("You are not in a crime family.");
@@ -215,20 +218,22 @@ export async function leaveFamily(uid: string, now: Date = new Date()): Promise<
         ? "Hand over the chair first (`!crew handover <user>`)."
         : "You're the only member. Leaving would disband the family: use `!crew disband`.");
     }
-    await removeMember(tx, family.id, uid, "LEFT", now);
+    return removeMember(tx, family.id, uid, "LEFT", now);
   });
+  await invalidateUsers(wallets);
   return { family };
 }
 
 /** Kick per the 6.3 rank table, re-read inside the transaction. */
 export async function kickMember(actorId: string, targetId: string, now: Date = new Date()): Promise<{ family: Family; targetId: string }> {
   const { family } = await requireMembership(actorId);
-  await runFamilyTx(async (tx) => {
+  const wallets = await runFamilyTx(async (tx) => {
     await touchFamily(tx, family.id, now);
     const { actor, target } = await readActorAndTarget(tx, family.id, actorId, targetId);
     if (!can(actorOf(actor), "kick", now, { role: target.role as FamilyRole })) throw new FamilyError(NO_PERMISSION);
-    await removeMember(tx, family.id, targetId, "KICKED", now);
+    return removeMember(tx, family.id, targetId, "KICKED", now);
   });
+  await invalidateUsers(wallets);
   return { family, targetId };
 }
 

@@ -38,11 +38,12 @@ export const CAPER_FAMILY_HOOK: FamilyHook = {
   },
 
   async onMemberExit(tx, { userId, kind, now }) {
-    if (kind !== "KICKED") return;
+    if (kind !== "KICKED") return [];
     const live = await liveSeatInTx(tx, userId);
-    if (!live || live.status !== "LOBBY") return;
-    if (live.seat.role === "MASTERMIND") await cancelCaperInTx(tx, live.seat.caperId, now);
-    else await removeSeatInTx(tx, live.seat, "kick");
+    if (!live || live.status !== "LOBBY") return [];
+    if (live.seat.role === "MASTERMIND") return (await cancelCaperInTx(tx, live.seat.caperId, now)).map((r) => r.userId);
+    await removeSeatInTx(tx, live.seat, "kick");
+    return [userId];
   },
 
   async disbandBlock(tx, familyId) {

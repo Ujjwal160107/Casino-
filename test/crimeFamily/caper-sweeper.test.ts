@@ -43,6 +43,17 @@ describe("sweepCapers (spec 15)", () => {
     expect(fc.edits.filter((e) => e.messageId === "m0").at(-1)!.payload.attachments).toEqual([]);
   });
 
+  it("a due lobby starts on the clock at its own start, not the sweep's earlier now: the GO window is whole", async () => {
+    const stale = new Date(Date.now() - 30_000);                                                        // earlier jobs ate 30 s
+    const { caper } = await seedLobby({ tier: 1, roles: [...R3], now: new Date(+stale - 601_000) });
+    const before = Date.now();
+    await sweepCapers(fakeCaperClient().client, stale, BOOT);
+    const row = await caperRow(caper.id);
+    expect(row.status).toBe("RUNNING");
+    expect(+row.startedAt).toBeGreaterThanOrEqual(before);
+    expect(+row.goEndsAt).toBe(+row.startedAt + 120_000);
+  });
+
   it("a RUNNING caper past goEndsAt resolves and the card shows the result", async () => {
     const { caper } = await seedRunning(dueRun());
     await board(caper.id, "m0");

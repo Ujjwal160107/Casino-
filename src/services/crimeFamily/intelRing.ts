@@ -32,11 +32,12 @@ export function buildAnswers(filled: readonly CaperRoleKey[], rng: Rng): CaperAn
   return { order, seats };
 }
 
-/** The stored answers, or null when missing or malformed (edge 63). */
+/** The stored answers, or null when missing or malformed (edge 63): every role once, and exactly the roles that have seats. */
 export function parseAnswers(json: unknown): CaperAnswers | null {
   if (!json || typeof json !== "object") return null;
   const { order, seats } = json as { order?: unknown; seats?: unknown };
   if (!Array.isArray(order) || order.length === 0 || !seats || typeof seats !== "object") return null;
+  if (new Set(order).size !== order.length || Object.keys(seats).length !== order.length) return null;
   const parsed: CaperAnswers = { order: [], seats: {} };
   for (const role of order) {
     if (typeof role !== "string" || !ROLE_KEYS.has(role)) return null;

@@ -8,7 +8,7 @@ import { joinCaper } from "../services/crimeFamily/caperLobbyService";
 import { lockChoice, openBrief } from "../services/crimeFamily/caperPlayService";
 import { buildPlannerView } from "../services/crimeFamily/caperQueries";
 import { FamilyError } from "../services/crimeFamily/tx";
-import { onSeatsChanged, openLobby, resolveAndAnnounce, runCancel, runLeave, runStart } from "../ui/crimeFamily/caperFlow";
+import { onSeatsChanged, openLobby, resolveAndAnnounce, runCancel, runLeave, runStart, safely } from "../ui/crimeFamily/caperFlow";
 import { buildBrief, buildCaperPlanner } from "../ui/crimeFamily/caperScreens";
 import { buildNotice, type CfPayload } from "../ui/crimeFamily/kit";
 import { jumpLink } from "../ui/crimeFamily/post";
@@ -51,7 +51,8 @@ const startRoute: CfRoute = async (i, [caperId]) => {
 const actRoute: CfRoute = async (i, [caperId, index]) => {
   const { brief, allLocked } = await lockChoice(caperId, i.user.id, Number(index));
   await show(i, buildBrief(brief));
-  if (allLocked) await resolveAndAnnounce(i.client, caperId, new Date());
+  // The lock committed and is shown: a failed resolve is logged (the sweeper settles it), never sent as a refusal.
+  if (allLocked) await safely("caper last-lock resolve", () => resolveAndAnnounce(i.client, caperId, new Date()));
 };
 
 export const CAPER_ROUTES: CfRouteTable = {

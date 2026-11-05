@@ -7,7 +7,8 @@ import { parseAnswers } from "../../src/services/crimeFamily/intelRing";
 import { postCaperCard, renderCaperCard, requestCaperRender } from "../../src/ui/crimeFamily/caperCard";
 import { trailingRender } from "../../src/ui/crimeFamily/debounce";
 import { onSeatsChanged, runStart, resolveAndAnnounce, announceLobby } from "../../src/ui/crimeFamily/caperFlow";
-import { testPrisma, resetFamilies, ensureUniqueIndexes, flushTestKeys, seedEligibleUser } from "../helpers";
+import { redisService } from "../../src/services/redisService";
+import { testPrisma, testRedis, resetFamilies, ensureUniqueIndexes, flushTestKeys, seedEligibleUser } from "../helpers";
 import { caperCrew, seedLobby, fakeCaperClient, setCaperUpdatedAt, G, CH } from "./caperFixtures";
 
 const T1 = ["MASTERMIND", "LOOKOUT", "SAFECRACKER", "DRIVER"] as const;
@@ -130,6 +131,27 @@ describe("caper card and flow (13.2, 8.4)", () => {
     await setCaperUpdatedAt(old.id, new Date(+now - 3_600_000));
     await flushTestKeys("cf:lobbydm:*");
     expect(await announceLobby(fc.client, c.id, now)).toEqual([]);
+  });
+
+  it("the lobby-DM counter is created with its 24 h TTL in one MULTI, and a Redis error still grants the DM (14.3)", async () => {
+    const now = new Date();
+    const f = await caperCrew({ tier: 1, roles: [...T1] });
+    const fc = fakeCaperClient({ members: [f.ids.MASTERMIND, f.ids.LOOKOUT] });
+    const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH, now });
+    const redis = redisService.getInstance();
+    const expire = vi.spyOn(redis, "expire").mockRejectedValue(new Error("EXPIRE lost"));   // a lone EXPIRE would leave the key forever
+    try {
+      expect(await announceLobby(fc.client, c.id, now)).toEqual([f.ids.LOOKOUT]);
+    } finally { expire.mockRestore(); }
+    const ttl = await testRedis().ttl(`cf:lobbydm:${f.ids.LOOKOUT}`);
+    expect(ttl).toBeGreaterThan(86_300);
+    expect(ttl).toBeLessThanOrEqual(86_400);
+    expect(await testRedis().get(`cf:lobbydm:${f.ids.LOOKOUT}`)).toBe("1");
+    const multi = vi.spyOn(redis, "multi").mockImplementation(() => { throw new Error("Redis down"); });
+    try {
+      await flushTestKeys("cf:lobbydm:*");
+      expect(await announceLobby(fc.client, c.id, now)).toEqual([f.ids.LOOKOUT]);
+    } finally { multi.mockRestore(); }
   });
 
   it("Start enqueues the caper reminder at the older seat's startedAt + 24 h", async () => {

@@ -10,7 +10,7 @@ import { CRIME_PREP_WHITELIST } from "../../data/crimePrepWhitelist";
 import { debitWalletInTx } from "../walletService";
 import { computeNetWorth } from "../netWorthService";
 import { getOwnedPrepKeys } from "../crimeService";
-import { getCaper, getLiveCaper, listCrew, liveSeatOf, startedCapersSince, startedSeatsSince } from "./caperQueries";
+import { getCaper, getLiveCaper, liveSeatOf, startedCapersSince, startedSeatsSince } from "./caperQueries";
 import { cancelCaperInTx, removeSeatInTx } from "./caperRefunds";
 import { bestRoleBonus, crewEdge } from "./caperMath";
 import { checkMemberEligibility, eligibilityError } from "./eligibility";
@@ -18,7 +18,7 @@ import { isUnderInvestigation, requireMembership } from "./familyQueries";
 import { buildAnswers, ringOrder } from "./intelRing";
 import { cryptoRng, type Rng } from "./random";
 import { can } from "./permissions";
-import { FamilyError, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
+import { FamilyError, invalidateUsers, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
 
 const LIVE_CAPER = "Your family already has a live caper.";
 const HOLDS_SEAT = "You already hold a seat in a live caper.";
@@ -93,8 +93,9 @@ export async function planCaper(input: { uid: string; tier: number; guildId: str
   if (blocked) throw new FamilyError(blocked);
   await seatGates(uid, { familyId: family.id, tier, guildId: input.guildId }, "MASTERMIND", input.guildId, now);
 
+  let caper: Caper;
   try {
-    return await runFamilyTx(async (tx) => {
+    caper = await runFamilyTx(async (tx) => {
       const current = await tx.family.findUnique({ where: { id: family.id } });
       if (!current) throw new FamilyError(NOT_IN_FAMILY);
       const planner = await tx.familyMember.findUnique({ where: { userId: uid } });
@@ -118,6 +119,8 @@ export async function planCaper(input: { uid: string; tier: number; guildId: str
     if (isUniqueViolation(err, "CaperCrew_userId_liveSlot_key")) throw new FamilyError(HOLDS_SEAT);
     throw err;
   }
+  await invalidateUsers([uid]);
+  return caper;
 }
 
 /** Spec 8.4 steps 2-3 (CFD-1): take an open seat and pay its stake; `full` once every seat up to the tier maximum is filled. */
@@ -133,8 +136,9 @@ export async function joinCaper(input: {
   if (!tierRoles(tier).includes(role)) throw new FamilyError("That role is not part of this caper.");
   await seatGates(uid, { familyId: snapshot.familyId, tier, guildId: snapshot.guildId }, role, input.guildId, now);
 
+  let joined: { caper: Caper; seat: CaperCrew; full: boolean };
   try {
-    return await runFamilyTx(async (tx) => {
+    joined = await runFamilyTx(async (tx) => {
       const { count } = await tx.caper.updateMany({
         where: { id: caperId, status: "LOBBY", lobbyClosesAt: { gt: now } },
         data: { seatsVersion: { increment: 1 } },
@@ -153,27 +157,31 @@ export async function joinCaper(input: {
     }
     throw err;
   }
+  await invalidateUsers([uid]);
+  return joined;
 }
 
 /** Leave a lobby: the seat is refunded; the planner leaving cancels the caper and refunds everyone. */
 export async function leaveCaper(caperId: string, uid: string, now: Date = new Date()): Promise<{ cancelled: boolean }> {
-  return runFamilyTx(async (tx) => {
+  const { cancelled, refunded } = await runFamilyTx(async (tx) => {
     const row = await tx.caperCrew.findFirst({ where: { caperId, userId: uid, liveSlot: "LIVE" } });
     if (!row) throw new FamilyError("You are not in this caper.");
     const caper = await tx.caper.findUnique({ where: { id: caperId }, select: { status: true } });
     if (caper?.status !== "LOBBY") throw new FamilyError("The caper has started; your seat is locked in.");
     if (row.role === "MASTERMIND") {
-      await cancelCaperInTx(tx, caperId, now);
-      return { cancelled: true };
+      const rows = await cancelCaperInTx(tx, caperId, now);
+      return { cancelled: true, refunded: rows.map((r) => r.userId) };
     }
     await removeSeatInTx(tx, row, "leave");
-    return { cancelled: false };
+    return { cancelled: false, refunded: [uid] };
   });
+  await invalidateUsers(refunded);
+  return { cancelled };
 }
 
 /** Cancel a lobby and refund every stake. actorId null is the sweeper; a user must be the planner or the current Boss (edge 2). */
 export async function cancelCaper(caperId: string, actorId: string | null, now: Date = new Date()): Promise<CaperCrew[]> {
-  return runFamilyTx(async (tx) => {
+  const refunded = await runFamilyTx(async (tx) => {
     const caper = await tx.caper.findUnique({ where: { id: caperId } });
     if (!caper) throw new FamilyError(LOBBY_CLOSED);
     if (actorId !== null && actorId !== caper.plannerId) {
@@ -182,6 +190,8 @@ export async function cancelCaper(caperId: string, actorId: string | null, now: 
     }
     return cancelCaperInTx(tx, caperId, now);
   });
+  await invalidateUsers(refunded.map((r) => r.userId));
+  return refunded;
 }
 
 /** CAS on the stored card: moves the caper's board off `fromMessageId` ("" = dead); false when another writer moved it first. */
@@ -230,58 +240,62 @@ async function seatHolds(
   return { ok, owned };
 }
 
+/** The card note naming the members a Start pinched. */
+const pinchNote = (pinched: readonly { userId: string }[]) => `${pinched.map((p) => mention(p.userId)).join(", ")} got pinched (stake refunded).`;
+
 /**
  * Spec 8.4 steps 4-5: re-validate every seat, pinch the ones that fail, then
  * LOBBY → RUNNING with the brief's answers, the crew edge and the heat snapshot
- * stored, and the family cooldown started. Every check runs inside the
- * transaction so a retry re-checks it. A pinched planner cancels the caper.
+ * stored, and the family cooldown started. Every check, the press permission
+ * included, runs inside the transaction so a retry re-checks it. A pinched
+ * planner cancels the caper.
  */
 export async function startCaper(caperId: string, by: StartBy, now: Date = new Date(), rng: Rng = cryptoRng): Promise<StartResult> {
   const closed: StartResult = { status: "closed", pinched: [], reason: LOBBY_CLOSED };
-  if (by.kind === "press") {
-    const snapshot = await getCaper(caperId);
-    if (!snapshot || snapshot.status !== "LOBBY") return closed;
-    if (by.uid !== snapshot.plannerId) {
-      const family = await prisma.family.findUnique({ where: { id: snapshot.familyId }, select: { bossId: true } });
-      if (family?.bossId !== by.uid) throw new FamilyError("Only the planner or the Boss can start this caper.");
-    }
-    const missing = missingRequired(caperTier(snapshot.tier), await listCrew(caperId));
-    if (missing.length > 0) return { status: "waiting", pinched: [], reason: `Fill the required roles first: ${missing.join(", ")}.` };
-  }
-
-  return runFamilyTx(async (tx): Promise<StartResult> => {
+  const { result, refunded } = await runFamilyTx(async (tx): Promise<{ result: StartResult; refunded: string[] }> => {
+    const done = (r: StartResult, ids: string[] = []) => ({ result: r, refunded: ids });
     const caper = await tx.caper.findUnique({ where: { id: caperId } });
-    if (!caper || caper.status !== "LOBBY") return closed;
+    if (!caper || caper.status !== "LOBBY") return done(closed);
     const tier = caperTier(caper.tier);
     const rows = await tx.caperCrew.findMany({ where: { caperId } });
+
+    if (by.kind === "press") {
+      if (by.uid !== caper.plannerId) {
+        const boss = await tx.family.findUnique({ where: { id: caper.familyId }, select: { bossId: true } });
+        if (boss?.bossId !== by.uid) throw new FamilyError("Only the planner or the Boss can start this caper.");
+      }
+      const missing = missingRequired(tier, rows);
+      if (missing.length > 0) return done({ status: "waiting", pinched: [], reason: `Fill the required roles first: ${missing.join(", ")}.` });
+    }
 
     const checked: { ok: boolean; owned: Set<string> }[] = [];
     for (const row of rows) checked.push(await seatHolds(tx, row, caper, tier, now));
     const failing = rows.filter((_, i) => !checked[i].ok);
     const planner = failing.find((r) => r.role === "MASTERMIND");
     if (planner) {
-      await cancelCaperInTx(tx, caperId, now);
-      return {
+      const all = await cancelCaperInTx(tx, caperId, now);
+      return done({
         status: "cancelled", pinched: [{ userId: planner.userId, role: "MASTERMIND" }],
         reason: `${mention(planner.userId)} got pinched; the caper was cancelled and every stake refunded.`,
-      };
+      }, all.map((r) => r.userId));
     }
     for (const row of failing) await removeSeatInTx(tx, row, "pinched");
     const pinched = failing.map((r) => ({ userId: r.userId, role: r.role as CaperRoleKey }));
+    const pinchedIds = pinched.map((p) => p.userId);
     const kept = rows.filter((_, i) => checked[i].ok);
     const owned = checked.filter((c) => c.ok).map((c) => c.owned);
 
     const missing = missingRequired(tier, kept);
     if (missing.length > 0) {
       if (pinched.length > 0) {
-        return { status: "pinched", pinched, reason: `${pinched.map((p) => mention(p.userId)).join(", ")} got pinched (stake refunded). Fill the required roles before the lobby closes.` };
+        return done({ status: "pinched", pinched, reason: `${pinchNote(pinched)} Fill the required roles before the lobby closes.` }, pinchedIds);
       }
-      return { status: "waiting", pinched, reason: `Fill the required roles first: ${missing.join(", ")}.` };
+      return done({ status: "waiting", pinched, reason: `Fill the required roles first: ${missing.join(", ")}.` });
     }
 
     const family = await tx.family.findUniqueOrThrow({ where: { id: caper.familyId } });
     const blocked = await familyCaperBlock(family, now);
-    if (blocked) return { status: "waiting", pinched, reason: blocked };
+    if (blocked) return done({ status: "waiting", pinched, reason: pinched.length > 0 ? `${pinchNote(pinched)} ${blocked}` : blocked }, pinchedIds);
 
     const roles = kept.map((r) => r.role as CaperRoleKey);
     const bonuses = kept.map((r, i) => bestRoleBonus(r.role as CaperRoleKey, owned[i]));
@@ -294,7 +308,7 @@ export async function startCaper(caperId: string, by: StartBy, now: Date = new D
         seatsVersion: { increment: 1 },
       },
     });
-    if (count === 0) return closed;
+    if (count === 0) return done(closed);
     for (const [i, row] of kept.entries()) {
       await tx.caperCrew.update({ where: { id: row.id }, data: { started: true, startedAt: now, itemBonus: bonuses[i] } });
     }
@@ -302,6 +316,8 @@ export async function startCaper(caperId: string, by: StartBy, now: Date = new D
       where: { id: family.id },
       data: { nextCaperAt: new Date(now.getTime() + levelDef(family.level).caperCooldownSeconds * 1000) },
     });
-    return { status: "started", pinched, reason: null };
+    return done({ status: "started", pinched, reason: null }, pinchedIds);
   });
+  await invalidateUsers(refunded);
+  return result;
 }

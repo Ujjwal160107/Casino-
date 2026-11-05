@@ -69,4 +69,13 @@ describe("intel ring (8.3)", () => {
     for (const bad of [null, undefined, {}, { order: [] }, { order: ["MASTERMIND"], seats: {} }, { order: ["MASTERMIND"], seats: { MASTERMIND: { options: ["a", "a", "b", "c"], correct: 0 } } }, { order: ["MASTERMIND"], seats: { MASTERMIND: { options: ["a", "b", "c", "d"], correct: 4 } } }])
       expect(parseAnswers(bad)).toBeNull();
   });
+
+  it("parseAnswers rejects an order naming a role twice, or roles that do not match the seats exactly (edge 63)", () => {
+    const a = JSON.parse(JSON.stringify(buildAnswers(T2, cryptoRng)));
+    expect(parseAnswers({ ...a, order: [...a.order, "MASTERMIND"] })).toBeNull();                  // a role twice
+    expect(parseAnswers({ ...a, order: a.order.map((r: string) => (r === "MUSCLE" ? "MASTERMIND" : r)) })).toBeNull();   // twice, same length as the seats
+    expect(parseAnswers({ ...a, order: a.order.slice(1) })).toBeNull();                            // a seat the ring skips
+    expect(parseAnswers({ ...a, seats: { ...a.seats, HACKER: a.seats.MUSCLE } })).toBeNull();      // a seat outside the order
+    expect(parseAnswers(a)).not.toBeNull();
+  });
 });

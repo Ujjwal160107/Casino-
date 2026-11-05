@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import prisma from "../../src/utils/prisma";
 import { handleCrimeFamilyInteraction } from "../../src/handlers/crimeFamilyRouter";
-import { planCaper } from "../../src/services/crimeFamily/caperLobbyService";
+import { planCaper, joinCaper } from "../../src/services/crimeFamily/caperLobbyService";
 import { CPR_IDS } from "../../src/ui/crimeFamily/ids";
 import { fakeButton, fakeSelect, said } from "./fakeInteraction";
 import { testPrisma, resetFamilies, ensureUniqueIndexes, withCfConfig, flushTestKeys } from "../helpers";
@@ -13,6 +13,16 @@ const wallet = async (id: string) => (await testPrisma.wallet.findUnique({ where
 const seat = (caperId: string, userId: string) => testPrisma.caperCrew.findFirstOrThrow({ where: { caperId, userId } });
 const press = async <T>(i: T) => { await handleCrimeFamilyInteraction(i as any); return i as any; };
 const open = <T>(fn: () => Promise<T>) => withCfConfig({ enabled: true }, fn);
+
+/** Lets the first `n` prisma.$transaction calls through, then throws make() on every later one. */
+function failTransactionsAfter(n: number, make: () => Error) {
+  const original = prisma.$transaction.bind(prisma);
+  let calls = 0;
+  return vi.spyOn(prisma, "$transaction").mockImplementation((async (...args: unknown[]) => {
+    if (++calls > n) throw make();
+    return (original as (...a: unknown[]) => Promise<unknown>)(...args);
+  }) as never);
+}
 
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "Caper", "CaperCrew"]));
 beforeEach(async () => { await resetFamilies(); await flushTestKeys("cf:*"); });
@@ -92,6 +102,34 @@ describe("cpr: lobby and GO routes", () => {
     await press(fakeButton(CPR_IDS.act(caper.id, answers.seats.SAFECRACKER!.correct), { userId: ids.SAFECRACKER, guildId: G, ephemeralSource: true, client: fakeCaperClient().client }));
     expect((await testPrisma.caper.findUniqueOrThrow({ where: { id: caper.id } })).status).toBe("RESOLVED");
   });
+
+  it("a committed last lock whose resolve fails shows the brief, not a refusal (the sweeper settles it)", async () => {
+    const { caper, ids, answers } = await seedRunning({ tier: 1, roles: [...R3], picks: { SAFECRACKER: "none" } });
+    const tx = failTransactionsAfter(1, () => new Error("settle down"));
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    let i: any;
+    try {
+      i = await press(fakeButton(CPR_IDS.act(caper.id, answers.seats.SAFECRACKER!.correct), { userId: ids.SAFECRACKER, guildId: G, ephemeralSource: true, client: fakeCaperClient().client }));
+    } finally { tx.mockRestore(); errors.mockRestore(); }
+    expect((await seat(caper.id, ids.SAFECRACKER)).choice).toBe(answers.seats.SAFECRACKER!.correct);
+    expect(said(i)).toContain("Tell <@");
+    expect(said(i)).not.toContain("Something went wrong.");
+  });
+
+  it("a committed last join whose auto-start fails is not refused (the press or the sweeper starts it)", () => open(async () => {
+    const f = await caperCrew({ tier: 1, roles: [...T1] });
+    const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
+    for (const r of ["LOOKOUT", "SAFECRACKER"] as const) await joinCaper({ caperId: c.id, uid: f.ids[r], role: r, guildId: G });
+    const tx = failTransactionsAfter(1, () => new Error("Write conflict"));
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    let i: any;
+    try {
+      i = await press(fakeSelect(CPR_IDS.join(c.id), ["DRIVER"], { userId: f.ids.DRIVER, guildId: G, client: fakeCaperClient().client }));
+    } finally { tx.mockRestore(); errors.mockRestore(); }
+    expect(await testPrisma.caperCrew.count({ where: { caperId: c.id, userId: f.ids.DRIVER } })).toBe(1);
+    expect((await testPrisma.caper.findUniqueOrThrow({ where: { id: c.id } })).status).toBe("LOBBY");
+    expect(said(i)).not.toContain("Vault busy, try again.");
+  }));
 
   it("a jailed crew member can still open the brief and lock (edge 5)", async () => {
     const { caper, ids } = await seedRunning({ tier: 1, roles: [...R3], picks: { LOOKOUT: "none" } });

@@ -26,9 +26,14 @@ async function eachCaper(ids: string[], fn: (id: string) => Promise<unknown>): P
   }
 }
 
-/** A closed lobby starts; one that cannot (pinched, missing roles) is cancelled with refunds and the D42 cooldown. */
+/**
+ * A closed lobby starts; one that cannot (pinched, missing roles) is cancelled
+ * with refunds and the D42 cooldown. The start reads the clock itself: the
+ * sweep's `now` predates every job before it, and a GO window must not open
+ * already short.
+ */
 async function closeLobby(client: Client, caperId: string, now: Date): Promise<void> {
-  const result = await runStart(client, caperId, { kind: "sweeper" }, now);
+  const result = await runStart(client, caperId, { kind: "sweeper" }, new Date());
   if (result.status === "pinched" || result.status === "waiting") await runCancel(client, caperId, null, now);
 }
 

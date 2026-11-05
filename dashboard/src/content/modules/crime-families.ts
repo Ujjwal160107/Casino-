@@ -270,7 +270,7 @@ const crimeFamilies: ModuleDoc = {
           ["Jail on a Bust (per seat)", "none", "20% chance, 20 minutes", "35% chance, 45 minutes", "50% chance, 60 minutes"],
           ["Heat added Clean / Messy / Bust", "20 / 30 / 40", "25 / 35 / 45", "30 / 40 / 50", "40 / 50 / 60"],
           ["Heat to join and at Start", "below 70", "below 60", "below 50", "below 40"],
-          ["Patrol chance (a perfect run turns Messy)", "10%", "15%", "20%", "25%"],
+          ["Patrol base (before crew edge and heat; see Outcome math)", "10%", "15%", "20%", "25%"],
           ["Lifetime shifts", "20 or more", "60 or more", "150 or more", "300 or more"],
           ["Fortuna profile age", "14 days or more", "30 days or more", "30 days or more", "45 days or more"],
           ["Net worth", "2,000,000 or more", "8,000,000 or more", "20,000,000 or more", "40,000,000 or more"],

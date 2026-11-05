@@ -16,7 +16,7 @@ import { voidCaperInTx } from "./caperRefunds";
 import { resolveCaperOutcome, splitCaperPool, type CaperOutcome } from "./caperMath";
 import { parseAnswers } from "./intelRing";
 import { cryptoRng, rollUnit, type Rng } from "./random";
-import { runFamilyTx } from "./tx";
+import { invalidateUsers, runFamilyTx } from "./tx";
 import { creditEarnings } from "./vaultService";
 
 export type ResolveResult = {
@@ -50,6 +50,7 @@ async function voidRun(caper: Caper, corrupt: boolean): Promise<ResolveResult> {
     return rows;
   });
   if (refunded.length === 0) return { caperId: caper.id, status: "busy", resolvedNow: false, outcome: null };
+  await invalidateUsers(refunded.map((r) => r.userId));
   return { caperId: caper.id, status: "void", resolvedNow: true, outcome: "VOID" };
 }
 

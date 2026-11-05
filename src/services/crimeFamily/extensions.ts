@@ -21,7 +21,8 @@ export interface FamilyHook {
   key: string;
   // Blocks run inside the runFamilyTx callback after touchFamily, so every retry re-checks; a string → FamilyError(string).
   memberExitBlock?(tx: Prisma.TransactionClient, ctx: { familyId: string; userId: string; kind: MemberExitKind }): Promise<string | null>;
-  onMemberExit?(tx: Prisma.TransactionClient, ctx: { familyId: string; userId: string; kind: MemberExitKind; now: Date }): Promise<void>;
+  /** Returns the users whose wallets it wrote (a refund), so the caller drops their cached user after the commit. */
+  onMemberExit?(tx: Prisma.TransactionClient, ctx: { familyId: string; userId: string; kind: MemberExitKind; now: Date }): Promise<string[] | void>;
   disbandBlock?(tx: Prisma.TransactionClient, familyId: string): Promise<string | null>;
   /** Runs after the blocks, before the final payday. */
   onDisband?(tx: Prisma.TransactionClient, ctx: { familyId: string; now: Date }): Promise<void>;
