@@ -4,6 +4,7 @@ import { seedRackets } from "../../src/services/crimeFamily/racketService";
 import { scoutWar, armHit, answerHit, sweepWarHits } from "../../src/services/crimeFamily/warActions";
 import { weakPoint, slotOf } from "../../src/services/crimeFamily/warMath";
 import { WAR_BLOCKS } from "../../src/data/crimeFamilyCatalog";
+import { disbandFamily } from "../../src/services/crimeFamily/disbandService";
 import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedContribution } from "../helpers";
 
 const at = (s: string) => new Date(s);
@@ -14,9 +15,9 @@ const heat = async (id: string) => (await testPrisma.user.findUnique({ where: { 
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "Racket", "War", "WarContribution"]));
 beforeEach(resetFamilies);
 
-async function family(level = 7, earnings = 0) {
+async function family(level = 7, earnings = 0, tag?: string) {
   const boss = await seedEligibleUser(); const a = await seedEligibleUser(); const b = await seedEligibleUser();
-  const f = await seedFamily({ bossId: boss, level, earnings, homeGuildId: "g1", members: [{ userId: a, role: "SOLDIER", joinedAt: daysAgo(10) }, { userId: b, role: "SOLDIER", joinedAt: daysAgo(10) }] });
+  const f = await seedFamily({ bossId: boss, level, earnings, tag, homeGuildId: "g1", members: [{ userId: a, role: "SOLDIER", joinedAt: daysAgo(10) }, { userId: b, role: "SOLDIER", joinedAt: daysAgo(10) }] });
   return { f, ids: [boss, a, b] };
 }
 
@@ -45,6 +46,22 @@ describe("war lifecycle (9.4, 15)", () => {
     const w3 = await seedWar({ racketKey: "valet_racket", status: "BIDDING", startsAt: past, topBid: 2_100_000, topBidderFamilyId: c.f.id });
     expect(await closeBidding(w3.id, new Date(), false)).toBe("CANCELLED");
     expect((await fam(c.f.id))!.earnings).toBe(2_100_000);
+  });
+
+  it("arming writes the racket, so the owner's racing disband never leaves a deleted defender", async () => {
+    for (const key of ["docks_numbers", "pawn_row", "valet_racket"]) {
+      const tag = key.slice(0, 3).toUpperCase();
+      const owner = await family(7, 0, tag); const a = await family();
+      await testPrisma.family.update({ where: { id: owner.f.id }, data: { lastPaydayAt: daysAgo(1) } });
+      const before = await seedRacket(key, { ownerFamilyId: owner.f.id });
+      const w = await seedWar({ racketKey: key, status: "BIDDING", startsAt: new Date(Date.now() + 30 * M), topBid: 2_100_000, topBidderFamilyId: a.f.id });
+      await Promise.allSettled([closeBidding(w.id, new Date(), true), disbandFamily(owner.ids[0], tag)]);
+      const armed = (await war(w.id))!;
+      expect(armed).toMatchObject({ status: "ARMED", attackerFamilyId: a.f.id });
+      if (armed.defenderFamilyId !== "") expect(await fam(armed.defenderFamilyId)).not.toBeNull();
+      const after = (await testPrisma.racket.findUnique({ where: { key } }))!;
+      expect(+after.updatedAt).toBeGreaterThan(+before.updatedAt);
+    }
   });
 
   it("the war-soon CAS fires once", async () => {
@@ -123,6 +140,20 @@ describe("settlement (9.4, edges 11, 12, 15, 16)", () => {
     const street = await seedWar({ racketKey: "city_hall", status: "SETTLING", topBid: 9_100_000, topBidderFamilyId: a.f.id, defenderFamilyId: "", scores: { atkDocks: 80, atkMain: 80, defDocks: 80, defMain: 80, defAlleys: 80 } });
     expect(await settleWar(street.id, new Date())).toMatchObject({ outcome: "HELD", burned: 9_100_000 });
     expect((await testPrisma.racket.findUnique({ where: { key: "city_hall" } }))!.ownerFamilyId).toBe("");
+  });
+
+  it("a held war whose defender family is gone settles as the Street: no XP, warWins or war_hits for it", async () => {
+    const d = await family(1); const a = await family(1);
+    await seedRacket("docks_numbers");                                   // the defender's disband released it
+    const w = await seedWar({ racketKey: "docks_numbers", status: "SETTLING", topBid: 2_100_000, topBidderFamilyId: a.f.id, defenderFamilyId: d.f.id, scores: { atkDocks: 40, atkMain: 20, atkAlleys: 0, defDocks: 30, defMain: 42, defAlleys: 30 } });
+    await seedContribution({ warId: w.id, familyId: a.f.id, userId: a.ids[0], side: "ATK", hits: 6, correctHits: 6, points: 60 });
+    await seedContribution({ warId: w.id, familyId: d.f.id, userId: d.ids[0], side: "DEF", hits: 1, correctHits: 1, points: 12 });
+    await testPrisma.familyMember.deleteMany({ where: { familyId: d.f.id } });
+    await testPrisma.family.delete({ where: { id: d.f.id } });
+    const r = await settleWar(w.id, new Date());
+    expect(r).toMatchObject({ outcome: "HELD", burned: 2_100_000, xp: [{ familyId: a.f.id, xp: 30 }] });
+    expect(await war(w.id)).toMatchObject({ status: "RESOLVED" });
+    expect((await testPrisma.racket.findUnique({ where: { key: "docks_numbers" } }))!.ownerFamilyId).toBe("");
   });
 
   it("a tick gap over 600 s cancels and refunds: no ownership, XP or heat (D55, edge 12)", async () => {

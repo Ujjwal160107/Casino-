@@ -64,7 +64,7 @@ export async function closeBidding(warId: string, now: Date, allowArm: boolean):
   return runFamilyTx(async (tx) => {
     const war = await tx.war.findFirst({ where: { id: warId, status: "BIDDING", bidClosesAt: { lte: now } } });
     if (!war) return null;
-    const racket = await tx.racket.findUnique({ where: { id: war.racketId }, select: { ownerFamilyId: true } });
+    const racket = await tx.racket.findUnique({ where: { id: war.racketId }, select: { ownerFamilyId: true, updatedAt: true } });
     const hasBid = war.topBidderFamilyId !== "";
     const status = hasBid && allowArm ? "ARMED" : "CANCELLED";
     const { count } = await tx.war.updateMany({
@@ -74,6 +74,16 @@ export async function closeBidding(warId: string, now: Date, allowArm: boolean):
         : { status },
     });
     if (count !== 1) return null;
+    if (status === "ARMED" && racket) {
+      // Write the racket so the owner's disband (which releases it) conflicts
+      // with this snapshot: Mongo only conflicts write-write, and a racing
+      // disband would otherwise leave defenderFamilyId naming a deleted family.
+      // Always later than the stored value, as in touchFamily, so Mongo never skips it.
+      await tx.racket.update({
+        where: { id: war.racketId },
+        data: { updatedAt: new Date(Math.max(now.getTime(), racket.updatedAt.getTime() + 1)) },
+      });
+    }
     if (hasBid && !allowArm) {
       await creditEarnings(tx, war.topBidderFamilyId, war.topBid, "bid_refund", "system", { warId, reason: "turf_closed" });
     }
@@ -188,6 +198,8 @@ export async function settleWar(warId: string, now: Date): Promise<WarSettlement
       await awardFamilyXp(tx, familyId, amount, source, "system", { warId });
       xp.set(familyId, (xp.get(familyId) ?? 0) + amount);
     };
+    // A defender whose Family row is gone counts as the Street: no XP or warWins to write.
+    const defenderLive = defender !== "" && (await tx.family.count({ where: { id: defender } })) > 0;
     const winWar = (familyId: string) => tx.family.update({ where: { id: familyId }, data: { warWins: { increment: 1 } } });
 
     if (captured) {
@@ -197,12 +209,12 @@ export async function settleWar(warId: string, now: Date): Promise<WarSettlement
       if (moved === 0) throw new Error(`settleWar ${warId}: racket ${war.racketKey} is held by neither the defender nor the Street`);
       await award(attacker, captureXp(def.class), "war_capture");
       await winWar(attacker);
-    } else if (defender !== "" && defenceEarnsXp(scores)) {
+    } else if (defenderLive && defenceEarnsXp(scores)) {
       await award(defender, captureXp(def.class), "war_defence");
       await winWar(defender);
     }
 
-    const sides: [WarSide, string][] = [["ATK", attacker], ["DEF", defender]];
+    const sides: [WarSide, string][] = [["ATK", attacker], ["DEF", defenderLive ? defender : ""]];
     for (const [side, familyId] of sides) {
       if (familyId === "") continue;
       const correct = contributions.filter((c) => c.side === side).reduce((sum, c) => sum + c.correctHits, 0);
