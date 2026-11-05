@@ -1,10 +1,13 @@
 // Caper test fixtures: a seated crew, a seeded lobby or run (direct writes, no
-// wallet debit), a scripted RNG and scoped Transaction counts.
+// wallet debit), a scripted RNG, scoped Transaction counts and a fake Discord client.
 import type { Caper, Family } from "@prisma/client";
+import { vi } from "vitest";
+import { PermissionFlagsBits, type Client } from "discord.js";
 import { caperRole, caperTier, type CaperRoleKey } from "../../src/data/crimeFamilyCatalog";
 import { buildAnswers, type CaperAnswers } from "../../src/services/crimeFamily/intelRing";
 import type { Rng } from "../../src/services/crimeFamily/random";
 import { testPrisma, seedEligibleUser, seedFamily, daysAgo } from "../helpers";
+import { fakeDmClient } from "../dm/helpers";
 
 export const G = "g1";
 export const CH = "c1";
@@ -116,4 +119,41 @@ export async function seedRunning(o: {
     });
   }
   return { caper, family, bossId, ids, answers };
+}
+
+export type BotPerm = "ViewChannel" | "SendMessages" | "ReadMessageHistory" | "AttachFiles";
+
+export function fakeCaperClient(o: { members?: string[]; missingPerms?: Record<string, BotPerm[]> } = {}) {
+  const dm = fakeDmClient();
+  const sent: { channelId: string; payload: any }[] = [];
+  const edits: { channelId: string; messageId: string; payload: any }[] = [];
+  const editFailures: unknown[] = [];   // each edit call shifts one: a present value is thrown instead of editing
+  const sendFailures: unknown[] = [];   // same for send
+  let n = 0;
+  const make = (id: string) => {
+    const missing = (o.missingPerms?.[id] ?? []).map((k) => PermissionFlagsBits[k]);   // bigints, the contract in Task 12
+    return {
+      id, guildId: G, isTextBased: () => true,
+      permissionsFor: (_botId: string) => ({ has: (p: bigint) => !missing.includes(p) }),
+      send: vi.fn(async (payload: any) => {
+        const f = sendFailures.shift(); if (f) throw f;
+        const m = { id: `m${++n}` }; sent.push({ channelId: id, payload }); return m;
+      }),
+      messages: { edit: vi.fn(async (messageId: string, payload: any) => {
+        const f = editFailures.shift(); if (f) throw f;
+        edits.push({ channelId: id, messageId, payload }); return { id: messageId };
+      }) },
+    };
+  };
+  const channels = new Map<string, ReturnType<typeof make>>();
+  const channel = (id: string) => { if (!channels.has(id)) channels.set(id, make(id)); return channels.get(id)!; };
+  const members = new Set(o.members ?? []);
+  const guild = { id: G, name: "Guild", members: { fetch: vi.fn(async (uid: string) => (members.has(uid) ? { id: uid } : Promise.reject(new Error("Unknown Member")))) } };
+  const client = {
+    user: { id: "bot" },
+    channels: { fetch: vi.fn(async (id: string) => channel(id)) },
+    users: (dm.client as any).users,
+    guilds: { cache: new Map([[G, guild]]) },
+  } as unknown as Client;
+  return { client, channel, sent, edits, editFailures, sendFailures, dms: dm.sent };
 }

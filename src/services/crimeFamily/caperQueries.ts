@@ -47,6 +47,12 @@ export function startedCapersSince(familyId: string, since: Date): Promise<Caper
   });
 }
 
+/** Whether the family cancelled a lobby (a VOID run does not count) since `since`; lobby DMs stay quiet after one. */
+export async function cancelledLobbySince(familyId: string, since: Date): Promise<boolean> {
+  const count = await prisma.caper.count({ where: { familyId, status: "CANCELLED", outcome: "CANCELLED", updatedAt: { gte: since } } });
+  return count > 0;
+}
+
 /**
  * The shared caper card's view. Each seat's holderId is its ring successor
  * (the holder of its intel); darkness is shown only once the caper has left

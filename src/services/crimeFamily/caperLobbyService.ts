@@ -184,6 +184,12 @@ export async function cancelCaper(caperId: string, actorId: string | null, now: 
   });
 }
 
+/** CAS on the stored card: moves the caper's board off `fromMessageId` ("" = dead); false when another writer moved it first. */
+export async function swapCaperMessage(caperId: string, fromMessageId: string, to: { messageId: string; channelId?: string }): Promise<boolean> {
+  const { count } = await prisma.caper.updateMany({ where: { id: caperId, messageId: fromMessageId }, data: to });
+  return count === 1;
+}
+
 export type StartBy = { kind: "press"; uid: string } | { kind: "auto" } | { kind: "sweeper" };
 export type StartResult = {
   status: "started" | "pinched" | "waiting" | "closed" | "cancelled";
