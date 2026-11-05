@@ -3,23 +3,12 @@ const { schedule } = vi.hoisted(() => ({ schedule: vi.fn() }));
 vi.mock("node-cron", () => ({ default: { schedule }, schedule }));
 const { CF_SCHEDULES, registerCrimeFamilyJobs, runJobs, chargeFamilyDues, runSuccession, autoPayday, sweepInvites } = await import("../../src/services/crimeFamily/scheduler");
 import { ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
-import { fakeDmClient } from "../dm/helpers";
+import { fakeClient } from "./fakeClient";
 import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
 
 const DAY = 864e5;
 const fam = (id: string) => testPrisma.family.findUnique({ where: { id } });
 const wallet = async (id: string) => (await testPrisma.wallet.findUnique({ where: { userId: id } }))!.balance;
-function fakeClient(o: { dead?: boolean } = {}) {
-  const dm = fakeDmClient();
-  const sent: any[] = []; const edits: [string, any][] = [];
-  const channel = {
-    isTextBased: () => true,
-    send: vi.fn(async (p: any) => { sent.push(p); return { id: `m${sent.length}` }; }),
-    messages: { edit: vi.fn(async (id: string, p: any) => { edits.push([id, p]); return {}; }) },
-  };
-  (dm.client as any).channels = { fetch: vi.fn(async () => { if (o.dead) throw Object.assign(new Error("Unknown Channel"), { code: 10003 }); return channel; }) };
-  return { client: dm.client, dm: dm.sent, sent, edits };
-}
 const allActive = { key: "all", label: "all", need: 0, count: async () => 1 };
 async function dueFamily(now: Date) {
   const boss = await seedEligibleUser(); const s = await seedEligibleUser();

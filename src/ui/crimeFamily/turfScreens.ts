@@ -218,11 +218,14 @@ export function buildScoutReport(r: ScoutReport, blockName: string): CfPayload {
 
 // ── S21 ──────────────────────────────────────────────────────────────────────
 
-function resultHeader(v: WarResultView): string {
+/** "Turf war on <racket>: <label> captured it (2 of 3 blocks)." / "…held it." / "… was called off: downtime.": S21 and the S28 result notice. */
+export function warOutcomeLine(v: Pick<WarResultView, "board" | "outcome">): string {
   const b = v.board;
-  if (v.outcome === "CAPTURED") return `${b.attacker.label} captured it (2 of 3 blocks).`;
-  if (v.outcome === "HELD") return `${b.defender.label} held it.`;
-  return "Called off: downtime.";
+  const head = `Turf war on ${b.racketName}`;
+  if (v.outcome === "CANCELLED") return `${head} was called off: downtime.`;
+  if (v.outcome === "HELD") return `${head}: ${b.defender.label} held it.`;
+  const won = blockResults(b.scores).filter((r) => r.winner === "ATK").length;
+  return `${head}: ${b.attacker.label} captured it (${won} of ${WAR_BLOCKS.length} blocks).`;
 }
 
 function resultTerms(v: WarResultView): string {
@@ -256,7 +259,7 @@ export function buildWarResult(v: WarResultView, art: "keep" | "none"): CfPayloa
   const container = new ContainerBuilder();
   if (banner) container.addMediaGalleryComponents(banner.gallery);
   container
-    .addTextDisplayComponents(text(`## ${cfLabel("war", `War over: ${v.board.racketName}`)}\n${resultHeader(v)}`))
+    .addTextDisplayComponents(text(`## ${cfLabel("war", `War over: ${v.board.racketName}`)}\n${warOutcomeLine(v)}`))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(text(results.join("\n")), text(resultTerms(v)));
   return cfPayload(container);

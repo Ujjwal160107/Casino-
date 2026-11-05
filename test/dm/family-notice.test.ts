@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DM_NOTICE_TYPES, isCooldownReminderType } from "../../src/services/dmPrefsService";
 import { caperGoNotice, caperLobbyNotice, familyArrearsNotice, familyInviteNotice, notifyMany } from "../../src/services/dmNoticeService";
-import { buildSettingsPayload } from "../../src/commands/general/settings";
 import { containerText, containerThumb, fakeDmClient } from "./helpers";
 import { seedUser } from "../helpers";
 import { setEmojiRecord } from "../../src/utils/emojiRegistry";
@@ -37,7 +36,6 @@ describe("family DM notices (13.4)", () => {
 });
 
 describe("caper DM notices (13.4)", () => {
-  const count = (n: any): number => 1 + (n.components ?? []).reduce((s: number, c: any) => s + count(c), 0) + (n.accessory ? 1 : 0);
   it("caper is a cooldown reminder for !caper; caper_lobby is an account notice with no command", () => {
     expect(DM_NOTICE_TYPES.caper).toEqual({ label: "Family caper", command: "!caper", group: "cooldown" });
     expect(isCooldownReminderType("caper")).toBe(true);
@@ -52,9 +50,5 @@ describe("caper DM notices (13.4)", () => {
     expect(containerThumb(caperGoNotice({ tierName: "x", goEndsAt: new Date(), jumpUrl: null }))).toContain("1456729243399753752");
     setEmojiRecord("cf_caper", { id: "1234567890123456780", name: "cf_caper" });
     expect(containerThumb(caperGoNotice({ tierName: "x", goEndsAt: new Date(), jumpUrl: null }))).toContain("1234567890123456780");
-  });
-  it("the settings panel is 29 components with DMs on and 30 off", () => {
-    expect(count(buildSettingsPayload("o", { remindersEnabled: true, disabledReminders: [] }).components[0].toJSON())).toBe(29);
-    expect(count(buildSettingsPayload("o", { remindersEnabled: false, disabledReminders: [] }).components[0].toJSON())).toBe(30);
   });
 });

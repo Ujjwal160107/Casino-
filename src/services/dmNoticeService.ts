@@ -16,6 +16,7 @@ import {
 } from "./dmPrefsService";
 import type { StatementIssued, StatementSettled } from "./creditCardService";
 import type { MaturedInvestment } from "./bankingService";
+import type { WarSide } from "./crimeFamily/warMath";
 
 // Every DM Fortuna sends a player is built and sent from here, so they all
 // share one look (noticeContainer) and one failure policy: a closed DM is a
@@ -326,7 +327,7 @@ export async function notifyMany(
   }
 }
 
-// ---- Crime Families: the `family` and `caper_lobby` account notices (spec 13.4). ----
+// ---- Crime Families: the `family`, `caper_lobby` and `turf` account notices (spec 13.4). ----
 
 const FAMILY_HINT = `-# ${SETTINGS_HINT}.`;
 
@@ -421,4 +422,44 @@ export function caperLobbyNotice(v: {
 export function caperGoNotice(v: { tierName: string; goEndsAt: Date; jumpUrl: string | null }): ContainerBuilder {
   const body = `The **${v.tierName}** caper is live.\nGO ends ${relTime(v.goEndsAt)}. Open your brief now.` + jumpLine(v.jumpUrl, "Go to the caper");
   return familyNotice("caper", "Caper GO", body);
+}
+
+// Turf (`turf`): bids, war warnings and results, and racket neglect.
+
+export function turfBidPlacedNotice(v: { racketName: string; bidderLabel: string; amount: number; startsAt: Date }): ContainerBuilder {
+  const body =
+    `**${v.bidderLabel}** bid ${fmtFortunes(v.amount)} to attack **${v.racketName}**.\n` +
+    `The war starts ${relTime(v.startsAt)}. Rally your crew to defend it.`;
+  return familyNotice("war", "A bid on your racket", body);
+}
+
+export function turfOutbidNotice(v: { racketName: string; amount: number; refunded: number; bidClosesAt: Date }): ContainerBuilder {
+  const body =
+    `You were outbid on ${v.racketName}: ${fmtFortunes(v.amount)}\n` +
+    `Your ${fmtFortunes(v.refunded)} went back to family earnings. Bidding closes ${relTime(v.bidClosesAt)}.`;
+  return familyNotice("war", "You were outbid", body);
+}
+
+export function turfWarSoonNotice(v: { racketName: string; side: WarSide; startsAt: Date; channelUrl: string }): ContainerBuilder {
+  const body =
+    `Your family is ${v.side === "ATK" ? "attacking" : "defending"} **${v.racketName}**. The war starts ${relTime(v.startsAt)}.\n` +
+    "The war board posts in your family's home channel." +
+    jumpLine(v.channelUrl || null, "Go to the home channel");
+  return familyNotice("war", "Turf war soon", body);
+}
+
+export function turfWarResultNotice(v: { racketName: string; side: WarSide; won: boolean; summary: string }): ContainerBuilder {
+  const body = `${v.summary}\nYou fought on the ${v.side === "ATK" ? "attacking" : "defending"} side.`;
+  return familyNotice("war", v.won ? `You won the war on ${v.racketName}` : `The war on ${v.racketName} is over`, body);
+}
+
+export function turfNeglectNotice(v: { racketName: string; strikes: number; max: number }): ContainerBuilder {
+  const body =
+    `Neglect strike ${v.strikes}/${v.max}: play two caper seats this week to keep ${v.racketName}.\n` +
+    `At ${v.max} strikes the racket goes back to the Street.`;
+  return familyNotice("war", "Racket neglected", body);
+}
+
+export function turfReleasedNotice(v: { racketName: string }): ContainerBuilder {
+  return familyNotice("war", "Racket released", `**${v.racketName}** went back to the Street after too many neglect strikes.`);
 }

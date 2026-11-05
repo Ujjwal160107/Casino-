@@ -25,6 +25,7 @@ export const DM_NOTICE_TYPES = {
   investment: { label: "Investment payouts", group: "account" },
   family: { label: "Crime family", group: "account" },
   caper_lobby: { label: "Caper lobby calls", group: "account" },
+  turf: { label: "Turf wars", group: "account" },
 } as const;
 
 export type DmNoticeType = keyof typeof DM_NOTICE_TYPES;
