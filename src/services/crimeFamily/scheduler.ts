@@ -1,4 +1,4 @@
-// The family jobs (spec 15): invite expiry every minute; dues, succession and
+// The family jobs (spec 15): invite expiry and the caper sweep every minute; dues, succession and
 // the automatic payday hourly. Each schedule is its own cron task in UTC with
 // noOverlap, each job and each family has its own try/catch, and every write
 // is a CAS in the service it calls, so a missed or doubled run is harmless.
@@ -10,6 +10,7 @@ import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { announceArrears, announceChairChange, announcePayday, resolveInviteCard } from "../../ui/crimeFamily/announce";
 import { buildClaimNotice, buildClaimResolved } from "../../ui/crimeFamily/familyScreens";
 import { editChannelMessage, sendToChannel } from "../../ui/crimeFamily/post";
+import { SWEEP_CAPERS_JOB } from "./caperSweeper";
 import { autoHandover, clearClaimNotice, markClaimNotice, setClaimMessage } from "./chairService";
 import { expireInvites } from "./membershipService";
 import { executePayday } from "./paydayService";
@@ -109,7 +110,7 @@ export async function autoPayday(client: Client, now: Date): Promise<void> {
 }
 
 export const CF_SCHEDULES: { cron: string; jobs: CfJob[] }[] = [
-  { cron: "* * * * *", jobs: [{ name: "sweepInvites", run: sweepInvites }] },
+  { cron: "* * * * *", jobs: [{ name: "sweepInvites", run: sweepInvites }, SWEEP_CAPERS_JOB] },
   {
     cron: "10 * * * *",
     jobs: [

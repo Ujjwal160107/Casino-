@@ -123,3 +123,7 @@ describe("crime family jobs (15)", () => {
     expect((await testPrisma.familyInvite.findUnique({ where: { id: inv.id } }))!.status).toBe("EXPIRED");
   });
 });
+
+it("sweepCapers runs in the minute schedule after sweepInvites", () => {
+  expect(CF_SCHEDULES.find((s) => s.cron === "* * * * *")!.jobs.map((j) => j.name)).toEqual(["sweepInvites", "sweepCapers"]);
+});
