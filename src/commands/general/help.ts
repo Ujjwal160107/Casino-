@@ -326,6 +326,16 @@ export const CATEGORIES: CategoryData[] = [
           "brief — open your brief during GO"
         ],
         example: "{p}caper join lookout"
+      },
+      {
+        name: "turf", aliases: ["racket", "rackets"], description: "The 10 rackets, weekly bidding and turf wars.",
+        usage: "{p}turf [racket <key>|bid <key> <amount>|war]",
+        subcommands: [
+          "racket <key|1-10> — a racket's owner, income and bidding window",
+          "bid <key> <amount> — Boss/Underboss: bid from earnings",
+          "war — your family's live war card"
+        ],
+        example: "{p}turf bid docks_numbers 2.1m"
       }
     ]
   },

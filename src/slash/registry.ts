@@ -4,6 +4,7 @@ import {
     SlashCommandBuilder,
     User,
 } from "discord.js";
+import { RACKETS } from "../data/crimeFamilyCatalog";
 
 /**
  * The single source of truth for slash commands.
@@ -255,6 +256,17 @@ export const SPECS: Spec[] = [
                 choices: ["plan", "join", "leave", "start", "cancel", "brief"],
             },
             { kind: "str", name: "value", desc: "Tier 1-4 for plan, a role for join", required: false },
+        ],
+    },
+    {
+        name: "turf", desc: "Rackets, bids and turf wars",
+        opts: [
+            {
+                kind: "str", name: "action", desc: "What to do -- leave blank for the turf map", required: false,
+                choices: ["map", "racket", "bid", "war"],
+            },
+            { kind: "str", name: "racket", desc: "Which racket", required: false, choices: RACKETS.map((r) => r.key) },
+            { kind: "str", name: "amount", desc: "Bid amount, like 2.1m", required: false },
         ],
     },
 ];

@@ -3,6 +3,7 @@ import { routeMessage } from "../../src/commandRouter";
 import { fakeMessage, replyText } from "./fakeMessage";
 import { seedEligibleUser, seedFamily, resetFamilies, withCfConfig, testPrisma } from "../helpers";
 import { seedRunning, seedLobby } from "../crimeFamily/caperFixtures";
+import { TURF_IDS } from "../../src/ui/crimeFamily/ids";
 
 beforeEach(resetFamilies);
 
@@ -61,6 +62,16 @@ describe("!crew routing", () => {
       await routeMessage({} as any, join.message, "!");
       expect(replyText(join.reply.mock.calls[0][0])).toMatch(/jail/i);
       expect(await testPrisma.caperCrew.count({ where: { userId: extra } })).toBe(0);
+    });
+  });
+  it("a jailed player can open the turf map with !turf and !rackets (13.1)", async () => {
+    await withCfConfig({ enabled: true, turfEnabled: true }, async () => {
+      const uid = await seedEligibleUser({ jailedUntil: new Date(Date.now() + 3600_000) });
+      for (const text of ["!turf", "!rackets"]) {
+        const m = fakeMessage(text, { authorId: uid, guildId: "g1" });
+        await routeMessage({} as any, m.message, "!");
+        expect(replyText(m.reply.mock.calls[0][0]), text).toContain(TURF_IDS.select(uid));
+      }
     });
   });
 });
