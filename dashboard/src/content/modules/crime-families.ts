@@ -636,7 +636,7 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Getting better at turf wars",
       body: [
-        "Run a scouting rota. Scout is free but covers only one random block per member per slot, so with three or four members scouting every 5 minutes the crew usually knows all three weak points. Agree who scouts at the start of each slot.",
+        "Have everyone scout every slot. Scout is free but shows only one random block per member per slot, and two scouts can land on the same block, so a rota can't assign blocks. With three scouts the crew sees all three weak points about 22% of the time, with four about 44%, and with six about 74%; most slots you know at least two of the three. Scout at the start of each 5-minute slot and post what you got.",
         "Call weak points in the home channel the moment you see them, with the block and the time it runs out (\"Docks: Pier 4 till :25\"). A hit called from a scout scores 10; a guess scores 2.5 on average and still costs 25,000.",
         "Save hits for the blackout. Your 6 hits are 600 seconds apart, so a member who hits at the start can still land the sixth at the 50-minute mark, right as the scores go dark. The other side can't see where you're pushing, and a defender who thought a block was safe can't react.",
         "Bid late, but before the close. Bidding shuts 1 hour before the war and a raise must beat the top bid by 10%, so an early bid only sets the price for everyone else. Have the Boss or Underboss ready in the last few hours, with the earnings in the vault (bids can't touch the treasury).",
