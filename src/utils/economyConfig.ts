@@ -238,6 +238,17 @@ export const CRIME_FAMILY_CONFIG = {
   scoutSlotSeconds: 300,
   warMinutes: 60,
   blackoutSeconds: 600,
+  bidOpensBeforeSeconds: 259_200,
+  bidClosesBeforeSeconds: 3_600,
+  bidRaisePct: 10,
+  bidMinRaise: 100_000,
+  warSoonSeconds: 900,
+  pairRuleSeconds: 1_209_600,
+  racketCycleHours: 24,
+  racketEligibleMin: 3,
+  neglectStrikesToRelease: 3,
+  activeCorrectHits: 3, // 7.3: correct war hits in the window that make a member active
+  warBoardRefreshSeconds: 50,
   renameCooldownSeconds: 2_592_000,
   maxPendingInvites: 5,
   acceptedInvitesPerInviterPer7d: 3,
@@ -260,6 +271,11 @@ export const CRIME_FAMILY_CONFIG = {
 export function isCrimeFamilyOpen(guildId: string | null | undefined): boolean {
   const { enabled, allowGuildIds } = CRIME_FAMILY_CONFIG;
   return enabled && !!guildId && (allowGuildIds === null || allowGuildIds.includes(guildId));
+}
+
+/** Whether !turf, the map, racket detail and new bids are open in this guild (running wars ignore it, T1). */
+export function isTurfOpen(guildId: string | null | undefined): boolean {
+  return isCrimeFamilyOpen(guildId) && CRIME_FAMILY_CONFIG.turfEnabled;
 }
 
 export const BANKING_CONFIG = {
