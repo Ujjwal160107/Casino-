@@ -3,6 +3,7 @@
 import prisma from "../../utils/prisma";
 import { levelDef } from "../../data/crimeFamilyCatalog";
 import { racketsHeldFor } from "./extensions";
+import { RACKETS_SORT } from "./turfLeaderboard";
 import type { LeaderboardView } from "./views";
 
 export interface LeaderboardSort {
@@ -39,9 +40,10 @@ function columnSort(key: string, label: string, column: "xp" | "warWins"): Leade
   };
 }
 
-/** Plan 3 adds { key: "rk", label: "Rackets" }. The first entry is the default sort. */
+/** The S10 button order. The first entry is the default sort. */
 export const LEADERBOARD_SORTS: LeaderboardSort[] = [
   columnSort("xp", "XP", "xp"),
+  RACKETS_SORT,
   columnSort("war", "War wins", "warWins"),
 ];
 

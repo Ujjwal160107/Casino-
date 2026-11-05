@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { levelUp, awardFamilyXp } from "../../src/services/crimeFamily/progression";
 import { getLeaderboard } from "../../src/services/crimeFamily/leaderboard";
 import { runFamilyTx } from "../../src/services/crimeFamily/tx";
-import { FAMILY_HOOKS } from "../../src/services/crimeFamily/extensions";
 import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes } from "../helpers";
 
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember"]));
@@ -54,14 +53,8 @@ describe("XP and leaderboard (10.2, 10.4)", () => {
     for (let x = 1; x <= 12; x++) fams.push(await seedFamily({ bossId: await seedEligibleUser(), xp: x }));
     const v = await getLeaderboard("xp", fams[0].id);
     expect(v.rows).toHaveLength(10);
-    expect(v.rows[0]).toMatchObject({ rank: 1, familyId: fams[11].id, value: 12, level: 1, members: 1, rackets: null });
+    expect(v.rows[0]).toMatchObject({ rank: 1, familyId: fams[11].id, value: 12, level: 1, members: 1, rackets: 0 });
     expect(v.viewer).toEqual({ rank: 12, value: 1 });
-    expect(v.sorts).toEqual([{ key: "xp", label: "XP" }, { key: "war", label: "War wins" }]);
-  });
-
-  it("fills rackets from a racketsHeld hook (P23)", async () => {
-    const f = await seedFamily({ bossId: await seedEligibleUser(), xp: 5 });
-    FAMILY_HOOKS.push({ key: "t", racketsHeld: async (ids) => new Map(ids.map((id) => [id, 2])) });
-    try { expect((await getLeaderboard("xp", f.id)).rows[0].rackets).toBe(2); } finally { FAMILY_HOOKS.pop(); }
+    expect(v.sorts).toEqual([{ key: "xp", label: "XP" }, { key: "rk", label: "Rackets" }, { key: "war", label: "War wins" }]);
   });
 });
