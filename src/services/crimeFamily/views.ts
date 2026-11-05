@@ -110,3 +110,59 @@ export interface BriefView {
   goEndsAt: Date;
   leakAt: Date;
 }
+
+/** One seat of a caper card, in tierRoles order; an open seat has userId null. */
+export interface CaperSeatView {
+  role: CaperRoleKey;
+  optional: boolean;
+  userId: string | null;
+  locked: boolean;
+  passed: boolean;
+  leaked: boolean;
+  /** Shown only once the caper has left RUNNING. */
+  dark: boolean;
+  /** The seat's ring successor: the holder of this seat's intel. */
+  holderId: string | null;
+  cut: number;
+  fine: number;
+  jailed: boolean;
+}
+
+/** S12, S13, S15 and the cancelled card: one shared caper card, built from the DB. */
+export interface CaperCardView {
+  caperId: string;
+  familyLabel: string;
+  tier: number;
+  status: "LOBBY" | "RUNNING" | "SETTLING" | "RESOLVED" | "CANCELLED";
+  outcome: "" | "CLEAN" | "MESSY" | "BUST" | "CANCELLED" | "VOID";
+  plannerId: string;
+  guildId: string;
+  channelId: string;
+  messageId: string;
+  lobbyClosesAt: Date;
+  goEndsAt: Date;
+  leakAt: Date;
+  /** tierRoles order. */
+  seats: CaperSeatView[];
+  openRoles: CaperRoleKey[];
+  lockedCount: number;
+  crewCount: number;
+  roll: number;
+  patrolChance: number;
+  pool: number;
+  note: string | null;
+}
+
+/** S11: the caper planner as one member sees it. */
+export interface CaperPlannerView {
+  ownerId: string;
+  familyLabel: string;
+  level: number;
+  tiers: { tier: number; unlocked: boolean }[];
+  nextCaperAt: Date;
+  startedLast24h: number;
+  duesArrears: number;
+  underInvestigation: boolean;
+  canPlan: boolean;
+  live: { caperId: string; tier: number; status: string; guildId: string; channelId: string; messageId: string } | null;
+}

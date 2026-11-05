@@ -14,6 +14,7 @@ import {
 } from "../../ui/crimeFamily/familyScreens";
 import { CREW_IDS } from "../../ui/crimeFamily/ids";
 import { buildNotice, buildOpener, type CfPayload } from "../../ui/crimeFamily/kit";
+import { caperWorstCases } from "./caperScreens";
 
 const OWNER = "12345678901234567890";
 const FAMILY_ID = "65f0000000000000000000ff";
@@ -119,5 +120,6 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
     { label: "S27 opener", max: 4, payload: buildOpener(`<@${OWNER}>, open your family vault.`, { customId: CREW_IDS.open("vault", OWNER), label: "Open vault" }) },
     { label: "S28 notice", max: 2, payload: buildNotice(`Payday: 12 members paid 950,000 each\n${MEMBERS.map((m) => `<@${m}>`).join(" ")}`) },
     { label: "S28 notice with button", max: 4, payload: buildNotice("Your family's caper is GO.", { customId: CREW_IDS.view("home", OWNER), label: "Open" }, MEMBERS) },
+    ...caperWorstCases(),
   ];
 }

@@ -57,9 +57,19 @@ export const CREW_IDS = {
   claim: (familyId: string) => cfId("crew", "claim", familyId),
 } as const;
 
-/** The S2 Caper button; plan 2 adds the rest. */
+/** Caper ids (spec 13.2): S2's Caper button and S11's select are owner-scoped; the shared cards carry the caper id. */
 export const CPR_IDS = {
   viewPlan: (owner: string) => cfId("cpr", "v", "plan", owner),
+  plan: (owner: string) => cfId("cpr", "plan", owner),
+  join: (caperId: string) => cfId("cpr", "join", caperId),
+  leave: (caperId: string) => cfId("cpr", "leave", caperId),
+  start: (caperId: string) => cfId("cpr", "start", caperId),
+  cancel: (caperId: string) => cfId("cpr", "cancel", caperId),
+  /** Open brief on S13, S25 and S28, and S14's Refresh. */
+  brief: (caperId: string) => cfId("cpr", "brief", caperId),
+  act: (caperId: string, index: number) => cfId("cpr", "act", caperId, index),
+  /** S27 opener for `!caper brief`: cpr:open:brief:<caperId>:<owner>, 60 characters at most. */
+  openBrief: (caperId: string, owner: string) => cfId("cpr", "open", "brief", caperId, owner),
 } as const;
 
 /** The S2 Turf button; plan 3 adds the rest. */
