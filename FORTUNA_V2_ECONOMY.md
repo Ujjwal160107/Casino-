@@ -216,7 +216,7 @@ Card notes:
 
 ## Crime Families
 
-Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`. Shipped behind `CRIME_FAMILY_CONFIG.enabled` (off by default). Families are global per `discordId`; a player is in at most one.
+Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`. Shipped behind `CRIME_FAMILY_CONFIG.enabled` (off by default); Turf (rackets, bids and wars) also needs `CRIME_FAMILY_CONFIG.turfEnabled` (off by default). Families are global per `discordId`; a player is in at most one.
 
 - **Founding** burns 10,000,000 from the wallet. Gates: net worth ≥ 15M (uncached), ≥ 60 lifetime shifts, Fortuna age ≥ 30 days, Discord age ≥ 180 days, heat < 70, not jailed or banned, hop cooldown clear, 7 days after disbanding as Boss.
 - **Joining** needs net worth ≥ 1M, ≥ 20 shifts, Fortuna ≥ 14 days, Discord ≥ 90 days, not jailed or banned. Invite caps: 5 pending per family, 3 accepted per inviter and 5 joins per family per rolling 7 days.
@@ -241,14 +241,14 @@ Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`. Shi
 | 9 | 46,000 | 38,000,000 | 12 | 3 | — | 2h00 | `cf_crest_3` |
 | 10 | 60,000 | 50,000,000 | 12 | 3 | — | 2h00 | `cf_crest_4` crowned gold |
 
-**XP sources** (rows marked "with Turf" pay once Turf ships):
+**XP sources:**
 
 | Source | XP |
 | --- | --- |
 | Caper Clean / Messy / Bust | T1 150/60/20, T2 225/90/30, T3 300/120/40, T4 375/150/50 |
-| Racket cycle minted (with Turf) | 20 per cycle (none on a neglected cycle) |
-| Correct war hit (with Turf) | 5 |
-| War won (with Turf) | capture 300 × 1 / 1.5 / 2 (Corner / District / Crown); defence the same, only if the attacker scored ≥ 1 correct hit on ≥ 2 blocks |
+| Racket cycle minted | 20 per cycle (none on a neglected cycle) |
+| Correct war hit | 5 to the hitter's family |
+| War won | capture 300 / 450 / 600 (Corner / District / Crown, 300 × 1 / 1.5 / 2); defence the same, only if the attacker scored ≥ 1 correct hit on ≥ 2 blocks |
 | Deposits, payday, scouting | 0 |
 
 **XP pacing** (p = 0.90, edge 0.10, full roster passing each tier's gates, 4 capers a day: T1 n=4 at L1–2, T2 n=5 at L3–4, T3 n=6 at L5–7, T4 n=6 at L8+; XP/day ≈ 447 / 634 / 788 / 964; vault EV/day 403,076 / 746,908 / 1,280,528 / 1,763,036 before dues; no rackets, no payday). A level needs both XP and fee, so the fee sets the pace:
@@ -330,6 +330,29 @@ Perfect play, p = 1.0 (only the patrol roll):
 
 Every seat is paid the same, so the perfect-play figure is also the planner's ceiling (1,049,600/day at T4). A realistic T4 seat pair (551,584/day) sits below a World Zoo (866,000/day net); perfect T4 play is about a Legendary Rifle (1,459,000/day) minus a third; a T1 seat (287,386/day) is about a City Zoo (388,000) minus a quarter.
 
+**Turf** (`!turf`, aliases `!racket` / `!rackets`, `/turf`; spec section 9; `RACKETS`, `RACKET_CLASSES`, `WAR_BLOCKS`, `WAR_RULES` in `src/data/crimeFamilyCatalog.ts`, math in `src/services/crimeFamily/warMath.ts`). Ten fixed rackets, all starting with the Street (`ownerFamilyId ""`); the only way to take one is to win its weekly war.
+
+| # | Key | Name | Class | Income / 24 h cycle | Bid floor (7 × income) | Baseline defence per block | Weekly war start (UTC) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | docks_numbers | Dockside Numbers | Corner | 300,000 | 2,100,000 | 30 | Mon 18:00 |
+| 2 | laundromat_front | Laundromat Front | Corner | 300,000 | 2,100,000 | 30 | Tue 12:00 |
+| 3 | harbor_customs | Harbor Customs Skim | District | 650,000 | 4,550,000 | 50 | Tue 18:00 |
+| 4 | neon_strip | Neon Strip Clubs | District | 650,000 | 4,550,000 | 50 | Wed 01:00 |
+| 5 | valet_racket | Valet Parking Racket | Corner | 300,000 | 2,100,000 | 30 | Wed 18:00 |
+| 6 | pawn_row | Pawn Row Fencing | Corner | 300,000 | 2,100,000 | 30 | Thu 01:00 |
+| 7 | union_kickbacks | Construction Union Kickbacks | District | 650,000 | 4,550,000 | 50 | Thu 18:00 |
+| 8 | racetrack_book | Racetrack Bookmaking | District | 650,000 | 4,550,000 | 50 | Fri 12:00 |
+| 9 | casino_row | Casino Row Protection | Crown | 1,300,000 | 9,100,000 | 80 | Sat 18:00 |
+| 10 | city_hall | City Hall Contracts | Crown | 1,300,000 | 9,100,000 | 80 | Sun 12:00 |
+
+Total racket income (source S3): at most 6,400,000 per day (44,800,000 per week) bot-wide, fixed whatever the player count; neglect only lowers it. Class level to bid: Corner any, District L4+, Crown L7+.
+
+- **Income:** no manual collection. `tickRackets` (`5 * * * *` UTC) pays `rentCyclesDue(lastPayoutAt, now, 24)` cycles (at most 3 banked, `MAX_BANKED_RENT_CYCLES`) into the owner's `earnings` as `racket_income`, +20 XP per cycle, and retries dues arrears. Needs ≥ 3 racket-eligible members (tenure ≥ 72 h, ≥ 20 shifts, Discord ≥ 90 d, not banned, active member; jail does not block). Fewer: nothing minted (N3), `neglectStrikes += cycles`; at 3 strikes the racket returns to the Street. Capture sets `lastPayoutAt = now`, so the old owner's partial cycle is never minted.
+- **Bidding:** window opens 72 h and closes 1 h before the war start. Boss or Underboss, not jailed, from earnings only (`spendFromVault(..., { earningsOnly: true })`), held in escrow on the War row. First bid ≥ floor; raise ≥ `max(ceil(top × 1.10), top + 100,000)` (9,100,000 → 10,010,000 → 11,011,000). Outbid escrow returns to earnings (`bid_refund`, T3). Refused: own racket, already top bidder, below the class level, dues in arrears, Under investigation, no home channel, held rackets + live bids/attacks + 1 > racket cap (1 / 2 / 3 at L1–3 / L4–6 / L7–10), a second Crown held or bid, or the 14-day pair rule (shared Boss, or ≥ 2 current members who left the other family). At close: a bid arms the war and the escrow is burned at settlement whatever the result (`war_bid_burn`, K9); no bid cancels it and the owner keeps the racket.
+- **War:** 60 minutes; blocks Docks (Crane, Warehouse, Pier 4, Boathouse), Main Street (Bank Steps, Diner, Bus Stop, Hotel Lobby), Back Alleys (Fire Escape, Dumpster Row, Cellar Door, Laundry Line). Fighters: members of either side in their home guild passing the `war` gate (tenure ≥ 72 h, Discord ≥ 90 d, Fortuna ≥ 14 d, ≥ 20 shifts, not jailed or banned, heat < 100). 12 slots of 300 s; weak point `HMAC_SHA256(seed, block:slot)[0] mod 4`. Scout: free, once per member per slot, one random block. Hit: 25,000 from the wallet, burned (`turf_hit`, K10), 600 s cooldown, ≤ 6 per member per war, 20 s to call (`min(now + 20 s, endsAt)`), judged against the arm-time slot; correct +10 attacking, +12 defending, otherwise 0. Defender (family or Street) starts each block at the class baseline 30 / 50 / 80; the Street never hits. Blackout: the last 600 s hide block scores and show hit counts. Each block to the higher score, ties to the defender; 2 of 3 wins. XP: capture 300 / 450 / 600; defence the same only if the attacker scored on ≥ 2 blocks; +5 per correct hit. +15 heat to every attacking hitter on a loss. No money moves between families.
+- **Downtime cancel:** a war that would go ACTIVE more than 600 s after its start, or whose largest tick gap exceeds 600 s, is CANCELLED: the escrow returns to earnings, no ownership change, XP or heat.
+- **Edges:** a capture by a family already at its racket cap releases the racket to the Street (bid still burned). Disband refunds live top bids to earnings (then burned with the vault) and releases every racket; disband is refused while a war is ARMED, ACTIVE or SETTLING, and kicks while one is ACTIVE.
+
 **Source and sink ledger:**
 
 | # | Flow | Kind | Amount | Bound |
@@ -369,7 +392,7 @@ Every seat is paid the same, so the perfect-play figure is also the planner's ce
 - Casino house edge.
 - Card interest on missed payments.
 - Property resale at 75%.
-- Crime Families: creation fee 10,000,000 (K1), rename 2,000,000 per 30 days (K2), level-up fees 2M → 50M, 172M in all (K3), dues 40,000 × level a day (K4), caper stakes 50,000 / 100,000 / 175,000 / 300,000 per seat per started run (K5), Bust fines 150,000 / 300,000 / 500,000 / 750,000 per seat (K6), 5% deposit tax (K7), 5% payday tax (K8), treasury and earnings burned on disband (K11). Never minted: the 10% caper fence (N1) and the cut rounding remainder (N2).
+- Crime Families: creation fee 10,000,000 (K1), rename 2,000,000 per 30 days (K2), level-up fees 2M → 50M, 172M in all (K3), dues 40,000 × level a day (K4), caper stakes 50,000 / 100,000 / 175,000 / 300,000 per seat per started run (K5), Bust fines 150,000 / 300,000 / 500,000 / 750,000 per seat (K6), 5% deposit tax (K7), 5% payday tax (K8), the winning war bid, at least 2,100,000 / 4,550,000 / 9,100,000, burned at settlement (K9), war hits 25,000 each, up to 6 per member per war (K10), treasury and earnings burned on disband (K11). Never minted: the 10% caper fence (N1), the cut rounding remainder (N2) and neglected racket cycles (N3).
 
 ## Open Issues (not changed in the 2026-10-11 rebalance)
 

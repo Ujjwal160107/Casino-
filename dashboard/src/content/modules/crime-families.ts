@@ -2,16 +2,17 @@ import type { ModuleDoc } from "../types";
 
 // Numbers come from CRIME_FAMILY_CONFIG (src/utils/economyConfig.ts) and
 // src/data/crimeFamilyCatalog.ts; the expected-value tables are pinned by
-// test/crimeFamily/caper-math.test.ts. Turf adds its own sections when it
-// ships; rows that depend on it are marked "with Turf".
+// test/crimeFamily/caper-math.test.ts. Turf numbers come from RACKETS,
+// RACKET_CLASSES, WAR_RULES and WAR_BLOCKS in the same catalog, and the war
+// and bid math from src/services/crimeFamily/warMath.ts.
 const crimeFamilies: ModuleDoc = {
   slug: "crime-families",
   title: "Crime Families",
-  tagline: "A crew of up to 12 players with ranks, a vault nobody can rob, ten family levels to buy, and capers you can only pull off together.",
+  tagline: "A crew of up to 12 players with ranks, a vault nobody can rob, ten family levels to buy, capers you can only pull off together, and ten rackets to fight over in weekly turf wars.",
   icon: "Users",
   forBeginners: {
     what: "A crime family is a crew of 6 to 12 players. Members pay into a shared vault, the vault pays the family's dues and level fees, and once a week the earned part of the vault is split between the members who played. Deposits never come back out: the vault is for the family, not for parking cash.",
-    firstCommands: ["!crew", "!caper"],
+    firstCommands: ["!crew", "!caper", "!turf"],
     tip: "You don't need to found a family to play. Joining needs 1,000,000 net worth and 20 shifts; founding needs 15,000,000, 60 shifts and 10,000,000 to burn. Get invited first.",
   },
   screenshot: {
@@ -86,8 +87,8 @@ const crimeFamilies: ModuleDoc = {
           ["Hand over the chair", "yes", "no", "no", "no", "no"],
           ["Plan a caper", "yes", "yes", "yes", "no", "no"],
           ["Take a caper seat", "yes", "yes", "yes", "yes", "no"],
-          ["Payday, level up, bid (bid with Turf)", "yes", "yes", "no", "no", "no"],
-          ["Scout and hit in a war (with Turf)", "yes", "yes", "yes", "yes", "no"],
+          ["Payday, level up, bid on a racket", "yes", "yes", "no", "no", "no"],
+          ["Scout and hit in a war", "yes", "yes", "yes", "yes", "no"],
           ["Home channel, rename, disband", "yes", "no", "no", "no", "no"],
           ["Claim the chair from an inactive Boss", "no", "after 7 days", "no", "no", "no"],
         ],
@@ -144,7 +145,7 @@ const crimeFamilies: ModuleDoc = {
         columns: ["Bucket", "Filled by", "Spent on", "Reaches a wallet?"],
         rows: [
           ["Treasury", "Member deposits, after the 5% tax", "Dues, level fees, rename, only after earnings is empty", "Never. Burned on disband."],
-          ["Earnings", "10% of every caper pool, racket income and refunded bids (with Turf)", "Dues, level fees, rename (first); racket bids (only from earnings, with Turf); Payday", "Only through Payday"],
+          ["Earnings", "10% of every caper pool, racket income and refunded bids", "Dues, level fees, rename (first); racket bids (only from earnings); Payday", "Only through Payday"],
         ],
       },
     },
@@ -181,7 +182,7 @@ const crimeFamilies: ModuleDoc = {
           ["Daily dues", "40,000 × level (40,000 at L1, 400,000 at L10)", "Once per UTC day, automatically"],
           ["Level-up fee", "2,000,000 → 50,000,000 (see Levels)", "Boss or Underboss presses Level up"],
           ["Rename", "2,000,000", "Boss, once per 30 days"],
-          ["Racket bid escrow (with Turf)", "From earnings only", "Refunded if outbid, burned when the war settles"],
+          ["Racket bid escrow", "From earnings only", "Refunded if outbid or the war is called off, burned when the war settles"],
         ],
       },
     },
@@ -202,11 +203,11 @@ const crimeFamilies: ModuleDoc = {
           ["Cap per member", "1,000,000 gross (950,000 net) per payday"],
           ["Tax", "5% of each share, burned"],
           ["Tenure", "In the family 7 days or more"],
-          ["Active member", "2 started caper seats or 3 correct war hits (with Turf) in the last 7 days"],
+          ["Active member", "2 started caper seats or 3 correct war hits in the last 7 days"],
           ["Account", "20 shifts, Discord 90 days, Fortuna 14 days, not banned; jail does not block payday"],
         ],
       },
-      note: "Being active is the gate most members miss. A member who sat in fewer than 2 started capers in the last 7 days gets nothing from this Payday.",
+      note: "Being active is the gate most members miss. A member with fewer than 2 started caper seats and fewer than 3 correct war hits in the last 7 days gets nothing from this Payday.",
     },
     {
       heading: "Levels",
@@ -216,7 +217,7 @@ const crimeFamilies: ModuleDoc = {
       ],
       table: {
         title: "Family levels",
-        columns: ["Level", "XP to reach", "Fee", "Members", "Rackets (with Turf)", "Caper tier unlocked", "Family caper cooldown", "Crest"],
+        columns: ["Level", "XP to reach", "Fee", "Members", "Racket cap", "Caper tier unlocked", "Family caper cooldown", "Crest"],
         rows: [
           ["1", "0", "—", "6", "1", "Tier 1", "3h00", "Bronze"],
           ["2", "1,000", "2,000,000", "7", "1", "—", "3h00", "Bronze"],
@@ -241,10 +242,11 @@ const crimeFamilies: ModuleDoc = {
         columns: ["Source", "XP"],
         rows: [
           ["Caper, Clean / Messy / Bust", "Tier 1 150/60/20, Tier 2 225/90/30, Tier 3 300/120/40, Tier 4 375/150/50"],
-          ["Racket cycle paid (with Turf)", "20 per cycle, none on a neglected cycle"],
-          ["Correct war hit (with Turf)", "5"],
-          ["War won (with Turf)", "300 × 1 / 1.5 / 2 for a Corner / District / Crown racket"],
-          ["Deposits, Payday", "0"],
+          ["Racket cycle paid", "20 per cycle (up to 60 when 3 banked cycles pay at once), none on a neglected cycle"],
+          ["Correct war hit", "5 to the hitter's family, attacking or defending"],
+          ["War won by capture", "300 Corner, 450 District, 600 Crown"],
+          ["War won by defence", "300 Corner, 450 District, 600 Crown, only if the attacker scored on at least 2 of the 3 blocks"],
+          ["Deposits, Payday, scouting", "0"],
         ],
       },
     },
@@ -483,6 +485,166 @@ const crimeFamilies: ModuleDoc = {
       ],
     },
     {
+      heading: "Rackets",
+      body: [
+        "Turf is ten fixed rackets that pay protection money into the owning family's earnings. !turf (aliases !racket and !rackets, or /turf) posts the turf map: every racket with its owner, daily income, weekly war time and the current top bid. Pick a racket from the menu, or type !turf racket <key> or its number 1–10, to open its detail card: owner, income, neglect strikes, bidding status, the floor, the smallest bid that would count now, and the next war.",
+        "Every racket starts with the Street, the city's unowned turf. There is no way to buy or claim one outright: the only way to take a racket is to win its weekly war. Each racket has one war a week at a fixed time, rotating between 18:00 UTC (EU evening), 01:00 UTC (US evening) and 12:00 UTC (Asia and Oceania evening); both Crown wars fall on the weekend.",
+        "Between them the ten rackets pay at most 6,400,000 a day (44,800,000 a week) across the whole bot, however many families play. Neglect only lowers that.",
+      ],
+      table: {
+        title: "The ten rackets",
+        columns: ["#", "Key", "Racket", "Class", "Income a day", "Bid floor", "Baseline defence per block", "Weekly war (UTC)"],
+        rows: [
+          ["1", "docks_numbers", "Dockside Numbers", "Corner", "300,000", "2,100,000", "30", "Mon 18:00"],
+          ["2", "laundromat_front", "Laundromat Front", "Corner", "300,000", "2,100,000", "30", "Tue 12:00"],
+          ["3", "harbor_customs", "Harbor Customs Skim", "District", "650,000", "4,550,000", "50", "Tue 18:00"],
+          ["4", "neon_strip", "Neon Strip Clubs", "District", "650,000", "4,550,000", "50", "Wed 01:00"],
+          ["5", "valet_racket", "Valet Parking Racket", "Corner", "300,000", "2,100,000", "30", "Wed 18:00"],
+          ["6", "pawn_row", "Pawn Row Fencing", "Corner", "300,000", "2,100,000", "30", "Thu 01:00"],
+          ["7", "union_kickbacks", "Construction Union Kickbacks", "District", "650,000", "4,550,000", "50", "Thu 18:00"],
+          ["8", "racetrack_book", "Racetrack Bookmaking", "District", "650,000", "4,550,000", "50", "Fri 12:00"],
+          ["9", "casino_row", "Casino Row Protection", "Crown", "1,300,000", "9,100,000", "80", "Sat 18:00"],
+          ["10", "city_hall", "City Hall Contracts", "Crown", "1,300,000", "9,100,000", "80", "Sun 12:00"],
+        ],
+      },
+      note: "Corner rackets are open to a family of any level. District rackets need family level 4 and Crown rackets family level 7 before the family can bid.",
+    },
+    {
+      heading: "How rackets pay",
+      body: [
+        "Nobody collects a racket. A job runs at five past every hour (UTC) and pays each owned racket for every full 24-hour cycle since its last payout, straight into the family's earnings. Members only see racket money through Payday. A captured racket's first cycle starts the moment it is captured, and whatever was left of the old owner's cycle is lost, never paid.",
+        "A cycle pays only if the family has at least 3 racket-eligible members when it falls due. A racket-eligible member has been in the family 72 hours or more, has 20 or more lifetime shifts, a Discord account 90 days or older, isn't banned, and is an active member: 2 started caper seats or 3 correct war hits in the last 7 days. Jail does not count against it.",
+        "A cycle with fewer than 3 racket-eligible members pays nothing and is a neglect strike instead. Each strike sends a \"Turf wars\" DM to the Boss, the Underboss and every member who isn't racket-eligible. On the third strike the racket goes back to the Street and every member gets a DM. A cycle that pays resets the strikes to 0.",
+        "Like property rent, a racket banks at most 3 cycles. If the bot was down for 2 days, the next tick pays 2 cycles at once; after 3 days or more it pays 3 and the rest is lost. A tick that finds 3 neglected cycles at once strikes all 3 and releases the racket.",
+        "Every racket credit also retries any dues the family owes, so racket income clears arrears on its own.",
+      ],
+      table: {
+        title: "Racket payouts",
+        columns: ["Rule", "Value"],
+        rows: [
+          ["Cycle", "24 hours, paid by the job at :05 every hour (UTC)"],
+          ["Pays into", "Family earnings (only Payday moves it to wallets)"],
+          ["Income per cycle", "300,000 Corner, 650,000 District, 1,300,000 Crown"],
+          ["XP per paid cycle", "20"],
+          ["Racket-eligible members needed", "3 or more, checked at every cycle"],
+          ["Neglect", "A cycle below 3 eligible members pays 0 and is a strike; 3 strikes release the racket to the Street"],
+          ["Banking after downtime", "At most 3 cycles; the rest is lost"],
+        ],
+      },
+    },
+    {
+      heading: "Bidding",
+      body: [
+        "A racket's weekly war has exactly one attacker, and bidding decides who. The window opens 72 hours before the war starts and closes 1 hour before it. Example: Dockside Numbers fights on Monday at 18:00 UTC, so its bidding runs from Friday 18:00 to Monday 17:00.",
+        "Only the Boss or the Underboss can bid, and not while jailed. Open the racket's card and press Bid to type an amount, or type !turf bid <key> <amount> (for example !turf bid docks_numbers 2.1m). Amounts take shorthand like 2.1m or 2,100,000, but never \"all\" and never a fraction of a Fortune.",
+        "Bids come from family earnings only, never the treasury. The bid sits in escrow on the war. When another family outbids you, your escrow goes straight back into your earnings and your Boss and Underboss get a DM; the owning family's Boss and Underboss get one for every bid on their racket. When bidding closes, the top bid is the attacker and its escrow is burned when the war settles, win or lose. Bid amounts are public: they are the price of a shot at the racket.",
+        "Every raise must beat the top bid by 10%, or by 100,000 if that is more: max(ceil(top × 1.10), top + 100,000). Since even the smallest floor is 2,100,000, the 10% is always the bigger step. On a Crown racket: 9,100,000, then at least 10,010,000, then at least 11,011,000.",
+        "If nobody bids, the war is cancelled and the owner keeps the racket for another week. A family that holds the top bid can't raise its own bid.",
+      ],
+      table: {
+        title: "Bidding rules",
+        columns: ["Rule", "Value"],
+        rows: [
+          ["Window", "Opens 72 hours before the war, closes 1 hour before"],
+          ["Who", "Boss or Underboss, not jailed"],
+          ["Paid from", "Family earnings only, held in escrow"],
+          ["First bid", "At least the floor: 7 days of income (2,100,000 Corner, 4,550,000 District, 9,100,000 Crown)"],
+          ["Raise", "max(ceil(top × 1.10), top + 100,000)"],
+          ["Outbid", "Escrow returns to your earnings at once"],
+          ["Winning bid", "Burned when the war settles, whatever the result"],
+          ["Class level", "Corner any level, District family L4+, Crown family L7+"],
+          ["Racket cap", "Rackets held plus live bids and attacks: 1 at L1–3, 2 at L4–6, 3 at L7–10"],
+          ["Crown cap", "At most 1 Crown racket held or bid on at a time"],
+          ["Family checks", "Not your own racket, no dues in arrears, not under investigation, home channel set"],
+          ["Pair rule", "No bid on a family that shared your Boss, or any 2 members, with your family in the last 14 days"],
+        ],
+      },
+      note: "The pair rule stops a family feeding a racket to its own alt family: you can't bid on a racket owned by a family whose Boss left your family, or whose family your Boss left, in the last 14 days, nor if 2 of either family's current members left the other in that time. A Street racket is never blocked.",
+    },
+    {
+      heading: "The Turf War",
+      body: [
+        "The war runs for 60 minutes from its start time. The attacker is the top bidder; the defender is the family that owns the racket, or the Street. Fifteen minutes before it starts, every member of both families who can fight gets a \"Turf wars\" DM with a link to their home channel. When it starts, a war board posts in each family's home channel and refreshes about once a minute.",
+        "Who can fight: members of the two families, acting in their family's home server, who have been in the family 72 hours or more (no Associates), have 20 or more lifetime shifts, a Fortuna profile 14 days and a Discord account 90 days or older, aren't jailed or banned, and have heat below 100. !turf war shows your own war card with the buttons, in the home server only.",
+        "The turf is three blocks: Docks, Main Street and Back Alleys. Each block has four approaches, and one of them is its weak point. The weak point changes every 5 minutes (12 slots in a war) and is secret: no button, emoji or board ever gives it away.",
+        "Scout is free once per member per 5-minute slot. It shows you the current weak point of one random block, valid until that slot ends, and only you see it. Call it in the home channel so the crew can use it.",
+        "Hit costs 25,000 from your wallet, burned. Press Hit on a block and you get 20 seconds to pick one of its four approaches (or until the war ends, if sooner). The call is judged against the weak point of the slot you pressed Hit in, so a hit armed just before a slot turns still counts. The right approach scores +10 to that block for the attacker or +12 for the defender (home advantage). A wrong pick or a timeout scores 0, and the 25,000 is gone either way. Each member gets at most 6 hits a war, 600 seconds apart.",
+        "The defender starts every block at the racket's baseline: 30 Corner, 50 District, 80 Crown. The Street never hits; it only has the baseline. In the last 10 minutes the board goes dark: block scores show as ??, and only each side's hit count is shown.",
+        "Each block goes to the higher score, and a tie goes to the defender. Win 2 of the 3 blocks to win the war. If the attacker wins, the racket is theirs; if not, nothing changes hands. No money moves between families either way.",
+        "If the bot was down when the war should have started, and it would start more than 10 minutes late, the war is called off. It is also called off if the bot missed more than 10 minutes of the war at any point. A called-off war refunds the bid to the attacker's earnings, with no change of owner, no XP and no heat.",
+      ],
+      table: {
+        title: "War rules",
+        columns: ["Rule", "Value"],
+        rows: [
+          ["Length", "60 minutes from the start time"],
+          ["Blocks and approaches", "Docks: Crane, Warehouse, Pier 4, Boathouse. Main Street: Bank Steps, Diner, Bus Stop, Hotel Lobby. Back Alleys: Fire Escape, Dumpster Row, Cellar Door, Laundry Line."],
+          ["Weak point", "1 of 4 approaches per block, new every 5 minutes (12 slots)"],
+          ["Scout", "Free, once per member per slot, one random block"],
+          ["Hit", "25,000 from the wallet, 20 seconds to call, 600 seconds between hits, 6 per member per war"],
+          ["Points for a correct call", "Attacker +10, defender +12; wrong or timed out 0"],
+          ["Baseline defence per block", "30 Corner, 50 District, 80 Crown"],
+          ["Blackout", "Last 10 minutes: scores hidden, hit counts shown"],
+          ["Block winner", "Higher score; ties go to the defender"],
+          ["War winner", "2 of 3 blocks"],
+          ["Capture XP", "300 Corner, 450 District, 600 Crown to the attacker"],
+          ["Defence XP", "The same, only if the attacker scored on at least 2 blocks"],
+          ["Hit XP", "5 per correct hit, to the hitter's family"],
+          ["Heat on a loss", "+15 to every attacking member who made at least 1 hit"],
+          ["Called off", "More than 10 minutes of downtime at the start or during the war: bid refunded, nothing else"],
+        ],
+      },
+    },
+    {
+      heading: "What it takes to win",
+      body: [
+        "A blind guess is right 1 time in 4, so it scores 2.5 points on average for the attacker. A hit called from a fresh scout scores 10. Against a defender that never hits, the attacker needs more points than the baseline on 2 blocks, and a tie is not enough.",
+        "Six hits per member is the limit, so a Crown war needs at least 3 attackers hitting perfectly even against the Street. Every correct defender hit adds 12 to that block, so a defending family that turns up makes those numbers climb fast.",
+      ],
+      table: {
+        title: "Correct attacker hits needed against a defender that never hits",
+        columns: ["Class", "Baseline", "Hits to take one block", "Hits to take the racket (2 blocks)", "Perfect hitters needed", "Hit spend at least"],
+        rows: [
+          ["Corner", "30", "4 (40 > 30)", "8", "2", "200,000"],
+          ["District", "50", "6 (60 > 50)", "12", "2", "300,000"],
+          ["Crown", "80", "9 (90 > 80)", "18", "3", "450,000"],
+        ],
+      },
+    },
+    {
+      heading: "Decay and caps",
+      body: [
+        "Rackets don't stay with a family that stops playing. A family whose members go quiet defends at the baseline only, and neglect hands its rackets to the Street within 3 cycles. A capture is never cheap: the winning bid, at least 7 days of the racket's income, is burned every time.",
+        "The racket cap is checked when you bid, counting every racket held and every live bid or attack, so a capture normally always fits. If a family ever does win while already at its cap, the racket goes to the Street instead, and the bid is still burned. Disbanding returns any top bids to earnings, where they are burned with the rest of the vault, and hands every racket the family held to the Street. A family can't disband while one of its wars is armed, live or settling, and nobody can be kicked during a live war.",
+      ],
+      table: {
+        title: "Decay, upkeep and caps",
+        columns: ["Mechanism", "Rule"],
+        rows: [
+          ["Neglect", "Fewer than 3 racket-eligible members at a cycle: no income and a strike; 3 strikes release the racket"],
+          ["Inactive owner", "Defends at the baseline only; neglect releases its rackets within 3 cycles"],
+          ["Upkeep", "Family dues of 40,000 × level a day; defending above the baseline costs attendance and hit spend"],
+          ["Banking", "At most 3 cycles after downtime"],
+          ["Racket cap", "1 at L1–3, 2 at L4–6, 3 at L7–10"],
+          ["Class level", "District needs family L4+, Crown L7+ to bid"],
+          ["Crown cap", "At most 1 Crown racket held or bid on at a time"],
+          ["Capture cost", "The winning bid, at least 7 days of the racket's income, burned"],
+          ["Leaving", "A member who fought in an armed or live war can't leave or be kicked until it resolves"],
+        ],
+      },
+    },
+    {
+      heading: "Getting better at turf wars",
+      body: [
+        "Run a scouting rota. Scout is free but covers only one random block per member per slot, so with three or four members scouting every 5 minutes the crew usually knows all three weak points. Agree who scouts at the start of each slot.",
+        "Call weak points in the home channel the moment you see them, with the block and the time it runs out (\"Docks: Pier 4 till :25\"). A hit called from a scout scores 10; a guess scores 2.5 on average and still costs 25,000.",
+        "Save hits for the blackout. Your 6 hits are 600 seconds apart, so a member who hits at the start can still land the sixth at the 50-minute mark, right as the scores go dark. The other side can't see where you're pushing, and a defender who thought a block was safe can't react.",
+        "Bid late, but before the close. Bidding shuts 1 hour before the war and a raise must beat the top bid by 10%, so an early bid only sets the price for everyone else. Have the Boss or Underboss ready in the last few hours, with the earnings in the vault (bids can't touch the treasury).",
+        "Keep 3 racket-eligible members at all times. A racket you hold pays nothing in a week where fewer than 3 members played 2 caper seats or landed 3 correct war hits, and three such cycles lose it without a fight.",
+        "Defend above the baseline only when the attacker is scoring. Every defender hit costs 25,000; against an attacker who isn't landing hits the baseline holds on its own, and ties go to you. Watch the board and spend your hits on the blocks they are actually taking, before the blackout hides them.",
+      ],
+    },
+    {
       heading: "Succession",
       body: [
         "Any !crew command or family button keeps you marked active. A Boss who goes quiet doesn't freeze the family.",
@@ -508,7 +670,8 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "The family leaderboard",
       body: [
-        "!crew top ranks the top 10 families by XP or by war wins, plus your own family's rank. Each line shows the crest, [TAG] Name, level and members (and rackets held, with Turf). No vault and no family net worth is ever shown. !crew info <TAG> opens any family's public dashboard.",
+        "!crew top ranks the top 10 families by XP, by rackets held or by war wins, plus your own family's rank. Each line shows the crest, [TAG] Name, level, members and rackets held. No vault and no family net worth is ever shown. !crew info <TAG> opens any family's public dashboard.",
+        "The Rackets sort lists only families that hold at least one racket, so it never has more than 10 lines; a family with none has no Rackets rank. A war win counts when a family captures a racket, or defends one against an attacker who scored on at least 2 blocks (the same rule as the defence XP).",
       ],
     },
     {
@@ -522,12 +685,13 @@ const crimeFamilies: ModuleDoc = {
       ],
     },
   ],
-  commandIds: ["crew", "caper", "family"],
+  commandIds: ["crew", "caper", "turf", "family"],
   proTips: [
     "Treasury never reaches a wallet, even on disband. Deposit only what the family will spend on dues and level fees.",
     "\"!crew deposit all\" stops at the 25,000,000 daily cap, so it never refuses a big wallet.",
     "Leaving costs you 72 hours before you can join anyone and 14 days before you can return to the same family. Being kicked costs 24 hours.",
     "The Underboss can claim the chair after the Boss has been gone 7 days. Without an Underboss the chair waits for the 14-day automatic handover.",
+    "Racket bids come from earnings only. A family that spends its earnings on a level fee the day before a war can't bid on it.",
   ],
 };
 

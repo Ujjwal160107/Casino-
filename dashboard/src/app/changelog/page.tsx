@@ -16,6 +16,9 @@ import {
   Archive,
   Users,
   Landmark,
+  MapPin,
+  Gavel,
+  Crosshair,
 } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -44,6 +47,99 @@ export default async function ChangelogPage() {
         </p>
 
         <div className="mt-12 space-y-10">
+          {/* v2.2 — Turf */}
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-mono text-sm text-gold">v2.2</span>
+              <span className="font-mono text-sm text-muted">November 5, 2026</span>
+              <Tag color="gold">NEW SYSTEM</Tag>
+            </div>
+
+            <Panel className="mt-4 p-6">
+              <h2 className="font-display text-xl font-bold text-ink">
+                Turf: 10 rackets, weekly bidding and turf wars
+              </h2>
+              <p className="mt-2 leading-relaxed text-muted">
+                Crime families now fight over the city. Ten rackets pay
+                protection money into the family vault, and the only way to
+                take one is to win its weekly turf war. Rolling out to servers
+                in stages, after Crime Families.
+              </p>
+
+              <div className="mt-8 space-y-8">
+                <div>
+                  <div className="flex items-start gap-4">
+                    <MapPin className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        Rackets
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        <strong className="text-ink">!turf</strong> shows the
+                        turf map: four Corner, four District and two Crown
+                        rackets, all starting with the Street. An owned racket
+                        pays the family&apos;s earnings every 24 hours with no
+                        collecting, as long as at least 3 members are playing.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>300,000 / 650,000 / 1,300,000 a day</FeatureItem>
+                    <FeatureItem>District at family level 4, Crown at level 7</FeatureItem>
+                    <FeatureItem>Up to 3 rackets a family, 1 Crown</FeatureItem>
+                    <FeatureItem>3 neglected days hand a racket back to the Street</FeatureItem>
+                  </ul>
+                </div>
+
+                <div className="border-t border-line pt-8">
+                  <div className="flex items-start gap-4">
+                    <Gavel className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        Weekly bidding
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        Every racket has one war a week, and the Boss or
+                        Underboss bids from family earnings for the right to
+                        attack it. The top bid when bidding closes is burned
+                        when the war settles, win or lose.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>Opens 72 hours before the war, closes 1 hour before</FeatureItem>
+                    <FeatureItem>Floor of 7 days&apos; income: 2,100,000 to 9,100,000</FeatureItem>
+                    <FeatureItem>Each raise at least 10% over the top bid</FeatureItem>
+                    <FeatureItem>Outbid escrow goes straight back to earnings</FeatureItem>
+                  </ul>
+                </div>
+
+                <div className="border-t border-line pt-8">
+                  <div className="flex items-start gap-4">
+                    <Crosshair className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        Turf wars
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        A 60-minute fight over three blocks. Scout for each
+                        block&apos;s weak point, call it in your home channel,
+                        and land hits on the right approach. Win 2 of 3 blocks
+                        to take the racket; ties go to the defender.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>Free scouting every 5 minutes</FeatureItem>
+                    <FeatureItem>Hits cost 25,000, 6 per member per war</FeatureItem>
+                    <FeatureItem>+10 attacking, +12 defending per correct hit</FeatureItem>
+                    <FeatureItem>Scores go dark for the last 10 minutes</FeatureItem>
+                  </ul>
+                </div>
+              </div>
+            </Panel>
+          </div>
+
           {/* v2.1 — Crime Families and Capers */}
           <div>
             <div className="flex flex-wrap items-center gap-3">
