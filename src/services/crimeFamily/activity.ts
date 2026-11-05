@@ -22,6 +22,15 @@ export async function setNx(key: string, ttlSeconds: number): Promise<SetNxResul
   }
 }
 
+/** Deletes a setNx key early. Never throws: a Redis error leaves the key to its TTL. */
+export async function clearKey(key: string): Promise<void> {
+  try {
+    await redisService.getInstance().del(key);
+  } catch (err) {
+    console.error(`[crimeFamily] clearKey error for ${key}:`, err);
+  }
+}
+
 /** Records that a member acted now, at most once per activityThrottleSeconds. Never throws. */
 export async function touchActivity(uid: string, now: Date = new Date()): Promise<void> {
   try {

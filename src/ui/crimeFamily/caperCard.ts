@@ -5,7 +5,7 @@
 import type { Family } from "@prisma/client";
 import type { Client, GuildBasedChannel } from "discord.js";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
-import { buildCaperCardView } from "../../services/crimeFamily/caperQueries";
+import { buildCaperCardView, getCaper } from "../../services/crimeFamily/caperQueries";
 import { swapCaperMessage } from "../../services/crimeFamily/caperLobbyService";
 import { FamilyError } from "../../services/crimeFamily/tx";
 import { buildCaperCard, buildLobbyMoved } from "./caperScreens";
@@ -15,8 +15,9 @@ import { editChannelMessage, jumpLink, missingBotPermissions, sendToChannel } fr
 /**
  * Edits the stored card to the caper's current screen. A rejected edit is
  * retried once with the banner and `attachments: []` (C5); a dead board gets
- * one repost in the lobby channel. "skipped": no caper, no live board, or an
- * edit that kept failing without the board being dead.
+ * one repost in the lobby channel. "skipped": no caper, no live board, an
+ * edit that kept failing without the board being dead, or a repost another
+ * writer superseded.
  */
 export async function renderCaperCard(
   client: Client, caperId: string, opts: { note?: string | null; now?: Date } = {},
@@ -32,8 +33,8 @@ export async function renderCaperCard(
   if (!(await swapCaperMessage(caperId, view.messageId, { messageId: "" }))) return "skipped";
   const reposted = await sendToChannel(client, view.channelId, buildCaperCard(view, { art: true }));
   if (reposted === null) return "dead";
-  await swapCaperMessage(caperId, "", { messageId: reposted });
-  return "ok";
+  if (await swapCaperMessage(caperId, "", { messageId: reposted })) return "ok";
+  return (await settleLostPost(client, caperId, view.channelId, reposted)) ? "ok" : "skipped";
 }
 
 /** A debounced render for roster changes (14.3). */
@@ -52,10 +53,32 @@ export async function postCaperCard(client: Client, caperId: string, channelId: 
   if (!view) return null;
   const posted = await sendToChannel(client, channelId, buildCaperCard(view, { art: true }));
   if (posted === null) return null;
+  if (!(await swapCaperMessage(caperId, view.messageId, { channelId, messageId: posted }))) {
+    return (await settleLostPost(client, caperId, channelId, posted)) ? posted : null;
+  }
   if (view.messageId !== "") {
     await editChannelMessage(client, view.channelId, view.messageId, buildLobbyMoved(jumpLink(view.guildId, channelId, posted)));
   }
-  return (await swapCaperMessage(caperId, view.messageId, { channelId, messageId: posted })) ? posted : null;
+  return posted;
+}
+
+/**
+ * A message this writer posted whose board CAS lost: a board left dead adopts
+ * it, otherwise another writer owns the board and the post is edited to
+ * "Lobby moved" pointing there, so no live card is left untracked. True when
+ * the post became the board.
+ */
+async function settleLostPost(client: Client, caperId: string, channelId: string, posted: string): Promise<boolean> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const caper = await getCaper(caperId);
+    if (!caper) return false;
+    if (caper.messageId !== "") {
+      await editChannelMessage(client, channelId, posted, buildLobbyMoved(jumpLink(caper.guildId, caper.channelId, caper.messageId)));
+      return false;
+    }
+    if (await swapCaperMessage(caperId, "", { channelId, messageId: posted })) return true;
+  }
+  return false;
 }
 
 async function fetchGuildChannel(client: Client, channelId: string): Promise<GuildBasedChannel | null> {

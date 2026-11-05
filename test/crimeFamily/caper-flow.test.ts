@@ -5,6 +5,7 @@ import { planCaper, joinCaper } from "../../src/services/crimeFamily/caperLobbyS
 import { openBrief, lockChoice } from "../../src/services/crimeFamily/caperPlayService";
 import { parseAnswers } from "../../src/services/crimeFamily/intelRing";
 import { postCaperCard, renderCaperCard, requestCaperRender } from "../../src/ui/crimeFamily/caperCard";
+import { trailingRender } from "../../src/ui/crimeFamily/debounce";
 import { onSeatsChanged, runStart, resolveAndAnnounce, announceLobby } from "../../src/ui/crimeFamily/caperFlow";
 import { testPrisma, resetFamilies, ensureUniqueIndexes, flushTestKeys, seedEligibleUser } from "../helpers";
 import { caperCrew, seedLobby, fakeCaperClient, setCaperUpdatedAt, G, CH } from "./caperFixtures";
@@ -156,4 +157,69 @@ describe("caper card and flow (13.2, 8.4)", () => {
     expect(moved.payload.attachments).toEqual([]);
     expect(await caperRow(caper.id)).toMatchObject({ channelId: "c2", messageId: mid });
   });
+
+  // Another writer moves the board while this one is posting: send resolves only after the DB changed.
+  const raceSend = (fc: ReturnType<typeof fakeCaperClient>, channelId: string, caperId: string, board: { channelId: string; messageId: string }) => {
+    const send = fc.channel(channelId).send;
+    const real = send.getMockImplementation()!;
+    send.mockImplementationOnce(async (payload: any) => {
+      await testPrisma.caper.update({ where: { id: caperId }, data: board });
+      return real(payload);
+    });
+  };
+
+  it("!caper losing the board CAS leaves the old card alone and retires its own post to Lobby moved", async () => {
+    const { caper } = await seedLobby({ tier: 1, roles: ["MASTERMIND", "LOOKOUT"] });
+    await testPrisma.caper.update({ where: { id: caper.id }, data: { messageId: "m0" } });
+    const fc = fakeCaperClient();
+    raceSend(fc, "c2", caper.id, { channelId: CH, messageId: "r9" });       // a dead-board render reposted r9 first
+    expect(await postCaperCard(fc.client, caper.id, "c2")).toBeNull();
+    const posted = fc.sent[0];
+    expect(posted.channelId).toBe("c2");
+    expect(fc.edits.some((e) => e.messageId === "m0")).toBe(false);
+    expect(fc.edits).toHaveLength(1);
+    expect(fc.edits[0]).toMatchObject({ channelId: "c2", messageId: "m1" });
+    expect(text(fc.edits[0].payload)).toContain(`Lobby moved: https://discord.com/channels/${G}/${CH}/r9`);
+    expect(await caperRow(caper.id)).toMatchObject({ channelId: CH, messageId: "r9" });
+  });
+
+  it("!caper losing the CAS to a board marked dead adopts its post", async () => {
+    const { caper } = await seedLobby({ tier: 1, roles: ["MASTERMIND", "LOOKOUT"] });
+    await testPrisma.caper.update({ where: { id: caper.id }, data: { messageId: "m0" } });
+    const fc = fakeCaperClient();
+    raceSend(fc, "c2", caper.id, { channelId: CH, messageId: "" });         // a render marked m0 dead and its repost failed
+    const mid = await postCaperCard(fc.client, caper.id, "c2");
+    expect(mid).toBe("m1");
+    expect(fc.edits).toHaveLength(0);
+    expect(await caperRow(caper.id)).toMatchObject({ channelId: "c2", messageId: mid });
+  });
+
+  it("a dead-board repost that loses its CAS is retired and the render is skipped (Review Focus 4)", async () => {
+    const { caper } = await seedLobby({ tier: 1, roles: ["MASTERMIND", "LOOKOUT"] });
+    await testPrisma.caper.update({ where: { id: caper.id }, data: { messageId: "m0" } });
+    const fc = fakeCaperClient();
+    fc.editFailures.push({ code: 10008 });
+    raceSend(fc, CH, caper.id, { channelId: "c2", messageId: "p7" });       // !caper won "" → p7 in c2
+    expect(await renderCaperCard(fc.client, caper.id)).toBe("skipped");
+    expect(fc.sent.map((s) => s.channelId)).toEqual([CH]);
+    expect(fc.edits).toHaveLength(1);
+    expect(fc.edits[0]).toMatchObject({ channelId: CH, messageId: "m1" });
+    expect(text(fc.edits[0].payload)).toContain(`Lobby moved: https://discord.com/channels/${G}/c2/p7`);
+    expect(await caperRow(caper.id)).toMatchObject({ channelId: "c2", messageId: "p7" });
+  });
+
+  it("an event held just after a trailing render fires still gets its own render", async () => {
+    let renders = 0;
+    const render = async () => { renders++; };
+    const at = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    await trailingRender("t", "x", 1, render);          // t=0: renders, main held to 1.0
+    await at(100);
+    await trailingRender("t", "x", 1, render);          // t=0.1: held, trailing render at 1.1 (pending TTL to 2.1)
+    await at(1_100);
+    await trailingRender("t", "x", 1, render);          // t=1.2: main expired, renders, main held to 2.2
+    expect(renders).toBe(3);
+    await at(300);
+    await trailingRender("t", "x", 1, render);          // t=1.5: main held, pending cleared by the 1.1 render: schedules one
+    await vi.waitFor(() => expect(renders).toBe(4), { timeout: 2_000, interval: 50 });
+  }, 10_000);
 });
