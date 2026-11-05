@@ -194,6 +194,7 @@ function normalizeCommand(command: string, args: string[]) {
     "black-market": "market",
     blackmarket: "market",
     mob: "crew",
+    capers: "caper",
   } as Record<string, string>)[normalized] ?? normalized;
 }
 
@@ -567,6 +568,10 @@ export async function routeMessage(client: Client, message: Message, prefix: str
       const { handleCrew } = require("./commands/economy/crew");
       return handleCrew(message, args, prefix);
     }
+    case "caper": {
+      const { handleCaper } = require("./commands/economy/caper");
+      return handleCaper(message, args, prefix);
+    }
     case "crew-forcerename": {
       const { handleCrewForceRename } = require("./commands/economy/crew");
       return handleCrewForceRename(message, args);
@@ -628,7 +633,7 @@ export async function routeMessage(client: Client, message: Message, prefix: str
         "balance", "bank", "card", "mycards", "deposit", "withdraw", "transfer",
         "work", "crime", "beg", "slut", "rob", "shop", "inventory", "profile",
         "leaderboard", "bet", "blackjack", "coinflip", "slots", "cockfight", "roll",
-        "credit", "ask", "ask-money", "set-prefix", "help", "guide", "jobs", "education", "relax", "crew"
+        "credit", "ask", "ask-money", "set-prefix", "help", "guide", "jobs", "education", "relax", "crew", "caper"
       ];
 
       const thinkUrl = getEmoteUrl(Mascot.Emotes.Think) ?? undefined;

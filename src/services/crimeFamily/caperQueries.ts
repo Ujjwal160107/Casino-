@@ -31,6 +31,11 @@ export function liveSeatOf(userId: string): Promise<CaperCrew | null> {
   return prisma.caperCrew.findFirst({ where: { userId, liveSlot: "LIVE" } });
 }
 
+/** The family's most recently ended RESOLVED caper, or null (`!caper` reposts a dead result, C7). */
+export function latestResolvedCaper(familyId: string): Promise<Caper | null> {
+  return prisma.caper.findFirst({ where: { familyId, status: "RESOLVED" }, orderBy: { updatedAt: "desc" } });
+}
+
 /** The user's started seats since `since`, oldest first (the rolling seat cap). */
 export function startedSeatsSince(userId: string, since: Date): Promise<CaperCrew[]> {
   return prisma.caperCrew.findMany({

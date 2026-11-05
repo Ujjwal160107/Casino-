@@ -37,6 +37,9 @@ describe("slash registry", () => {
     ["crew", { action: "invite", target: "Bob" }, ["invite", "Bob"]],
     ["crew", { action: "deposit", target: "5m" }, ["deposit", "5m"]],
     ["crew", {}, []],
+    ["caper", { action: "join", value: "lookout" }, ["join", "lookout"]],
+    ["caper", { action: "plan", value: "2" }, ["plan", "2"]],
+    ["caper", {}, []],
   ] as const)("/%s %o serialises to the handler's args", (name, values, expected) => {
     expect(argsFor(name, values as any)).toEqual(expected);
   });

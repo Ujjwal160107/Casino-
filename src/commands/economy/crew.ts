@@ -153,7 +153,7 @@ export const CREW_SUBACTIONS: Readonly<Record<string, (ctx: CrewCtx) => Promise<
 };
 
 /** Runs one subaction; a FamilyError or a short wallet is a public one-line refusal. */
-async function replyOrRefuse(message: Message, run: () => Promise<unknown>): Promise<unknown> {
+export async function replyOrRefuse(message: Message, run: () => Promise<unknown>): Promise<unknown> {
   try {
     return await run();
   } catch (err) {

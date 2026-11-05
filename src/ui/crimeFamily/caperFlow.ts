@@ -3,6 +3,7 @@
 // reminders, the settle timer), cancel and resolve. Service refusals
 // propagate; Discord failures are logged and never thrown, so a dead channel
 // never stops the money or the DMs.
+import type { Caper } from "@prisma/client";
 import type { Client } from "discord.js";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { caperRole, caperTier, type CaperRoleKey, type CaperTierDef } from "../../data/crimeFamilyCatalog";
@@ -13,11 +14,11 @@ import { enqueueReminder } from "../../services/cooldownReminderService";
 import { getOwnedPrepKeys } from "../../services/crimeService";
 import { caperGoNotice, caperLobbyNotice, notifyMany } from "../../services/dmNoticeService";
 import { buildCaperCardView, cancelledLobbySince, getCaper, listCrew, startedSeatsSince } from "../../services/crimeFamily/caperQueries";
-import { cancelCaper, startCaper, type StartBy, type StartResult } from "../../services/crimeFamily/caperLobbyService";
+import { cancelCaper, leaveCaper, planCaper, startCaper, type StartBy, type StartResult } from "../../services/crimeFamily/caperLobbyService";
 import { processBootedAt, resolveCaper, type ResolveResult } from "../../services/crimeFamily/caperSettleService";
 import { checkMemberEligibility } from "../../services/crimeFamily/eligibility";
-import { listMembers } from "../../services/crimeFamily/familyQueries";
-import { renderCaperCard, requestCaperRender } from "./caperCard";
+import { listMembers, requireMembership } from "../../services/crimeFamily/familyQueries";
+import { pickLobbyChannel, postCaperCard, renderCaperCard, requestCaperRender } from "./caperCard";
 import { buildGoCall } from "./caperScreens";
 import { jumpLink, sendToChannel } from "./post";
 
@@ -90,6 +91,22 @@ export async function announceLobby(client: Client, caperId: string, now: Date =
   return ids;
 }
 
+/**
+ * Plans a lobby from `channelId` (or the family's home channel, edge 75),
+ * posts its card there and sends the lobby DMs in the background. `posted` is
+ * null when the card could not be sent; `!caper` reposts it.
+ */
+export async function openLobby(
+  client: Client, input: { uid: string; tier: number; guildId: string; channelId: string },
+): Promise<{ caper: Caper; channelId: string; posted: string | null }> {
+  const { family } = await requireMembership(input.uid);
+  const channelId = await pickLobbyChannel(client, input.channelId, family);
+  const caper = await planCaper({ uid: input.uid, tier: input.tier, guildId: input.guildId, channelId });
+  const posted = await postCaperCard(client, caper.id, channelId);
+  void announceLobby(client, caper.id).catch((err) => console.error("[crimeFamily] caper lobby DMs failed:", err));
+  return { caper, channelId, posted };
+}
+
 /** After a Start committed: S13, the S28 GO call, the GO DMs, the seat-free reminders and the settle timer (C8). */
 async function announceStart(client: Client, caperId: string, pinched: string[], now: Date): Promise<void> {
   const note = pinched.length > 0 ? `Pinched at Start: ${pinched.map(mention).join(", ")} (stake refunded)` : null;
@@ -131,6 +148,14 @@ export async function runStart(client: Client, caperId: string, by: StartBy, now
 export async function onSeatsChanged(client: Client, caperId: string, full: boolean, now: Date = new Date()): Promise<void> {
   if (full) await runStart(client, caperId, { kind: "auto" }, now);
   else await safely("caper roster render", () => requestCaperRender(client, caperId));
+}
+
+/** Leaves the lobby (the seat is refunded; the planner leaving cancels it) and redraws the card. */
+export async function runLeave(client: Client, caperId: string, uid: string, now: Date = new Date()): Promise<{ cancelled: boolean }> {
+  const result = await leaveCaper(caperId, uid, now);
+  if (result.cancelled) await safely("caper cancel render", () => renderCaperCard(client, caperId, { now }));
+  else await safely("caper roster render", () => requestCaperRender(client, caperId));
+  return result;
 }
 
 /** Cancels the lobby (refunds every stake) and draws the cancelled card. */

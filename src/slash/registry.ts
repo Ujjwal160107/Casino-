@@ -247,6 +247,16 @@ export const SPECS: Spec[] = [
             { kind: "str", name: "target", desc: "Player, tag or amount, when the action needs one", required: false },
         ],
     },
+    {
+        name: "caper", desc: "Family capers: plan, join and play the crew heist",
+        opts: [
+            {
+                kind: "str", name: "action", desc: "What to do -- leave blank to view", required: false,
+                choices: ["plan", "join", "leave", "start", "cancel", "brief"],
+            },
+            { kind: "str", name: "value", desc: "Tier 1-4 for plan, a role for join", required: false },
+        ],
+    },
 ];
 
 /** Turn a spec into the Discord command definition. */

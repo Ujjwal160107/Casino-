@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { routeMessage } from "../../src/commandRouter";
 import { fakeMessage, replyText } from "./fakeMessage";
-import { seedEligibleUser, seedFamily, resetFamilies, withCfConfig } from "../helpers";
+import { seedEligibleUser, seedFamily, resetFamilies, withCfConfig, testPrisma } from "../helpers";
+import { seedRunning, seedLobby } from "../crimeFamily/caperFixtures";
 
 beforeEach(resetFamilies);
 
@@ -41,6 +42,25 @@ describe("!crew routing", () => {
       const other = fakeMessage("!crew", { authorId: u, guildId: "g1" });
       await routeMessage({} as any, other.message, "!");
       expect(replyText(other.reply.mock.calls[0][0])).toContain("Crime Families are not open in this server yet.");
+    });
+  });
+  it("a jailed member can open the caper brief but cannot join (13.1)", async () => {
+    await withCfConfig({ enabled: true }, async () => {
+      const run = await seedRunning({ tier: 1, roles: ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] });
+      await testPrisma.user.update({ where: { discordId: run.ids.LOOKOUT }, data: { isJailed: true, jailReleaseTime: new Date(Date.now() + 3_600_000) } });
+      const brief = fakeMessage("!caper brief", { authorId: run.ids.LOOKOUT, guildId: "g1" });
+      await routeMessage({} as any, brief.message, "!");
+      expect(replyText(brief.reply.mock.calls[0][0])).toContain(`cpr:open:brief:${run.caper.id}:${run.ids.LOOKOUT}`);
+    });
+    await resetFamilies();
+    await withCfConfig({ enabled: true }, async () => {
+      const lobby = await seedLobby({ tier: 1, roles: ["MASTERMIND", "LOOKOUT"] });
+      const extra = await seedEligibleUser({ wallet: 3_000_000, prepKeys: ["mechanic_toolkit"], jailedUntil: new Date(Date.now() + 3_600_000) });
+      await testPrisma.familyMember.create({ data: { familyId: lobby.family.id, userId: extra, role: "SOLDIER", roleSlot: extra, seat: 9, joinedAt: new Date(Date.now() - 10 * 864e5) } });
+      const join = fakeMessage("!caper join safecracker", { authorId: extra, guildId: "g1" });
+      await routeMessage({} as any, join.message, "!");
+      expect(replyText(join.reply.mock.calls[0][0])).toMatch(/jail/i);
+      expect(await testPrisma.caperCrew.count({ where: { userId: extra } })).toBe(0);
     });
   });
 });

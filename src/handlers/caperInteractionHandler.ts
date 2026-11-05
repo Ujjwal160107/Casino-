@@ -4,13 +4,11 @@
 // module. A press on a shared card never sends a locally built card: the card
 // writer edits the stored message.
 import type { CaperRoleKey } from "../data/crimeFamilyCatalog";
-import { joinCaper, leaveCaper, planCaper } from "../services/crimeFamily/caperLobbyService";
+import { joinCaper } from "../services/crimeFamily/caperLobbyService";
 import { lockChoice, openBrief } from "../services/crimeFamily/caperPlayService";
 import { buildPlannerView } from "../services/crimeFamily/caperQueries";
-import { requireMembership } from "../services/crimeFamily/familyQueries";
 import { FamilyError } from "../services/crimeFamily/tx";
-import { pickLobbyChannel, postCaperCard, renderCaperCard, requestCaperRender } from "../ui/crimeFamily/caperCard";
-import { announceLobby, onSeatsChanged, resolveAndAnnounce, runCancel, runStart } from "../ui/crimeFamily/caperFlow";
+import { onSeatsChanged, openLobby, resolveAndAnnounce, runCancel, runLeave, runStart } from "../ui/crimeFamily/caperFlow";
 import { buildBrief, buildCaperPlanner } from "../ui/crimeFamily/caperScreens";
 import { buildNotice, type CfPayload } from "../ui/crimeFamily/kit";
 import { jumpLink } from "../ui/crimeFamily/post";
@@ -31,12 +29,9 @@ function assertOpen(i: CfInteraction): void {
 
 const planRoute: CfRoute = async (i) => {
   assertOpen(i);
-  const uid = i.user.id;
-  const { family } = await requireMembership(uid);
-  const channelId = await pickLobbyChannel(i.client, i.channelId ?? "", family);
-  const caper = await planCaper({ uid, tier: Number(values(i)[0]), guildId: i.guildId ?? "", channelId });
-  const posted = await postCaperCard(i.client, caper.id, channelId);
-  void announceLobby(i.client, caper.id).catch((err) => console.error("[crimeFamily] caper lobby DMs failed:", err));
+  const { caper, channelId, posted } = await openLobby(i.client, {
+    uid: i.user.id, tier: Number(values(i)[0]), guildId: i.guildId ?? "", channelId: i.channelId ?? "",
+  });
   await show(i, buildNotice(posted
     ? `Lobby posted: ${jumpLink(caper.guildId, channelId, posted)}`
     : "Lobby opened, but the card could not be posted. Use `!caper` to post it."));
@@ -46,12 +41,6 @@ const joinRoute: CfRoute = async (i, [caperId]) => {
   assertOpen(i);
   const { full } = await joinCaper({ caperId, uid: i.user.id, role: values(i)[0] as CaperRoleKey, guildId: i.guildId });
   await onSeatsChanged(i.client, caperId, full);
-};
-
-const leaveRoute: CfRoute = async (i, [caperId]) => {
-  const { cancelled } = await leaveCaper(caperId, i.user.id);
-  if (cancelled) await renderCaperCard(i.client, caperId);
-  else await requestCaperRender(i.client, caperId);
 };
 
 const startRoute: CfRoute = async (i, [caperId]) => {
@@ -69,7 +58,7 @@ export const CAPER_ROUTES: CfRouteTable = {
   "v:plan": owner(async (i) => show(i, buildCaperPlanner(await buildPlannerView(i.user.id, new Date()), { art: true, ephemeral: true }))),
   plan: owner(planRoute),
   join: shared("update", joinRoute),
-  leave: shared("update", leaveRoute),
+  leave: shared("update", async (i, [caperId]) => { await runLeave(i.client, caperId, i.user.id); }),
   start: shared("update", startRoute),
   cancel: shared("update", (i, [caperId]) => runCancel(i.client, caperId, i.user.id)),
   brief: shared("auto", async (i, [caperId]) => show(i, buildBrief(await openBrief(caperId, i.user.id)))),
