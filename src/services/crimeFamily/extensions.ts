@@ -28,13 +28,13 @@ export interface FamilyHook {
   onDisband?(tx: Prisma.TransactionClient, ctx: { familyId: string; now: Date }): Promise<void>;
   /** What onDisband would add to earnings (plan 3 escrow). */
   disbandPreview?(familyId: string): Promise<{ returnedToEarnings: number }>;
-  /** Plan 3; with no provider, views show no racket count (P23). */
-  racketsHeld?(familyIds: string[]): Promise<Map<string, number>>;
+  /** Plan 3; with no provider, or a provider returning null, views show no racket count (P23). */
+  racketsHeld?(familyIds: string[]): Promise<Map<string, number> | null>;
 }
 
 export const FAMILY_HOOKS: FamilyHook[] = [CAPER_FAMILY_HOOK, TURF_FAMILY_HOOK];
 
-/** Rackets held per family from the first hook that provides them, or null when none does. */
+/** Rackets held per family from the first hook that provides them, or null when none does (or it is switched off). */
 export async function racketsHeldFor(familyIds: string[]): Promise<Map<string, number> | null> {
   const provider = FAMILY_HOOKS.find((h) => h.racketsHeld);
   return provider?.racketsHeld ? provider.racketsHeld(familyIds) : null;

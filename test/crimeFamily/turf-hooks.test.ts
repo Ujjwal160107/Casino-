@@ -3,7 +3,8 @@ import { isActiveMember } from "../../src/services/crimeFamily/eligibility";
 import { leaveFamily, kickMember } from "../../src/services/crimeFamily/membershipService";
 import { disbandFamily, previewDisband } from "../../src/services/crimeFamily/disbandService";
 import { getLeaderboard } from "../../src/services/crimeFamily/leaderboard";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedContribution, seedWarHits } from "../helpers";
+import { buildDashboardView } from "../../src/services/crimeFamily/familyQueries";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedContribution, seedWarHits, withCfConfig } from "../helpers";
 
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "FamilyInvite", "Racket", "War", "WarContribution"]));
 beforeEach(resetFamilies);
@@ -56,15 +57,41 @@ describe("turf entries in plan 1's registries", () => {
     expect((await testPrisma.familyLedger.findFirst({ where: { familyId: f.id, type: "disband_burn" } }))!.amount).toBe(-2_101_000);
   });
 
-  it("racket counts feed the dashboard and the Rackets sort (10.4, P23)", async () => {
+  it("disband as a top bidder in arrears: the refund pays no dues, so the S22 preview is exactly what is paid and burned (6.4)", async () => {
+    const boss = await seedEligibleUser(); const s = await seedEligibleUser();
+    const f = await seedFamily({ bossId: boss, tag: "ARR", duesArrears: 2, lastPaydayAt: daysAgo(8), members: [{ userId: s, role: "SOLDIER", joinedAt: daysAgo(10) }] });
+    for (const uid of [boss, s]) await seedWarHits(uid, f.id, 3);
+    await seedWar({ racketKey: "docks_numbers", status: "BIDDING", topBid: 2_100_000, topBidderFamilyId: f.id });
+    const preview = await previewDisband(f.id);
+    expect(preview).toMatchObject({ finalPayday: { count: 2, split: { gross: 1_000_000 } }, burnTreasury: 0, burnEarnings: 100_000 });
+    const r = await disbandFamily(boss, "ARR");
+    expect(r.split).toEqual(preview.finalPayday!.split);
+    expect(r.burned).toBe(preview.burnTreasury + preview.burnEarnings);
+    expect(await testPrisma.familyLedger.count({ where: { familyId: f.id, type: "dues" } })).toBe(0);
+  });
+
+  it("racket counts feed the dashboard and the Rackets sort while turf is on (10.4, P23)", async () => {
     const a = await seedFamily({ bossId: await seedEligibleUser() });
     const b = await seedFamily({ bossId: await seedEligibleUser() });
     const none = await seedFamily({ bossId: await seedEligibleUser() });
     await seedRacket("pawn_row", { ownerFamilyId: a.id }); await seedRacket("docks_numbers", { ownerFamilyId: a.id }); await seedRacket("valet_racket", { ownerFamilyId: b.id });
-    const v = await getLeaderboard("rk", none.id);
-    expect(v.rows.map((r) => [r.familyId, r.value, r.rackets])).toEqual([[a.id, 2, 2], [b.id, 1, 1]]);
-    expect(v.viewer).toBeNull();
-    expect(v.sorts.map((s) => s.key)).toEqual(["xp", "rk", "war"]);
+    await withCfConfig({ turfEnabled: true }, async () => {
+      const v = await getLeaderboard("rk", none.id);
+      expect(v.rows.map((r) => [r.familyId, r.value, r.rackets])).toEqual([[a.id, 2, 2], [b.id, 1, 1]]);
+      expect(v.viewer).toBeNull();
+      expect(v.sorts.map((s) => s.key)).toEqual(["xp", "rk", "war"]);
+      expect((await buildDashboardView(a.id, a.bossId, new Date())).racketsHeld).toBe(2);
+    });
+  });
+
+  it("with turf off no racket count shows and the Rackets tab is gone; an rk key falls back to XP (P23)", async () => {
+    const a = await seedFamily({ bossId: await seedEligibleUser(), xp: 5 });
+    await seedRacket("pawn_row", { ownerFamilyId: a.id });
+    const v = await getLeaderboard("rk", a.id);
+    expect(v.sort).toBe("xp");
+    expect(v.sorts.map((s) => s.key)).toEqual(["xp", "war"]);
+    expect(v.rows.map((r) => [r.familyId, r.value, r.rackets])).toEqual([[a.id, 5, null]]);
+    expect((await buildDashboardView(a.id, a.bossId, new Date())).racketsHeld).toBeNull();
   });
 
   it("the registry import cycle resolves from either entry point (T12)", async () => {
@@ -81,6 +108,6 @@ describe("turf entries in plan 1's registries", () => {
     const ext3 = await import("../../src/services/crimeFamily/extensions");
     expect(lb.LEADERBOARD_SORTS.every(Boolean) && ext3.ACTIVITY_RULES.every(Boolean) && ext3.FAMILY_HOOKS.every(Boolean)).toBe(true);
     const src = (await import("fs")).readFileSync("src/services/crimeFamily/turfLeaderboard.ts", "utf8");
-    expect(src.match(/^import (?!type ).*$/gm)!.every((l) => /utils\/prisma/.test(l))).toBe(true);   // only prisma, so turfHooks is reachable only through extensions
+    expect(src.match(/^import (?!type ).*$/gm)!.every((l) => /utils\/(prisma|economyConfig)"/.test(l))).toBe(true);   // only leaves, so turfHooks is reachable only through extensions
   });
 });

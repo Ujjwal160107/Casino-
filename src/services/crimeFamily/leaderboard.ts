@@ -11,6 +11,8 @@ export interface LeaderboardSort {
   label: string;
   top(limit: number): Promise<{ familyId: string; value: number }[]>;
   rankOf(familyId: string): Promise<{ rank: number; value: number } | null>;
+  /** Omitted means always shown; false hides the tab and its key falls back to the default sort. */
+  enabled?(): boolean;
 }
 
 const TOP_FAMILIES = 10;
@@ -47,9 +49,10 @@ export const LEADERBOARD_SORTS: LeaderboardSort[] = [
   columnSort("war", "War wins", "warWins"),
 ];
 
-/** S10: the top families by sortKey (unknown keys fall back to the first sort) and the viewer's family rank. */
+/** S10: the top families by sortKey (unknown or disabled keys fall back to the first sort) and the viewer's family rank. */
 export async function getLeaderboard(sortKey: string, viewerFamilyId: string | null): Promise<LeaderboardView> {
-  const sort = LEADERBOARD_SORTS.find((s) => s.key === sortKey) ?? LEADERBOARD_SORTS[0];
+  const sorts = LEADERBOARD_SORTS.filter((s) => s.enabled?.() ?? true);
+  const sort = sorts.find((s) => s.key === sortKey) ?? sorts[0];
   const top = await sort.top(TOP_FAMILIES);
   const ids = top.map((t) => t.familyId);
   const [families, counts, rackets, viewer] = await Promise.all([
@@ -62,7 +65,7 @@ export async function getLeaderboard(sortKey: string, viewerFamilyId: string | n
   const members = new Map(counts.map((c) => [c.familyId, c._count._all]));
   return {
     sort: sort.key,
-    sorts: LEADERBOARD_SORTS.map((s) => ({ key: s.key, label: s.label })),
+    sorts: sorts.map((s) => ({ key: s.key, label: s.label })),
     rows: top.flatMap((t, i) => {
       const f = byId.get(t.familyId);
       if (!f) return [];

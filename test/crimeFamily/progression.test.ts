@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { levelUp, awardFamilyXp } from "../../src/services/crimeFamily/progression";
 import { getLeaderboard } from "../../src/services/crimeFamily/leaderboard";
 import { runFamilyTx } from "../../src/services/crimeFamily/tx";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, withCfConfig } from "../helpers";
 
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember"]));
 beforeEach(resetFamilies);
@@ -48,10 +48,10 @@ describe("XP and leaderboard (10.2, 10.4)", () => {
       .toMatchObject({ actorId: "u1", amount: 0, treasuryAfter: 7, earningsAfter: 9, meta: { xp: 150, source: "caper_t1_clean", caperId: "c" } });
   });
 
-  it("ranks the top 10 by XP and gives the viewer's rank outside it", async () => {
+  it("ranks the top 10 by XP and gives the viewer's rank outside it (turf on: racket counts and the Rackets tab)", async () => {
     const fams = [];
     for (let x = 1; x <= 12; x++) fams.push(await seedFamily({ bossId: await seedEligibleUser(), xp: x }));
-    const v = await getLeaderboard("xp", fams[0].id);
+    const v = await withCfConfig({ turfEnabled: true }, () => getLeaderboard("xp", fams[0].id));
     expect(v.rows).toHaveLength(10);
     expect(v.rows[0]).toMatchObject({ rank: 1, familyId: fams[11].id, value: 12, level: 1, members: 1, rackets: 0 });
     expect(v.viewer).toEqual({ rank: 12, value: 1 });

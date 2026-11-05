@@ -2,7 +2,7 @@
 // payday activity (7.3), a live war blocks leaving, kicks and disband, a
 // disbanding top bidder gets its escrow back into earnings (burned with the
 // vault) and its rackets go to the Street (6.4), and racket counts feed the
-// dashboard and leaderboard (10.4).
+// dashboard and leaderboard (10.4) while turf is on.
 // No top-level calls, and only extensions.ts imports this file (T12): the cycle
 // extensions → turfHooks → vaultService → familyQueries → extensions is safe
 // because every use is at call time. Never import membershipService or
@@ -56,7 +56,7 @@ export const TURF_FAMILY_HOOK: FamilyHook = {
         data: { topBid: 0, topBidderFamilyId: "" },
       });
       if (count !== 1) throw new VaultBusy();
-      await creditEarnings(tx, familyId, war.topBid, "bid_refund", "system", { warId: war.id, reason: "disband" });
+      await creditEarnings(tx, familyId, war.topBid, "bid_refund", "system", { warId: war.id, reason: "disband" }, { retryArrears: false });
     }
     await tx.racket.updateMany({ where: { ownerFamilyId: familyId }, data: { ownerFamilyId: "", neglectStrikes: 0, lastPayoutAt: now } });
   },
@@ -67,6 +67,7 @@ export const TURF_FAMILY_HOOK: FamilyHook = {
   },
 
   async racketsHeld(familyIds) {
+    if (!CRIME_FAMILY_CONFIG.turfEnabled) return null;   // no turf, no rackets shown (P23)
     const rows = await prisma.racket.groupBy({ by: ["ownerFamilyId"], where: { ownerFamilyId: { in: familyIds } }, _count: { _all: true } });
     const held = new Map(rows.map((r) => [r.ownerFamilyId, r._count._all]));
     return new Map(familyIds.map((id) => [id, held.get(id) ?? 0]));

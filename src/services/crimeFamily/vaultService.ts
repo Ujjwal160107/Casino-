@@ -81,10 +81,14 @@ export async function retryArrears(tx: Prisma.TransactionClient, familyId: strin
   return true;
 }
 
-/** Adds to the family's earnings (and XP, P13), then retries any dues arrears. */
+/**
+ * Adds to the family's earnings (and XP, P13), then retries any dues arrears
+ * unless opts.retryArrears is false (a disband refund: the family is about to
+ * be deleted, and previewDisband never collects arrears).
+ */
 export async function creditEarnings(
   tx: Prisma.TransactionClient, familyId: string, amount: number, type: LedgerType, actorId: string,
-  meta: Record<string, unknown>, opts: { xp?: number } = {},
+  meta: Record<string, unknown>, opts: { xp?: number; retryArrears?: boolean } = {},
 ): Promise<{ earningsAfter: number; arrearsCleared: boolean }> {
   const xp = opts.xp ?? 0;
   const family = await tx.family.update({
@@ -95,7 +99,7 @@ export async function creditEarnings(
     familyId, actorId, type, amount, treasuryAfter: family.treasury, earningsAfter: family.earnings,
     meta: opts.xp !== undefined ? { ...meta, xp } : meta,
   });
-  const arrearsCleared = await retryArrears(tx, familyId, actorId);
+  const arrearsCleared = opts.retryArrears !== false && await retryArrears(tx, familyId, actorId);
   if (!arrearsCleared) return { earningsAfter: family.earnings, arrearsCleared };
   const after = await tx.family.findUniqueOrThrow({ where: { id: familyId }, select: { earnings: true } });
   return { earningsAfter: after.earnings, arrearsCleared };
