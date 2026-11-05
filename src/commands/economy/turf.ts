@@ -21,6 +21,7 @@ import { isTurfOpen } from "../../utils/economyConfig";
 import { fmtFortunes } from "../../utils/format";
 import { replyOrRefuse, type CrewCtx } from "./crew";
 
+const TITLE = "Turf";
 const unix = (d: Date) => Math.floor(d.getTime() / 1000);
 const show = (ctx: CrewCtx, payload: CfPayload) => ctx.message.reply(payload);
 
@@ -77,12 +78,12 @@ export const TURF_SUBACTIONS: Readonly<Record<"map" | "racket" | "bid" | "war", 
  */
 export async function handleTurf(message: Message, args: string[], prefix = "!"): Promise<unknown> {
   if (!message.guildId) return undefined;
-  if (!isTurfOpen(message.guildId)) return message.reply(v2Quiet(errorContainer("Turf", TURF_NOT_OPEN_HERE)));
+  if (!isTurfOpen(message.guildId)) return message.reply(v2Quiet(errorContainer(TITLE, TURF_NOT_OPEN_HERE)));
   const uid = message.author.id;
   void touchActivity(uid);
   const first = args[0]?.toLowerCase() ?? "map";
   const isSub = Object.prototype.hasOwnProperty.call(TURF_SUBACTIONS, first);
   const run = isSub ? TURF_SUBACTIONS[first as keyof typeof TURF_SUBACTIONS] : racket;
   const ctx: CrewCtx = { message, args: isSub ? args.slice(1) : args, uid, guildId: message.guildId, channelId: message.channelId, prefix };
-  return replyOrRefuse(message, () => run(ctx));
+  return replyOrRefuse(message, () => run(ctx), TITLE);
 }

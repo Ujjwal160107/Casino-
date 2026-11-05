@@ -170,7 +170,10 @@ export interface CaperPlannerView {
 }
 
 /** T8: one home-channel war board, stored in `War.boards` so it is edited by id without a fetch. */
-export type WarBoardRef = { side: "ATK" | "DEF"; guildId: string; channelId: string; messageId: string; hasBanner: boolean; dead: boolean };
+/** `reposted` is set once the board's one repost (edge 28) is spent; absent on refs stored before it existed. */
+export type WarBoardRef = {
+  side: "ATK" | "DEF"; guildId: string; channelId: string; messageId: string; hasBanner: boolean; dead: boolean; reposted?: boolean;
+};
 
 /** S16, S17: one racket as the map shows it. */
 export interface TurfRacketLine {

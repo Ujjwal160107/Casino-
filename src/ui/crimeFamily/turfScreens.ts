@@ -117,7 +117,7 @@ export function buildRacketDetail(ownerId: string, v: RacketDetailView, note?: s
   ];
   const hint = note ?? (v.blockers[0]
     ? `-# ${v.blockers[0]}`
-    : "-# Bids come from family earnings only (never the treasury) and are burned when the war settles, win or lose.");
+    : "-# Bids come from family earnings only (never the treasury). An outbid bid or a called-off war is refunded; the winning bid burns when the war settles, win or lose.");
   container
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(text(details.join("\n")), text(hint))

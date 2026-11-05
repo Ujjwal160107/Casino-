@@ -49,6 +49,19 @@ describe("turf announcer", () => {
     expect(broken.calls.slice(before).every((x) => x.channelId === "ch-a")).toBe(true);
   });
 
+  it("a board deleted again after its one successful repost is marked dead without a second repost (edge 28)", async () => {
+    const { a, d } = await sides();
+    const w = await seedWar({ racketKey: "docks_numbers", status: "ACTIVE", topBid: 2_100_000, topBidderFamilyId: a.f.id, defenderFamilyId: d.f.id });
+    await syncWarBoards(fakeClient().client, w.id, new Date(), { force: true });
+    const deleted = fakeClient({ failEdit: new Set(["ch-d"]) });
+    await syncWarBoards(deleted.client, w.id, new Date(), { force: true });
+    expect(deleted.calls.filter((x) => x.op === "send" && x.channelId === "ch-d")).toHaveLength(1);    // the one repost
+    expect((await boards(w.id)).find((b) => b.side === "DEF")).toMatchObject({ dead: false });
+    await syncWarBoards(deleted.client, w.id, new Date(), { force: true });
+    expect(deleted.calls.filter((x) => x.op === "send" && x.channelId === "ch-d")).toHaveLength(1);    // no second repost
+    expect((await boards(w.id)).find((b) => b.side === "DEF")).toMatchObject({ dead: true, messageId: "" });
+  });
+
   it("a first post that fails gets one more try on the next sync, then the board is dead (edge 28)", async () => {
     const { a, d } = await sides();
     const w = await seedWar({ racketKey: "docks_numbers", status: "ACTIVE", topBid: 2_100_000, topBidderFamilyId: a.f.id, defenderFamilyId: d.f.id });

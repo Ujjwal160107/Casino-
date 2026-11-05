@@ -21,6 +21,16 @@ describe("!turf (13.1)", () => {
     expect(await run("!turf", await seedEligibleUser())).toContain("Turf wars are not open in this server yet.");
   });
 
+  it("every turf refusal is titled Turf, closed or not (one title for the command)", async () => {
+    const u = await seedEligibleUser();
+    expect(await run("!turf", u)).toContain("## Turf\\n");
+    await withCfConfig(ON, async () => {
+      const bad = await run("!turf racket casino", u);
+      expect(bad).toContain("## Turf\\n");
+      expect(bad).not.toContain("Crime Families");
+    });
+  });
+
   it("racket <key|n> posts an opener; an unknown key lists keys (Review Focus 2)", async () => {
     await withCfConfig(ON, async () => {
       const u = await seedEligibleUser();

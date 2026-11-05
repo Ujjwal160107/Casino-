@@ -38,10 +38,11 @@ export const TURF_FAMILY_HOOK: FamilyHook = {
       const active = await tx.war.findFirst({ where: { status: "ACTIVE", OR: involving(familyId) }, select: { id: true } });
       if (active) return "No kicks during an active turf war.";
     }
-    const fought = await tx.warContribution.findMany({ where: { userId }, select: { warId: true } });
-    if (fought.length === 0) return null;
-    const live = await tx.war.count({ where: { id: { in: fought.map((c) => c.warId) }, status: { in: LIVE } } });
-    return live > 0 ? "Members who fought in a live turf war stay until it resolves." : null;
+    // The family's live wars first, then a [warId, userId] index hit, not a scan of the member's war history.
+    const live = await tx.war.findMany({ where: { status: { in: LIVE }, OR: involving(familyId) }, select: { id: true } });
+    if (live.length === 0) return null;
+    const fought = await tx.warContribution.count({ where: { warId: { in: live.map((w) => w.id) }, userId } });
+    return fought > 0 ? "Members who fought in a live turf war stay until it resolves." : null;
   },
 
   async disbandBlock(tx, familyId) {

@@ -152,16 +152,16 @@ export const CREW_SUBACTIONS: Readonly<Record<string, (ctx: CrewCtx) => Promise<
   claim,
 };
 
-/** Runs one subaction; a FamilyError or a short wallet is a public one-line refusal. */
-export async function replyOrRefuse(message: Message, run: () => Promise<unknown>): Promise<unknown> {
+/** Runs one subaction; a FamilyError or a short wallet is a public one-line refusal titled `title`. */
+export async function replyOrRefuse(message: Message, run: () => Promise<unknown>, title = TITLE): Promise<unknown> {
   try {
     return await run();
   } catch (err) {
     if (err instanceof FamilyError || err instanceof InsufficientFundsError) {
-      return message.reply(v2Quiet(errorContainer(TITLE, err.message)));
+      return message.reply(v2Quiet(errorContainer(title, err.message)));
     }
     console.error(`[crimeFamily] ${message.content} failed:`, err);
-    return message.reply(v2Quiet(errorContainer(TITLE, "Something went wrong.")));
+    return message.reply(v2Quiet(errorContainer(title, "Something went wrong.")));
   }
 }
 

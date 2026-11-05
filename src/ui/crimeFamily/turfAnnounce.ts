@@ -52,18 +52,21 @@ async function postBoard(client: Client, channelId: string, view: WarBoardView):
 
 /**
  * One side's board after this sync (edge 28): a first post; a failed first
- * post or a dead edit gets exactly one repost, after which the board is dead
- * and never touched again. An edit keeps the gallery only when the message
- * holds the banner, and sends no files (T8).
+ * post or a dead edit gets exactly one repost per board, after which a failed
+ * repost or a later dead edit leaves the board dead and never touched again.
+ * An edit keeps the gallery only when the message holds the banner, and sends
+ * no files (T8).
  */
 async function syncBoard(client: Client, ref: WarBoardRef, view: WarBoardView): Promise<WarBoardRef> {
   if (ref.dead) return ref;
+  const dead: WarBoardRef = { ...ref, messageId: "", dead: true };
   if (ref.messageId !== "") {
     const edited = await editChannelMessage(client, ref.channelId, ref.messageId, buildWarBoard(view, ref.hasBanner ? "keep" : "none"));
     if (edited !== "dead") return ref;
+    if (ref.reposted) return dead;
   }
   const posted = await postBoard(client, ref.channelId, view);
-  return posted ? { ...ref, ...posted } : { ...ref, messageId: "", dead: true };
+  return posted ? { ...ref, ...posted, reposted: true } : dead;
 }
 
 /**
