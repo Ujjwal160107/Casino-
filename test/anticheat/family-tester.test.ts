@@ -6,7 +6,9 @@ import { createFamily } from "../../src/services/crimeFamily/familyService";
 import { depositToVault } from "../../src/services/crimeFamily/vaultService";
 import { executePayday } from "../../src/services/crimeFamily/paydayService";
 import { ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
+import { planCaper, cancelCaper } from "../../src/services/crimeFamily/caperLobbyService";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, resetUser, ensureUniqueIndexes, daysAgo } from "../helpers";
+import { caperCrew, G, CH } from "../crimeFamily/caperFixtures";
 
 // D34: testers get no Crime Families bypass. Every fee, tax, cap, interval
 // and gate applies to an allowlisted developer exactly as to anyone else.
@@ -61,5 +63,35 @@ describe("testers get no family bypass (D34)", () => {
     const dir = path.join(__dirname, "../../src/services/crimeFamily");
     const offenders = fs.readdirSync(dir).filter((f) => fs.readFileSync(path.join(dir, f), "utf8").includes("isTester"));
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("capers treat testers like everyone else", () => {
+  const T1 = ["MASTERMIND", "LOOKOUT", "SAFECRACKER", "DRIVER"] as const;
+  const bal = async (id: string) => (await testPrisma.wallet.findUnique({ where: { userId: id } }))!.balance;
+  const plan = (uid: string) => planCaper({ uid, tier: 1, guildId: G, channelId: CH });
+  beforeEach(async () => { await resetFamilies(); await resetUser(BOT_DEVELOPER_ID); });
+
+  it("the stake, the family cooldown and the 2-seat cap all apply to BOT_DEVELOPER_ID", async () => {
+    const f = await caperCrew({ tier: 1, roles: [...T1], plannerId: BOT_DEVELOPER_ID });
+    const dev = f.ids.MASTERMIND;
+    expect(dev).toBe(BOT_DEVELOPER_ID);
+    const before = await bal(dev);
+    const c = await plan(dev);
+    expect(await bal(dev)).toBe(before - 50_000);
+    await cancelCaper(c.id, dev);                                          // sets nextCaperAt = now + 1,800 s
+    await expect(plan(dev)).rejects.toThrow(/^Family caper cooldown: ready <t:\d+:R>\.$/);
+    await testPrisma.family.update({ where: { id: f.family.id }, data: { nextCaperAt: new Date() } });
+    for (const k of [1, 2]) await testPrisma.caperCrew.create({ data: { caperId: `65f00000000000000000000${k}`, familyId: f.family.id, userId: dev, role: "MASTERMIND", liveSlot: `65f00000000000000000000${k}`, stake: 50_000, started: true, startedAt: new Date(Date.now() - k * 3_600_000) } });
+    await expect(plan(dev)).rejects.toThrow(/^You've used both caper seats in the last 24 hours\. A seat frees <t:\d+:R>\.$/);
+  });
+
+  it("no Crime Families service and no caper UI module reads isTester", () => {
+    const src = path.join(__dirname, "../../src");
+    const files = [
+      ...fs.readdirSync(path.join(src, "services/crimeFamily")).map((f) => path.join(src, "services/crimeFamily", f)),
+      ...fs.readdirSync(path.join(src, "ui/crimeFamily")).filter((f) => f.startsWith("caper")).map((f) => path.join(src, "ui/crimeFamily", f)),
+    ];
+    for (const f of files) expect(fs.readFileSync(f, "utf8"), f).not.toContain("isTester");
   });
 });

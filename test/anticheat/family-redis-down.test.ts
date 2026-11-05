@@ -7,6 +7,12 @@ import { depositToVault } from "../../src/services/crimeFamily/vaultService";
 import { executePayday } from "../../src/services/crimeFamily/paydayService";
 import { ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
 import { testPrisma, testRedis, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
+import { planCaper, joinCaper } from "../../src/services/crimeFamily/caperLobbyService";
+import { openBrief, lockChoice } from "../../src/services/crimeFamily/caperPlayService";
+import { parseAnswers } from "../../src/services/crimeFamily/intelRing";
+import { postCaperCard } from "../../src/ui/crimeFamily/caperCard";
+import { onSeatsChanged, resolveAndAnnounce, announceLobby } from "../../src/ui/crimeFamily/caperFlow";
+import { caperCrew, fakeCaperClient, G, CH } from "../crimeFamily/caperFixtures";
 
 // Redis never guards family money or membership (spec 14.3): an outage must
 // not stop a single family write, and the activity throttle writes anyway.
@@ -82,5 +88,50 @@ describe("with Redis down", () => {
     } finally {
       ACTIVITY_RULES.splice(ACTIVITY_RULES.indexOf(activeRule), 1);
     }
+  });
+});
+
+describe("capers with Redis down", () => {
+  const T1 = ["MASTERMIND", "LOOKOUT", "SAFECRACKER", "DRIVER"] as const;
+  const bal = async (id: string) => (await testPrisma.wallet.findUnique({ where: { userId: id } }))!.balance;
+  const text = (payload: any) => JSON.stringify(payload.components.map((c: any) => c.toJSON()));
+  let down: ReturnType<typeof vi.spyOn>;
+  beforeEach(async () => { await resetFamilies(); down = vi.spyOn(redisService, "getInstance").mockImplementation(() => { throw new Error("down"); }); });
+  afterEach(() => down.mockRestore());
+
+  it("plan → joins → auto-start → locks → settle pays exactly the stored outcome, and every state renders", async () => {
+    const f = await caperCrew({ tier: 1, roles: [...T1] });
+    const fc = fakeCaperClient({ members: Object.values(f.ids) });
+    const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
+    const mid = await postCaperCard(fc.client, c.id, CH);
+    for (const r of ["LOOKOUT", "SAFECRACKER", "DRIVER"] as const) {
+      const j = await joinCaper({ caperId: c.id, uid: f.ids[r], role: r, guildId: G });
+      await onSeatsChanged(fc.client, c.id, j.full);                     // un-debounced render, then the auto-start
+    }
+    const run = await testPrisma.caper.findUniqueOrThrow({ where: { id: c.id } });
+    expect(run.status).toBe("RUNNING");
+    const base = new Map(await Promise.all(Object.values(f.ids).map(async (id) => [id, await bal(id)] as const)));   // after every stake
+    const earnings0 = (await testPrisma.family.findUniqueOrThrow({ where: { id: f.family.id } })).earnings;
+    const answers = parseAnswers(run.answers)!;
+    const t = new Date(+run.startedAt + 5_000);
+    for (const r of T1) { await openBrief(c.id, f.ids[r], t); await lockChoice(c.id, f.ids[r], answers.seats[r]!.correct, t); }
+    await resolveAndAnnounce(fc.client, c.id, new Date(+run.goEndsAt + 1_000), new Date(0));
+    const done = await testPrisma.caper.findUniqueOrThrow({ where: { id: c.id } });
+    expect(done.status).toBe("RESOLVED");
+    const cut = done.outcome === "CLEAN" ? 280_000 : 98_000;             // T1 n=4 (8.6)
+    for (const id of Object.values(f.ids)) expect(await bal(id)).toBe(base.get(id)! + cut);
+    expect((await testPrisma.family.findUniqueOrThrow({ where: { id: f.family.id } })).earnings).toBe(earnings0 + Math.floor((done.pool * 10) / 100));
+    const cards = fc.edits.filter((e) => e.messageId === mid).map((e) => e.payload);
+    expect(cards.some((p) => text(p).includes(`cpr:join:${c.id}`))).toBe(true);                                   // LOBBY
+    expect(cards.some((p) => text(p).includes(`cpr:brief:${c.id}`))).toBe(true);                                  // GO (S13)
+    expect(cards.some((p) => (p.files ?? []).some((x: any) => x.name.startsWith("cf_result_")))).toBe(true);      // result (S15)
+  });
+
+  it("announceLobby still DMs a qualified member (the lobby-DM cap fails open)", async () => {
+    const f = await caperCrew({ tier: 1, roles: [...T1] });
+    const fc = fakeCaperClient({ members: Object.values(f.ids) });
+    const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
+    expect(await announceLobby(fc.client, c.id)).toEqual(expect.arrayContaining([f.ids.LOOKOUT, f.ids.SAFECRACKER, f.ids.DRIVER]));
+    expect(fc.dms.get(f.ids.LOOKOUT)).toBe(1);
   });
 });
