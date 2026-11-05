@@ -16,7 +16,7 @@ async function bidder(o: { level?: number; earnings?: number; treasury?: number;
 const bid = (actorId: string, amount: number, racketKey = "docks_numbers") => placeBid({ racketKey, actorId, amount });
 
 describe("bidding (9.4)", () => {
-  it.each([["2.1m", 2_100_000], ["10,010,000", 10_010_000], ["all", null], ["max", null], ["-1", null], ["0", null], ["1e7", null], ["abc", null], ["2.5", null]] as const)(
+  it.each([["2.1m", 2_100_000], ["4.1m", 4_100_000], ["8.03m", 8_030_000], ["1.001m", 1_001_000], ["2.05m", 2_050_000], ["1.5000k", 1_500], ["1.0001k", null], ["0m", null], ["10,010,000", 10_010_000], ["all", null], ["max", null], ["-1", null], ["0", null], ["1e7", null], ["abc", null], ["2.5", null]] as const)(
     "parseBidAmount(%s) = %s", (raw, want) => expect(parseBidAmount(raw)).toBe(want));
 
   it("a first bid at the floor moves earnings into escrow", async () => {
