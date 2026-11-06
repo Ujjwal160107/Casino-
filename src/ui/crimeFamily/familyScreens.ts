@@ -49,7 +49,7 @@ export function buildNoFamilyCard(ownerId: string, join: EligibilityResult, foun
     .addTextDisplayComponents(
       text(`**Join a family**\n${checklist(join)}`),
       text(`**Found one** (costs ${fmtFortunes(CRIME_FAMILY_CONFIG.createFee)})\n${checklist(found)}`),
-      text("-# Ask a family's Capo for an invite; `!crew top` lists families; caper lobbies and results post in this server."),
+      text("-# Ask a family's Capo for an invite; `!crew top` lists families; crew heist lobbies and results post in this server."),
     )
     .addActionRowComponents(buttonRow(
       cfButton(CREW_IDS.createOpen(ownerId), "Create", ButtonStyle.Primary, { disabled: !found.ok }),
@@ -79,7 +79,7 @@ export function buildDashboard(view: FamilyDashboardView, opts: { art: boolean }
   const status: string[] = [];
   if (member) status.push(view.duesArrears > 0 ? `Dues in arrears: ${view.duesArrears} days` : "Dues paid");
   if (view.racketsHeld !== null) status.push(`Rackets ${view.racketsHeld}`);
-  status.push(`Next caper ${rel(view.nextCaperAt)}`);
+  status.push(`Next crew heist ${rel(view.nextCaperAt)}`);
   if (view.underInvestigation) status.push("Under investigation");
 
   container
@@ -96,7 +96,7 @@ export function buildDashboard(view: FamilyDashboardView, opts: { art: boolean }
   if (member) {
     const buttons = [
       cfButton(CREW_IDS.view("vault", owner), "Vault", ButtonStyle.Secondary, { emojiKey: "vault" }),
-      cfButton(CPR_IDS.viewPlan(owner), "Caper", ButtonStyle.Secondary, { emojiKey: "caper" }),
+      cfButton(CPR_IDS.viewPlan(owner), "Crew Heist", ButtonStyle.Secondary, { emojiKey: "caper" }),
       ...(view.showTurf ? [cfButton(TURF_IDS.viewMap(owner), "Turf", ButtonStyle.Secondary, { emojiKey: "war" })] : []),
       cfButton(CREW_IDS.view("manage", owner), "Manage", ButtonStyle.Secondary, { disabled: !view.viewer.canManage }),
       cfButton(CREW_IDS.view("log", owner), "Log"),
@@ -163,7 +163,7 @@ export function buildInviteResolved(v: InviteView, status: string): CfPayload {
 
 const MANAGE_LEGEND =
   "-# Boss: everything. Underboss: promote, demote, payday and level up. Capo: invite and kick Soldiers. " +
-  "Associates (first 72 h) can't take caper seats or war actions.";
+  "Associates (first 72 h) can't take crew heist seats or war actions.";
 
 export function buildManagePanel(ownerId: string, view: FamilyDashboardView, selected: string | null): CfPayload {
   const roster = view.roster.slice(0, 12);
@@ -201,7 +201,7 @@ export function buildManagePanel(ownerId: string, view: FamilyDashboardView, sel
 
 const LEDGER_LABELS: Readonly<Record<LedgerType, string>> = {
   create_fee: "Founded", deposit: "Deposit", deposit_tax: "Deposit tax", payday: "Payday", payday_tax: "Payday tax",
-  caper_cut: "Caper cut", racket_income: "Racket income", racket_neglect: "Racket neglect", dues: "Dues", dues_missed: "Dues missed",
+  caper_cut: "Crew heist cut", racket_income: "Racket income", racket_neglect: "Racket neglect", dues: "Dues", dues_missed: "Dues missed",
   level_fee: "Level up", rename_fee: "Rename", bid_escrow: "Bid escrow", bid_refund: "Bid refund", war_bid_burn: "War bid burned",
   disband_burn: "Disband burn", xp: "XP",
 };
@@ -284,7 +284,7 @@ export function buildLevelUpConfirm(ownerId: string, v: VaultView): CfPayload {
   const fromEarnings = next ? Math.min(v.earnings, next.fee) : 0;
   const body = next
     ? `**Fee:** ${fmtFortunes(next.fee)}, burned: ${fmtFortunes(fromEarnings)} from earnings, ${fmtFortunes(next.fee - fromEarnings)} from the treasury.\n` +
-      `**Level ${next.level}:** up to ${next.memberCap} members${next.tierUnlocked ? `, tier ${next.tierUnlocked} capers` : ""}.` +
+      `**Level ${next.level}:** up to ${next.memberCap} members${next.tierUnlocked ? `, tier ${next.tierUnlocked} crew heists` : ""}.` +
       (v.levelUp.blockers.length ? `\n${v.levelUp.blockers.join("\n")}` : "")
     : "Your family is at the max level.";
   const container = new ContainerBuilder()

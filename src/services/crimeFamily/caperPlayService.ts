@@ -10,7 +10,7 @@ import { FamilyError, runFamilyTx } from "./tx";
 import type { BriefView } from "./views";
 
 const TOO_LATE = "Too late.";
-const NOT_IN_CAPER = "You are not in this caper.";
+const NOT_IN_CAPER = "You are not in this crew heist.";
 const OPTIONS = 4;
 
 /** The stored answers of a live GO; a corrupt row (edge 63) is played no further, resolve voids it. */

@@ -101,7 +101,7 @@ describe("crime family interactions", () => {
     await handleCrimeFamilyInteraction(i as any);
     expect(i.deferReply).toHaveBeenCalledTimes(1);
     expect(i.ephemeral).toBe(true);
-    expect(said(i)).toContain("How a caper works");
+    expect(said(i)).toContain("How a crew heist works");
     expect(said(i)).toContain(`cpr:plan:${boss}`);
     const gone = fakeButton("cpr:nope:u1", { userId: "u1" });
     await handleCrimeFamilyInteraction(gone as any);

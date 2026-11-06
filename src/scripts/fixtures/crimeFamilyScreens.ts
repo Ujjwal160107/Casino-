@@ -62,7 +62,7 @@ function paydayPreview(locked: boolean): PaydayPreview {
     split: { gross: 1_000_000, tax: 50_000, net: 950_000 },
     eligible: locked ? [] : MEMBERS.slice(0, 6),
     ineligible: (locked ? MEMBERS : MEMBERS.slice(6)).map((userId) => ({
-      userId, reason: "≥ 2 caper seats or ≥ 3 correct war hits in 7 days (you have 0 caper seats, 0 correct war hits)",
+      userId, reason: "≥ 2 crew heist seats or ≥ 3 correct war hits in 7 days (you have 0 crew heist seats, 0 correct war hits)",
     })),
     dueAt: SOON(),
     lockedReason: locked ? "Payday locked: nobody qualifies yet." : null,
@@ -120,7 +120,7 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
     { label: "S26 confirm (hand over)", max: 6, payload: buildConfirm(OWNER, "chair", MEMBERS[1], "You become a Soldier. They become the Boss and hold every Boss power. This cannot be undone.") },
     { label: "S27 opener", max: 4, payload: buildOpener(`<@${OWNER}>, open your family vault.`, { customId: CREW_IDS.open("vault", OWNER), label: "Open vault" }) },
     { label: "S28 notice", max: 2, payload: buildNotice(`Payday: 12 members paid 950,000 each\n${MEMBERS.map((m) => `<@${m}>`).join(" ")}`) },
-    { label: "S28 notice with button", max: 4, payload: buildNotice("Your family's caper is GO.", { customId: CREW_IDS.view("home", OWNER), label: "Open" }, MEMBERS) },
+    { label: "S28 notice with button", max: 4, payload: buildNotice("Your family's crew heist is GO.", { customId: CREW_IDS.view("home", OWNER), label: "Open" }, MEMBERS) },
     ...caperWorstCases(),
     ...turfWorstCases(),
   ];

@@ -83,10 +83,10 @@ describe("capers treat testers like everyone else", () => {
     const c = await plan(dev);
     expect(await bal(dev)).toBe(before - 50_000);
     await cancelCaper(c.id, dev);                                          // sets nextCaperAt = now + 1,800 s
-    await expect(plan(dev)).rejects.toThrow(/^Family caper cooldown: ready <t:\d+:R>\.$/);
+    await expect(plan(dev)).rejects.toThrow(/^Family crew heist cooldown: ready <t:\d+:R>\.$/);
     await testPrisma.family.update({ where: { id: f.family.id }, data: { nextCaperAt: new Date() } });
     for (const k of [1, 2]) await testPrisma.caperCrew.create({ data: { caperId: `65f00000000000000000000${k}`, familyId: f.family.id, userId: dev, role: "MASTERMIND", liveSlot: `65f00000000000000000000${k}`, stake: 50_000, started: true, startedAt: new Date(Date.now() - k * 3_600_000) } });
-    await expect(plan(dev)).rejects.toThrow(/^You've used both caper seats in the last 24 hours\. A seat frees <t:\d+:R>\.$/);
+    await expect(plan(dev)).rejects.toThrow(/^You've used both crew heist seats in the last 24 hours\. A seat frees <t:\d+:R>\.$/);
   });
 
   it("no Crime Families service and no caper UI module reads isTester", () => {

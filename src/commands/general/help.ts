@@ -315,8 +315,8 @@ export const CATEGORIES: CategoryData[] = [
         example: "{p}crew deposit 5m"
       },
       {
-        name: "caper", aliases: ["capers"], description: "Plan or join a family caper: a 10-minute lobby and a 120-second GO where the crew trades intel.",
-        usage: "{p}caper [subcommand]",
+        name: "heist", aliases: ["crewheist", "caper", "capers"], description: "Plan or join a crew heist: a 10-minute lobby and a 120-second GO where the crew trades intel.",
+        usage: "{p}heist [subcommand]",
         subcommands: [
           "plan <1-4> — plan a tier (Capo and above)",
           "join <role> — take a seat (Lookout, Safecracker, Driver, Muscle, Hacker)",
@@ -325,7 +325,7 @@ export const CATEGORIES: CategoryData[] = [
           "cancel — cancel the lobby (planner or Boss)",
           "brief — open your brief during GO"
         ],
-        example: "{p}caper join lookout"
+        example: "{p}heist join lookout"
       },
       {
         name: "turf", aliases: ["racket", "rackets"], description: "The 10 rackets, weekly bidding and turf wars.",

@@ -412,16 +412,16 @@ export function caperLobbyNotice(v: {
   familyLabel: string; tierName: string; stake: number; closesAt: Date; jumpUrl: string | null;
 }): ContainerBuilder {
   const body =
-    `**${v.familyLabel}** is planning a **${v.tierName}** caper.\n` +
+    `**${v.familyLabel}** is planning a **${v.tierName}** crew heist.\n` +
     `**Stake:** ${fmtFortunes(v.stake)}\n` +
     `The lobby closes ${relTime(v.closesAt)}.` +
     jumpLine(v.jumpUrl, "Join the lobby");
-  return familyNotice("caper", "Caper lobby open", body);
+  return familyNotice("caper", "Crew heist lobby open", body);
 }
 
 export function caperGoNotice(v: { tierName: string; goEndsAt: Date; jumpUrl: string | null }): ContainerBuilder {
-  const body = `The **${v.tierName}** caper is live.\nGO ends ${relTime(v.goEndsAt)}. Open your brief now.` + jumpLine(v.jumpUrl, "Go to the caper");
-  return familyNotice("caper", "Caper GO", body);
+  const body = `The **${v.tierName}** crew heist is live.\nGO ends ${relTime(v.goEndsAt)}. Open your brief now.` + jumpLine(v.jumpUrl, "Go to the crew heist");
+  return familyNotice("caper", "Crew heist GO", body);
 }
 
 // Turf (`turf`): bids, war warnings and results, and racket neglect.
@@ -455,7 +455,7 @@ export function turfWarResultNotice(v: { racketName: string; side: WarSide; won:
 
 export function turfNeglectNotice(v: { racketName: string; strikes: number; max: number }): ContainerBuilder {
   const body =
-    `Neglect strike ${v.strikes}/${v.max}: play two caper seats this week to keep ${v.racketName}.\n` +
+    `Neglect strike ${v.strikes}/${v.max}: play two crew heist seats this week to keep ${v.racketName}.\n` +
     `At ${v.max} strikes the racket goes back to the Street.`;
   return familyNotice("war", "Racket neglected", body);
 }

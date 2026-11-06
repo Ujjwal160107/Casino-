@@ -231,10 +231,10 @@ describe("leave and kick (6.4)", () => {
   it("a hook's memberExitBlock refuses leave and kick, inside the transaction", async () => {
     const { bossId, ids: [s] } = await famWith([{ role: "SOLDIER" }]);
     const kinds: string[] = [];
-    FAMILY_HOOKS.push({ key: "t", memberExitBlock: async (tx, ctx) => { await tx.family.findUnique({ where: { id: ctx.familyId } }); kinds.push(ctx.kind); return "You are seated in a live caper."; } });
+    FAMILY_HOOKS.push({ key: "t", memberExitBlock: async (tx, ctx) => { await tx.family.findUnique({ where: { id: ctx.familyId } }); kinds.push(ctx.kind); return "You are seated in a live crew heist."; } });
     try {
-      await expect(leaveFamily(s)).rejects.toThrow("You are seated in a live caper.");
-      await expect(kickMember(bossId, s)).rejects.toThrow("You are seated in a live caper.");
+      await expect(leaveFamily(s)).rejects.toThrow("You are seated in a live crew heist.");
+      await expect(kickMember(bossId, s)).rejects.toThrow("You are seated in a live crew heist.");
     } finally { FAMILY_HOOKS.pop(); }
     expect(kinds).toEqual(["LEFT", "KICKED"]);
     expect(await testPrisma.familyMember.findUnique({ where: { userId: s } })).not.toBeNull();

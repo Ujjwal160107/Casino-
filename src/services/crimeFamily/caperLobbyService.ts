@@ -20,8 +20,8 @@ import { cryptoRng, type Rng } from "./random";
 import { can } from "./permissions";
 import { FamilyError, invalidateUsers, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
 
-const LIVE_CAPER = "Your family already has a live caper.";
-const HOLDS_SEAT = "You already hold a seat in a live caper.";
+const LIVE_CAPER = "Your family already has a live crew heist.";
+const HOLDS_SEAT = "You already hold a seat in a live crew heist.";
 const LOBBY_CLOSED = "Lobby closed.";
 const NOT_IN_FAMILY = "You are not in a crime family.";
 
@@ -43,10 +43,10 @@ export function openRoles(tier: CaperTierDef, filled: readonly CaperRoleKey[]): 
 
 /** The family cooldown and the rolling family caper cap; the refusal, or null when the family may run one. */
 export async function familyCaperBlock(family: Family, now: Date): Promise<string | null> {
-  if (now < family.nextCaperAt) return `Family caper cooldown: ready ${rel(family.nextCaperAt)}.`;
+  if (now < family.nextCaperAt) return `Family crew heist cooldown: ready ${rel(family.nextCaperAt)}.`;
   const recent = await startedCapersSince(family.id, windowStart(now));
   if (recent.length >= CRIME_FAMILY_CONFIG.capersPerFamilyPer24h) {
-    return `Your family has run ${CRIME_FAMILY_CONFIG.capersPerFamilyPer24h} capers in the last 24 hours. Next slot ${rel(windowEnd(recent[0].startedAt))}.`;
+    return `Your family has run ${CRIME_FAMILY_CONFIG.capersPerFamilyPer24h} crew heists in the last 24 hours. Next slot ${rel(windowEnd(recent[0].startedAt))}.`;
   }
   return null;
 }
@@ -59,10 +59,10 @@ async function seatGates(
   uid: string, target: { familyId: string; tier: CaperTierDef; guildId: string }, role: CaperRoleKey, guildId: string | null, now: Date,
 ): Promise<void> {
   const { family } = await requireMembership(uid);
-  if (family.id !== target.familyId) throw new FamilyError("This caper belongs to another family.");
+  if (family.id !== target.familyId) throw new FamilyError("This crew heist belongs to another family.");
   const gate = await checkMemberEligibility(uid, `caper_t${target.tier.tier}`, { role, guildId, expectedGuildId: target.guildId, now });
   if (!gate.ok) {
-    if (gate.failures.some((f) => f.gate === "guild")) throw new FamilyError("This caper is in another server; join that server to play.");
+    if (gate.failures.some((f) => f.gate === "guild")) throw new FamilyError("This crew heist is in another server; join that server to play.");
     const base = eligibilityError(gate.failures).message;
     if (!gate.failures.some((f) => f.gate === "prep_item")) throw new FamilyError(base);
     const def = caperRole(role);
@@ -71,7 +71,7 @@ async function seatGates(
   if (await liveSeatOf(uid)) throw new FamilyError(HOLDS_SEAT);
   const seats = await startedSeatsSince(uid, windowStart(now));
   if (seats.length >= CRIME_FAMILY_CONFIG.seatsPer24h) {
-    throw new FamilyError(`You've used both caper seats in the last 24 hours. A seat frees ${rel(windowEnd(seats[0].startedAt))}.`);
+    throw new FamilyError(`You've used both crew heist seats in the last 24 hours. A seat frees ${rel(windowEnd(seats[0].startedAt))}.`);
   }
 }
 
@@ -84,10 +84,10 @@ export async function planCaper(input: { uid: string; tier: number; guildId: str
   const { family, member } = await requireMembership(uid);
   if (await getLiveCaper(family.id)) throw new FamilyError(LIVE_CAPER);
   const mayPlan = (m: { role: string; joinedAt: Date }) => can({ role: m.role as FamilyRole, joinedAt: m.joinedAt }, "plan_caper", now);
-  if (!mayPlan(member)) throw new FamilyError("Only a Capo or above can plan a caper.");
+  if (!mayPlan(member)) throw new FamilyError("Only a Capo or above can plan a crew heist.");
   if (family.level < tier.levelToPlan) throw new FamilyError(`${tier.name} unlocks at family level ${tier.levelToPlan}.`);
   if (await isUnderInvestigation(family.id)) {
-    throw new FamilyError(`Your family is under investigation: no capers until fewer than ${CRIME_FAMILY_CONFIG.underInvestigationMembers} members are at ${CRIME_FAMILY_CONFIG.underInvestigationHeat} heat.`);
+    throw new FamilyError(`Your family is under investigation: no crew heists until fewer than ${CRIME_FAMILY_CONFIG.underInvestigationMembers} members are at ${CRIME_FAMILY_CONFIG.underInvestigationHeat} heat.`);
   }
   const blocked = await familyCaperBlock(family, now);
   if (blocked) throw new FamilyError(blocked);
@@ -100,7 +100,7 @@ export async function planCaper(input: { uid: string; tier: number; guildId: str
       if (!current) throw new FamilyError(NOT_IN_FAMILY);
       const planner = await tx.familyMember.findUnique({ where: { userId: uid } });
       if (!planner || planner.familyId !== family.id) throw new FamilyError(NOT_IN_FAMILY);
-      if (!mayPlan(planner)) throw new FamilyError("Only a Capo or above can plan a caper.");
+      if (!mayPlan(planner)) throw new FamilyError("Only a Capo or above can plan a crew heist.");
       const block = await familyCaperBlock(current, now);
       if (block) throw new FamilyError(block);
       await touchFamily(tx, family.id, now);
@@ -133,7 +133,7 @@ export async function joinCaper(input: {
   if (!snapshot || snapshot.status !== "LOBBY" || snapshot.lobbyClosesAt <= now) throw new FamilyError(LOBBY_CLOSED);
   const tier = caperTier(snapshot.tier);
   if (role === "MASTERMIND") throw new FamilyError("The Mastermind seat belongs to the planner.");
-  if (!tierRoles(tier).includes(role)) throw new FamilyError("That role is not part of this caper.");
+  if (!tierRoles(tier).includes(role)) throw new FamilyError("That role is not part of this crew heist.");
   await seatGates(uid, { familyId: snapshot.familyId, tier, guildId: snapshot.guildId }, role, input.guildId, now);
 
   let joined: { caper: Caper; seat: CaperCrew; full: boolean };
@@ -153,7 +153,7 @@ export async function joinCaper(input: {
   } catch (err) {
     if (isUniqueViolation(err, "CaperCrew_caperId_role_key")) throw new FamilyError("Role just taken.");
     if (isUniqueViolation(err, "CaperCrew_caperId_userId_key") || isUniqueViolation(err, "CaperCrew_userId_liveSlot_key")) {
-      throw new FamilyError("Already in this caper.");
+      throw new FamilyError("Already in this crew heist.");
     }
     throw err;
   }
@@ -165,9 +165,9 @@ export async function joinCaper(input: {
 export async function leaveCaper(caperId: string, uid: string, now: Date = new Date()): Promise<{ cancelled: boolean }> {
   const { cancelled, refunded } = await runFamilyTx(async (tx) => {
     const row = await tx.caperCrew.findFirst({ where: { caperId, userId: uid, liveSlot: "LIVE" } });
-    if (!row) throw new FamilyError("You are not in this caper.");
+    if (!row) throw new FamilyError("You are not in this crew heist.");
     const caper = await tx.caper.findUnique({ where: { id: caperId }, select: { status: true } });
-    if (caper?.status !== "LOBBY") throw new FamilyError("The caper has started; your seat is locked in.");
+    if (caper?.status !== "LOBBY") throw new FamilyError("The crew heist has started; your seat is locked in.");
     if (row.role === "MASTERMIND") {
       const rows = await cancelCaperInTx(tx, caperId, now);
       return { cancelled: true, refunded: rows.map((r) => r.userId) };
@@ -186,7 +186,7 @@ export async function cancelCaper(caperId: string, actorId: string | null, now: 
     if (!caper) throw new FamilyError(LOBBY_CLOSED);
     if (actorId !== null && actorId !== caper.plannerId) {
       const family = await tx.family.findUnique({ where: { id: caper.familyId }, select: { bossId: true } });
-      if (family?.bossId !== actorId) throw new FamilyError("Only the planner or the Boss can cancel this caper.");
+      if (family?.bossId !== actorId) throw new FamilyError("Only the planner or the Boss can cancel this crew heist.");
     }
     return cancelCaperInTx(tx, caperId, now);
   });
@@ -262,7 +262,7 @@ export async function startCaper(caperId: string, by: StartBy, now: Date = new D
     if (by.kind === "press") {
       if (by.uid !== caper.plannerId) {
         const boss = await tx.family.findUnique({ where: { id: caper.familyId }, select: { bossId: true } });
-        if (boss?.bossId !== by.uid) throw new FamilyError("Only the planner or the Boss can start this caper.");
+        if (boss?.bossId !== by.uid) throw new FamilyError("Only the planner or the Boss can start this crew heist.");
       }
       const missing = missingRequired(tier, rows);
       if (missing.length > 0) return done({ status: "waiting", pinched: [], reason: `Fill the required roles first: ${missing.join(", ")}.` });
@@ -276,7 +276,7 @@ export async function startCaper(caperId: string, by: StartBy, now: Date = new D
       const all = await cancelCaperInTx(tx, caperId, now);
       return done({
         status: "cancelled", pinched: [{ userId: planner.userId, role: "MASTERMIND" }],
-        reason: `${mention(planner.userId)} got pinched; the caper was cancelled and every stake refunded.`,
+        reason: `${mention(planner.userId)} got pinched; the crew heist was cancelled and every stake refunded.`,
       }, all.map((r) => r.userId));
     }
     for (const row of failing) await removeSeatInTx(tx, row, "pinched");

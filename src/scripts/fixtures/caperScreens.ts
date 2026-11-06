@@ -65,7 +65,7 @@ export function caperWorstCases(): { label: string; max: number; payload: CfPayl
   const jump = jumpLink(GUILD, CHANNEL, MESSAGE);
   return [
     { label: "S11 planner (Capo)", max: 11, payload: buildCaperPlanner(plannerView(false), { art: true, ephemeral: false }) },
-    { label: "S11 planner (live caper)", max: 9, payload: buildCaperPlanner(plannerView(true), { art: true, ephemeral: true }) },
+    { label: "S11 planner (live crew heist)", max: 9, payload: buildCaperPlanner(plannerView(true), { art: true, ephemeral: true }) },
     { label: "S12 lobby (T4, 1 seat)", max: 14, payload: buildCaperCard(cardView({ status: "LOBBY", seats: seats(1, false) }), { art: true }) },
     { label: "S12 lobby (T4, full)", max: 12, payload: buildCaperCard(cardView({ status: "LOBBY", seats: seats(6, false) }), { art: true }) },
     { label: "S12 cancelled", max: 3, payload: buildCaperCard(cardView({ status: "CANCELLED", outcome: "VOID", seats: seats(6, false) }), { art: true }) },
@@ -74,8 +74,8 @@ export function caperWorstCases(): { label: string; max: number; payload: CfPayl
     { label: "S14 brief (locked)", max: 10, payload: buildBrief(briefView({ lockedIndex: 3 })) },
     { label: "S14 brief (dark)", max: 6, payload: buildBrief(briefView({ dark: true, leaked: null })) },
     { label: "S15 result (T4 BUST, 6 seats)", max: 8, payload: buildCaperCard(cardView({ status: "RESOLVED", outcome: "BUST", roll: 0.1234, seats: seats(6, true) }), { art: true }) },
-    { label: "S25 caper card", max: 4, payload: buildCaperSeatCard({ caperId: CAPER_ID, text: "Seated as Safecracker.", jumpUrl: jump }) },
-    { label: "S27 brief opener", max: 4, payload: buildOpener("Your caper brief is ready.", { customId: CPR_IDS.openBrief(CAPER_ID, OWNER), label: "Open brief" }) },
+    { label: "S25 crew heist card", max: 4, payload: buildCaperSeatCard({ caperId: CAPER_ID, text: "Seated as Safecracker.", jumpUrl: jump }) },
+    { label: "S27 brief opener", max: 4, payload: buildOpener("Your crew heist brief is ready.", { customId: CPR_IDS.openBrief(CAPER_ID, OWNER), label: "Open brief" }) },
     { label: "S28 GO call (6 crew)", max: 4, payload: buildGoCall({ caperId: CAPER_ID, crewIds: CREW, goEndsAt: SOON(), pinched: ["98765432109876543401", "98765432109876543402"] }) },
     { label: "S28 lobby moved", max: 2, payload: buildLobbyMoved(jump) },
   ];

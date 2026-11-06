@@ -249,7 +249,7 @@ export const SPECS: Spec[] = [
         ],
     },
     {
-        name: "caper", desc: "Family capers: plan, join and play the crew heist",
+        name: "heist", desc: "Crew heists: plan, join and play with your family",
         opts: [
             {
                 kind: "str", name: "action", desc: "What to do -- leave blank to view", required: false,

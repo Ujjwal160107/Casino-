@@ -52,14 +52,14 @@ function tierLine(tier: CaperTierDef, unlocked: boolean): string {
 
 function familyStatus(v: CaperPlannerView): string {
   const lines = [
-    `**Next caper:** ${v.nextCaperAt.getTime() > Date.now() ? rel(v.nextCaperAt) : "ready"}` +
+    `**Next crew heist:** ${v.nextCaperAt.getTime() > Date.now() ? rel(v.nextCaperAt) : "ready"}` +
       ` · **Started:** ${v.startedLast24h}/${CRIME_FAMILY_CONFIG.capersPerFamilyPer24h} in 24 h`,
   ];
   if (v.duesArrears > 0) lines.push(`Dues in arrears: ${v.duesArrears} days`);
-  if (v.underInvestigation) lines.push("Under investigation: no capers until the family cools down.");
+  if (v.underInvestigation) lines.push("Under investigation: no crew heists until the family cools down.");
   if (v.live) {
     const link = v.live.messageId ? ` · ${jumpLink(v.live.guildId, v.live.channelId, v.live.messageId)}` : "";
-    lines.push(`**Live caper:** T${v.live.tier} ${caperTier(v.live.tier).name} (${v.live.status.toLowerCase()})${link}`);
+    lines.push(`**Live crew heist:** T${v.live.tier} ${caperTier(v.live.tier).name} (${v.live.status.toLowerCase()})${link}`);
   }
   return lines.join("\n");
 }
@@ -67,12 +67,12 @@ function familyStatus(v: CaperPlannerView): string {
 export function buildCaperPlanner(v: CaperPlannerView, opts: { art: boolean; ephemeral: boolean }): CfPayload {
   const unlocked = new Set(v.tiers.filter((t) => t.unlocked).map((t) => t.tier));
   const container = new ContainerBuilder();
-  const file = addThumbSection(container, `## ${cfLabel("caper", "Capers")}\n${v.familyLabel} · level ${v.level}`, "caper");
+  const file = addThumbSection(container, `## ${cfLabel("caper", "Crew Heists")}\n${v.familyLabel} · level ${v.level}`, "caper");
   container
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       text(
-        "**How a caper works**\n" +
+        "**How a crew heist works**\n" +
         `1. A Capo or above plans a tier and pays the stake; the lobby stays open ${minutes(CRIME_FAMILY_CONFIG.lobbySeconds)} minutes.\n` +
         "2. Members join by role, each holding one of the role's prep items, and pay the same stake.\n" +
         `3. GO lasts ${CRIME_FAMILY_CONFIG.goSeconds} s: open your brief, tell your contact their intel and lock your own call.\n` +
@@ -84,7 +84,7 @@ export function buildCaperPlanner(v: CaperPlannerView, opts: { art: boolean; eph
   if (v.canPlan && v.live === null && !v.underInvestigation && unlocked.size > 0) {
     const select = new StringSelectMenuBuilder()
       .setCustomId(CPR_IDS.plan(v.ownerId))
-      .setPlaceholder("Plan a caper…")
+      .setPlaceholder("Plan a crew heist…")
       .addOptions(CAPER_TIERS.filter((t) => unlocked.has(t.tier)).map((t) =>
         new StringSelectMenuOptionBuilder()
           .setLabel(`T${t.tier} · ${t.name}`)
@@ -106,8 +106,8 @@ function buildLobby(v: CaperCardView, tier: CaperTierDef, art: boolean): CfPaylo
     `${roleLabel(s.role)} · ${s.userId ? mention(s.userId) : "open"}${s.optional ? " (optional)" : ""}`);
   const hint = v.note ?? (v.openRoles.length === 0
     ? "All seats filled, waiting for Start"
-    : `-# Pick a role from **Join as…** or use \`!caper join <role>\`. Start needs ${tier.required.map((r) => caperRole(r).name).join(", ")}; ` +
-      "the caper starts by itself once every seat is filled.");
+    : `-# Pick a role from **Join as…** or use \`!heist join <role>\`. Start needs ${tier.required.map((r) => caperRole(r).name).join(", ")}; ` +
+      "the crew heist starts by itself once every seat is filled.");
 
   const container = new ContainerBuilder();
   if (banner) container.addMediaGalleryComponents(banner.gallery);
@@ -190,13 +190,13 @@ function buildResult(v: CaperCardView, tier: CaperTierDef): CfPayload {
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       text(seats.map((s) => payoutLine(s, tier)).join("\n")),
-      text(v.note ?? "-# Caper over. `!caper` shows when the family's next caper is ready."),
+      text(v.note ?? "-# Crew heist over. `!heist` shows when the family's next crew heist is ready."),
     );
   return cfPayload(container, { files: banner ? [banner.file] : undefined, freshAttachments: true });
 }
 
 function buildCancelled(v: CaperCardView, tier: CaperTierDef): CfPayload {
-  const title = v.outcome === "VOID" ? "Caper void" : "Caper cancelled";
+  const title = v.outcome === "VOID" ? "Crew heist void" : "Crew heist cancelled";
   const container = new ContainerBuilder().addTextDisplayComponents(
     text(`## ${title}\n${tier.name} · ${v.familyLabel}`),
     text(v.note ? `Every stake was refunded.\n${v.note}` : "Every stake was refunded."),
@@ -252,7 +252,7 @@ export function buildBrief(v: BriefView): CfPayload {
 /** S25: a member's personal caper card (status and jump link, no roster, so it never needs a refresh). */
 export function buildCaperSeatCard(v: { caperId: string; text: string; jumpUrl: string | null }): CfPayload {
   const container = new ContainerBuilder()
-    .addTextDisplayComponents(text(v.jumpUrl ? `${v.text}\n[Go to the caper](${v.jumpUrl})` : v.text))
+    .addTextDisplayComponents(text(v.jumpUrl ? `${v.text}\n[Go to the crew heist](${v.jumpUrl})` : v.text))
     .addActionRowComponents(buttonRow(cfButton(CPR_IDS.brief(v.caperId), "Open brief", ButtonStyle.Primary)));
   return cfPayload(container);
 }
@@ -261,7 +261,7 @@ export function buildCaperSeatCard(v: { caperId: string; text: string; jumpUrl: 
 export function buildGoCall(v: { caperId: string; crewIds: string[]; goEndsAt: Date; pinched: string[] }): CfPayload {
   const pinched = v.pinched.length > 0 ? `\nPinched at Start: ${v.pinched.map(mention).join(", ")} (stake refunded)` : "";
   return buildNotice(
-    `Caper GO! ${v.crewIds.map(mention).join(" ")} Open your brief. GO ends ${rel(v.goEndsAt)}.${pinched}`,
+    `Crew Heist GO! ${v.crewIds.map(mention).join(" ")} Open your brief. GO ends ${rel(v.goEndsAt)}.${pinched}`,
     { customId: CPR_IDS.brief(v.caperId), label: "Open brief" },
     v.crewIds,
   );

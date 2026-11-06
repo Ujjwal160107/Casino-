@@ -72,11 +72,11 @@ describe("disband (6.4)", () => {
 
   it("re-checks hook blocks on every attempt and runs onDisband before the final payday", async () => {
     const { family, bossId } = await disbandFam({ earnings: 0, treasury: 0, lastPaydayAt: daysAgo(8) });
-    FAMILY_HOOKS.push({ key: "block", disbandBlock: async () => "A caper is in its lobby." });
-    try { await expect(disbandFamily(bossId, "VLA")).rejects.toThrow("A caper is in its lobby."); } finally { FAMILY_HOOKS.pop(); }
+    FAMILY_HOOKS.push({ key: "block", disbandBlock: async () => "A crew heist is in its lobby." });
+    try { await expect(disbandFamily(bossId, "VLA")).rejects.toThrow("A crew heist is in its lobby."); } finally { FAMILY_HOOKS.pop(); }
     let calls = 0;
-    FAMILY_HOOKS.push({ key: "flip", disbandBlock: async () => { if (++calls === 1) throw new VaultBusy(); return "A caper is in its lobby."; } });
-    try { await expect(disbandFamily(bossId, "VLA")).rejects.toThrow("A caper is in its lobby."); } finally { FAMILY_HOOKS.pop(); }
+    FAMILY_HOOKS.push({ key: "flip", disbandBlock: async () => { if (++calls === 1) throw new VaultBusy(); return "A crew heist is in its lobby."; } });
+    try { await expect(disbandFamily(bossId, "VLA")).rejects.toThrow("A crew heist is in its lobby."); } finally { FAMILY_HOOKS.pop(); }
     expect(calls).toBe(2);
     expect(await testPrisma.family.count()).toBe(1);
     FAMILY_HOOKS.push({

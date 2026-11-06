@@ -15,10 +15,10 @@ beforeEach(resetFamilies);
 describe("caper family hooks (6.4, 7.3)", () => {
   it("leave is refused while seated in a LOBBY or a RUNNING caper", async () => {
     const lobby = await seedLobby({ tier: 1, roles: ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] });
-    await expect(leaveFamily(lobby.ids.LOOKOUT)).rejects.toThrow("You are seated in a live caper. Leave its lobby with `!caper leave`, or wait for it to finish.");
+    await expect(leaveFamily(lobby.ids.LOOKOUT)).rejects.toThrow("You are seated in a live crew heist. Leave its lobby with `!heist leave`, or wait for it to finish.");
     await resetFamilies();
     const run = await seedRunning({ tier: 1, roles: ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] });
-    await expect(leaveFamily(run.ids.SAFECRACKER)).rejects.toThrow(/seated in a live caper/);
+    await expect(leaveFamily(run.ids.SAFECRACKER)).rejects.toThrow(/seated in a live crew heist/);
   });
 
   it("kicking a LOBBY seat deletes it and refunds the stake as unearned income", async () => {
@@ -45,11 +45,11 @@ describe("caper family hooks (6.4, 7.3)", () => {
 
   it("kicking a member seated in a RUNNING caper is refused", async () => {
     const { ids, bossId } = await seedRunning({ tier: 1, roles: ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] });
-    await expect(kickMember(bossId, ids.LOOKOUT)).rejects.toThrow(`<@${ids.LOOKOUT}> is in a running caper.`);
+    await expect(kickMember(bossId, ids.LOOKOUT)).rejects.toThrow(`<@${ids.LOOKOUT}> is in a running crew heist.`);
     expect(await testPrisma.familyMember.findUnique({ where: { userId: ids.LOOKOUT } })).not.toBeNull();
   });
 
-  it.each([["LOBBY", "A caper is in its lobby."], ["RUNNING", "A caper is running."], ["SETTLING", "A caper is running."]] as const)(
+  it.each([["LOBBY", "A crew heist is in its lobby."], ["RUNNING", "A crew heist is running."], ["SETTLING", "A crew heist is running."]] as const)(
     "disband is refused while a caper is %s", async (status, msg) => {
       const seeded = status === "LOBBY"
         ? await seedLobby({ tier: 1, roles: ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] })

@@ -8,16 +8,16 @@ import type { ModuleDoc } from "../types";
 const crimeFamilies: ModuleDoc = {
   slug: "crime-families",
   title: "Crime Families",
-  tagline: "A crew of up to 12 players with ranks, a vault nobody can rob, ten family levels to buy, capers you can only pull off together, and ten rackets to fight over in weekly turf wars.",
+  tagline: "A crew of up to 12 players with ranks, a vault nobody can rob, ten family levels to buy, crew heists you can only pull off together, and ten rackets to fight over in weekly turf wars.",
   icon: "Users",
   forBeginners: {
     what: "A crime family is a crew of 6 to 12 players. Members pay into a shared vault, the vault pays the family's dues and level fees, and once a week the earned part of the vault is split between the members who played. Deposits never come back out: the vault is for the family, not for parking cash.",
-    firstCommands: ["!crew", "!caper", "!turf"],
+    firstCommands: ["!crew", "!heist", "!turf"],
     tip: "You don't need to found a family to play. Joining needs 1,000,000 net worth and 20 shifts; founding needs 15,000,000, 60 shifts and 10,000,000 to burn. Get invited first.",
   },
   screenshot: {
     src: "/art/cf-caper-t4.png",
-    alt: "The Diamond Exchange Vault, the Tier 4 caper",
+    alt: "The Diamond Exchange Vault, the Tier 4 crew heist",
     caption: "Diamond Exchange Vault",
     aspect: "aspect-[960/336]",
   },
@@ -72,7 +72,7 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Ranks and permissions",
       body: [
-        "Every family has one Boss, at most one Underboss, at most three Capos and any number of Soldiers. A member who joined less than 72 hours ago shows as an Associate: they can view and deposit but can't take a caper seat or act in a war yet. The Boss is never an Associate.",
+        "Every family has one Boss, at most one Underboss, at most three Capos and any number of Soldiers. A member who joined less than 72 hours ago shows as an Associate: they can view and deposit but can't take a crew heist seat or act in a war yet. The Boss is never an Associate.",
         "!crew promote and !crew demote move a member one rank at a time, and only to a rank below your own. The chair itself moves only by !crew handover, a claim, or the automatic handover. Your rank is re-read on every press, so an old button never carries a rank you've since lost.",
       ],
       table: {
@@ -85,8 +85,8 @@ const crimeFamilies: ModuleDoc = {
           ["Kick", "anyone", "Capo and below", "Soldier only", "no", "no"],
           ["Promote / demote", "up to Underboss", "up to Capo", "no", "no", "no"],
           ["Hand over the chair", "yes", "no", "no", "no", "no"],
-          ["Plan a caper", "yes", "yes", "yes", "no", "no"],
-          ["Take a caper seat", "yes", "yes", "yes", "yes", "no"],
+          ["Plan a crew heist", "yes", "yes", "yes", "no", "no"],
+          ["Take a crew heist seat", "yes", "yes", "yes", "yes", "no"],
           ["Payday, level up, bid on a racket", "yes", "yes", "no", "no", "no"],
           ["Scout and hit in a war", "yes", "yes", "yes", "yes", "no"],
           ["Home channel, rename, disband", "yes", "no", "no", "no", "no"],
@@ -145,7 +145,7 @@ const crimeFamilies: ModuleDoc = {
         columns: ["Bucket", "Filled by", "Spent on", "Reaches a wallet?"],
         rows: [
           ["Treasury", "Member deposits, after the 5% tax", "Dues, level fees, rename, only after earnings is empty", "Never. Burned on disband."],
-          ["Earnings", "10% of every caper pool, racket income and refunded bids", "Dues, level fees, rename (first); racket bids (only from earnings); Payday", "Only through Payday"],
+          ["Earnings", "10% of every crew heist pool, racket income and refunded bids", "Dues, level fees, rename (first); racket bids (only from earnings); Payday", "Only through Payday"],
         ],
       },
     },
@@ -173,7 +173,7 @@ const crimeFamilies: ModuleDoc = {
       heading: "Dues and arrears",
       body: [
         "Once per UTC day the vault pays dues of 40,000 × the family level, earnings first. When the vault can't cover it, the family falls a day into arrears instead, and the Boss and Underboss get a DM on the first missed day. The dashboard shows how many days are owed; !crew vault shows the exact amount.",
-        "While dues are in arrears the family can't level up or bid on turf. Capers, joining, deposits, Payday and wars carry on. Every deposit and every earnings credit retries the arrears in full and clears them if the vault can pay.",
+        "While dues are in arrears the family can't level up or bid on turf. Crew heists, joining, deposits, Payday and wars carry on. Every deposit and every earnings credit retries the arrears in full and clears them if the vault can pay.",
       ],
       table: {
         title: "What the vault pays for",
@@ -203,11 +203,11 @@ const crimeFamilies: ModuleDoc = {
           ["Cap per member", "1,000,000 gross (950,000 net) per payday"],
           ["Tax", "5% of each share, burned"],
           ["Tenure", "In the family 7 days or more"],
-          ["Active member", "2 started caper seats or 3 correct war hits in the last 7 days"],
+          ["Active member", "2 started crew heist seats or 3 correct war hits in the last 7 days"],
           ["Account", "20 shifts, Discord 90 days, Fortuna 14 days, not banned; jail does not block payday"],
         ],
       },
-      note: "Being active is the gate most members miss. A member with fewer than 2 started caper seats and fewer than 3 correct war hits in the last 7 days gets nothing from this Payday.",
+      note: "Being active is the gate most members miss. A member with fewer than 2 started crew heist seats and fewer than 3 correct war hits in the last 7 days gets nothing from this Payday.",
     },
     {
       heading: "Levels",
@@ -217,7 +217,7 @@ const crimeFamilies: ModuleDoc = {
       ],
       table: {
         title: "Family levels",
-        columns: ["Level", "XP to reach", "Fee", "Members", "Racket cap", "Caper tier unlocked", "Family caper cooldown", "Crest"],
+        columns: ["Level", "XP to reach", "Fee", "Members", "Racket cap", "Crew heist tier unlocked", "Family crew heist cooldown", "Crest"],
         rows: [
           ["1", "0", "—", "6", "1", "Tier 1", "3h00", "Bronze"],
           ["2", "1,000", "2,000,000", "7", "1", "—", "3h00", "Bronze"],
@@ -241,7 +241,7 @@ const crimeFamilies: ModuleDoc = {
         title: "XP sources",
         columns: ["Source", "XP"],
         rows: [
-          ["Caper, Clean / Messy / Bust", "Tier 1 150/60/20, Tier 2 225/90/30, Tier 3 300/120/40, Tier 4 375/150/50"],
+          ["Crew heist, Clean / Messy / Bust", "Tier 1 150/60/20, Tier 2 225/90/30, Tier 3 300/120/40, Tier 4 375/150/50"],
           ["Racket cycle paid", "20 per cycle (up to 60 when 3 banked cycles pay at once), none on a neglected cycle"],
           ["Correct war hit", "5 to the hitter's family, attacking or defending"],
           ["War won by capture", "300 Corner, 450 District, 600 Crown"],
@@ -251,11 +251,11 @@ const crimeFamilies: ModuleDoc = {
       },
     },
     {
-      heading: "Capers: the family heist",
+      heading: "Crew Heists: the family job",
       body: [
-        "A caper is a heist the family runs together in one server. A Capo or higher plans it with !caper, and a lobby card posts in the channel. For 10 minutes members pick a role from the \"Join as…\" select or type !caper join <role>; every seat pays its stake when it sits down. Once the required roles are filled the planner presses Start, or the caper starts by itself the moment every seat up to the tier's maximum is taken.",
+        "A crew heist is a job the family runs together in one server. A Capo or higher plans it with !heist, and a lobby card posts in the channel. For 10 minutes members pick a role from the \"Join as…\" select or type !heist join <role>; every seat pays its stake when it sits down. Once the required roles are filled the planner presses Start, or the crew heist starts by itself the moment every seat up to the tier's maximum is taken.",
         "Then comes the GO: 120 seconds in which each member opens their own brief and answers one question. Nobody holds their own answer. Each brief shows the answer to a crewmate's question, so the crew has to talk it through in the channel. The number of wrong or missing answers decides whether the job is Clean, Messy or a Bust.",
-        "Capers are the family's main income. Every caper puts 10% of its pool into the vault's earnings and gives the family XP, and 2 started seats in 7 days is what makes a member active for Payday.",
+        "Crew heists are the family's main income. Every crew heist puts 10% of its pool into the vault's earnings and gives the family XP, and 2 started seats in 7 days is what makes a member active for Payday.",
       ],
       table: {
         title: "The four tiers",
@@ -284,7 +284,7 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Roles and prep items",
       body: [
-        "Every seat is a role, and every role needs at least one of its prep items in your inventory. Items are only checked, never used up: a caper never takes an item from you. Ten of the items are shop consumables, though, and if you use one elsewhere after joining you fail the re-check at Start and lose the seat (your stake comes back).",
+        "Every seat is a role, and every role needs at least one of its prep items in your inventory. Items are only checked, never used up: a crew heist never takes an item from you. Ten of the items are shop consumables, though, and if you use one elsewhere after joining you fail the re-check at Start and lose the seat (your stake comes back).",
         "The planner always takes the Mastermind seat. Every role has at least one item that is not a consumable, so you never need to rebuy gear for a seat.",
         "Your best owned item for the role sets your seat's bonus at Start. The crew edge is the average bonus over the filled seats, and it lowers the patrol chance (see Outcome math). The weakest items give an edge of 0.0733 (3 seats) to 0.08 (6 seats); the best items give 0.1333 (3 or 6 seats), 0.13 (4 seats) or 0.132 (5 seats).",
       ],
@@ -323,15 +323,15 @@ const crimeFamilies: ModuleDoc = {
       },
     },
     {
-      heading: "A caper, step by step",
+      heading: "A crew heist, step by step",
       body: [
-        "Plan. A Capo, Underboss or Boss runs !caper and picks a tier, or types !caper plan <1-4>. The family's level must unlock the tier, the family can't be under investigation (3 or more members at heat 100 or above), the family cooldown must be over, the family must have started fewer than 4 capers in the last 24 hours, and the planner must pass every seat gate for the Mastermind seat. The planner's stake is taken at once. If the bot can't post in the channel, the lobby goes to the family's home channel when it is in the same server; otherwise the plan is refused with the missing permission.",
-        "Lobby: 10 minutes. The card lists every open role. Members who aren't seated, are in this server, pass the tier's gates and have a free seat get a \"Caper lobby open\" DM with a link (at most 3 lobby calls a day, and none for 2 hours after a lobby is cancelled). Joining works from the card or with !caper join <role> anywhere in the lobby's server; another channel gets a small \"joined\" card with a link back. Role names ignore case and spaces, so \"safe cracker\" works.",
-        "Leave before Start with the Leave button or !caper leave, and your stake comes straight back. If the Mastermind leaves, the whole caper is cancelled and every stake is refunded.",
-        "Start. The planner presses Start (or types !caper start) once the required roles are filled; the caper also starts on its own when the last seat up to the maximum fills, or when the lobby closes with the required roles filled. Start re-checks every seat: jail, ban, heat, net worth (your paid stake counts towards it), prep items and your seat count. A seat that fails is removed and refunded and the card says it \"got pinched\". If that leaves a required role empty, the lobby stays open until its 10 minutes are up. From Start the stakes are spent, and the family cooldown begins.",
-        "GO: 120 seconds. A new message mentions every crew member with an Open brief button, and each member gets a \"Caper GO\" DM. Open your brief (the button or !caper brief), press Refresh to see the time left and any leaked intel, and lock one of the 4 options. One answer per member, and it can't be changed. The card shows how many have locked in, never who is right.",
-        "Result. The caper resolves the moment the last answer locks, or when the GO ends. The result card lists every seat's cut, fine and jail time. There is no result DM.",
-        "If the lobby closes without its required roles, or the planner or the Boss cancels it (!caper cancel), every stake is refunded and the family waits 30 minutes before the next caper. If the bot restarts during a GO before every seat has answered, the run is void: every stake is refunded and nothing else happens (no heat, fine, jail, XP or vault cut), and the void run doesn't count towards anyone's seat limit or the family's 4 a day.",
+        "Plan. A Capo, Underboss or Boss runs !heist and picks a tier, or types !heist plan <1-4>. The family's level must unlock the tier, the family can't be under investigation (3 or more members at heat 100 or above), the family cooldown must be over, the family must have started fewer than 4 crew heists in the last 24 hours, and the planner must pass every seat gate for the Mastermind seat. The planner's stake is taken at once. If the bot can't post in the channel, the lobby goes to the family's home channel when it is in the same server; otherwise the plan is refused with the missing permission.",
+        "Lobby: 10 minutes. The card lists every open role. Members who aren't seated, are in this server, pass the tier's gates and have a free seat get a \"Crew heist lobby open\" DM with a link (at most 3 lobby calls a day, and none for 2 hours after a lobby is cancelled). Joining works from the card or with !heist join <role> anywhere in the lobby's server; another channel gets a small \"joined\" card with a link back. Role names ignore case and spaces, so \"safe cracker\" works.",
+        "Leave before Start with the Leave button or !heist leave, and your stake comes straight back. If the Mastermind leaves, the whole crew heist is cancelled and every stake is refunded.",
+        "Start. The planner presses Start (or types !heist start) once the required roles are filled; the crew heist also starts on its own when the last seat up to the maximum fills, or when the lobby closes with the required roles filled. Start re-checks every seat: jail, ban, heat, net worth (your paid stake counts towards it), prep items and your seat count. A seat that fails is removed and refunded and the card says it \"got pinched\". If that leaves a required role empty, the lobby stays open until its 10 minutes are up. From Start the stakes are spent, and the family cooldown begins.",
+        "GO: 120 seconds. A new message mentions every crew member with an Open brief button, and each member gets a \"Crew heist GO\" DM. Open your brief (the button or !heist brief), press Refresh to see the time left and any leaked intel, and lock one of the 4 options. One answer per member, and it can't be changed. The card shows how many have locked in, never who is right.",
+        "Result. The crew heist resolves the moment the last answer locks, or when the GO ends. The result card lists every seat's cut, fine and jail time. There is no result DM.",
+        "If the lobby closes without its required roles, or the planner or the Boss cancels it (!heist cancel), every stake is refunded and the family waits 30 minutes before the next crew heist. If the bot restarts during a GO before every seat has answered, the run is void: every stake is refunded and nothing else happens (no heat, fine, jail, XP or vault cut), and the void run doesn't count towards anyone's seat limit or the family's 4 a day.",
       ],
       table: {
         title: "Seat gates, checked in this order",
@@ -343,7 +343,7 @@ const crimeFamilies: ModuleDoc = {
           ["4", "Lifetime shifts, Fortuna profile age and Discord account age for the tier"],
           ["5", "Net worth for the tier, counted fresh (never the cached leaderboard figure)"],
           ["6", "Owns at least one prep item for the role"],
-          ["7", "No other live caper seat"],
+          ["7", "No other live crew heist seat"],
           ["8", "Fewer than 2 started seats in the last 24 hours"],
         ],
       },
@@ -351,9 +351,9 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Outcome math",
       body: [
-        "A miss is a wrong answer, a seat that never locked one, or a dark seat. Misses decide the outcome; with no misses, one roll against the patrol chance decides between Clean and Messy (\"a patrol car turned the corner\"). The roll is drawn once when the caper resolves and stored, so a restart can never re-roll it.",
+        "A miss is a wrong answer, a seat that never locked one, or a dark seat. Misses decide the outcome; with no misses, one roll against the patrol chance decides between Clean and Messy (\"a patrol car turned the corner\"). The roll is drawn once when the crew heist resolves and stored, so a restart can never re-roll it.",
         "Patrol chance = the tier's patrol base × (1 − crew edge) + 0.002 × the highest heat in the crew at Start, capped at 60%. Because the heat ceiling caps that heat (39 at most at Tier 4), heat adds at most 7.8 points at Tier 4 and 13.8 at Tier 1. Example: a Tier 4 crew with edge 0.10 and heat 0 has a patrol chance of 22.5%.",
-        "No buff, luck charm or income multiplier ever touches a caper, and caper cuts pay no income tax: the fence below takes its place.",
+        "No buff, luck charm or income multiplier ever touches a crew heist, and crew heist cuts pay no income tax: the fence below takes its place.",
       ],
       table: {
         title: "Misses and the outcome",
@@ -401,16 +401,16 @@ const crimeFamilies: ModuleDoc = {
       },
     },
     {
-      heading: "Caper caps and cooldowns",
+      heading: "Crew heist caps and cooldowns",
       body: [
-        "Seats and family capers are counted over a rolling 24 hours from each Start, not per UTC day. When your second seat in 24 hours starts, the bot DMs you the moment your first seat frees up (the \"Family caper\" cooldown alarm in !settings).",
+        "Seats and family crew heists are counted over a rolling 24 hours from each Start, not per UTC day. When your second seat in 24 hours starts, the bot DMs you the moment your first seat frees up (the \"Crew heist\" cooldown alarm in !settings).",
       ],
       table: {
         title: "Limits",
         columns: ["Limit", "Value"],
         rows: [
           ["Seats per player", "2 started seats per rolling 24 hours; 1 live seat at a time"],
-          ["Capers per family", "4 started per rolling 24 hours; 1 live at a time"],
+          ["Crew heists per family", "4 started per rolling 24 hours; 1 live at a time"],
           ["Family cooldown, from Start", "3h00 at L1–3, 2h45 at L4–5, 2h30 at L6–8, 2h00 at L9–10"],
           ["Cancelled or expired lobby", "30 minutes"],
           ["Lobby / GO / leak point", "10 minutes / 120 seconds / the last 30 seconds of the GO"],
@@ -426,7 +426,7 @@ const crimeFamilies: ModuleDoc = {
       ],
       table: {
         title: "Per-step pass rate 90%",
-        columns: ["Tier", "Seats", "Clean", "Messy", "Bust", "Gross per seat", "Stake", "Expected fine", "Net per caper", "Net per day (2 seats)", "Vault per caper"],
+        columns: ["Tier", "Seats", "Clean", "Messy", "Bust", "Gross per seat", "Stake", "Expected fine", "Net per crew heist", "Net per day (2 seats)", "Vault per crew heist"],
         rows: [
           ["1", "3", "66.34%", "30.86%", "2.80%", "215,993", "50,000", "4,200", "161,793", "323,586", "80,997"],
           ["1", "4", "59.71%", "35.06%", "5.23%", "201,538", "50,000", "7,845", "143,693", "287,386", "100,769"],
@@ -447,7 +447,7 @@ const crimeFamilies: ModuleDoc = {
       ],
       table: {
         title: "Per-step pass rate 95%",
-        columns: ["Tier", "Seats", "Net per caper", "Net per day (2 seats)"],
+        columns: ["Tier", "Seats", "Net per crew heist", "Net per day (2 seats)"],
         rows: [
           ["1", "4", "179,422", "358,844"],
           ["2", "5", "244,900", "489,800"],
@@ -464,7 +464,7 @@ const crimeFamilies: ModuleDoc = {
       ],
       table: {
         title: "Per-step pass rate 100%",
-        columns: ["Tier", "Clean (edge 0.10)", "Net per caper", "Net per day", "Best gear: net per day (seats, edge)", "Paid out per caper, crew + vault (max seats, best gear)"],
+        columns: ["Tier", "Clean (edge 0.10)", "Net per crew heist", "Net per day", "Best gear: net per day (seats, edge)", "Paid out per crew heist, crew + vault (max seats, best gear)"],
         rows: [
           ["1", "91.0%", "213,620", "427,240", "428,453 (3, 0.1333)", "1,188,747 (4, 0.13)"],
           ["2", "86.5%", "301,390", "602,780", "605,526 (5, 0.132)", "2,265,541 (5, 0.132)"],
@@ -474,7 +474,7 @@ const crimeFamilies: ModuleDoc = {
       },
     },
     {
-      heading: "Getting better at capers",
+      heading: "Getting better at crew heists",
       body: [
         "Open your brief early, well before the last 30 seconds. A brief opened late makes your seat dark: you can't answer, it counts as a miss, and your partner reads your intel as a leak instead of hearing it from you.",
         "Say your intel to the right person. Your brief names who needs it (the seat before you in the ring), and the answer you need is with someone else. Call it in the channel with their name, read your own answer back, and only then lock. A wrong lock can't be undone.",
@@ -513,7 +513,7 @@ const crimeFamilies: ModuleDoc = {
       heading: "How rackets pay",
       body: [
         "Nobody collects a racket. A job runs at five past every hour (UTC) and pays each owned racket for every full 24-hour cycle since its last payout, straight into the family's earnings. Members only see racket money through Payday. A captured racket's first cycle starts the moment it is captured, and whatever was left of the old owner's cycle is lost, never paid.",
-        "A cycle pays only if the family has at least 3 racket-eligible members when it falls due. A racket-eligible member has been in the family 72 hours or more, has 20 or more lifetime shifts, a Discord account 90 days or older, isn't banned, and is an active member: 2 started caper seats or 3 correct war hits in the last 7 days. Jail does not count against it.",
+        "A cycle pays only if the family has at least 3 racket-eligible members when it falls due. A racket-eligible member has been in the family 72 hours or more, has 20 or more lifetime shifts, a Discord account 90 days or older, isn't banned, and is an active member: 2 started crew heist seats or 3 correct war hits in the last 7 days. Jail does not count against it.",
         "A cycle with fewer than 3 racket-eligible members pays nothing and is a neglect strike instead. Each strike sends a \"Turf wars\" DM to the Boss, the Underboss and every member who isn't racket-eligible. On the third strike the racket goes back to the Street and every member gets a DM. A cycle that pays resets the strikes to 0.",
         "Like property rent, a racket banks at most 3 cycles. If the bot was down for 2 days, the next tick pays 2 cycles at once; after 3 days or more it pays 3 and the rest is lost. A tick that finds 3 neglected cycles at once strikes all 3 and releases the racket.",
         "Every racket credit also retries any dues the family owes, so racket income clears arrears on its own.",
@@ -640,7 +640,7 @@ const crimeFamilies: ModuleDoc = {
         "Call weak points in the home channel the moment you see them, with the block and the time it runs out (\"Docks: Pier 4 till :25\"). A hit called from a scout scores 10; a guess scores 2.5 on average and still costs 25,000.",
         "Save hits for the blackout. Your 6 hits are 600 seconds apart, so a member who hits at the start can still land the sixth at the 50-minute mark, right as the scores go dark. The other side can't see where you're pushing, and a defender who thought a block was safe can't react.",
         "Bid late, but before the close. Bidding shuts 1 hour before the war and a raise must beat the top bid by 10%, so an early bid only sets the price for everyone else. Have the Boss or Underboss ready in the last few hours, with the earnings in the vault (bids can't touch the treasury).",
-        "A cycle pays nothing if, when it falls due, fewer than 3 members are racket-eligible (72 h in the family, 20 shifts, and 2 started caper seats or 3 correct war hits in the last 7 days), and three such cycles lose the racket without a fight.",
+        "A cycle pays nothing if, when it falls due, fewer than 3 members are racket-eligible (72 h in the family, 20 shifts, and 2 started crew heist seats or 3 correct war hits in the last 7 days), and three such cycles lose the racket without a fight.",
         "Defend above the baseline only when the attacker is scoring. Every defender hit costs 25,000; against an attacker who isn't landing hits the baseline holds on its own, and ties go to you. Watch the board and spend your hits on the blocks they are actually taking, before the blackout hides them.",
       ],
     },
@@ -648,7 +648,7 @@ const crimeFamilies: ModuleDoc = {
       heading: "Succession",
       body: [
         "Any !crew command or family button keeps you marked active. A Boss who goes quiet doesn't freeze the family.",
-        "The automatic heir is the Underboss; if there isn't one, the Capo who joined first; then the Soldier with the most capers, ties to who joined first. The heir must have been active in the last 7 days; if nobody qualifies, nothing changes. The old Boss becomes a Soldier.",
+        "The automatic heir is the Underboss; if there isn't one, the Capo who joined first; then the Soldier with the most crew heists, ties to who joined first. The heir must have been active in the last 7 days; if nobody qualifies, nothing changes. The old Boss becomes a Soldier.",
       ],
       table: {
         title: "When the Boss goes inactive",
@@ -680,12 +680,12 @@ const crimeFamilies: ModuleDoc = {
         "Recruit players who will actually play. Payday pays only members who were active in the last 7 days, and the split is per eligible member, so a big roster of idle friends earns nothing and dilutes nothing either. Twelve members who play are worth more than twelve names.",
         "Deposit to keep pace with your XP, not ahead of it. A level needs its XP before the fee matters, and the fee is all the treasury is for. Parking money in the vault before the family has the XP only locks it away for good.",
         "Keep dues paid. At L10 dues are 400,000 a day; a few dry days put the family in arrears and block levelling until a deposit or a payout of earnings clears them. A steady stream of small deposits is cheaper than one rescue.",
-        "Decide each week: pay out or level up. Earnings pay the fee or go out as Payday, never both. A young family usually levels first, since each level unlocks bigger capers and more members; a family at L8 or above can pay out the 950,000-a-member cap and still fund the last fees from what the cap leaves behind.",
+        "Decide each week: pay out or level up. Earnings pay the fee or go out as Payday, never both. A young family usually levels first, since each level unlocks bigger crew heists and more members; a family at L8 or above can pay out the 950,000-a-member cap and still fund the last fees from what the cap leaves behind.",
         "Pick an Underboss you trust and who logs in. They can run Payday and level up, and they take the chair if you vanish for 14 days.",
       ],
     },
   ],
-  commandIds: ["crew", "caper", "turf", "family"],
+  commandIds: ["crew", "heist", "turf", "family"],
   proTips: [
     "Treasury never reaches a wallet, even on disband. Deposit only what the family will spend on dues and level fees.",
     "\"!crew deposit all\" stops at the 25,000,000 daily cap, so it never refuses a big wallet.",

@@ -23,7 +23,7 @@ describe("brief and lock (8.4 step 6)", () => {
     await resetFamilies();
     const { caper, ids } = await seedRunning({ tier: 1, roles: [...R] });
     await expect(openBrief(caper.id, ids.LOOKOUT, caper.goEndsAt)).rejects.toThrow("Too late.");
-    await expect(openBrief(caper.id, "999999999999999999")).rejects.toThrow("You are not in this caper.");
+    await expect(openBrief(caper.id, "999999999999999999")).rejects.toThrow("You are not in this crew heist.");
     await testPrisma.caper.update({ where: { id: caper.id }, data: { status: "RESOLVED", liveSlot: caper.id } });
     await expect(openBrief(caper.id, ids.LOOKOUT, caper.startedAt)).rejects.toThrow("Too late.");
     await expect(lockChoice(caper.id, ids.LOOKOUT, 0, caper.startedAt)).rejects.toThrow("Too late.");

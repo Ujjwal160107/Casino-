@@ -36,10 +36,10 @@ describe("family DM notices (13.4)", () => {
 });
 
 describe("caper DM notices (13.4)", () => {
-  it("caper is a cooldown reminder for !caper; caper_lobby is an account notice with no command", () => {
-    expect(DM_NOTICE_TYPES.caper).toEqual({ label: "Family caper", command: "!caper", group: "cooldown" });
+  it("caper is a cooldown reminder for !heist; caper_lobby is an account notice with no command", () => {
+    expect(DM_NOTICE_TYPES.caper).toEqual({ label: "Crew heist", command: "!heist", group: "cooldown" });
     expect(isCooldownReminderType("caper")).toBe(true);
-    expect(DM_NOTICE_TYPES.caper_lobby).toEqual({ label: "Caper lobby calls", group: "account" });
+    expect(DM_NOTICE_TYPES.caper_lobby).toEqual({ label: "Crew heist lobby", group: "account" });
     expect(isCooldownReminderType("caper_lobby")).toBe(false);
   });
   it("the lobby call names the tier, stake and close time and links the card", () => {

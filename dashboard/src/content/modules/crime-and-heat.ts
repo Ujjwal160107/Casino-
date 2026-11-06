@@ -29,7 +29,7 @@ const crimeAndHeat: ModuleDoc = {
       heading: "Tiers, payouts, and fines",
       body: [
         "Tier determines stages, time pressure, payout, fine, and jail risk. Starting a crime spends its one-hour cooldown whether you win or lose.",
-        "Legendary heists are solo. For crew jobs see Crime Families: Capers.",
+        "Legendary heists are solo. For crew jobs see Crime Families: Crew Heists.",
       ],
       table: {
         title: "Crime tiers",

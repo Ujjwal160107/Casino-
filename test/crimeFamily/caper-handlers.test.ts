@@ -32,7 +32,7 @@ describe("cpr: planner routes", () => {
     const { ids } = await caperCrew({ tier: 1, roles: [...R3] });
     const fc = fakeCaperClient();
     const i = await press(fakeSelect(CPR_IDS.plan(ids.LOOKOUT), ["1"], { userId: ids.LOOKOUT, guildId: G, channelId: CH, client: fc.client }));
-    expect(said(i)).toContain("Only a Capo or above can plan a caper.");
+    expect(said(i)).toContain("Only a Capo or above can plan a crew heist.");
     expect(await testPrisma.caper.count()).toBe(0);
   }));
 
@@ -72,7 +72,7 @@ describe("cpr: lobby and GO routes", () => {
     const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
     const i = await press(fakeSelect(CPR_IDS.join(c.id), ["LOOKOUT"], { userId: f.ids.LOOKOUT, guildId: "g2", client: fakeCaperClient().client }));
     expect(i.order[0]).toBe("deferUpdate");
-    expect(said(i)).toContain("This caper is in another server; join that server to play.");
+    expect(said(i)).toContain("This crew heist is in another server; join that server to play.");
     expect(await testPrisma.caperCrew.count({ where: { caperId: c.id } })).toBe(1);
   }));
 

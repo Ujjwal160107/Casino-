@@ -220,15 +220,15 @@ Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`. Shi
 
 - **Founding** burns 10,000,000 from the wallet. Gates: net worth ≥ 15M (uncached), ≥ 60 lifetime shifts, Fortuna age ≥ 30 days, Discord age ≥ 180 days, heat < 70, not jailed or banned, hop cooldown clear, 7 days after disbanding as Boss.
 - **Joining** needs net worth ≥ 1M, ≥ 20 shifts, Fortuna ≥ 14 days, Discord ≥ 90 days, not jailed or banned. Invite caps: 5 pending per family, 3 accepted per inviter and 5 joins per family per rolling 7 days.
-- **Vault:** `treasury` (deposits, locked forever, burned on disband) and `earnings` (caper vault cut, racket income, refunded bids). Spends take earnings first. Deposits: wallet only, min 10,000, cap 25,000,000 per member per UTC day, 5% tax burned inline (never `applyTransferTax`), 0 XP.
+- **Vault:** `treasury` (deposits, locked forever, burned on disband) and `earnings` (crew heist vault cut, racket income, refunded bids). Spends take earnings first. Deposits: wallet only, min 10,000, cap 25,000,000 per member per UTC day, 5% tax burned inline (never `applyTransferTax`), 0 XP.
 - **Dues:** 40,000 × level per UTC day from the vault. A missed day adds a day of arrears, which blocks level-ups and bids until a deposit or earnings credit clears it.
-- **Payday** (the only vault exit): every 7 days, earnings ≥ 500,000, Boss or Underboss (auto 24 h after due). Eligible: 7 days of tenure, an active member (≥ 2 started caper seats or ≥ 3 correct war hits in 7 days), ≥ 20 shifts, Discord ≥ 90 days, Fortuna ≥ 14 days. `gross = min(floor(E / N), 1,000,000)`, 5% tax burned, so at most 950,000 net per member per week.
+- **Payday** (the only vault exit): every 7 days, earnings ≥ 500,000, Boss or Underboss (auto 24 h after due). Eligible: 7 days of tenure, an active member (≥ 2 started crew heist seats or ≥ 3 correct war hits in 7 days), ≥ 20 shifts, Discord ≥ 90 days, Fortuna ≥ 14 days. `gross = min(floor(E / N), 1,000,000)`, 5% tax burned, so at most 950,000 net per member per week.
 - **Disband** burns treasury and earnings after a capped final payday (only if the last payday was ≥ 7 days ago).
 - The vault is excluded from net worth and every leaderboard.
 
 **Family levels** (XP cumulative and never spent; the fee comes from the vault, earnings first, and is burned; fees L2 → L10 total 172,000,000; no level grants a money multiplier):
 
-| Level | XP to reach | Fee | Member cap | Racket cap | Tier unlocked | Family caper cooldown | Crest |
+| Level | XP to reach | Fee | Member cap | Racket cap | Tier unlocked | Family crew heist cooldown | Crest |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 0 | — | 6 | 1 | T1 | 3h00 | `cf_crest_1` bronze |
 | 2 | 1,000 | 2,000,000 | 7 | 1 | — | 3h00 | `cf_crest_1` |
@@ -245,13 +245,13 @@ Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`. Shi
 
 | Source | XP |
 | --- | --- |
-| Caper Clean / Messy / Bust | T1 150/60/20, T2 225/90/30, T3 300/120/40, T4 375/150/50 |
+| Crew heist Clean / Messy / Bust | T1 150/60/20, T2 225/90/30, T3 300/120/40, T4 375/150/50 |
 | Racket cycle minted | 20 per cycle (none on a neglected cycle) |
 | Correct war hit | 5 to the hitter's family |
 | War won | capture 300 / 450 / 600 (Corner / District / Crown, 300 × 1 / 1.5 / 2); defence the same, only if the attacker scored ≥ 1 correct hit on ≥ 2 blocks |
 | Deposits, payday, scouting | 0 |
 
-**XP pacing** (p = 0.90, edge 0.10, full roster passing each tier's gates, 4 capers a day: T1 n=4 at L1–2, T2 n=5 at L3–4, T3 n=6 at L5–7, T4 n=6 at L8+; XP/day ≈ 447 / 634 / 788 / 964; vault EV/day 403,076 / 746,908 / 1,280,528 / 1,763,036 before dues; no rackets, no payday). A level needs both XP and fee, so the fee sets the pace:
+**XP pacing** (p = 0.90, edge 0.10, full roster passing each tier's gates, 4 crew heists a day: T1 n=4 at L1–2, T2 n=5 at L3–4, T3 n=6 at L5–7, T4 n=6 at L8+; XP/day ≈ 447 / 634 / 788 / 964; vault EV/day 403,076 / 746,908 / 1,280,528 / 1,763,036 before dues; no rackets, no payday). A level needs both XP and fee, so the fee sets the pace:
 
 | Level reached | By XP alone (day) | Member deposits needed to keep the XP pace (cumulative) | With no deposits (day) |
 | --- | --- | --- | --- |
@@ -262,14 +262,14 @@ Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`. Shi
 
 **Daily income per member by band** (p = 0.90, edge 0.10; payday is a range because earnings either pay level fees or go out as Payday, never both; share is of the band floor):
 
-| Band | Band income/day | Reachable tiers | Assumed family | Caper net/day (2 seats) | Payday net/day | Feature total/day | Share of band floor |
+| Band | Band income/day | Reachable tiers | Assumed family | Crew heist net/day (2 seats) | Payday net/day | Feature total/day | Share of band floor |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Week 1 | 1–1.5M | none (14-day Fortuna gate) | — | 0 | 0 | 0 | 0% |
-| Weeks 2–4 | 3–6M | T1 only | L3, 8 members, 4 T1 capers/day (n=4), 1 Corner racket | 287,386 | 0 – 69,240 | 287,386 – 356,626 | 9.6–11.9% |
-| Month 2+ | 8–15M | T3, T4 | L8, 12 members passing the T4 seat gates, 4 T4 capers/day (n=6), 1 District + 1 Crown held | 487,836 (T3) – 551,584 (T4) | 0 – 135,714 (cap) | 487,836 – 687,298 | 6.1–8.6% |
+| Weeks 2–4 | 3–6M | T1 only | L3, 8 members, 4 T1 crew heists/day (n=4), 1 Corner racket | 287,386 | 0 – 69,240 | 287,386 – 356,626 | 9.6–11.9% |
+| Month 2+ | 8–15M | T3, T4 | L8, 12 members passing the T4 seat gates, 4 T4 crew heists/day (n=6), 1 District + 1 Crown held | 487,836 (T3) – 551,584 (T4) | 0 – 135,714 (cap) | 487,836 – 687,298 | 6.1–8.6% |
 | Any band, perfect play | — | T4 | as above, p = 1.0, best gear | 1,049,600 | 135,714 | 1,185,314 | 14.8% of the Month 2+ floor |
 
-**Capers** (`!caper`, alias `!capers`, `/caper`; spec section 8). A Capo+ plans a tier; a 600 s lobby fills role seats (each seat pays its stake on join, refunded on leave, cancel or VOID); Start re-validates every seat (the net-worth check counts the stake already paid) and burns the stakes; a 120 s GO follows in which each seat answers one 4-option call whose answer only the next seat in the ring holds. A seat that has not opened its brief before the last 30 s is dark: it is a miss and its partner sees the answer leaked. Misses `k` (wrong, unlocked or dark): BUST at `k ≥ 2` (n ≤ 4) or `k ≥ 3` (n ≥ 5), MESSY at `k ≥ 1`, else MESSY if `roll < q` and CLEAN otherwise, with `q = min(0.60, base × (1 − edge) + 0.002 × H)`, edge = mean best prep bonus over the seats, H = hottest seat's heat at Start, the roll drawn once at settlement. No buff, luck or `applyIncomeModifiers` touches caper money and no income tax applies (the fence replaces it). Limits: 2 started seats per player and 4 started capers per family per rolling 24 h; 1 live seat and 1 live caper; family cooldown from Start 3h00 (L1–3), 2h45 (L4–5), 2h30 (L6–8), 2h00 (L9–10); 30 min after a cancelled or expired lobby. Prep items are checked, never consumed.
+**Crew Heists** (`!heist`, aliases `!crewheist`, `!caper`, `!capers`, `/heist`; "caper" in code; spec section 8). A Capo+ plans a tier; a 600 s lobby fills role seats (each seat pays its stake on join, refunded on leave, cancel or VOID); Start re-validates every seat (the net-worth check counts the stake already paid) and burns the stakes; a 120 s GO follows in which each seat answers one 4-option call whose answer only the next seat in the ring holds. A seat that has not opened its brief before the last 30 s is dark: it is a miss and its partner sees the answer leaked. Misses `k` (wrong, unlocked or dark): BUST at `k ≥ 2` (n ≤ 4) or `k ≥ 3` (n ≥ 5), MESSY at `k ≥ 1`, else MESSY if `roll < q` and CLEAN otherwise, with `q = min(0.60, base × (1 − edge) + 0.002 × H)`, edge = mean best prep bonus over the seats, H = hottest seat's heat at Start, the roll drawn once at settlement. No buff, luck or `applyIncomeModifiers` touches crew heist money and no income tax applies (the fence replaces it). Limits: 2 started seats per player and 4 started crew heists per family per rolling 24 h; 1 live seat and 1 live crew heist; family cooldown from Start 3h00 (L1–3), 2h45 (L4–5), 2h30 (L6–8), 2h00 (L9–10); 30 min after a cancelled or expired lobby. Prep items are checked, never consumed.
 
 | | T1 | T2 | T3 | T4 |
 | --- | --- | --- | --- | --- |
@@ -291,7 +291,7 @@ Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`. Shi
 | Seat gate: Discord age / family tenure | ≥ 90 d / ≥ 72 h | same | same | same |
 | Family XP Clean / Messy / Bust | 150 / 60 / 20 | 225 / 90 / 30 | 300 / 120 / 40 | 375 / 150 / 50 |
 
-**Caper payout.** `pool = B × n × fPct / 100` (CLEAN 100, MESSY 35, BUST 0; n = seats at Start); `crewShare = floor(pool × 80 / 100)` minted to wallets as `caper_cut` (earned, so garnishment applies); `vaultCut = floor(pool × 10 / 100)` minted to earnings; the last 10% is the fence (N1), never minted. Every seat weighs 1.00: `cut = floor(crewShare / n)` for each seat that locked a choice, 0 for an unlocked or dark seat; that share and the rounding remainder (N2) are never minted. A Bust fines every seat (`caper_fine`, wallet then bank, may go into debt) and rolls jail per seat; every seat takes the outcome's heat. Exact cuts (every seat locked):
+**Crew heist payout.** `pool = B × n × fPct / 100` (CLEAN 100, MESSY 35, BUST 0; n = seats at Start); `crewShare = floor(pool × 80 / 100)` minted to wallets as `caper_cut` (earned, so garnishment applies); `vaultCut = floor(pool × 10 / 100)` minted to earnings; the last 10% is the fence (N1), never minted. Every seat weighs 1.00: `cut = floor(crewShare / n)` for each seat that locked a choice, 0 for an unlocked or dark seat; that share and the rounding remainder (N2) are never minted. A Bust fines every seat (`caper_fine`, wallet then bank, may go into debt) and rolls jail per seat; every seat takes the outcome's heat. Exact cuts (every seat locked):
 
 | Tier | n | Pool (Clean) | Crew share | Vault cut | Cut, Clean | Pool (Messy) | Vault cut, Messy | Cut, Messy |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -304,9 +304,9 @@ Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`. Shi
 | T4 | 5 | 6,000,000 | 4,800,000 | 600,000 | 960,000 | 2,100,000 | 210,000 | 336,000 |
 | T4 | 6 | 7,200,000 | 5,760,000 | 720,000 | 960,000 | 2,520,000 | 252,000 | 336,000 |
 
-**Caper expected value per seat** (edge 0.10, heat 0, every seat locks; net = gross cut − stake − expected fine; pinned by `test/crimeFamily/caper-math.test.ts`). Realistic play, per-step pass rate p = 0.90:
+**Crew heist expected value per seat** (edge 0.10, heat 0, every seat locks; net = gross cut − stake − expected fine; pinned by `test/crimeFamily/caper-math.test.ts`). Realistic play, per-step pass rate p = 0.90:
 
-| Tier | n | P(Clean) | P(Messy) | P(Bust) | Gross EV/seat | Stake | E[fine] | Net/caper | Net/day (2 seats) | Vault EV/caper |
+| Tier | n | P(Clean) | P(Messy) | P(Bust) | Gross EV/seat | Stake | E[fine] | Net/crew heist | Net/day (2 seats) | Vault EV/crew heist |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | T1 | 3 | 66.34% | 30.86% | 2.80% | 215,993 | 50,000 | 4,200 | 161,793 | 323,586 | 80,997 |
 | T1 | 4 | 59.71% | 35.06% | 5.23% | 201,538 | 50,000 | 7,845 | 143,693 | 287,386 | 100,769 |
@@ -317,11 +317,11 @@ Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`. Shi
 | T4 | 5 | 45.76% | 53.38% | 0.86% | 618,685 | 300,000 | 6,420 | 312,265 | 624,530 | 386,678 |
 | T4 | 6 | 41.19% | 57.23% | 1.58% | 587,679 | 300,000 | 11,887 | 275,792 | 551,584 | 440,759 |
 
-Strong crew, p = 0.95, net per caper (per day): T1 n=4 179,422 (358,844); T2 n=5 244,900 (489,800); T3 n=6 327,781 (655,562); T4 n=6 389,069 (778,138).
+Strong crew, p = 0.95, net per crew heist (per day): T1 n=4 179,422 (358,844); T2 n=5 244,900 (489,800); T3 n=6 327,781 (655,562); T4 n=6 389,069 (778,138).
 
 Perfect play, p = 1.0 (only the patrol roll):
 
-| Tier | Edge 0.10: P(Clean) | Net/caper | Net/day | Worst case, best gear: net/day (n, edge) | Mint per caper (crew + vault), max crew, best gear |
+| Tier | Edge 0.10: P(Clean) | Net/crew heist | Net/day | Worst case, best gear: net/day (n, edge) | Mint per crew heist (crew + vault), max crew, best gear |
 | --- | --- | --- | --- | --- | --- |
 | T1 | 91.0% | 213,620 | 427,240 | 428,453 (n=3, 0.1333) | 1,188,747 (n=4, 0.13) |
 | T2 | 86.5% | 301,390 | 602,780 | 605,526 (n=5, 0.132) | 2,265,541 (n=5, 0.132) |
@@ -357,8 +357,8 @@ Total racket income (source S3): at most 6,400,000 per day (44,800,000 per week)
 
 | # | Flow | Kind | Amount | Bound |
 | --- | --- | --- | --- | --- |
-| S1 | Caper crew cut | mint → wallets | 0.80 × B × n × f | 2 seats/player/rolling 24 h; 4 capers/family/rolling 24 h |
-| S2 | Caper vault cut | mint → earnings | 0.10 × B × n × f | same |
+| S1 | Crew heist crew cut | mint → wallets | 0.80 × B × n × f | 2 seats/player/rolling 24 h; 4 crew heists/family/rolling 24 h |
+| S2 | Crew heist vault cut | mint → earnings | 0.10 × B × n × f | same |
 | S3 | Racket income | mint → earnings | 300k / 650k / 1.3M per cycle | 6,400,000/day bot-wide; needs ≥ 3 eligible members |
 | T1 | Payday | earnings → wallets | gross ≤ 1,000,000 per member per week | once per 7 days; equal split |
 | T2 | Stake refund (before Start, cancel, VOID) | return, `earned = false` | 50k–300k | — |
@@ -368,7 +368,7 @@ Total racket income (source S3): at most 6,400,000 per day (44,800,000 per week)
 | K2 | Rename | sink | 2,000,000 | per 30 days |
 | K3 | Level-up fees | sink | 2M → 50M (172M total) | per level |
 | K4 | Daily dues | sink | 40,000 × level/day | — |
-| K5 | Caper stake | sink | 50k / 100k / 175k / 300k per seat per run | every started run |
+| K5 | Crew heist stake | sink | 50k / 100k / 175k / 300k per seat per run | every started run |
 | K6 | Bust fine | sink | 150k / 300k / 500k / 750k per seat | 0.9–5.2% of runs at p = 0.90 |
 | K7 | Deposit tax | sink | 5% | — |
 | K8 | Payday tax | sink | 5% | — |
@@ -377,9 +377,9 @@ Total racket income (source S3): at most 6,400,000 per day (44,800,000 per week)
 | K11 | Treasury and earnings on disband | sink | full balance after the capped final payday | — |
 | — | Heat → Fixer and raids | not counted | existing code, unchanged | — |
 | N1 | Fence | never minted | 0.10 × pool | — |
-| N2 | Cut rounding remainder | never minted | < n Fortunes per caper | — |
+| N2 | Cut rounding remainder | never minted | < n Fortunes per crew heist | — |
 | N3 | Neglected racket cycles | never minted | full cycle | — |
-| N4 | Wallet overflow on a caper cut | never minted | excess over `MAX_SAFE_BALANCE` | recorded in `meta.capped` |
+| N4 | Wallet overflow on a crew heist cut | never minted | excess over `MAX_SAFE_BALANCE` | recorded in `meta.capped` |
 
 ## Money Sinks
 
@@ -392,7 +392,7 @@ Total racket income (source S3): at most 6,400,000 per day (44,800,000 per week)
 - Casino house edge.
 - Card interest on missed payments.
 - Property resale at 75%.
-- Crime Families: creation fee 10,000,000 (K1), rename 2,000,000 per 30 days (K2), level-up fees 2M → 50M, 172M in all (K3), dues 40,000 × level a day (K4), caper stakes 50,000 / 100,000 / 175,000 / 300,000 per seat per started run (K5), Bust fines 150,000 / 300,000 / 500,000 / 750,000 per seat (K6), 5% deposit tax (K7), 5% payday tax (K8), the winning war bid, at least 2,100,000 / 4,550,000 / 9,100,000, burned at settlement (K9), war hits 25,000 each, up to 6 per member per war (K10), treasury and earnings burned on disband (K11). Never minted: the 10% caper fence (N1), the cut rounding remainder (N2) and neglected racket cycles (N3).
+- Crime Families: creation fee 10,000,000 (K1), rename 2,000,000 per 30 days (K2), level-up fees 2M → 50M, 172M in all (K3), dues 40,000 × level a day (K4), crew heist stakes 50,000 / 100,000 / 175,000 / 300,000 per seat per started run (K5), Bust fines 150,000 / 300,000 / 500,000 / 750,000 per seat (K6), 5% deposit tax (K7), 5% payday tax (K8), the winning war bid, at least 2,100,000 / 4,550,000 / 9,100,000, burned at settlement (K9), war hits 25,000 each, up to 6 per member per war (K10), treasury and earnings burned on disband (K11). Never minted: the 10% crew heist fence (N1), the cut rounding remainder (N2) and neglected racket cycles (N3).
 
 ## Open Issues (not changed in the 2026-10-11 rebalance)
 

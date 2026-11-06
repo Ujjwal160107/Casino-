@@ -38,7 +38,7 @@ export function hopCooldownEndsAt(exit: { reason: ExitReason; leftAt: Date }): D
 
 /** Active for payday and rackets (7.3): any ACTIVITY_RULES entry met in the last 7 days. */
 export async function isActiveMember(uid: string, now: Date): Promise<{ active: boolean; have: string; need: string }> {
-  if (ACTIVITY_RULES.length === 0) return { active: false, have: "0", need: "recent caper or war play" };
+  if (ACTIVITY_RULES.length === 0) return { active: false, have: "0", need: "recent crew heist or war play" };
   const since = new Date(now.getTime() - ACTIVE_WINDOW_MS);
   const counts = await Promise.all(ACTIVITY_RULES.map((r) => r.count(uid, since)));
   return {

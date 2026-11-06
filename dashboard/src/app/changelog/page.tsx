@@ -140,7 +140,7 @@ export default async function ChangelogPage() {
             </Panel>
           </div>
 
-          {/* v2.1 — Crime Families and Capers */}
+          {/* v2.1 — Crime Families and Crew Heists */}
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <span className="font-mono text-sm text-gold">v2.1</span>
@@ -150,12 +150,12 @@ export default async function ChangelogPage() {
 
             <Panel className="mt-4 p-6">
               <h2 className="font-display text-xl font-bold text-ink">
-                Crime Families and Capers
+                Crime Families and Crew Heists
               </h2>
               <p className="mt-2 leading-relaxed text-muted">
                 Fortuna&apos;s first real group play. Found or join a crime
-                family of up to 12 players, fill a shared vault, and run capers
-                that only work when the whole crew talks to each other. Rolling
+                family of up to 12 players, fill a shared vault, and run crew
+                heists that only work when the whole crew talks to each other. Rolling
                 out to servers in stages.
               </p>
 
@@ -208,10 +208,10 @@ export default async function ChangelogPage() {
                     <Swords className="mt-1 h-5 w-5 shrink-0 text-gold" />
                     <div>
                       <h3 className="font-display text-lg font-bold text-ink">
-                        Capers
+                        Crew Heists
                       </h3>
                       <p className="mt-1 leading-relaxed text-muted">
-                        <strong className="text-ink">!caper</strong> plans a
+                        <strong className="text-ink">!heist</strong> plans a
                         family heist in four tiers, from the Pawnshop Back Room
                         to the Diamond Exchange Vault. A 10-minute lobby fills
                         the roles, then a 120-second GO where every member holds

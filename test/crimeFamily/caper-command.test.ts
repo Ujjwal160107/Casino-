@@ -39,7 +39,7 @@ describe("!caper", () => {
     const { ids, fc } = await lobby();
     const before = await wallet(ids.LOOKOUT);
     expect((await run(fc, ids.LOOKOUT, ["join", "mastermind"])).said()).toContain("The Mastermind seat belongs to the planner.");
-    expect((await run(fc, ids.LOOKOUT, ["join", "hacker"])).said()).toContain("That role is not part of this caper.");
+    expect((await run(fc, ids.LOOKOUT, ["join", "hacker"])).said()).toContain("That role is not part of this crew heist.");
     expect((await run(fc, ids.LOOKOUT, ["join", "wizard"])).said()).toContain("Unknown role. Roles: Lookout, Safecracker, Driver, Muscle, Hacker.");
     expect(await wallet(ids.LOOKOUT)).toBe(before);
   }));
@@ -97,15 +97,15 @@ describe("!caper", () => {
     await setCaperUpdatedAt(r.caper.id, new Date(Date.now() - 7_200_000));
     const m = await run(fc, r.ids.LOOKOUT, []);
     expect(fc.sent).toHaveLength(1);
-    expect(m.said()).toContain("How a caper works");
+    expect(m.said()).toContain("How a crew heist works");
   }));
 
-  it("!caper brief with a running seat replies an S27 opener; without one, No caper is running.", async () => {
+  it("!caper brief with a running seat replies an S27 opener; without one, No crew heist is running.", async () => {
     const r = await seedRunning({ tier: 1, roles: [...R3] });
     const fc = fakeCaperClient();
     expect((await run(fc, r.ids.LOOKOUT, ["brief"])).said()).toContain(CPR_IDS.openBrief(r.caper.id, r.ids.LOOKOUT));
     await testPrisma.caper.update({ where: { id: r.caper.id }, data: { status: "RESOLVED", liveSlot: r.caper.id } });
     await testPrisma.caperCrew.updateMany({ where: { caperId: r.caper.id }, data: { liveSlot: r.caper.id } });
-    expect((await run(fc, r.ids.LOOKOUT, ["brief"])).said()).toContain("No caper is running.");
+    expect((await run(fc, r.ids.LOOKOUT, ["brief"])).said()).toContain("No crew heist is running.");
   });
 });

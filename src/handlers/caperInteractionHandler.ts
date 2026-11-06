@@ -34,7 +34,7 @@ const planRoute: CfRoute = async (i) => {
   });
   await show(i, buildNotice(posted
     ? `Lobby posted: ${jumpLink(caper.guildId, channelId, posted)}`
-    : "Lobby opened, but the card could not be posted. Use `!caper` to post it."));
+    : "Lobby opened, but the card could not be posted. Use `!heist` to post it."));
 };
 
 const joinRoute: CfRoute = async (i, [caperId]) => {

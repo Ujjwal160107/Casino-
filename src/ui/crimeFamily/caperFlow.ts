@@ -186,7 +186,7 @@ export async function resolveAndAnnounce(client: Client, caperId: string, now: D
       const guild = view ? client.guilds.cache.get(view.guildId) : undefined;
       if (!view || !guild || view.pool < CRIME_FAMILY_CONFIG.caperTradeLogMinPool) return;
       await logToChannel(client, {
-        guild, type: "TRADE", title: "Caper resolved",
+        guild, type: "TRADE", title: "Crew heist resolved",
         description: `${view.familyLabel} · T${view.tier} ${caperTier(view.tier).name} · ${view.outcome} · pool ${fmtFortunes(view.pool)}`,
       });
     });

@@ -33,17 +33,17 @@ describe("plan (8.4 step 1)", () => {
   it("refuses with the reason and takes nothing", async () => {
     const { family, ids } = await caperCrew({ tier: 1, roles: [...T1] });
     const before = await wallet(ids.MASTERMIND);
-    await expect(plan(ids.LOOKOUT)).rejects.toThrow("Only a Capo or above can plan a caper.");
+    await expect(plan(ids.LOOKOUT)).rejects.toThrow("Only a Capo or above can plan a crew heist.");
     await expect(plan(ids.MASTERMIND, 2)).rejects.toThrow("Payroll Van unlocks at family level 3.");
     await expect(plan(ids.MASTERMIND, 5)).rejects.toThrow("Pick a tier from 1 to 4.");
     await testPrisma.family.update({ where: { id: family.id }, data: { nextCaperAt: new Date(Date.now() + 3_600_000) } });
-    await expect(plan(ids.MASTERMIND)).rejects.toThrow(/^Family caper cooldown: ready <t:\d+:R>\.$/);
+    await expect(plan(ids.MASTERMIND)).rejects.toThrow(/^Family crew heist cooldown: ready <t:\d+:R>\.$/);
     await testPrisma.family.update({ where: { id: family.id }, data: { nextCaperAt: new Date() } });
     for (let k = 0; k < 4; k++) await testPrisma.caper.create({ data: { familyId: family.id, tier: 1, status: "RESOLVED", liveSlot: `old${k}`, plannerId: ids.MASTERMIND, guildId: G, channelId: CH, lobbyClosesAt: new Date(), startedAt: new Date(Date.now() - 3_600_000) } });
-    await expect(plan(ids.MASTERMIND)).rejects.toThrow(/^Your family has run 4 capers in the last 24 hours\. Next slot <t:\d+:R>\.$/);
+    await expect(plan(ids.MASTERMIND)).rejects.toThrow(/^Your family has run 4 crew heists in the last 24 hours\. Next slot <t:\d+:R>\.$/);
     await testPrisma.caper.updateMany({ where: { liveSlot: "old0" }, data: { status: "CANCELLED", outcome: "VOID" } });   // VOID never counts
     for (const id of [ids.LOOKOUT, ids.SAFECRACKER, ids.DRIVER]) await testPrisma.user.update({ where: { discordId: id }, data: { crimeHeat: 100 } });
-    await expect(plan(ids.MASTERMIND)).rejects.toThrow("Your family is under investigation: no capers until fewer than 3 members are at 100 heat.");
+    await expect(plan(ids.MASTERMIND)).rejects.toThrow("Your family is under investigation: no crew heists until fewer than 3 members are at 100 heat.");
     expect(await wallet(ids.MASTERMIND)).toBe(before);
   });
 
@@ -53,7 +53,7 @@ describe("plan (8.4 step 1)", () => {
     const [p, d] = await Promise.allSettled([plan(ids.MASTERMIND), disbandFamily(ids.MASTERMIND, family.tag)]);
     expect([p.status, d.status].filter((s) => s === "fulfilled")).toHaveLength(1);
     if (d.status === "fulfilled") { expect(await testPrisma.caper.count()).toBe(0); expect(await wallet(ids.MASTERMIND)).toBe(before); }
-    else expect((d as PromiseRejectedResult).reason.message).toMatch(BUSY_OR("A caper is in its lobby."));
+    else expect((d as PromiseRejectedResult).reason.message).toMatch(BUSY_OR("A crew heist is in its lobby."));
   });
 });
 
@@ -73,8 +73,8 @@ describe("join (8.4 steps 2-3)", () => {
     const c = await plan(ids.MASTERMIND);
     const before = await wallet(ids.LOOKOUT);
     await expect(join(c.id, ids.LOOKOUT, "MASTERMIND")).rejects.toThrow("The Mastermind seat belongs to the planner.");
-    await expect(join(c.id, ids.LOOKOUT, "HACKER")).rejects.toThrow("That role is not part of this caper.");
-    await expect(join(c.id, ids.LOOKOUT, "LOOKOUT", undefined, "g2")).rejects.toThrow("This caper is in another server; join that server to play.");
+    await expect(join(c.id, ids.LOOKOUT, "HACKER")).rejects.toThrow("That role is not part of this crew heist.");
+    await expect(join(c.id, ids.LOOKOUT, "LOOKOUT", undefined, "g2")).rejects.toThrow("This crew heist is in another server; join that server to play.");
     await expect(join(c.id, ids.LOOKOUT, "DRIVER")).rejects.toThrow("Driver needs one of: Iron Spurs, Guard Vest, Arctic Wolf Spirit Charm.");
     expect(await wallet(ids.LOOKOUT)).toBe(before);
     expect(await crew(c.id)).toHaveLength(1);
@@ -87,7 +87,7 @@ describe("join (8.4 steps 2-3)", () => {
     await testPrisma.familyMember.create({ data: { familyId: c.familyId, userId: both, role: "SOLDIER", roleSlot: both, seat: 9, joinedAt: new Date(Date.now() - 10 * 864e5) } });
     const rs = await Promise.allSettled([join(c.id, both, "LOOKOUT"), join(c.id, both, "SAFECRACKER")]);
     expect(rs.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-    for (const r of rs) if (r.status === "rejected") expect(r.reason.message).toMatch(BUSY_OR("Already in this caper."));
+    for (const r of rs) if (r.status === "rejected") expect(r.reason.message).toMatch(BUSY_OR("Already in this crew heist."));
     expect(await wallet(both)).toBe(2_950_000);
   });
 
@@ -109,7 +109,7 @@ describe("join (8.4 steps 2-3)", () => {
     await plan(ids.MASTERMIND);
     const briefcase = await testPrisma.shopItem.findFirst({ where: { catalogKey: "business_briefcase" } });
     await testPrisma.inventory.create({ data: { userId: bossId, shopItemId: briefcase!.id, amount: 1 } });   // the fixture's unseated Boss owns no prep item
-    await expect(plan(bossId)).rejects.toThrow("Your family already has a live caper.");
+    await expect(plan(bossId)).rejects.toThrow("Your family already has a live crew heist.");
     expect(await testPrisma.caper.count()).toBe(1);
   });
 
@@ -156,7 +156,7 @@ describe("join (8.4 steps 2-3)", () => {
     await seat(new Date("2026-11-04T00:02:00Z"), 1); await seat(new Date("2026-11-04T23:00:00Z"), 2);
     await testPrisma.family.update({ where: { id: family.id }, data: { nextCaperAt: new Date(+now - 1) } });
     const c = await plan(ids.MASTERMIND, 1, now);
-    await expect(join(c.id, ids.LOOKOUT, "LOOKOUT", now)).rejects.toThrow(/^You've used both caper seats in the last 24 hours\. A seat frees <t:1793836920:R>\.$/);
+    await expect(join(c.id, ids.LOOKOUT, "LOOKOUT", now)).rejects.toThrow(/^You've used both crew heist seats in the last 24 hours\. A seat frees <t:1793836920:R>\.$/);
     await testPrisma.caperCrew.updateMany({ where: { userId: ids.LOOKOUT, liveSlot: "65f000000000000000000001" }, data: { startedAt: new Date("2026-11-04T00:00:00Z") } });
     await expect(join(c.id, ids.LOOKOUT, "LOOKOUT", now)).resolves.toBeTruthy();
   });
@@ -167,7 +167,7 @@ describe("join (8.4 steps 2-3)", () => {
     await join(c.id, ids.LOOKOUT, "LOOKOUT");
     const emit = vi.spyOn(questBus, "emit");
     await leaveCaper(c.id, ids.LOOKOUT);
-    await expect(leaveCaper(c.id, ids.LOOKOUT)).rejects.toThrow("You are not in this caper.");
+    await expect(leaveCaper(c.id, ids.LOOKOUT)).rejects.toThrow("You are not in this crew heist.");
     expect(emit).not.toHaveBeenCalledWith("economy:earn", expect.anything());
     emit.mockRestore();
     const w = await testPrisma.wallet.findUnique({ where: { userId: ids.LOOKOUT } });
@@ -179,7 +179,7 @@ describe("join (8.4 steps 2-3)", () => {
     const { ids } = await caperCrew({ tier: 1, roles: [...T1] });
     const c = await plan(ids.MASTERMIND);
     await join(c.id, ids.LOOKOUT, "LOOKOUT");
-    await expect(cancelCaper(c.id, ids.LOOKOUT)).rejects.toThrow("Only the planner or the Boss can cancel this caper.");
+    await expect(cancelCaper(c.id, ids.LOOKOUT)).rejects.toThrow("Only the planner or the Boss can cancel this crew heist.");
     expect(await leaveCaper(c.id, ids.MASTERMIND)).toEqual({ cancelled: true });
     expect(await testPrisma.caper.findUnique({ where: { id: c.id } })).toMatchObject({ status: "CANCELLED", outcome: "CANCELLED", liveSlot: c.id });
     expect(await txCount("caper_stake_refund", Object.values(ids))).toBe(2);
@@ -228,7 +228,7 @@ describe("start (8.4 step 5)", () => {
 
   it("only the planner or the current Boss may press Start; required roles first", async () => {
     const { ids, caper } = await fullLobby(["MASTERMIND", "LOOKOUT"]);
-    await expect(startCaper(caper.id, { kind: "press", uid: ids.LOOKOUT })).rejects.toThrow("Only the planner or the Boss can start this caper.");
+    await expect(startCaper(caper.id, { kind: "press", uid: ids.LOOKOUT })).rejects.toThrow("Only the planner or the Boss can start this crew heist.");
     expect(await startCaper(caper.id, { kind: "press", uid: ids.MASTERMIND })).toEqual({ status: "waiting", pinched: [], reason: "Fill the required roles first: Safecracker." });
   });
 
@@ -266,7 +266,7 @@ describe("start (8.4 step 5)", () => {
     const before = await Promise.all(Object.values(ids).map(wallet));
     expect(await startCaper(caper.id, { kind: "auto" }, now)).toEqual({
       status: "cancelled", pinched: [{ userId: ids.MASTERMIND, role: "MASTERMIND" }],
-      reason: `<@${ids.MASTERMIND}> got pinched; the caper was cancelled and every stake refunded.`,
+      reason: `<@${ids.MASTERMIND}> got pinched; the crew heist was cancelled and every stake refunded.`,
     });
     expect(await testPrisma.caper.findUnique({ where: { id: caper.id } })).toMatchObject({ status: "CANCELLED", outcome: "CANCELLED", liveSlot: caper.id });
     expect(await Promise.all(Object.values(ids).map(wallet))).toEqual(before.map((b) => b + 50_000));
@@ -294,7 +294,7 @@ describe("start (8.4 step 5)", () => {
       throw new Error("Write conflict");                                                                // and the first attempt retries
     }) as never);
     try {
-      await expect(startCaper(c.id, { kind: "press", uid: f.bossId })).rejects.toThrow("Only the planner or the Boss can start this caper.");
+      await expect(startCaper(c.id, { kind: "press", uid: f.bossId })).rejects.toThrow("Only the planner or the Boss can start this crew heist.");
     } finally { spy.mockRestore(); }
     expect((await testPrisma.caper.findUnique({ where: { id: c.id } }))!.status).toBe("LOBBY");
   });
@@ -305,13 +305,13 @@ describe("start (8.4 step 5)", () => {
     await testPrisma.family.update({ where: { id: family.id }, data: { nextCaperAt: new Date(Date.now() + 600_000) } });
     const r = await startCaper(caper.id, { kind: "auto" });
     expect(r).toMatchObject({ status: "waiting", pinched: [{ userId: ids.DRIVER, role: "DRIVER" }] });
-    expect(r.reason).toMatch(new RegExp(`^<@${ids.DRIVER}> got pinched \\(stake refunded\\)\\. Family caper cooldown: ready <t:\\d+:R>\\.$`));
+    expect(r.reason).toMatch(new RegExp(`^<@${ids.DRIVER}> got pinched \\(stake refunded\\)\\. Family crew heist cooldown: ready <t:\\d+:R>\\.$`));
   });
 
   it("waits while the family cooldown is running (edge 71)", async () => {
     const { family, caper } = await fullLobby();
     await testPrisma.family.update({ where: { id: family.id }, data: { nextCaperAt: new Date(Date.now() + 600_000) } });
-    expect(await startCaper(caper.id, { kind: "auto" })).toMatchObject({ status: "waiting", reason: expect.stringMatching(/^Family caper cooldown: ready <t:\d+:R>\.$/) });
+    expect(await startCaper(caper.id, { kind: "auto" })).toMatchObject({ status: "waiting", reason: expect.stringMatching(/^Family crew heist cooldown: ready <t:\d+:R>\.$/) });
     expect((await testPrisma.caper.findUnique({ where: { id: caper.id } }))!.status).toBe("LOBBY");
   });
 

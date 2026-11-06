@@ -21,6 +21,6 @@ describe("turf DM notices (13.4)", () => {
     const c = turfOutbidNotice({ racketName: "Casino Row Protection", amount: 10_010_000, refunded: 9_100_000, bidClosesAt: new Date() });
     expect(containerText(c)).toContain("You were outbid on Casino Row Protection: 10,010,000");
     expect(containerThumb(c)).toContain("1456729243399753752");
-    expect(containerText(turfNeglectNotice({ racketName: "Pawn Row Fencing", strikes: 2, max: 3 }))).toContain("Neglect strike 2/3: play two caper seats this week to keep Pawn Row Fencing");
+    expect(containerText(turfNeglectNotice({ racketName: "Pawn Row Fencing", strikes: 2, max: 3 }))).toContain("Neglect strike 2/3: play two crew heist seats this week to keep Pawn Row Fencing");
   });
 });
