@@ -252,7 +252,6 @@ export const CRIME_FAMILY_CONFIG = {
   renameCooldownSeconds: 2_592_000,
   maxPendingInvites: 5,
   acceptedInvitesPerInviterPer7d: 3,
-  joinsPerFamilyPer7d: 5,
   associateSeconds: 259_200,
   claimChairAfterSeconds: 604_800,
   autoHandoverAfterSeconds: 1_209_600,

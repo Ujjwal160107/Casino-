@@ -192,14 +192,67 @@ describe("accept (6.4)", () => {
   });
 
   it("two invitees racing for the last seat: one joins, the other gets 'Family is full.'", async () => {
-    const { family, bossId } = await famWith([{ role: "SOLDIER" }, { role: "SOLDIER" }, { role: "SOLDIER" }, { role: "SOLDIER" }]); // 5 of 6
+    const { family, bossId } = await famWith(Array.from({ length: 8 }, () => ({ role: "SOLDIER" as const }))); // 9 of 10
     const a = await joiner(); const b = await joiner();
     const invs = [await invite(bossId, a), await invite(bossId, b)];
     const rs = await Promise.allSettled([acceptInvite(invs[0].id, a), acceptInvite(invs[1].id, b)]);
-    expect(await testPrisma.familyMember.count({ where: { familyId: family.id } })).toBe(6);
+    expect(await testPrisma.familyMember.count({ where: { familyId: family.id } })).toBe(10);
+    expect((await testPrisma.family.findUniqueOrThrow({ where: { id: family.id } })).memberCount).toBe(10);
     const lost = rs.findIndex((r) => r.status === "rejected");
     expect((rs[lost] as PromiseRejectedResult).reason.message).toBe("Family is full.");
     expect((await inviteRow(invs[lost].id))!.status).toBe("PENDING");
+  });
+
+  it("memberCount equals the member rows after 6 concurrent accepts, 2 leaves and 2 kicks", async () => {
+    const bossId = await seedEligibleUser();
+    const capos = [await joiner(), await joiner(), await joiner()];
+    const soldiers = [await joiner(), await joiner(), await joiner()];
+    const family = await seedFamily({ bossId, level: 3, members: [                       // 7 of 14
+      ...capos.map((userId) => ({ userId, role: "CAPO" as const, joinedAt: daysAgo(30) })),
+      ...soldiers.map((userId) => ({ userId, role: "SOLDIER" as const, joinedAt: daysAgo(10) })),
+    ] });
+    const invitees = await Promise.all(Array.from({ length: 6 }, joiner));
+    const invs = [];
+    for (const [k, inviteeId] of invitees.entries()) {
+      invs.push(await testPrisma.familyInvite.create({ data: {
+        familyId: family.id, inviterId: capos[k % 3], inviteeId, status: "PENDING", slot: "PENDING", guildId: "g1", channelId: "c1",
+        expiresAt: new Date(Date.now() + 86_400_000) } }));
+    }
+    const rs = await Promise.allSettled([
+      ...invs.map((inv) => acceptInvite(inv.id, inv.inviteeId)),
+      leaveFamily(soldiers[0]), leaveFamily(soldiers[1]),
+      kickMember(bossId, soldiers[2]), kickMember(bossId, capos[2]),
+    ]);
+    const rows = await testPrisma.familyMember.count({ where: { familyId: family.id } });
+    expect(rs.some((r) => r.status === "fulfilled")).toBe(true);
+    expect((await testPrisma.family.findUniqueOrThrow({ where: { id: family.id } })).memberCount).toBe(rows);
+  });
+
+  it("a 30-member L10 family refuses the 31st accept with 'Family is full.' and keeps memberCount 30", async () => {
+    const bossId = await seedEligibleUser();
+    const ids: string[] = [];
+    for (let k = 0; k < 29; k++) ids.push(await joiner());
+    const family = await seedFamily({ bossId, level: 10, members: ids.map((userId) => ({ userId, role: "SOLDIER" as const, joinedAt: daysAgo(10) })) });
+    const u = await joiner();
+    const inv = await invite(bossId, u);
+    await expect(acceptInvite(inv.id, u)).rejects.toThrow("Family is full.");
+    expect((await testPrisma.family.findUniqueOrThrow({ where: { id: family.id } })).memberCount).toBe(30);
+    expect(await testPrisma.familyMember.count({ where: { familyId: family.id } })).toBe(30);
+    expect((await inviteRow(inv.id))!.status).toBe("PENDING");
+  });
+
+  it("an L10 family takes 10 joins a week: the 10th accept commits, the 11th reads 'Your family can take 10 new members per 7 days.'", async () => {
+    const bossId = await seedEligibleUser();
+    const family = await seedFamily({ bossId, level: 10 });
+    await testPrisma.familyInvite.createMany({ data: Array.from({ length: 9 }, (_, k) => ({
+      familyId: family.id, inviterId: `old-inviter-${k % 3}`, inviteeId: `old-${k}`, status: "ACCEPTED", slot: `s-old-${k}`,
+      guildId: "g1", channelId: "c1", expiresAt: daysAgo(1), resolvedAt: daysAgo(1) })) });
+    const a = await joiner(); const b = await joiner();
+    const ia = await invite(bossId, a); const ib = await invite(bossId, b);
+    await expect(acceptInvite(ia.id, a)).resolves.toMatchObject({ member: { role: "SOLDIER" } });
+    await expect(acceptInvite(ib.id, b)).rejects.toThrow("Your family can take 10 new members per 7 days.");
+    expect((await inviteRow(ib.id))!.status).toBe("PENDING");
+    expect((await testPrisma.family.findUniqueOrThrow({ where: { id: family.id } })).memberCount).toBe(2);
   });
 
   it("decline marks DECLINED with slot = id, once", async () => {

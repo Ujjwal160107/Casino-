@@ -235,16 +235,16 @@ export interface FamilyLevelDef {
 }
 
 export const FAMILY_LEVELS: readonly FamilyLevelDef[] = [
-  { level: 1, xpToReach: 0, fee: 0, memberCap: 6, racketCap: 1, tierUnlocked: 1, caperCooldownSeconds: 10_800, crestKey: "crest_1" },
-  { level: 2, xpToReach: 1_000, fee: 2_000_000, memberCap: 7, racketCap: 1, tierUnlocked: null, caperCooldownSeconds: 10_800, crestKey: "crest_1" },
-  { level: 3, xpToReach: 3_000, fee: 4_000_000, memberCap: 8, racketCap: 1, tierUnlocked: 2, caperCooldownSeconds: 10_800, crestKey: "crest_1" },
-  { level: 4, xpToReach: 6_000, fee: 6_000_000, memberCap: 8, racketCap: 2, tierUnlocked: null, caperCooldownSeconds: 9_900, crestKey: "crest_2" },
-  { level: 5, xpToReach: 10_000, fee: 10_000_000, memberCap: 10, racketCap: 2, tierUnlocked: 3, caperCooldownSeconds: 9_900, crestKey: "crest_2" },
-  { level: 6, xpToReach: 16_000, fee: 14_000_000, memberCap: 10, racketCap: 2, tierUnlocked: null, caperCooldownSeconds: 9_000, crestKey: "crest_2" },
-  { level: 7, xpToReach: 24_000, fee: 20_000_000, memberCap: 12, racketCap: 3, tierUnlocked: null, caperCooldownSeconds: 9_000, crestKey: "crest_3" },
-  { level: 8, xpToReach: 34_000, fee: 28_000_000, memberCap: 12, racketCap: 3, tierUnlocked: 4, caperCooldownSeconds: 9_000, crestKey: "crest_3" },
-  { level: 9, xpToReach: 46_000, fee: 38_000_000, memberCap: 12, racketCap: 3, tierUnlocked: null, caperCooldownSeconds: 7_200, crestKey: "crest_3" },
-  { level: 10, xpToReach: 60_000, fee: 50_000_000, memberCap: 12, racketCap: 3, tierUnlocked: null, caperCooldownSeconds: 7_200, crestKey: "crest_4" },
+  { level: 1, xpToReach: 0, fee: 0, memberCap: 10, racketCap: 1, tierUnlocked: 1, caperCooldownSeconds: 10_800, crestKey: "crest_1" },
+  { level: 2, xpToReach: 1_000, fee: 2_000_000, memberCap: 12, racketCap: 1, tierUnlocked: null, caperCooldownSeconds: 10_800, crestKey: "crest_1" },
+  { level: 3, xpToReach: 3_000, fee: 4_000_000, memberCap: 14, racketCap: 1, tierUnlocked: 2, caperCooldownSeconds: 10_800, crestKey: "crest_1" },
+  { level: 4, xpToReach: 6_000, fee: 6_000_000, memberCap: 16, racketCap: 2, tierUnlocked: null, caperCooldownSeconds: 9_900, crestKey: "crest_2" },
+  { level: 5, xpToReach: 10_000, fee: 10_000_000, memberCap: 18, racketCap: 2, tierUnlocked: 3, caperCooldownSeconds: 9_900, crestKey: "crest_2" },
+  { level: 6, xpToReach: 16_000, fee: 14_000_000, memberCap: 20, racketCap: 2, tierUnlocked: null, caperCooldownSeconds: 9_000, crestKey: "crest_2" },
+  { level: 7, xpToReach: 24_000, fee: 20_000_000, memberCap: 23, racketCap: 3, tierUnlocked: null, caperCooldownSeconds: 9_000, crestKey: "crest_3" },
+  { level: 8, xpToReach: 34_000, fee: 28_000_000, memberCap: 25, racketCap: 3, tierUnlocked: 4, caperCooldownSeconds: 9_000, crestKey: "crest_3" },
+  { level: 9, xpToReach: 46_000, fee: 38_000_000, memberCap: 28, racketCap: 3, tierUnlocked: null, caperCooldownSeconds: 7_200, crestKey: "crest_3" },
+  { level: 10, xpToReach: 60_000, fee: 50_000_000, memberCap: 30, racketCap: 3, tierUnlocked: null, caperCooldownSeconds: 7_200, crestKey: "crest_4" },
 ];
 
 export function levelDef(level: number): FamilyLevelDef {

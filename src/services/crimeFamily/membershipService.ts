@@ -9,6 +9,7 @@ import { checkMemberEligibility, eligibilityError } from "./eligibility";
 import { FAMILY_HOOKS, type MemberExitKind } from "./extensions";
 import { assertNotJailed, getFamilyByTag, getMembership, readActorAndTarget, requireMembership } from "./familyQueries";
 import { can, NO_PERMISSION } from "./permissions";
+import { joinsPerFamilyFor } from "./sizeRules";
 import { FamilyError, invalidateUsers, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
 
 const WEEK_MS = 7 * 86_400_000;
@@ -18,11 +19,12 @@ const INVITE_EXPIRED = "Invite expired.";
 const actorOf = (m: FamilyMember) => ({ role: m.role as FamilyRole, joinedAt: m.joinedAt });
 
 /**
- * The rolling 7-day accepted-join caps (6.4). `alreadyAccepted` is 1 when the
- * caller's own invite was just marked ACCEPTED in this transaction.
+ * The rolling 7-day accepted-join caps (6.4; the family's scales with its
+ * level, A11). `alreadyAccepted` is 1 when the caller's own invite was just
+ * marked ACCEPTED in this transaction.
  */
 async function assertJoinCaps(
-  tx: Prisma.TransactionClient, familyId: string, inviterId: string, now: Date, alreadyAccepted: 0 | 1,
+  tx: Prisma.TransactionClient, familyId: string, level: number, inviterId: string, now: Date, alreadyAccepted: 0 | 1,
 ): Promise<void> {
   const since = new Date(now.getTime() - WEEK_MS);
   const byInviter = await tx.familyInvite.count({ where: { inviterId, status: "ACCEPTED", resolvedAt: { gte: since } } });
@@ -30,8 +32,9 @@ async function assertJoinCaps(
     throw new FamilyError(`You can bring in ${CRIME_FAMILY_CONFIG.acceptedInvitesPerInviterPer7d} members per 7 days.`);
   }
   const byFamily = await tx.familyInvite.count({ where: { familyId, status: "ACCEPTED", resolvedAt: { gte: since } } });
-  if (byFamily - alreadyAccepted >= CRIME_FAMILY_CONFIG.joinsPerFamilyPer7d) {
-    throw new FamilyError(`Your family can take ${CRIME_FAMILY_CONFIG.joinsPerFamilyPer7d} new members per 7 days.`);
+  const joins = joinsPerFamilyFor(level);
+  if (byFamily - alreadyAccepted >= joins) {
+    throw new FamilyError(`Your family can take ${joins} new members per 7 days.`);
   }
 }
 
@@ -60,7 +63,7 @@ export async function inviteMember(input: {
       if (pendingCount >= CRIME_FAMILY_CONFIG.maxPendingInvites) {
         throw new FamilyError(`Too many pending invites (max ${CRIME_FAMILY_CONFIG.maxPendingInvites}).`);
       }
-      await assertJoinCaps(tx, family.id, input.inviterId, now, 0);
+      await assertJoinCaps(tx, family.id, family.level, input.inviterId, now, 0);
       return tx.familyInvite.create({
         data: {
           familyId: family.id, inviterId: input.inviterId, inviteeId: input.inviteeId, status: "PENDING", slot: "PENDING",
@@ -96,46 +99,67 @@ function lowestFreeSeat(taken: number[], cap: number): number | null {
 }
 
 /**
- * Spec 6.4 accept: CAS the invite, run the join gate, re-check the caps and
- * seat the invitee as a Soldier, all in one transaction (a refusal rolls the
- * invite back to PENDING). A seat collision retries the whole transaction.
+ * The shared join (amendment 8.5): run the join gate, re-check the caps and
+ * seat the player as a Soldier in the lowest free seat, inside the caller's
+ * transaction (whose own invite or application is already ACCEPTED).
+ */
+export async function joinFamilyInTx(
+  tx: Prisma.TransactionClient, i: { familyId: string; uid: string; inviterId: string; now: Date },
+): Promise<{ family: Family; member: FamilyMember }> {
+  const { familyId, uid, inviterId, now } = i;
+  const gate = await checkMemberEligibility(uid, "family_join", { now, familyId });
+  if (!gate.ok) throw eligibilityError(gate.failures);
+  const family = await tx.family.findUnique({ where: { id: familyId } });
+  if (!family) throw new FamilyError("That family no longer exists.");
+  await assertJoinCaps(tx, familyId, family.level, inviterId, now, 1);
+  const seats = await tx.familyMember.findMany({ where: { familyId }, select: { seat: true } });
+  const seat = lowestFreeSeat(seats.map((s) => s.seat), levelDef(family.level).memberCap);
+  if (seat === null) throw new FamilyError("Family is full.");
+  const member = await tx.familyMember.create({
+    data: { familyId, userId: uid, role: "SOLDIER", roleSlot: uid, seat, joinedAt: now, lastActiveAt: now },
+  });
+  await tx.family.update({ where: { id: familyId }, data: { memberCount: { increment: 1 } } });
+  await touchFamily(tx, familyId, now);
+  return { family: await tx.family.findUniqueOrThrow({ where: { id: familyId } }), member };
+}
+
+/**
+ * Runs a join transaction up to 3 times while two joiners collide on a seat.
+ * The joiner already holding a membership maps to msgs.alreadyInFamily (the
+ * presser is not always the joiner).
+ */
+export async function withSeatRetry<T>(fn: () => Promise<T>, msgs: { alreadyInFamily: string }): Promise<T> {
+  for (let run = 1; ; run++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (isUniqueViolation(err, "FamilyMember_familyId_seat_key")) {
+        if (run < SEAT_RACE_RUNS) continue;
+        throw new FamilyError("Vault busy, try again.");
+      }
+      if (isUniqueViolation(err, "FamilyMember_userId_key")) throw new FamilyError(msgs.alreadyInFamily);
+      throw err;
+    }
+  }
+}
+
+/**
+ * Spec 6.4 accept: CAS the invite, then the shared join, all in one
+ * transaction (a refusal rolls the invite back to PENDING).
  */
 export async function acceptInvite(inviteId: string, uid: string, now: Date = new Date()): Promise<{ family: Family; member: FamilyMember }> {
   const invite = await readOwnInvite(inviteId, uid);
   await assertNotJailed(uid);
   if (await getMembership(uid)) throw new FamilyError("You are already in a family.");
 
-  for (let run = 1; ; run++) {
-    try {
-      return await runFamilyTx(async (tx) => {
-        const { count } = await tx.familyInvite.updateMany({
-          where: { id: inviteId, status: "PENDING", expiresAt: { gt: now } },
-          data: { status: "ACCEPTED", slot: inviteId, resolvedAt: now },
-        });
-        if (count !== 1) throw new FamilyError(INVITE_EXPIRED);
-        const gate = await checkMemberEligibility(uid, "family_join", { now, familyId: invite.familyId });
-        if (!gate.ok) throw eligibilityError(gate.failures);
-        await assertJoinCaps(tx, invite.familyId, invite.inviterId, now, 1);
-        const family = await tx.family.findUnique({ where: { id: invite.familyId } });
-        if (!family) throw new FamilyError(INVITE_EXPIRED);
-        const seats = await tx.familyMember.findMany({ where: { familyId: family.id }, select: { seat: true } });
-        const seat = lowestFreeSeat(seats.map((s) => s.seat), levelDef(family.level).memberCap);
-        if (seat === null) throw new FamilyError("Family is full.");
-        const member = await tx.familyMember.create({
-          data: { familyId: family.id, userId: uid, role: "SOLDIER", roleSlot: uid, seat, joinedAt: now, lastActiveAt: now },
-        });
-        await touchFamily(tx, family.id, now);
-        return { family, member };
-      });
-    } catch (err) {
-      if (isUniqueViolation(err, "FamilyMember_familyId_seat_key")) {
-        if (run < SEAT_RACE_RUNS) continue;
-        throw new FamilyError("Vault busy, try again.");
-      }
-      if (isUniqueViolation(err, "FamilyMember_userId_key")) throw new FamilyError("You are already in a family.");
-      throw err;
-    }
-  }
+  return withSeatRetry(() => runFamilyTx(async (tx) => {
+    const { count } = await tx.familyInvite.updateMany({
+      where: { id: inviteId, status: "PENDING", expiresAt: { gt: now } },
+      data: { status: "ACCEPTED", slot: inviteId, resolvedAt: now },
+    });
+    if (count !== 1) throw new FamilyError(INVITE_EXPIRED);
+    return joinFamilyInTx(tx, { familyId: invite.familyId, uid, inviterId: invite.inviterId, now });
+  }), { alreadyInFamily: "You are already in a family." });
 }
 
 async function pendingInviteFromTag(uid: string, tag: string): Promise<FamilyInvite> {
@@ -198,6 +222,7 @@ async function removeMember(tx: Prisma.TransactionClient, familyId: string, user
   }
   const { count } = await tx.familyMember.deleteMany({ where: { userId, familyId } });
   if (count !== 1) throw new FamilyError(kind === "LEFT" ? "You are not in a crime family." : `<@${userId}> is not in your family.`);
+  await tx.family.update({ where: { id: familyId }, data: { memberCount: { decrement: 1 } } });
   await tx.familyExit.create({ data: { userId, familyId, reason: kind, wasBoss: false, leftAt: now } });
   await tx.familyInvite.deleteMany({ where: { inviterId: userId, status: "PENDING" } });
   const wallets: string[] = [];
