@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { getBoardView, getFamilyCardView } from "../../src/services/crimeFamily/recruitQueries";
-import { buildFamilyCard } from "../../src/ui/crimeFamily/recruitScreens";
+import { buildFamilyCard, literal } from "../../src/ui/crimeFamily/recruitScreens";
 import { FAMILY_LEVELS } from "../../src/data/crimeFamilyCatalog";
 import { visibleText } from "./visibleText";
 import { testPrisma, seedEligibleUser, seedFamily, resetFamilies } from "../helpers";
@@ -75,5 +75,10 @@ describe("recruitment board (amendment 8.3)", () => {
     expect(text).toContain("\\*\\*bold\\*\\*");
     expect(text).toContain("\\# Big");
     expect(card.allowedMentions).toEqual({ parse: [] });
+  });
+
+  it("a line-leading > stays literal instead of becoming a blockquote", () => {
+    expect(literal("> We run heists\n>>> big")).toBe("\\> We run heists\n\\>>> big");
+    expect(literal("a > b")).toBe("a > b");
   });
 });

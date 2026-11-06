@@ -37,9 +37,9 @@ describe("slash registry", () => {
     ["crew", { action: "invite", target: "Bob" }, ["invite", "Bob"]],
     ["crew", { action: "deposit", target: "5m" }, ["deposit", "5m"]],
     ["crew", {}, []],
-    ["caper", { action: "join", value: "lookout" }, ["join", "lookout"]],
-    ["caper", { action: "plan", value: "2" }, ["plan", "2"]],
-    ["caper", {}, []],
+    ["heist", { action: "join", value: "lookout" }, ["join", "lookout"]],
+    ["heist", { action: "plan", value: "2" }, ["plan", "2"]],
+    ["heist", {}, []],
     ["turf", { action: "bid", racket: "casino_row", amount: "9.1m" }, ["bid", "casino_row", "9.1m"]],
     ["turf", {}, []],
   ] as const)("/%s %o serialises to the handler's args", (name, values, expected) => {

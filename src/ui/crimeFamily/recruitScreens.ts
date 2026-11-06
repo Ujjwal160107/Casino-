@@ -30,10 +30,13 @@ const selectRow = (select: StringSelectMenuBuilder) => new ActionRowBuilder<Stri
 /**
  * Pitch and message text rendered literally (Review Focus 3): markdown, lists
  * and masked links through escapeMarkdown, plus every `#` (a heading or `-#`
- * anywhere) and `<` (timestamps, mentions), which escapeMarkdown leaves alone.
+ * anywhere), `<` (timestamps, mentions) and a line-leading `>` (blockquotes),
+ * which escapeMarkdown leaves alone.
  */
 export const literal = (s: string) =>
-  escapeMarkdown(s, { bulletedList: true, numberedList: true, maskedLink: true }).replace(/[#<]/g, "\\$&");
+  escapeMarkdown(s, { bulletedList: true, numberedList: true, maskedLink: true })
+    .replace(/[#<]/g, "\\$&")
+    .replace(/^(\s*)>/gm, "$1\\>");
 
 const SORT_LABELS: Readonly<Record<BoardSort, string>> = { lvl: "Level", mem: "Members", act: "Activity" };
 

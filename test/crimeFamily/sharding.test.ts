@@ -43,7 +43,7 @@ describe("REST seam (A28)", () => {
     expect(fc.calls[0].payload.allowed_mentions).toEqual({ parse: [] });
     expect((fc.client as any).channels.fetch).not.toHaveBeenCalled();
   });
-  it("a REST 10008 marks the board dead", async () => {
+  it("a dead channel (REST 10003) marks the board dead", async () => {
     const fc = fakeClient({ dead: true });
     expect(await editChannelMessage(fc.client as any, "c1", "m9", buildNotice("x"))).toBe("dead");
     expect(await sendToChannel(fc.client as any, "c1", buildNotice("x"))).toBeNull();
