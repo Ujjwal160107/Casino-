@@ -245,8 +245,14 @@ export async function acceptApplication(
   }), { alreadyInFamily });
 }
 
-/** S32 Decline: CAS PENDING and unexpired → DECLINED (slot = id); the applicant may reapply after reapplyAfterDeclineSeconds. */
-export async function declineApplication(appId: string, officerId: string, now: Date = new Date()): Promise<FamilyInvite> {
+/**
+ * S32 Decline: CAS PENDING and unexpired → DECLINED (slot = id); the applicant may reapply after
+ * reapplyAfterDeclineSeconds. Returns the family read in the same transaction, so the applicant's
+ * DM never depends on the officer still being a member after the commit.
+ */
+export async function declineApplication(
+  appId: string, officerId: string, now: Date = new Date(),
+): Promise<{ family: Family; application: FamilyInvite }> {
   const app = await readApplication(appId);
   return runFamilyTx(async (tx) => {
     await assertMayInTx(tx, app.familyId, officerId, "review_apps", now);
@@ -256,7 +262,8 @@ export async function declineApplication(appId: string, officerId: string, now: 
       data: { status: "DECLINED", slot: appId, inviterId: officerId, resolvedAt: now },
     });
     if (count !== 1) throw new FamilyError(NOT_PENDING);
-    return tx.familyInvite.findUniqueOrThrow({ where: { id: appId } });
+    const family = await tx.family.findUniqueOrThrow({ where: { id: app.familyId } });
+    return { family, application: await tx.familyInvite.findUniqueOrThrow({ where: { id: appId } }) };
   });
 }
 

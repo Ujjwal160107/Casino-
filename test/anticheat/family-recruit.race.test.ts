@@ -4,6 +4,7 @@ import { disbandFamily } from "../../src/services/crimeFamily/disbandService";
 import { createFamily } from "../../src/services/crimeFamily/familyService";
 import { containerText } from "../dm/helpers";
 import { announceDisband } from "../../src/ui/crimeFamily/announce";
+import { announceApplicationAnswer } from "../../src/ui/crimeFamily/recruitAnnounce";
 import { fakeClient } from "../crimeFamily/fakeClient";
 import { acceptInvite, acceptInviteByTag, declineInviteByTag, inviteMember, listPendingInvites } from "../../src/services/crimeFamily/membershipService";
 import { redisService } from "../../src/services/redisService";
@@ -214,6 +215,22 @@ describe("accept and decline (amendment 8.5)", () => {
     await expect(acceptApplication(a.id, boss)).rejects.toThrow(NOT_PENDING);
     await expect(declineApplication(a.id, boss)).rejects.toThrow(NOT_PENDING);
     expect(await row(a.id)).toMatchObject({ status: "DECLINED", inviterId: boss });
+  });
+
+  it("decline hands back its own family, so the applicant's DM goes out even if the officer left after the commit", async () => {
+    const { f, capo, tag } = await withOfficer();
+    const p = await seedApplicant();
+    const a = await apply(p, f.id);
+    const { family, application } = await declineApplication(a.id, capo);
+    expect(family.id).toBe(f.id);
+    expect(application).toMatchObject({ id: a.id, status: "DECLINED", inviterId: capo });
+    await testPrisma.familyMember.delete({ where: { userId: capo } });          // the officer leaves in the gap
+    const c = fakeClient();
+    await announceApplicationAnswer(c.client as any, application, family, "declined");
+    expect(c.dm.get(p)).toBe(1);
+    const text = containerText((c.dmLast.get(p) as any).components[0]);
+    expect(text).toContain(`**[${tag}] `);
+    expect(text).toContain("declined your application. You can apply again");
   });
 
   it("edge 11: disband with 25 PENDING applications expires them all and DMs each applicant once", async () => {

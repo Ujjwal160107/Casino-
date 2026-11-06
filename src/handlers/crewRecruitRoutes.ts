@@ -4,7 +4,6 @@
 // they check only the kill switch, never the guild (F1). Imports no other
 // route table.
 import type { ModalBuilder } from "discord.js";
-import { requireMembership } from "../services/crimeFamily/familyQueries";
 import {
   getBoardView, getFamilyCardView, getInboxView, getMyApplicationsView, getRecruitPanelView, type BoardSort,
 } from "../services/crimeFamily/recruitQueries";
@@ -100,8 +99,7 @@ const answerRoute: CfRoute = async (i, [answer, appId, uid]) => {
     return showThenAnnounce(i, inboxScreen(uid, 0, `Accepted <@${application.inviteeId}>.`),
       () => announceApplicationAnswer(i.client, application, family, "accepted"));
   }
-  const application = await declineApplication(appId, uid);
-  const { family } = await requireMembership(uid);
+  const { family, application } = await declineApplication(appId, uid);
   return showThenAnnounce(i, inboxScreen(uid, 0, `Declined <@${application.inviteeId}>.`),
     () => announceApplicationAnswer(i.client, application, family, "declined"));
 };
