@@ -4,6 +4,7 @@ import { ComponentType } from "discord.js";
 import { setEmojiRecord } from "../../src/utils/emojiRegistry";
 import { CF_ASSETS } from "../../src/utils/crimeFamilyAssets";
 import { CPR_IDS } from "../../src/ui/crimeFamily/ids";
+import { visibleText } from "./visibleText";
 
 const art = vi.hoisted(() => ({ present: true }));
 vi.mock("../../src/utils/assetPaths", async (orig) => {
@@ -69,4 +70,9 @@ describe("caper screens (13.3)", () => {
     const longest = [CPR_IDS.openBrief("a".repeat(24), "9".repeat(20)), CPR_IDS.act("a".repeat(24), 3), CPR_IDS.plan("9".repeat(20))];
     expect(Math.max(...longest.map((s) => s.length))).toBe(60);
   });
+});
+
+it("S11 names the size-scaled heist cap", () => {
+  const s11 = caperWorstCases().find((c) => c.label === "S11 planner (Capo)")!;
+  expect(visibleText(s11.payload)).toContain("/10 in 24 h");
 });

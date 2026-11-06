@@ -14,10 +14,11 @@ import { getCaper, getLiveCaper, liveSeatOf, startedCapersSince, startedSeatsSin
 import { cancelCaperInTx, removeSeatInTx } from "./caperRefunds";
 import { bestRoleBonus, crewEdge } from "./caperMath";
 import { checkMemberEligibility, eligibilityError } from "./eligibility";
-import { isUnderInvestigation, requireMembership } from "./familyQueries";
+import { investigationOf, requireMembership } from "./familyQueries";
 import { buildAnswers, ringOrder } from "./intelRing";
 import { cryptoRng, type Rng } from "./random";
 import { can } from "./permissions";
+import { heistCapFor } from "./sizeRules";
 import { FamilyError, invalidateUsers, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
 
 const LIVE_CAPER = "Your family already has a live crew heist.";
@@ -41,12 +42,18 @@ export function openRoles(tier: CaperTierDef, filled: readonly CaperRoleKey[]): 
   return tierRoles(tier).filter((r) => r !== "MASTERMIND" && !taken.has(r));
 }
 
-/** The family cooldown and the rolling family caper cap; the refusal, or null when the family may run one. */
+/**
+ * The family cooldown and the size-scaled rolling cap (amendment 2.2), read
+ * from the row the caller passes; the refusal, or null when the family may run
+ * one. A family over its cap (members left) waits until enough runs age out.
+ */
 export async function familyCaperBlock(family: Family, now: Date): Promise<string | null> {
   if (now < family.nextCaperAt) return `Family crew heist cooldown: ready ${rel(family.nextCaperAt)}.`;
   const recent = await startedCapersSince(family.id, windowStart(now));
-  if (recent.length >= CRIME_FAMILY_CONFIG.capersPerFamilyPer24h) {
-    return `Your family has run ${CRIME_FAMILY_CONFIG.capersPerFamilyPer24h} crew heists in the last 24 hours. Next slot ${rel(windowEnd(recent[0].startedAt))}.`;
+  const cap = heistCapFor(family.memberCount);
+  if (recent.length >= cap) {
+    const next = windowEnd(recent[recent.length - cap].startedAt);
+    return `Your family has run ${recent.length} crew heists in the last 24 hours (cap ${cap} for ${family.memberCount} members). Next slot ${rel(next)}.`;
   }
   return null;
 }
@@ -86,8 +93,9 @@ export async function planCaper(input: { uid: string; tier: number; guildId: str
   const mayPlan = (m: { role: string; joinedAt: Date }) => can({ role: m.role as FamilyRole, joinedAt: m.joinedAt }, "plan_caper", now);
   if (!mayPlan(member)) throw new FamilyError("Only a Capo or above can plan a crew heist.");
   if (family.level < tier.levelToPlan) throw new FamilyError(`${tier.name} unlocks at family level ${tier.levelToPlan}.`);
-  if (await isUnderInvestigation(family.id)) {
-    throw new FamilyError(`Your family is under investigation: no crew heists until fewer than ${CRIME_FAMILY_CONFIG.underInvestigationMembers} members are at ${CRIME_FAMILY_CONFIG.underInvestigationHeat} heat.`);
+  const investigation = await investigationOf(family.id);
+  if (investigation.under) {
+    throw new FamilyError(`Your family is under investigation: no crew heists until fewer than ${investigation.threshold} members are at ${CRIME_FAMILY_CONFIG.underInvestigationHeat} heat.`);
   }
   const blocked = await familyCaperBlock(family, now);
   if (blocked) throw new FamilyError(blocked);

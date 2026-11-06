@@ -53,10 +53,12 @@ function tierLine(tier: CaperTierDef, unlocked: boolean): string {
 function familyStatus(v: CaperPlannerView): string {
   const lines = [
     `**Next crew heist:** ${v.nextCaperAt.getTime() > Date.now() ? rel(v.nextCaperAt) : "ready"}` +
-      ` · **Started:** ${v.startedLast24h}/${CRIME_FAMILY_CONFIG.capersPerFamilyPer24h} in 24 h`,
+      ` · **Started:** ${v.startedLast24h}/${v.heistCap} in 24 h`,
   ];
   if (v.duesArrears > 0) lines.push(`Dues in arrears: ${v.duesArrears} days`);
-  if (v.underInvestigation) lines.push("Under investigation: no crew heists until the family cools down.");
+  if (v.underInvestigation) {
+    lines.push(`Under investigation: no crew heists until fewer than ${v.investigationThreshold} members are at ${CRIME_FAMILY_CONFIG.underInvestigationHeat} heat.`);
+  }
   if (v.live) {
     const link = v.live.messageId ? ` · ${jumpLink(v.live.guildId, v.live.channelId, v.live.messageId)}` : "";
     lines.push(`**Live crew heist:** T${v.live.tier} ${caperTier(v.live.tier).name} (${v.live.status.toLowerCase()})${link}`);

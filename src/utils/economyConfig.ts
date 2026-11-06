@@ -218,7 +218,6 @@ export const CRIME_FAMILY_CONFIG = {
   heatPenaltyPerPoint: 0.002,
   patrolCap: 0.60,
   seatsPer24h: 2,
-  capersPerFamilyPer24h: 4,
   cancelledLobbyCooldownSeconds: 1_800,
   lobbyDmsPer24h: 3,
   lobbyDmQuietAfterCancelSeconds: 7_200,

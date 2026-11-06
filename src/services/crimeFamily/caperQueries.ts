@@ -7,7 +7,8 @@ import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { CAPER_TIERS, caperTier, type CaperRoleKey, type FamilyRole } from "../../data/crimeFamilyCatalog";
 import { patrolChance } from "./caperMath";
 import { openRoles, tierRoles } from "./caperLobbyService";
-import { familyLabel, isUnderInvestigation, requireMembership } from "./familyQueries";
+import { familyLabel, investigationOf, requireMembership } from "./familyQueries";
+import { heistCapFor } from "./sizeRules";
 import { isDark, leakAtOf, parseAnswers, ringNeighbours } from "./intelRing";
 import { can } from "./permissions";
 import type { CaperCardView, CaperPlannerView, CaperSeatView } from "./views";
@@ -101,13 +102,14 @@ export async function buildCaperCardView(caperId: string, _now: Date, note: stri
 export async function buildPlannerView(ownerId: string, now: Date): Promise<CaperPlannerView> {
   const { family, member } = await requireMembership(ownerId);
   const since = new Date(now.getTime() - CRIME_FAMILY_CONFIG.caperWindowSeconds * 1000);
-  const [recent, underInvestigation, live] = await Promise.all([
-    startedCapersSince(family.id, since), isUnderInvestigation(family.id), getLiveCaper(family.id),
+  const [recent, investigation, live] = await Promise.all([
+    startedCapersSince(family.id, since), investigationOf(family.id), getLiveCaper(family.id),
   ]);
   return {
     ownerId, familyLabel: familyLabel(family), level: family.level,
     tiers: CAPER_TIERS.map((t) => ({ tier: t.tier, unlocked: family.level >= t.levelToPlan })),
-    nextCaperAt: family.nextCaperAt, startedLast24h: recent.length, duesArrears: family.duesArrears, underInvestigation,
+    nextCaperAt: family.nextCaperAt, startedLast24h: recent.length, heistCap: heistCapFor(family.memberCount),
+    duesArrears: family.duesArrears, underInvestigation: investigation.under, investigationThreshold: investigation.threshold,
     canPlan: can({ role: member.role as FamilyRole, joinedAt: member.joinedAt }, "plan_caper", now),
     live: live
       ? { caperId: live.id, tier: live.tier, status: live.status, guildId: live.guildId, channelId: live.channelId, messageId: live.messageId }

@@ -163,8 +163,10 @@ export interface CaperPlannerView {
   tiers: { tier: number; unlocked: boolean }[];
   nextCaperAt: Date;
   startedLast24h: number;
+  heistCap: number; // heistCapFor(memberCount)
   duesArrears: number;
   underInvestigation: boolean;
+  investigationThreshold: number; // investigationThresholdFor(memberCount)
   canPlan: boolean;
   live: { caperId: string; tier: number; status: string; guildId: string; channelId: string; messageId: string } | null;
 }

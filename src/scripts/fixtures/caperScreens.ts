@@ -47,7 +47,7 @@ function cardView(o: Partial<CaperCardView> & Pick<CaperCardView, "status" | "se
 function plannerView(live: boolean): CaperPlannerView {
   return {
     ownerId: OWNER, familyLabel: FAMILY_LABEL, level: 10, tiers: [1, 2, 3, 4].map((tier) => ({ tier, unlocked: true })),
-    nextCaperAt: SOON(), startedLast24h: 3, duesArrears: 999, underInvestigation: false, canPlan: true,
+    nextCaperAt: SOON(), startedLast24h: 3, heistCap: 10, duesArrears: 999, underInvestigation: false, investigationThreshold: 8, canPlan: true,
     live: live ? { caperId: CAPER_ID, tier: 4, status: "RUNNING", guildId: GUILD, channelId: CHANNEL, messageId: MESSAGE } : null,
   };
 }

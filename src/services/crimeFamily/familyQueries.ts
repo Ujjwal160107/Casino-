@@ -7,6 +7,7 @@ import { FAMILY_LEVELS, levelDef, type FamilyRole } from "../../data/crimeFamily
 import { checkJailStatus } from "../jailService";
 import { racketsHeldFor } from "./extensions";
 import { can, isAssociate, ROLE_RANK } from "./permissions";
+import { investigationThresholdFor } from "./sizeRules";
 import { FamilyError } from "./tx";
 import type { FamilyDashboardView, InviteView } from "./views";
 
@@ -56,14 +57,26 @@ export async function getFamilyByTag(tag: string): Promise<Family | null> {
   return prisma.family.findUnique({ where: { tagKey: tag.trim().toUpperCase() } });
 }
 
-/** Enough members at investigation heat put the whole family under investigation. */
-export async function isUnderInvestigation(familyId: string): Promise<boolean> {
-  const members = await prisma.familyMember.findMany({ where: { familyId }, select: { userId: true } });
-  if (members.length === 0) return false;
+/**
+ * Members at investigation heat, the size-scaled threshold (A12) and whether
+ * the family is under investigation (hot ≥ threshold).
+ */
+export async function investigationOf(familyId: string): Promise<{ hot: number; threshold: number; under: boolean }> {
+  const [family, members] = await Promise.all([
+    prisma.family.findUnique({ where: { id: familyId }, select: { memberCount: true } }),
+    prisma.familyMember.findMany({ where: { familyId }, select: { userId: true } }),
+  ]);
+  if (!family || members.length === 0) return { hot: 0, threshold: investigationThresholdFor(0), under: false };
   const hot = await prisma.user.count({
     where: { discordId: { in: members.map((m) => m.userId) }, crimeHeat: { gte: CRIME_FAMILY_CONFIG.underInvestigationHeat } },
   });
-  return hot >= CRIME_FAMILY_CONFIG.underInvestigationMembers;
+  const threshold = investigationThresholdFor(family.memberCount);
+  return { hot, threshold, under: hot >= threshold };
+}
+
+/** Enough members at investigation heat put the whole family under investigation. */
+export async function isUnderInvestigation(familyId: string): Promise<boolean> {
+  return (await investigationOf(familyId)).under;
 }
 
 export async function buildDashboardView(familyId: string, viewerId: string, now: Date): Promise<FamilyDashboardView> {

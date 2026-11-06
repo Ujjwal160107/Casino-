@@ -4,9 +4,10 @@ import { planCaper, joinCaper, leaveCaper, cancelCaper, startCaper } from "../..
 import { questBus } from "../../src/services/questEvents";
 import { disbandFamily } from "../../src/services/crimeFamily/disbandService";
 import { computeNetWorth } from "../../src/services/netWorthService";
-import { caperTier } from "../../src/data/crimeFamilyCatalog";
-import { testPrisma, resetFamilies, ensureUniqueIndexes, seedEligibleUser } from "../helpers";
-import { caperCrew, txCount, G, CH } from "../crimeFamily/caperFixtures";
+import { caperRole, caperTier } from "../../src/data/crimeFamilyCatalog";
+import { leaveFamily } from "../../src/services/crimeFamily/membershipService";
+import { testPrisma, resetFamilies, ensureUniqueIndexes, seedEligibleUser, seedFamily, daysAgo } from "../helpers";
+import { caperCrew, seedLobby, txCount, G, CH } from "../crimeFamily/caperFixtures";
 
 const wallet = async (id: string) => (await testPrisma.wallet.findUnique({ where: { userId: id } }))!.balance;
 const crew = (caperId: string) => testPrisma.caperCrew.findMany({ where: { caperId } });
@@ -40,7 +41,7 @@ describe("plan (8.4 step 1)", () => {
     await expect(plan(ids.MASTERMIND)).rejects.toThrow(/^Family crew heist cooldown: ready <t:\d+:R>\.$/);
     await testPrisma.family.update({ where: { id: family.id }, data: { nextCaperAt: new Date() } });
     for (let k = 0; k < 4; k++) await testPrisma.caper.create({ data: { familyId: family.id, tier: 1, status: "RESOLVED", liveSlot: `old${k}`, plannerId: ids.MASTERMIND, guildId: G, channelId: CH, lobbyClosesAt: new Date(), startedAt: new Date(Date.now() - 3_600_000) } });
-    await expect(plan(ids.MASTERMIND)).rejects.toThrow(/^Your family has run 4 crew heists in the last 24 hours\. Next slot <t:\d+:R>\.$/);
+    await expect(plan(ids.MASTERMIND)).rejects.toThrow(/^Your family has run 4 crew heists in the last 24 hours \(cap 4 for 4 members\)\. Next slot <t:\d+:R>\.$/);
     await testPrisma.caper.updateMany({ where: { liveSlot: "old0" }, data: { status: "CANCELLED", outcome: "VOID" } });   // VOID never counts
     for (const id of [ids.LOOKOUT, ids.SAFECRACKER, ids.DRIVER]) await testPrisma.user.update({ where: { discordId: id }, data: { crimeHeat: 100 } });
     await expect(plan(ids.MASTERMIND)).rejects.toThrow("Your family is under investigation: no crew heists until fewer than 3 members are at 100 heat.");
@@ -349,5 +350,67 @@ describe("start (8.4 step 5)", () => {
       if (j.status === "fulfilled") expect(row?.started).toBe(true);
       else expect(row).toBeNull();
     }
+  });
+});
+
+/** A level-10 family of n (the Boss can plan tier 1), off its cooldown. */
+async function sized(n: number) {
+  const boss = await seedEligibleUser({ wallet: 5_000_000, prepKeys: [caperRole("MASTERMIND").prepKeys[0]] });
+  const ids: string[] = [];
+  for (let k = 0; k < n - 1; k++) ids.push(await seedEligibleUser());
+  const f = await seedFamily({ bossId: boss, level: 10, homeGuildId: G, homeChannelId: CH, members: ids.map((userId) => ({ userId, role: "SOLDIER" as const, joinedAt: daysAgo(10) })) });
+  await testPrisma.family.update({ where: { id: f.id }, data: { nextCaperAt: daysAgo(1) } });
+  return { f, boss, ids };
+}
+/** k started (RESOLVED) runs, the j-th started (k - j) hours ago, so index 0 is the oldest. */
+async function startedRuns(familyId: string, plannerId: string, k: number) {
+  for (let j = 0; j < k; j++) {
+    const at = new Date(Date.now() - (k - j) * 3_600_000);
+    await testPrisma.caper.create({ data: { familyId, tier: 1, status: "RESOLVED", liveSlot: `old${j}`, plannerId, guildId: G, channelId: CH, lobbyClosesAt: at, startedAt: at } });
+  }
+}
+/** k extra Soldiers in seats after the current ones; memberCount follows. */
+async function grow(familyId: string, k: number): Promise<string[]> {
+  const seats = await testPrisma.familyMember.count({ where: { familyId } });
+  const ids: string[] = [];
+  for (let j = 0; j < k; j++) {
+    const userId = await seedEligibleUser();
+    await testPrisma.familyMember.create({ data: { familyId, userId, role: "SOLDIER", roleSlot: userId, seat: seats + j + 1, joinedAt: daysAgo(10) } });
+    ids.push(userId);
+  }
+  await testPrisma.family.update({ where: { id: familyId }, data: { memberCount: { increment: k } } });
+  return ids;
+}
+
+describe("heist cap by size (amendment 2.2)", () => {
+  it.each([[12, 4], [13, 5], [25, 9], [30, 10]])("%i members: the cap is %i", async (n, cap) => {
+    const { f, boss } = await sized(n);
+    await startedRuns(f.id, boss, cap - 1);
+    const c = await plan(boss);
+    await testPrisma.caper.update({ where: { id: c.id }, data: { status: "RESOLVED", liveSlot: c.id, startedAt: new Date() } });
+    await expect(plan(boss)).rejects.toThrow(new RegExp(`^Your family has run ${cap} crew heists in the last 24 hours \\(cap ${cap} for ${n} members\\)\\. Next slot <t:\\d+:R>\\.$`));
+  });
+
+  it("Start re-checks the cap after members leave: 25 → 21 members, 8 runs, cap 7, the second-oldest run frees the slot", async () => {
+    const { caper, family, ids } = await seedLobby({ roles: [...T1] });
+    const extra = await grow(family.id, 21);                                    // 4 + 21 = 25 members, cap 9
+    await startedRuns(family.id, ids.MASTERMIND, 8);
+    for (const id of extra.slice(0, 4)) await leaveFamily(id);                   // 21 members, cap 7
+    expect((await testPrisma.family.findUniqueOrThrow({ where: { id: family.id } })).memberCount).toBe(21);
+    const r = await startCaper(caper.id, { kind: "press", uid: ids.MASTERMIND });
+    expect(r.status).toBe("waiting");
+    expect(r.reason).toContain("Your family has run 8 crew heists in the last 24 hours (cap 7 for 21 members).");
+    const second = await testPrisma.caper.findFirstOrThrow({ where: { familyId: family.id, liveSlot: "old1" } });
+    expect(r.reason).toContain(`<t:${Math.floor((+second.startedAt! + 86_400_000) / 1000)}:R>`);
+  });
+
+  it("8 of 30 members at 100 heat freezes planning; 7 does not", async () => {
+    const { boss, ids } = await sized(30);
+    const heat = (who: string[]) => testPrisma.user.updateMany({ where: { discordId: { in: who } }, data: { crimeHeat: 100 } });
+    await heat(ids.slice(0, 7));
+    await expect(plan(boss)).resolves.toMatchObject({ status: "LOBBY" });
+    await testPrisma.caper.deleteMany({});
+    await heat(ids.slice(0, 8));
+    await expect(plan(boss)).rejects.toThrow("Your family is under investigation: no crew heists until fewer than 8 members are at 100 heat.");
   });
 });
