@@ -1,7 +1,7 @@
 # Crime Families at Scale: Amendment PRD
 
 - **Date:** 2026-11-05
-- **Status:** The eight changes in section 0 are owner decisions (approved 2026-11-05) and their numbers are fixed. Every other row of the Decisions table is an author decision the owner can overrule before build. **A37 needs explicit owner sign-off before Plan 5**: it narrows the owner's "the existing name rules filter" for free text (section 8.6).
+- **Status:** The eight changes in section 0 are owner decisions (approved 2026-11-05) and their numbers are fixed. Every other row of the Decisions table is an author decision the owner can overrule before build. **A37 (per-word free-text filter) was accepted by the owner's lead (2026-11-06) and ships in Plan 4 Task 12**: it narrows the owner's "the existing name rules filter" for free text (section 8.6).
 - **Amends:** `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md` (the "old spec"). Where the two differ, this document wins. Rules this document does not mention are unchanged and are not repeated here.
 - **Repo:** `/home/ujjwal/dev/Casino-`. File citations are `path:line` against `main` at commit `1badb42`. The code is the truth where it differs from the old spec.
 - **Deployment state:** nothing in Crime Families is deployed. No player data exists in the new collections, so every schema and rule change below needs no data migration.
@@ -69,7 +69,7 @@ Conventions:
 | A36 | Officers get one digest DM per family per 6 h at most (Mongo CAS on `Family.appDigestAt`), under a new opt-out DM type `recruit` ("Family applications") | Author | 25 pending applications must not become 25 DMs to 8 officers. |
 | A37 | The pitch and the application message use one validator: length, no mentions, links or invites, the name slur list matched per word (each whitespace-separated word folded on its own, runs of single-character words joined), and the impersonation words of the name denylist as whole words. **Needs owner sign-off** (it changes the owner's "existing name rules filter") | Author | The name fold over a whole sentence joins words and invents slurs ("be a nerd" → "beanerd", "go ok" → "gook"); the full denylist as substrings would refuse "where", "there" and "street"; the mention forms it guards are refused directly. |
 | A38 | The banners keep their "FORTUNA'S CAPERS" placard | Author | No new art is allowed; the placard reads as flavour on an image, not as a command name. |
-| A39 | Three plans: 4 (rename, sizes, Capos, cross-server and relay, sharding seams, two-phase payday), 5 (vote, recruitment), 6 (leagues) | Author | Each plan ships behind the existing flags and has one schema commit. |
+| A39 | Three plans: 4 (rename, sizes, Capos, sharding seams, two-phase payday, vote, recruitment), 5 (cross-server heists and war actions, intel relay), 6 (leagues). Amended 2026-11-06: the plans swapped the vote/recruitment and cross-server scopes (plan 4 F1) | Author | Each plan ships behind the existing flags and has one schema commit. |
 | A40 | The Boss's 7-day vote grace counts from `FamilyMember.firstBossAt`, the member's first time in this family's chair, set once and never rewritten by a later chair move | Author | A grace reset by every chair move lets a Boss and one loyalist (or an alt) swap the chair weekly and never face a vote. Each member gets the 7 days once. |
 | A41 | A member demoted out of Underboss or Capo keeps `start_vote` for 7 days (`FamilyMember.officerUntil`) | Author | Otherwise a Boss who sees a revolt coming demotes every officer before a vote exists and nobody can ever start one. |
 | A42 | The start and the result of a vote are announced by whoever wins a CAS on `FamilyVote.announced` / `resultAnnounced`; `sweepVotes` picks up any vote whose announcement is overdue | Author | A crash between the start commit and the post would leave a silent vote that fails for lack of ballots and costs the family its 7-day cooldown. |
@@ -945,7 +945,7 @@ One new key: `cf:render:vote:<voteId>` (2 s trailing debounce, fails open). Redi
 | `dashboard/src/content/modules/crime-families.ts` | sizes (lines 11, 14, 115, 228-231), Capo cap and the 10M bar, the vote, the recruitment board, cross-server play and the intel relay (replacing "in one server", lines 256, 328-329, 340, and the war rule at line 568: "acting in their family's home server" and "!turf war … in the home server only" become any server the bot shares with them), the heist cap, leagues and cities with the income table, the census rule, two-phase payday wording; strategy section additions (share early, recruit by activity, when to move up a league) |
 | `dashboard/src/content/commands.ts:247-288` | `heist` (id and aliases), `crew` usage; settings key numbers (`:77-78`) with the new labels and "family applications" |
 | `dashboard/src/content/modules/crime-and-heat.ts:32` | "For crew jobs see Crime Families: Crew Heists." |
-| `dashboard/src/app/changelog/page.tsx:143-157` | the unreleased v2.1 entry rewritten: "Crime Families and Crew Heists", 10–30 members, leagues |
+| `dashboard/src/app/changelog/page.tsx:143-157` | the unreleased v2.1 entry rewritten: "Crime Families and Crew Heists", 10–30 members (leagues go in the v2.2 Turf entry, plan 6) |
 | `FORTUNA_V2_ECONOMY.md:217-383` and Money Sinks `:384-396` | the Crime Families section: member caps, heist cap, Capo rule, vote, leagues and income table, sections 10.1, 10.3, 10.4, the ledger rows; all "caper" copy renamed |
 | Old spec | one amendment line under its title (done with this document) |
 
@@ -956,8 +956,8 @@ One new key: `cf:render:vote:<voteId>` (2 s trailing debounce, fails open). Redi
 - **Unsharded today.** Every change runs identically with `client.shard === null`; sharding later needs no Crime Families change.
 - **Schema and code ship together** per plan (one commit or merge commit; `deploy.yml` diffs `HEAD~1`). All new models are new collections; changed models have no documents (nothing deployed), so `prisma db push` needs no `--accept-data-loss`. Dropping `Racket.key @unique` and adding `@@unique([cityId, key])` happen on empty collections.
 - **Plans** (A39), each with docs for its own part:
-  - **Plan 4, Scale foundation.** Task 1: the rename (§9). Then member caps, `memberCount`, heist cap, join caps, investigation threshold; the two-phase payday; Capos; cross-server play, the intel relay and the DM cards; `isJobShard`, the REST seam and `BotProcessBoot`.
-  - **Plan 5, Governance and recruiting.** The no-confidence vote; the recruitment board, applications, inbox, digest and the `recruit` DM type.
+  - **Plan 4, Families at scale.** Task 1: the rename (§9). Then member caps, `memberCount`, heist cap, join caps, investigation threshold; the two-phase payday; Capos; `isJobShard`, the REST seam and `BotProcessBoot`; the no-confidence vote; the recruitment board, applications, inbox, digest and the `recruit` DM type.
+  - **Plan 5, Global play.** Cross-server heists and war actions, the intel relay and the DM cards.
   - **Plan 6, Turf leagues.** Cities, the census, placement, per-league income, league-changing level-ups, the city pager, closures.
 - Tests run on memory-server Mongo and Redis on 6381 (`MONGOMS_SYSTEM_BINARY= npx vitest run --exclude '.claude/**' --exclude 'node_modules/**'`); nothing runs against `.env`.
 
