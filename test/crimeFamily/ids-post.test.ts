@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { PermissionFlagsBits } from "discord.js";
+import { PermissionFlagsBits, Routes } from "discord.js";
 import { CREW_IDS, CPR_IDS, TURF_IDS, cfId, decodeName, encodeName, parseCfId } from "../../src/ui/crimeFamily/ids";
 import { channelLink, editChannelMessage, jumpLink, missingBotPermissions, sendToChannel } from "../../src/ui/crimeFamily/post";
 import { buildNotice } from "../../src/ui/crimeFamily/kit";
@@ -50,30 +50,27 @@ describe("customIds", () => {
 
 describe("channel I/O", () => {
   const payload = buildNotice("Hello");
-  function fake(fail: { fetch?: unknown; send?: unknown; edit?: unknown } = {}) {
-    const channel = {
-      isTextBased: () => true,
-      send: vi.fn(async () => { if (fail.send) throw fail.send; return { id: "m1" }; }),
-      messages: {
-        fetch: vi.fn(),
-        edit: vi.fn(async () => { if (fail.edit) throw fail.edit; return {}; }),
-      },
+  function fake(fail: { send?: unknown; edit?: unknown } = {}) {
+    const rest = {
+      post: vi.fn(async () => { if (fail.send) throw fail.send; return { id: "m1" }; }),
+      patch: vi.fn(async () => { if (fail.edit) throw fail.edit; return {}; }),
     };
-    const client = { channels: { fetch: vi.fn(async () => { if (fail.fetch) throw fail.fetch; return channel; }) } } as any;
-    return { client, channel };
+    const client = { options: {}, rest, channels: { fetch: vi.fn() } } as any;
+    return { client, rest };
   }
 
   it("sends and edits without fetching the message", async () => {
-    const { client, channel } = fake();
+    const { client, rest } = fake();
     expect(await sendToChannel(client, "c1", payload)).toBe("m1");
     expect(await editChannelMessage(client, "c1", "m9", payload)).toBe("ok");
-    expect(channel.messages.edit).toHaveBeenCalledWith("m9", payload);
-    expect(channel.messages.fetch).not.toHaveBeenCalled();
+    expect(rest.patch).toHaveBeenCalledTimes(1);
+    expect(rest.patch.mock.calls[0][0]).toBe(Routes.channelMessage("c1", "m9"));
+    expect(client.channels.fetch).not.toHaveBeenCalled();
   });
 
   it.each([10003, 10008, 50001, 50013])("a dead board (%i) is null / \"dead\" and never throws", async (code) => {
     const err = Object.assign(new Error("dead"), { code });
-    for (const where of ["fetch", "send", "edit"] as const) {
+    for (const where of ["send", "edit"] as const) {
       const { client } = fake({ [where]: err });
       await expect(sendToChannel(client, "c1", payload)).resolves.toBe(where === "edit" ? "m1" : null);
       await expect(editChannelMessage(client, "c1", "m1", payload)).resolves.toBe(where === "send" ? "ok" : "dead");

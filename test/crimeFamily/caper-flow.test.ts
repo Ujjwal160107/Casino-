@@ -1,6 +1,6 @@
 // test/crimeFamily/caper-flow.test.ts
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
-import { ComponentType } from "discord.js";
+import { ComponentType, Routes } from "discord.js";
 import { planCaper, joinCaper } from "../../src/services/crimeFamily/caperLobbyService";
 import { openBrief, lockChoice } from "../../src/services/crimeFamily/caperPlayService";
 import { parseAnswers } from "../../src/services/crimeFamily/intelRing";
@@ -14,11 +14,11 @@ import { caperCrew, seedLobby, fakeCaperClient, setCaperUpdatedAt, G, CH } from 
 const T1 = ["MASTERMIND", "LOOKOUT", "SAFECRACKER", "DRIVER"] as const;
 const JOINERS = ["LOOKOUT", "SAFECRACKER", "DRIVER"] as const;
 const caperRow = (id: string) => testPrisma.caper.findUniqueOrThrow({ where: { id } });
-const json = (payload: any) => payload.components.map((c: any) => c.toJSON());
+const json = (payload: any) => payload.components;   // REST body JSON (F15)
 const text = (payload: any) => JSON.stringify(json(payload));
 const types = (payload: any) => { const t: number[] = []; const walk = (x: any) => { if (x.type) t.push(x.type); (x.components ?? []).forEach(walk); if (x.accessory) walk(x.accessory); }; json(payload).forEach(walk); return t; };
 const fileNames = (payload: any): string[] => (payload.files ?? []).map((f: any) => f.name);
-const isGoCall = (s: { payload: any }) => Array.isArray(s.payload.allowedMentions?.users);
+const isGoCall = (s: { payload: any }) => Array.isArray(s.payload.allowed_mentions?.users);
 
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "Caper", "CaperCrew"]));
 beforeEach(async () => { await resetFamilies(); await flushTestKeys("cf:*"); });
@@ -36,7 +36,7 @@ describe("caper card and flow (13.2, 8.4)", () => {
     const { ids, fc, c, mid } = await postedLobby();
     expect(fc.sent).toHaveLength(1);
     expect(fileNames(fc.sent[0].payload)).toEqual(["cf_caper_t1.png"]);
-    expect(fc.sent[0].payload.allowedMentions).toEqual({ parse: [] });
+    expect(fc.sent[0].payload.allowed_mentions).toEqual({ parse: [] });
     expect((await caperRow(c.id)).messageId).toBe(mid);
 
     for (const r of JOINERS) {
@@ -49,16 +49,16 @@ describe("caper card and flow (13.2, 8.4)", () => {
     expect(fileNames(goEdit.payload)).toEqual([]);
     const go = fc.sent.filter(isGoCall);
     expect(go).toHaveLength(1);
-    expect([...go[0].payload.allowedMentions.users].sort()).toEqual(Object.values(ids).sort());
+    expect([...go[0].payload.allowed_mentions.users].sort()).toEqual(Object.values(ids).sort());
     for (const id of Object.values(ids)) expect(fc.dms.get(id)).toBe(1);   // the GO DM (caper_lobby)
 
     const answers = parseAnswers(run.answers)!;
     const t = new Date(+run.startedAt + 5_000);
     for (const r of T1) { await openBrief(c.id, ids[r], t); await lockChoice(c.id, ids[r], answers.seats[r]!.correct, t); }
-    expect(await resolveAndAnnounce(fc.client, c.id, new Date(+run.goEndsAt + 1_000), new Date(0))).toMatchObject({ status: "settled", resolvedNow: true });
+    expect(await resolveAndAnnounce(fc.client, c.id, new Date(+run.goEndsAt + 1_000))).toMatchObject({ status: "settled", resolvedNow: true });
     const last = fc.edits.filter((e) => e.messageId === mid).at(-1)!;
     expect(fileNames(last.payload)[0]).toMatch(/^cf_result_(clean|messy)\.png$/);
-    expect(last.payload.attachments).toEqual([]);
+    expect(last.payload.attachments).toEqual([{ id: "0" }]);   // attachments: [] plus the result art: every old file replaced
     expect(types(last.payload)).not.toContain(ComponentType.ActionRow);
   });
 
@@ -72,13 +72,13 @@ describe("caper card and flow (13.2, 8.4)", () => {
 
   it("a 50013 on render marks the board dead after one failed repost; the next render is skipped (Review Focus 4)", async () => {
     const { ids, fc, c } = await postedLobby();
-    const ch = fc.channel(CH);
+    const rest = fc.rest;
     fc.editFailures.push({ code: 50013 }); fc.sendFailures.push({ code: 50013 });
     expect(await renderCaperCard(fc.client, c.id)).toBe("dead");
     expect((await caperRow(c.id)).messageId).toBe("");
-    const calls = ch.send.mock.calls.length + ch.messages.edit.mock.calls.length;
+    const calls = rest.post.mock.calls.length + rest.patch.mock.calls.length;
     expect(await renderCaperCard(fc.client, c.id)).toBe("skipped");
-    expect(ch.send.mock.calls.length + ch.messages.edit.mock.calls.length).toBe(calls);
+    expect(rest.post.mock.calls.length + rest.patch.mock.calls.length).toBe(calls);
     let full = false;
     for (const r of JOINERS) full = (await joinCaper({ caperId: c.id, uid: ids[r], role: r, guildId: G })).full;
     expect(full).toBe(true);
@@ -92,16 +92,16 @@ describe("caper card and flow (13.2, 8.4)", () => {
     const fc = fakeCaperClient();
     fc.editFailures.push({ code: 50035 });
     expect(await renderCaperCard(fc.client, caper.id)).toBe("ok");
-    const edit = fc.channel(CH).messages.edit;
+    const edit = fc.rest.patch;
     expect(edit).toHaveBeenCalledTimes(2);
     expect(fileNames(edit.mock.calls[0][1])).toEqual([]);
     expect(fileNames(edit.mock.calls[1][1])).toEqual(["cf_caper_t1.png"]);
-    expect(edit.mock.calls[1][1].attachments).toEqual([]);
+    expect(edit.mock.calls[1][1].body.attachments).toEqual([{ id: "0" }]);   // attachments: [] plus the banner: every old file replaced
   });
 
   it("the trailing debounce renders the last of two joins inside 2 s", async () => {
     const { ids, fc, c, mid } = await postedLobby();
-    const edit = fc.channel(CH).messages.edit;
+    const edit = fc.rest.patch;
     await joinCaper({ caperId: c.id, uid: ids.LOOKOUT, role: "LOOKOUT", guildId: G });
     await requestCaperRender(fc.client, c.id);                      // "set": renders now
     await new Promise((r) => setTimeout(r, 100));
@@ -109,8 +109,8 @@ describe("caper card and flow (13.2, 8.4)", () => {
     await requestCaperRender(fc.client, c.id);                      // "held": schedules one trailing render
     expect(edit).toHaveBeenCalledTimes(1);
     await vi.waitFor(() => expect(edit).toHaveBeenCalledTimes(2), { timeout: 4_000, interval: 50 });
-    expect(edit.mock.calls[1][0]).toBe(mid);
-    expect(text(edit.mock.calls[1][1])).toContain(`<@${ids.SAFECRACKER}>`);     // read from the DB at fire time
+    expect(edit.mock.calls[1][0]).toBe(Routes.channelMessage(CH, mid));
+    expect(text(edit.mock.calls[1][1].body)).toContain(`<@${ids.SAFECRACKER}>`);     // read from the DB at fire time
     await new Promise((r) => setTimeout(r, 2_100));
     expect(edit).toHaveBeenCalledTimes(2);
   }, 10_000);
@@ -182,11 +182,12 @@ describe("caper card and flow (13.2, 8.4)", () => {
 
   // Another writer moves the board while this one is posting: send resolves only after the DB changed.
   const raceSend = (fc: ReturnType<typeof fakeCaperClient>, channelId: string, caperId: string, board: { channelId: string; messageId: string }) => {
-    const send = fc.channel(channelId).send;
+    const send = fc.rest.post;
     const real = send.getMockImplementation()!;
-    send.mockImplementationOnce(async (payload: any) => {
+    send.mockImplementationOnce(async (route: string, o: any) => {
+      expect(route).toBe(Routes.channelMessages(channelId));
       await testPrisma.caper.update({ where: { id: caperId }, data: board });
-      return real(payload);
+      return real(route, o);
     });
   };
 

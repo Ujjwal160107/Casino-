@@ -9,7 +9,6 @@ import { testPrisma, resetFamilies, ensureUniqueIndexes, flushTestKeys, withCfCo
 import { seedLobby, seedRunning, fakeCaperClient, setCaperUpdatedAt, txCount } from "./caperFixtures";
 
 const R3 = ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] as const;
-const BOOT = new Date(0);                                         // booted long before every seeded startedAt: no C1 VOID
 const caperRow = (id: string) => testPrisma.caper.findUniqueOrThrow({ where: { id } });
 const wallet = async (id: string) => (await testPrisma.wallet.findUnique({ where: { userId: id } }))!.balance;
 const board = (id: string, messageId: string) => testPrisma.caper.update({ where: { id }, data: { messageId } });
@@ -25,9 +24,9 @@ describe("sweepCapers (spec 15)", () => {
     const { caper } = await seedLobby({ tier: 1, roles: [...R3], now: new Date(+now - 601_000) });   // lobbyClosesAt = now − 1 s
     await board(caper.id, "m0");
     const fc = fakeCaperClient();
-    await sweepCapers(fc.client, now, BOOT);
+    await sweepCapers(fc.client, now);
     expect((await caperRow(caper.id)).status).toBe("RUNNING");
-    expect(fc.sent.filter((s) => Array.isArray(s.payload.allowedMentions?.users))).toHaveLength(1);
+    expect(fc.sent.filter((s) => Array.isArray(s.payload.allowed_mentions?.users))).toHaveLength(1);
   });
 
   it("a lobby past its close without the required roles is cancelled with refunds and the 30-minute cooldown", async () => {
@@ -35,7 +34,7 @@ describe("sweepCapers (spec 15)", () => {
     const { caper, family, ids } = await seedLobby({ tier: 1, roles: ["MASTERMIND", "LOOKOUT"], now: new Date(+now - 601_000) });
     await board(caper.id, "m0");
     const fc = fakeCaperClient();
-    await sweepCapers(fc.client, now, BOOT);
+    await sweepCapers(fc.client, now);
     expect(await caperRow(caper.id)).toMatchObject({ status: "CANCELLED", outcome: "CANCELLED" });
     expect(await txCount("caper_stake_refund", Object.values(ids))).toBe(2);
     expect(+(await testPrisma.family.findUniqueOrThrow({ where: { id: family.id } })).nextCaperAt).toBe(+now + 1_800_000);
@@ -47,7 +46,7 @@ describe("sweepCapers (spec 15)", () => {
     const stale = new Date(Date.now() - 30_000);                                                        // earlier jobs ate 30 s
     const { caper } = await seedLobby({ tier: 1, roles: [...R3], now: new Date(+stale - 601_000) });
     const before = Date.now();
-    await sweepCapers(fakeCaperClient().client, stale, BOOT);
+    await sweepCapers(fakeCaperClient().client, stale);
     const row = await caperRow(caper.id);
     expect(row.status).toBe("RUNNING");
     expect(+row.startedAt).toBeGreaterThanOrEqual(before);
@@ -58,7 +57,7 @@ describe("sweepCapers (spec 15)", () => {
     const { caper } = await seedRunning(dueRun());
     await board(caper.id, "m0");
     const fc = fakeCaperClient();
-    await sweepCapers(fc.client, new Date(), BOOT);
+    await sweepCapers(fc.client, new Date());
     expect((await caperRow(caper.id)).status).toBe("RESOLVED");
     expect(fc.edits.some((e) => e.messageId === "m0" && fileNames(e.payload).some((n) => n.startsWith("cf_result_")))).toBe(true);
   });
@@ -66,14 +65,15 @@ describe("sweepCapers (spec 15)", () => {
   it("a restart VOID through the sweeper", async () => {
     const run = dueRun();
     const { caper, ids } = await seedRunning({ ...run, picks: { LOOKOUT: "none" } });
-    await sweepCapers(fakeCaperClient().client, new Date(), new Date(+run.startedAt + 50_000));
+    await testPrisma.botProcessBoot.create({ data: { shardIds: [3], bootedAt: new Date(+run.startedAt + 50_000) } });   // another process booted mid-GO
+    await sweepCapers(fakeCaperClient().client, new Date());
     expect(await caperRow(caper.id)).toMatchObject({ status: "CANCELLED", outcome: "VOID" });
     for (const id of Object.values(ids)) expect(await wallet(id)).toBe(50_000);
   });
 
   it("a SETTLING caper is resumed", async () => {
     const { caper } = await seedRunning({ tier: 1, roles: [...R3], status: "SETTLING" });
-    await sweepCapers(fakeCaperClient().client, new Date(), BOOT);
+    await sweepCapers(fakeCaperClient().client, new Date());
     expect((await caperRow(caper.id)).status).toBe("RESOLVED");
   });
 
@@ -88,7 +88,7 @@ describe("sweepCapers (spec 15)", () => {
       await setCaperUpdatedAt(x.caper.id, new Date(+now - ago));
     }
     const fc = fakeCaperClient();
-    await sweepCapers(fc.client, now, BOOT);
+    await sweepCapers(fc.client, now);
     expect(fc.edits.map((e) => e.messageId).sort()).toEqual(["mA", "mB"]);
   });
 
@@ -96,14 +96,14 @@ describe("sweepCapers (spec 15)", () => {
     const x = await seedRunning(dueRun());
     const y = await seedRunning(dueRun());
     boom.id = x.caper.id;
-    await sweepCapers(fakeCaperClient().client, new Date(), BOOT);
+    await sweepCapers(fakeCaperClient().client, new Date());
     expect((await caperRow(x.caper.id)).status).toBe("RUNNING");
     expect((await caperRow(y.caper.id)).status).toBe("RESOLVED");
   });
 
   it("runs while the feature is off", () => withCfConfig({ enabled: false }, async () => {
     const { caper } = await seedRunning(dueRun());
-    await sweepCapers(fakeCaperClient().client, new Date(), BOOT);
+    await sweepCapers(fakeCaperClient().client, new Date());
     expect((await caperRow(caper.id)).status).toBe("RESOLVED");
   }));
 });

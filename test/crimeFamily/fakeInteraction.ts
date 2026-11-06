@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import { MessageFlags } from "discord.js";
+import { fakeRest } from "./fakeClient";
 
 // The slice of a discord.js button, select or modal interaction that the
 // crime family router and routes touch. Each ack updates deferred / replied /
@@ -14,13 +15,11 @@ const isEphemeral = (options: unknown) =>
 
 function fakeInteraction(customId: string, kind: Kind, opts: FakeOpts) {
   const order: string[] = [];
-  const channel = {
-    isTextBased: () => true,
-    send: vi.fn(async (_payload: unknown) => ({ id: "m-sent" })),
-    messages: { edit: vi.fn(async (_id: string, _payload: unknown) => ({})) },
-  };
+  const channel = { isTextBased: () => true };
   const client = {
     user: { id: "bot" },
+    options: {},
+    rest: fakeRest({ send: async () => ({ id: "m-sent" }), edit: async () => ({}) }),
     channels: { fetch: vi.fn(async (_id: string) => channel) },
     users: { fetch: vi.fn(async (_id: string) => ({ send: vi.fn(async () => ({})) })) },
   };

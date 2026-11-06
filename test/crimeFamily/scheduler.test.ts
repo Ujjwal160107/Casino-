@@ -54,7 +54,7 @@ describe("crime family jobs (15)", () => {
     await setActive(boss, new Date(+now - 7 * DAY - 60_000));
     await runSuccession(c.client, now); await runSuccession(c.client, now);
     expect(c.sent).toHaveLength(1);
-    expect(c.sent[0].allowedMentions).toEqual({ parse: [], users: [ub] });
+    expect(c.sent[0].allowed_mentions).toEqual({ parse: [], users: [ub] });
     expect(await fam(f.id)).toMatchObject({ claimNoticeFor: boss, claimChannelId: "home", claimMessageId: "m1" });
     await setActive(boss, now);                                           // the Boss is back (P22)
     await runSuccession(c.client, now);

@@ -3,11 +3,13 @@
 // tickRackets at :05. Each schedule is its own cron task in UTC with
 // noOverlap, each job and each family has its own try/catch, and every write
 // is a CAS in the service it calls, so a missed or doubled run is harmless.
-// Plans 2 and 3 add CfJob entries to CF_SCHEDULES, never branches.
+// Plans 2 and 3 add CfJob entries to CF_SCHEDULES, never branches. Only the
+// job shard registers them (startCrimeFamilyJobs, A29).
 import cron from "node-cron";
 import type { Client } from "discord.js";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
+import { isJobShard } from "../../utils/shard";
 import { announceArrears, announceChairChange, announcePayday, resolveInviteCard } from "../../ui/crimeFamily/announce";
 import { buildClaimNotice, buildClaimResolved } from "../../ui/crimeFamily/familyScreens";
 import { editChannelMessage, sendToChannel } from "../../ui/crimeFamily/post";
@@ -15,6 +17,7 @@ import { SWEEP_CAPERS_JOB } from "./caperSweeper";
 import { autoHandover, clearClaimNotice, markClaimNotice, setClaimMessage } from "./chairService";
 import { expireInvites } from "./membershipService";
 import { executePayday } from "./paydayService";
+import { seedRackets } from "./racketService";
 import { tickRackets, tickWars } from "./turfJobs";
 import { FamilyError } from "./tx";
 import { chargeDues } from "./vaultService";
@@ -153,4 +156,11 @@ export function registerCrimeFamilyJobs(client: Client): void {
       name: `crimeFamily:${s.jobs.map((j) => j.name).join("+")}`,
     });
   }
+}
+
+/** The one entry initScheduler calls (F14): family jobs and the boot seed run only on the job shard (A29). */
+export function startCrimeFamilyJobs(client: Client): void {
+  if (!isJobShard(client)) return;
+  registerCrimeFamilyJobs(client);
+  seedRackets().catch((err) => console.error("[crimeFamily] seedRackets error", err));
 }

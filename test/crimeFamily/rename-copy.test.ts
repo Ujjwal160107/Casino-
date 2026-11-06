@@ -73,7 +73,7 @@ describe("Crew Heist rename (amendment 9)", () => {
       logToChannel.mockClear();
       const run = await seedRunning({ tier: 1, roles: ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] });
       const fc = fakeCaperClient({ members: Object.values(run.ids) });
-      const result = await resolveAndAnnounce(fc.client, run.caper.id, new Date(+run.caper.goEndsAt! + 1_000), new Date(0));
+      const result = await resolveAndAnnounce(fc.client, run.caper.id, new Date(+run.caper.goEndsAt! + 1_000));
       expect(result).toMatchObject({ status: "settled", resolvedNow: true });
       expect(logToChannel).toHaveBeenCalledTimes(1);
       for (const [, options] of logToChannel.mock.calls) expect(visibleText(options)).not.toMatch(OLD);

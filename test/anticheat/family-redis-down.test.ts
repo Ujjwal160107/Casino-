@@ -100,7 +100,7 @@ describe("with Redis down", () => {
 describe("capers with Redis down", () => {
   const T1 = ["MASTERMIND", "LOOKOUT", "SAFECRACKER", "DRIVER"] as const;
   const bal = async (id: string) => (await testPrisma.wallet.findUnique({ where: { userId: id } }))!.balance;
-  const text = (payload: any) => JSON.stringify(payload.components.map((c: any) => c.toJSON()));
+  const text = (payload: any) => JSON.stringify(payload.components);
   let down: ReturnType<typeof vi.spyOn>;
   beforeEach(async () => { await resetFamilies(); down = vi.spyOn(redisService, "getInstance").mockImplementation(() => { throw new Error("down"); }); });
   afterEach(() => down.mockRestore());
@@ -121,7 +121,7 @@ describe("capers with Redis down", () => {
     const answers = parseAnswers(run.answers)!;
     const t = new Date(+run.startedAt + 5_000);
     for (const r of T1) { await openBrief(c.id, f.ids[r], t); await lockChoice(c.id, f.ids[r], answers.seats[r]!.correct, t); }
-    await resolveAndAnnounce(fc.client, c.id, new Date(+run.goEndsAt + 1_000), new Date(0));
+    await resolveAndAnnounce(fc.client, c.id, new Date(+run.goEndsAt + 1_000));
     const done = await testPrisma.caper.findUniqueOrThrow({ where: { id: c.id } });
     expect(done.status).toBe("RESOLVED");
     const cut = done.outcome === "CLEAN" ? 280_000 : 98_000;             // T1 n=4 (8.6)

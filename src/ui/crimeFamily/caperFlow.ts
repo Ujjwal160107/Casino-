@@ -15,7 +15,7 @@ import { getOwnedPrepKeys } from "../../services/crimeService";
 import { caperGoNotice, caperLobbyNotice, notifyMany } from "../../services/dmNoticeService";
 import { buildCaperCardView, cancelledLobbySince, getCaper, listCrew, startedSeatsSince } from "../../services/crimeFamily/caperQueries";
 import { cancelCaper, leaveCaper, planCaper, startCaper, type StartBy, type StartResult } from "../../services/crimeFamily/caperLobbyService";
-import { processBootedAt, resolveCaper, type ResolveResult } from "../../services/crimeFamily/caperSettleService";
+import { resolveCaper, type ResolveResult } from "../../services/crimeFamily/caperSettleService";
 import { checkMemberEligibility } from "../../services/crimeFamily/eligibility";
 import { listMembers, requireMembership } from "../../services/crimeFamily/familyQueries";
 import { pickLobbyChannel, postCaperCard, renderCaperCard, requestCaperRender } from "./caperCard";
@@ -176,8 +176,8 @@ export async function runCancel(client: Client, caperId: string, actorId: string
 }
 
 /** Resolves a run (VOID, corrupt or settle), draws the result, and logs a big pool to the guild's trade log. */
-export async function resolveAndAnnounce(client: Client, caperId: string, now: Date, bootedAt?: Date): Promise<ResolveResult> {
-  const result = await resolveCaper(caperId, now, bootedAt ?? processBootedAt());
+export async function resolveAndAnnounce(client: Client, caperId: string, now: Date): Promise<ResolveResult> {
+  const result = await resolveCaper(caperId, now);
   if (!result.resolvedNow) return result;
   await safely("caper result render", () => renderCaperCard(client, caperId, { now }));
   if (result.status === "settled") {

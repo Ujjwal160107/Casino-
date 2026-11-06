@@ -7,8 +7,7 @@ import { marketTick, initGlobalMarket } from "./services/stockService";
 import { decayAllHeat, runRaidScan } from "./services/taxService";
 import { processDueReminders } from "./services/cooldownReminderService";
 import { notifyCardWeekly, notifyInvestmentsMatured } from "./services/dmNoticeService";
-import { registerCrimeFamilyJobs } from "./services/crimeFamily/scheduler";
-import { seedRackets } from "./services/crimeFamily/racketService";
+import { startCrimeFamilyJobs } from "./services/crimeFamily/scheduler";
 import prisma from "./utils/prisma";
 
 export function initScheduler(client: Client) {
@@ -72,8 +71,7 @@ export function initScheduler(client: Client) {
     }
   });
 
-  registerCrimeFamilyJobs(client);
-  seedRackets().catch((err) => console.error("[crimeFamily] seedRackets error", err));
+  startCrimeFamilyJobs(client);
 
   console.log("Banking scheduler initialized.");
 }

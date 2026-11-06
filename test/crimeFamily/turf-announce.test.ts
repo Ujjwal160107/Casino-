@@ -85,7 +85,7 @@ describe("turf announcer", () => {
     const s = (await settleWar(w.id, new Date()))!;
     await announceWarResult(c.client, s, new Date());
     const edits = c.calls.filter((x) => x.op === "edit");
-    expect(edits.slice(-2).every((x) => !/"type":1[,}]/.test(JSON.stringify(x.payload.components.map((c: any) => c.toJSON()))))).toBe(true); // no ActionRow
+    expect(edits.slice(-2).every((x) => !/"type":1[,}]/.test(JSON.stringify(x.payload.components)))).toBe(true); // no ActionRow
     expect(c.calls.filter((x) => x.op === "send").slice(-2).map((x) => x.channelId).sort()).toEqual(["ch-a", "ch-d"]);
     expect([...c.dm.keys()]).toEqual([a.s]);
   });

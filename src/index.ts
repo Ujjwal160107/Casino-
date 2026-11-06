@@ -27,6 +27,7 @@ import {
   handleGlobalEconomyReminderInteraction
 } from "./services/globalEconomyReminderService";
 import { initScheduler } from "./scheduler";
+import { recordProcessBoot } from "./services/processBootService";
 import { backfillStarterChickens } from "./services/starterChickenService";
 import { handleSlashCommand } from "./slash/handle";
 import { buildCommand, SPECS } from "./slash/registry";
@@ -90,6 +91,7 @@ client.once("ready", async () => {
   initQuestListeners();
 
   guildCreateListener(client);
+  await recordProcessBoot(client).catch((err) => console.error("[crimeFamily] recordProcessBoot failed:", err));
   initScheduler(client);
 
   // Registered globally rather than per guild: one API call instead of one per

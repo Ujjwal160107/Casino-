@@ -42,7 +42,7 @@ async function closeLobby(client: Client, caperId: string, now: Date): Promise<v
  * before (a)-(c) run, so a caper this sweep starts or resolves is drawn once,
  * by the flow step that moved it.
  */
-export async function sweepCapers(client: Client, now: Date, bootedAt?: Date): Promise<void> {
+export async function sweepCapers(client: Client, now: Date): Promise<void> {
   const endedSince = new Date(now.getTime() - CRIME_FAMILY_CONFIG.caperEndedRerenderSeconds * 1000);
   const [dueLobbies, dueRuns, settling, openLobbies, ended] = await Promise.all([
     idsWhere({ status: "LOBBY", lobbyClosesAt: { lte: now } }),
@@ -52,7 +52,7 @@ export async function sweepCapers(client: Client, now: Date, bootedAt?: Date): P
     idsWhere({ status: { in: ["RESOLVED", "CANCELLED"] }, updatedAt: { gte: endedSince } }),
   ]);
   await eachCaper(dueLobbies, (id) => closeLobby(client, id, now));
-  await eachCaper([...dueRuns, ...settling], (id) => resolveAndAnnounce(client, id, now, bootedAt));
+  await eachCaper([...dueRuns, ...settling], (id) => resolveAndAnnounce(client, id, now));
   await eachCaper([...openLobbies, ...ended], (id) => renderCaperCard(client, id, { now }));
 }
 

@@ -1,4 +1,4 @@
-// Caper settlement (spec 8.4 step 7, 8.8): VOID a run a restart interrupted,
+// Caper settlement (spec 8.4 step 7, 8.8, A30): VOID a run a restart interrupted,
 // then draw once, pay each seat once, pay the vault once and resolve. Every
 // step is guarded by a CAS (`roll: -1`, `settled`, `vaultPaid`, status), so a
 // second settler, a crash or a restart resumes without paying anyone twice.
@@ -11,6 +11,7 @@ import { addCrimeHeatTx, migrateLegacyHeatForUser } from "../taxService";
 import { jailUserTx } from "../jailService";
 import { recordPotentialSoulLedgerLoss } from "../shopBuffs";
 import { invalidateUserCache } from "../userService";
+import { bootedSince } from "../processBootService";
 import { getCaper } from "./caperQueries";
 import { voidCaperInTx } from "./caperRefunds";
 import { resolveCaperOutcome, splitCaperPool, type CaperOutcome } from "./caperMath";
@@ -27,11 +28,6 @@ export type ResolveResult = {
 };
 
 const OUTCOMES: readonly string[] = ["CLEAN", "MESSY", "BUST"];
-
-/** When this process booted (C1): a RUNNING caper started before it was unsettled across a restart. */
-export function processBootedAt(): Date {
-  return new Date(Date.now() - process.uptime() * 1000);
-}
 
 const column = (outcome: CaperOutcome) => outcome.toLowerCase() as "clean" | "messy" | "bust";
 
@@ -60,7 +56,7 @@ async function voidRun(caper: Caper, corrupt: boolean): Promise<ResolveResult> {
  * goEndsAt, otherwise moves RUNNING → SETTLING and settles. A SETTLING caper
  * is resumed (C4); anything else is busy.
  */
-export async function resolveCaper(caperId: string, now: Date, bootedAt: Date, rng: Rng = cryptoRng): Promise<ResolveResult> {
+export async function resolveCaper(caperId: string, now: Date, rng: Rng = cryptoRng): Promise<ResolveResult> {
   const caper = await getCaper(caperId);
   const busy: ResolveResult = { caperId, status: "busy", resolvedNow: false, outcome: null };
   if (!caper) return busy;
@@ -68,7 +64,7 @@ export async function resolveCaper(caperId: string, now: Date, bootedAt: Date, r
     if (parseAnswers(caper.answers) === null) return voidRun(caper, true);
     const unlocked = (await prisma.caperCrew.count({ where: { caperId, choice: -1 } })) > 0;
     if (unlocked && now < caper.goEndsAt) return { caperId, status: "not_due", resolvedNow: false, outcome: null };
-    if (unlocked && bootedAt > caper.startedAt) return voidRun(caper, false);
+    if (unlocked && (await bootedSince(caper.startedAt))) return voidRun(caper, false);
     const { count } = await prisma.caper.updateMany({ where: { id: caperId, status: "RUNNING" }, data: { status: "SETTLING" } });
     if (count === 0 && (await getCaper(caperId))?.status !== "SETTLING") return busy;
   } else if (caper.status !== "SETTLING") {

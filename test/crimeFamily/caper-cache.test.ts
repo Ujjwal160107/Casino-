@@ -62,7 +62,7 @@ describe("caper wallet writes drop the user cache", () => {
     const { caper, ids } = await seedRunning({ tier: 1, roles: [...R3] });
     await testPrisma.caper.update({ where: { id: caper.id }, data: { answers: {} } });   // corrupt (edge 63)
     await cache(Object.values(ids));
-    expect(await resolveCaper(caper.id, new Date(), new Date(0))).toMatchObject({ status: "void" });
+    expect(await resolveCaper(caper.id, new Date())).toMatchObject({ status: "void" });
     expect(await cached(Object.values(ids))).toEqual(none(Object.values(ids)));
   });
 

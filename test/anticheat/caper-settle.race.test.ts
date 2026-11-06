@@ -19,14 +19,15 @@ const user = (id: string) => testPrisma.user.findUnique({ where: { discordId: id
 const fam = (id: string) => testPrisma.family.findUnique({ where: { id } });
 const caperRow = (id: string) => testPrisma.caper.findUnique({ where: { id } });
 const after = (c: { goEndsAt: Date }) => new Date(+c.goEndsAt + 1_000);
-const OLD_BOOT = new Date(0);
+/** A boot written by another process (shard 3): the A30 restart signal. */
+const bootAt = (bootedAt: Date) => testPrisma.botProcessBoot.create({ data: { shardIds: [3], bootedAt } });
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "Caper", "CaperCrew"]));
 beforeEach(async () => { await resetFamilies(); fail.at = 0; fail.calls = 0; });
 
 describe("settlement (8.8)", () => {
   it("CLEAN pays each locked seat once, credits the vault cut and XP once and counts the seat", async () => {
     const { caper, family, ids } = await seedRunning({ tier: 1, roles: [...R3] });
-    expect(await resolveCaper(caper.id, after(caper), OLD_BOOT, scriptedRng([5_000]))).toEqual({ caperId: caper.id, status: "settled", resolvedNow: true, outcome: "CLEAN" });
+    expect(await resolveCaper(caper.id, after(caper), scriptedRng([5_000]))).toEqual({ caperId: caper.id, status: "settled", resolvedNow: true, outcome: "CLEAN" });
     for (const id of Object.values(ids)) {
       expect(await wallet(id)).toBe(280_000);
       expect((await user(id))!.crimeHeat).toBe(20);
@@ -42,7 +43,7 @@ describe("settlement (8.8)", () => {
 
   it("MESSY from one unlocked seat: that seat gets 0 and its share is never minted", async () => {
     const { caper, family, ids } = await seedRunning({ tier: 1, roles: [...R3], picks: { SAFECRACKER: "none" } });
-    await resolveCaper(caper.id, after(caper), OLD_BOOT, scriptedRng([5_000]));
+    await resolveCaper(caper.id, after(caper), scriptedRng([5_000]));
     expect([await wallet(ids.MASTERMIND), await wallet(ids.LOOKOUT), await wallet(ids.SAFECRACKER)]).toEqual([98_000, 98_000, 0]);
     expect(await fam(family.id)).toMatchObject({ earnings: 36_750, xp: 60 });
     expect((await user(ids.SAFECRACKER))!.crimeHeat).toBe(30);
@@ -54,7 +55,7 @@ describe("settlement (8.8)", () => {
     const later = new Date(+now + 9_000_000);
     await testPrisma.user.update({ where: { discordId: ids.SAFECRACKER }, data: { isJailed: true, jailReleaseTime: later } });
     // roll, then one jail roll per seat in ring order: MM jailed (0 < 0.2), LO free, SC jailed, DR free
-    await resolveCaper(caper.id, now, OLD_BOOT, scriptedRng([5_000, 0, 9_999, 0, 9_999]));
+    await resolveCaper(caper.id, now, scriptedRng([5_000, 0, 9_999, 0, 9_999]));
     for (const id of Object.values(ids)) {
       expect(await wallet(id)).toBe(700_000);
       expect((await user(id))!.crimeHeat).toBe(45);
@@ -90,22 +91,23 @@ describe("settlement (8.8)", () => {
 
   it("the last lock's settle racing the sweeper pays one set (edge 25)", async () => {
     const { caper, ids } = await seedRunning({ tier: 1, roles: [...R3] });
-    await Promise.allSettled([resolveCaper(caper.id, new Date(+caper.startedAt + 10_000), OLD_BOOT, scriptedRng([5_000])), resolveCaper(caper.id, after(caper), OLD_BOOT, scriptedRng([5_000]))]);
-    await resolveCaper(caper.id, after(caper), OLD_BOOT, scriptedRng([5_000]));
+    await Promise.allSettled([resolveCaper(caper.id, new Date(+caper.startedAt + 10_000), scriptedRng([5_000])), resolveCaper(caper.id, after(caper), scriptedRng([5_000]))]);
+    await resolveCaper(caper.id, after(caper), scriptedRng([5_000]));
     for (const id of Object.values(ids)) expect(await wallet(id)).toBe(280_000);
   });
 
   it("an unlocked seat before goEndsAt is not due", async () => {
     const { caper } = await seedRunning({ tier: 1, roles: [...R3], picks: { LOOKOUT: "none" } });
-    expect((await resolveCaper(caper.id, new Date(+caper.startedAt + 10_000), OLD_BOOT)).status).toBe("not_due");
+    expect((await resolveCaper(caper.id, new Date(+caper.startedAt + 10_000))).status).toBe("not_due");
     expect((await caperRow(caper.id))!.status).toBe("RUNNING");
   });
 
   it.each([["inside the GO", 50_000], ["after the GO ended, still unsettled (C1)", 150_000]] as const)(
-    "VOID: a restart %s with an unlocked seat refunds every stake and records nothing", async (_n, bootOffset) => {
+    "VOID: a restart (another shard's boot row) %s with an unlocked seat refunds every stake and records nothing", async (_n, bootOffset) => {
       const startedAt = new Date(Date.now() - 200_000);
       const { caper, family, ids } = await seedRunning({ tier: 1, roles: [...R3], picks: { LOOKOUT: "none" }, startedAt });
-      expect(await resolveCaper(caper.id, after(caper), new Date(+startedAt + bootOffset))).toMatchObject({ status: "void", outcome: "VOID" });
+      await bootAt(new Date(+startedAt + bootOffset));
+      expect(await resolveCaper(caper.id, after(caper))).toMatchObject({ status: "void", outcome: "VOID" });
       expect(await caperRow(caper.id)).toMatchObject({ status: "CANCELLED", outcome: "VOID", liveSlot: caper.id });
       for (const id of Object.values(ids)) { expect(await wallet(id)).toBe(50_000); expect((await user(id))!.crimeHeat).toBe(0); }
       const lw = await testPrisma.wallet.findUnique({ where: { userId: ids.LOOKOUT } });
@@ -119,16 +121,18 @@ describe("settlement (8.8)", () => {
   it("a boot before startedAt settles normally; every seat locked never VOIDs", async () => {
     const startedAt = new Date(Date.now() - 200_000);
     const a = await seedRunning({ tier: 1, roles: [...R3], picks: { LOOKOUT: "none" }, startedAt });
-    expect((await resolveCaper(a.caper.id, after(a.caper), new Date(+startedAt - 1), scriptedRng([5_000]))).outcome).toBe("MESSY");
+    await bootAt(new Date(+startedAt - 1));
+    expect((await resolveCaper(a.caper.id, after(a.caper), scriptedRng([5_000]))).outcome).toBe("MESSY");
     await resetFamilies();
     const b = await seedRunning({ tier: 1, roles: [...R3], startedAt });
-    expect((await resolveCaper(b.caper.id, after(b.caper), new Date(+startedAt + 50_000), scriptedRng([5_000]))).outcome).toBe("CLEAN");
+    await bootAt(new Date(+startedAt + 50_000));
+    expect((await resolveCaper(b.caper.id, after(b.caper), scriptedRng([5_000]))).outcome).toBe("CLEAN");
   });
 
   it("corrupt answers on a RUNNING caper: VOID with refunds and a caper_corrupt audit (edge 63)", async () => {
     const { caper, ids } = await seedRunning({ tier: 1, roles: [...R3] });
     await testPrisma.caper.update({ where: { id: caper.id }, data: { answers: {} } });
-    expect((await resolveCaper(caper.id, after(caper), OLD_BOOT)).status).toBe("void");
+    expect((await resolveCaper(caper.id, after(caper))).status).toBe("void");
     expect(await testPrisma.audit.count({ where: { type: "caper_corrupt", userId: ids.MASTERMIND } })).toBe(1);
     expect(await txCount("caper_stake_refund", Object.values(ids))).toBe(3);
   });
@@ -136,7 +140,7 @@ describe("settlement (8.8)", () => {
   it("a cut above MAX_SAFE_BALANCE is clamped and the excess is never minted (edge 20)", async () => {
     const { caper, ids } = await seedRunning({ tier: 1, roles: [...R3] });
     await testPrisma.wallet.update({ where: { userId: ids.LOOKOUT }, data: { balance: MAX_SAFE_BALANCE - 100_000 } });
-    await resolveCaper(caper.id, after(caper), OLD_BOOT, scriptedRng([5_000]));
+    await resolveCaper(caper.id, after(caper), scriptedRng([5_000]));
     expect(await wallet(ids.LOOKOUT)).toBe(MAX_SAFE_BALANCE);
     const w = await testPrisma.wallet.findUnique({ where: { userId: ids.LOOKOUT } });
     expect(await testPrisma.transaction.findFirst({ where: { walletId: w!.id, type: "caper_cut" } })).toMatchObject({ amount: 100_000, meta: expect.objectContaining({ capped: true }) });
@@ -145,7 +149,7 @@ describe("settlement (8.8)", () => {
   it("the vault cut retries dues arrears (7.4)", async () => {
     const { caper, family } = await seedRunning({ tier: 1, roles: [...R3] });
     await testPrisma.family.update({ where: { id: family.id }, data: { duesArrears: 1 } });
-    await resolveCaper(caper.id, after(caper), OLD_BOOT, scriptedRng([5_000]));
+    await resolveCaper(caper.id, after(caper), scriptedRng([5_000]));
     expect(await fam(family.id)).toMatchObject({ earnings: 65_000, duesArrears: 0 });
   });
 });

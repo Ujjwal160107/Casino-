@@ -82,7 +82,7 @@ describe("!caper", () => {
     const mid = await postCaperCard(fc.client, c.id, CH);
     await run(fc, ids.LOOKOUT, [], "c2");
     expect(fc.sent.map((s) => s.channelId)).toEqual([CH, "c2"]);
-    expect(JSON.stringify(fc.edits.find((e) => e.messageId === mid)!.payload.components.map((x: any) => x.toJSON()))).toContain("Lobby moved");
+    expect(JSON.stringify(fc.edits.find((e) => e.messageId === mid)!.payload.components)).toContain("Lobby moved");
   }));
 
   it("!caper reposts a dead result from 10 minutes ago and shows S11 for one from 2 hours ago (C7)", () => open(async () => {
