@@ -1,21 +1,25 @@
-// The no-confidence vote (amendment 4): who may start one and the start
-// itself. One OPEN vote per family is the unique (familyId, liveSlot) index;
-// every write runs in runFamilyTx after touchFamily, so it conflicts with any
-// chair, rank or membership write of the same family.
+// The no-confidence vote (amendment 4): who may start one, the start, secret
+// changeable ballots, the close and the once-only announcement CASes. One OPEN
+// vote per family is the unique (familyId, liveSlot) index; a start and a close
+// run touchFamily, so they conflict with any chair, rank or membership write of
+// the same family, and every ballot writes the vote so it conflicts with the close.
 import type { Family, FamilyVote, Prisma } from "@prisma/client";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import type { FamilyRole } from "../../data/crimeFamilyCatalog";
 import { isBanActive } from "../banService";
+import { moveChair, pickHeir } from "./chairService";
 import { assertNotJailed, familyLabel, requireMembership } from "./familyQueries";
 import { can, isAssociate } from "./permissions";
 import { FamilyError, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
-import { votePassNeed } from "./voteRules";
-import type { VoteStartView } from "./views";
+import { decideVote, voidReasonOf, voteCooldownUntil, votePassNeed, type VoteStatus } from "./voteRules";
+import type { VoteStartView, VoteView } from "./views";
 
 const NOT_MEMBER = "You are not in a crime family.";
 const ALREADY_OPEN = "A vote is already open.";
 const BANNED = "Banned accounts can't take part in a vote.";
+const CLOSED = "Voting closed.";
+const NOT_ELIGIBLE = "You can't vote in this one.";
 
 const rel = (d: Date) => `<t:${Math.floor(d.getTime() / 1000)}:R>`;
 const secondsAfter = (d: Date, seconds: number) => new Date(d.getTime() + seconds * 1000);
@@ -113,5 +117,126 @@ export async function getVoteStartView(actorId: string, now: Date): Promise<Vote
     need: votePassNeed(read.snapshot.length),
     openVoteId: open?.id ?? null,
     block: read.block,
+  };
+}
+
+/**
+ * A secret, changeable ballot (4.3 step 2). The vote write (ballotsVersion)
+ * makes a ballot and the close conflict, so a late ballot reads "Voting
+ * closed."; a first-ballot double press that loses the unique (voteId, userId)
+ * retries once into the update path (mapped outside the transaction).
+ */
+export async function castBallot(voteId: string, userId: string, choice: "YES" | "NO", now: Date = new Date()): Promise<FamilyVote> {
+  const attempt = () => runFamilyTx(async (tx) => {
+    const { count } = await tx.familyVote.updateMany({
+      where: { id: voteId, status: "OPEN", closesAt: { gt: now } },
+      data: { ballotsVersion: { increment: 1 } },
+    });
+    if (count !== 1) throw new FamilyError(CLOSED);
+    const vote = await tx.familyVote.findUniqueOrThrow({ where: { id: voteId } });
+    const member = await tx.familyMember.findUnique({ where: { userId } });
+    if (!vote.eligibleIds.includes(userId) || !member || member.familyId !== vote.familyId) throw new FamilyError(NOT_ELIGIBLE);
+    const gated = await jailOrBanBlock(tx, userId, now);
+    if (gated) throw new FamilyError(gated);
+    const prior = await tx.familyBallot.findFirst({ where: { voteId, userId } });
+    if (prior) await tx.familyBallot.update({ where: { id: prior.id }, data: { choice, castAt: now } });
+    else await tx.familyBallot.create({ data: { voteId, familyId: vote.familyId, userId, choice, castAt: now } });
+    return vote;
+  });
+  try {
+    return await attempt();
+  } catch (err) {
+    if (isUniqueViolation(err, "FamilyBallot_voteId_userId_key")) return attempt();
+    throw err;
+  }
+}
+
+/**
+ * Closes a due OPEN vote (4.3 step 3); null when it is not due or another
+ * close won. Counts only ballots of snapshot ids still members and not the
+ * Boss; on a pass the chair moves to the Underboss at close, else the heir
+ * order. A chair move racing the close conflicts on the family document; the
+ * retry reads the new bossId and closes VOID.
+ */
+export async function closeVote(voteId: string, now: Date): Promise<FamilyVote | null> {
+  return runFamilyTx(async (tx) => {
+    const vote = await tx.familyVote.findUnique({ where: { id: voteId } });
+    if (!vote || vote.status !== "OPEN" || vote.closesAt > now) return null;
+    const family = await tx.family.findUniqueOrThrow({ where: { id: vote.familyId } });
+    const members = await tx.familyMember.findMany({ where: { familyId: vote.familyId } });
+    const memberIds = new Set(members.map((m) => m.userId));
+    const ids = new Set(vote.eligibleIds.filter((id) => memberIds.has(id) && id !== vote.bossId));
+    const counted = (await tx.familyBallot.findMany({ where: { voteId } })).filter((b) => ids.has(b.userId));
+    const yes = counted.filter((b) => b.choice === "YES").length;
+    const no = counted.length - yes;
+    const others = members.filter((m) => m.userId !== vote.bossId);
+    const heirId = others.find((m) => m.role === "UNDERBOSS")?.userId ?? pickHeir(others, now)?.userId ?? null;
+    const { status, voidReason } = decideVote({ eligibleAtClose: ids.size, yes, heirId, chairMoved: family.bossId !== vote.bossId });
+    const { count } = await tx.familyVote.updateMany({
+      where: { id: voteId, status: "OPEN" },
+      data: {
+        status, liveSlot: voteId, closedAt: now, cooldownUntil: voteCooldownUntil(status, voidReason, now),
+        yes, no, eligibleAtClose: ids.size, newBossId: status === "PASSED" ? heirId! : "",
+      },
+    });
+    if (count !== 1) return null;
+    if (status === "PASSED") await moveChair(tx, vote.familyId, vote.bossId, heirId!, now);
+    await touchFamily(tx, vote.familyId, now);
+    return tx.familyVote.findUniqueOrThrow({ where: { id: voteId } });
+  });
+}
+
+/** CAS: true once per vote for whoever posts S34 and the start DMs ("start"), or edits the result and sends the close DMs ("result", only once closed). */
+export async function claimVoteAnnouncement(voteId: string, which: "start" | "result"): Promise<boolean> {
+  const { count } = which === "start"
+    ? await prisma.familyVote.updateMany({ where: { id: voteId, announced: false }, data: { announced: true } })
+    : await prisma.familyVote.updateMany({ where: { id: voteId, status: { not: "OPEN" }, resultAnnounced: false }, data: { resultAnnounced: true } });
+  return count === 1;
+}
+
+/** CAS on the stored S34 id: true when it was still expectMessageId ("" for the first post). */
+export async function setVoteMessage(voteId: string, expectMessageId: string, channelId: string, messageId: string): Promise<boolean> {
+  const { count } = await prisma.familyVote.updateMany({ where: { id: voteId, messageId: expectMessageId }, data: { channelId, messageId } });
+  return count === 1;
+}
+
+/** The sweeper's work: due closes, and starts or results still silent after voteAnnounceGraceSeconds (A42). */
+export async function votesDue(now: Date): Promise<{ close: string[]; announceStart: string[]; announceResult: string[] }> {
+  const silentBefore = new Date(now.getTime() - CRIME_FAMILY_CONFIG.voteAnnounceGraceSeconds * 1000);
+  const ids = (rows: { id: string }[]) => rows.map((r) => r.id);
+  const [close, announceStart, announceResult] = await Promise.all([
+    prisma.familyVote.findMany({ where: { status: "OPEN", closesAt: { lte: now } }, select: { id: true } }),
+    prisma.familyVote.findMany({ where: { status: "OPEN", announced: false, createdAt: { lte: silentBefore } }, select: { id: true } }),
+    prisma.familyVote.findMany({ where: { status: { not: "OPEN" }, resultAnnounced: false, closedAt: { lte: silentBefore } }, select: { id: true } }),
+  ]);
+  return { close: ids(close), announceStart: ids(announceStart), announceResult: ids(announceResult) };
+}
+
+/** S34 and the S25 vote card; null when the vote or its family is gone. Counts only: never a ballot (F21). */
+export async function getVoteView(voteId: string, viewerId: string | null, now: Date): Promise<VoteView | null> {
+  const vote = await prisma.familyVote.findUnique({ where: { id: voteId } });
+  if (!vote) return null;
+  const family = await prisma.family.findUnique({ where: { id: vote.familyId } });
+  if (!family) return null;
+  const status = vote.status as VoteStatus;
+  const base = {
+    voteId: vote.id, familyId: family.id, familyLabel: familyLabel(family), tag: family.tag, homeChannelId: family.homeChannelId,
+    channelId: vote.channelId, messageId: vote.messageId, bossId: vote.bossId, starterId: vote.starterId, status, closesAt: vote.closesAt,
+  };
+  if (status !== "OPEN") {
+    return {
+      ...base, eligible: vote.eligibleAtClose, need: votePassNeed(vote.eligibleAtClose), voted: vote.yes + vote.no, heirId: null,
+      result: { yes: vote.yes, no: vote.no, newBossId: vote.newBossId, voidReason: voidReasonOf(vote) }, viewerCanVote: false,
+    };
+  }
+  const members = await prisma.familyMember.findMany({ where: { familyId: family.id }, select: { userId: true, role: true } });
+  const memberIds = new Set(members.map((m) => m.userId));
+  const ids = new Set(vote.eligibleIds.filter((id) => memberIds.has(id) && id !== vote.bossId));
+  const voted = await prisma.familyBallot.count({ where: { voteId, userId: { in: [...ids] } } });
+  return {
+    ...base, eligible: ids.size, need: votePassNeed(ids.size), voted,
+    heirId: members.find((m) => m.role === "UNDERBOSS")?.userId ?? null,
+    result: null,
+    viewerCanVote: viewerId !== null && ids.has(viewerId) && vote.closesAt > now,
   };
 }

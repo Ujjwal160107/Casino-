@@ -4,6 +4,7 @@ import type { CaperRoleKey, FamilyLevelDef, FamilyRole } from "../../data/crimeF
 import type { LedgerLine } from "./ledger";
 import type { WarSettlement, WarStatus } from "./warService";
 import type { BidPhase, BlockScores, RacketClass } from "./warMath";
+import type { VoidReason, VoteStatus } from "./voteRules";
 
 /** S2: the family dashboard as one viewer sees it. */
 export interface FamilyDashboardView {
@@ -261,4 +262,31 @@ export interface VoteStartView {
   openVoteId: string | null;
   /** voteStartBlock's refusal, shown on S35 with Start disabled. */
   block: string | null;
+}
+
+/** S34 and the S25 vote card. F21: no field ever says how anyone voted. */
+export interface VoteView {
+  voteId: string;
+  familyId: string;
+  familyLabel: string;
+  tag: string;
+  homeChannelId: string;
+  channelId: string;
+  messageId: string;
+  bossId: string;
+  starterId: string;
+  status: VoteStatus;
+  closesAt: Date;
+  /** OPEN: snapshot ids still members (not the Boss); closed: eligibleAtClose. */
+  eligible: number;
+  /** votePassNeed(eligible). */
+  need: number;
+  /** OPEN: ballots from those ids; closed: yes + no. */
+  voted: number;
+  /** OPEN: the current Underboss (null → "the heir order picks the next Boss"). */
+  heirId: string | null;
+  /** Null while OPEN. */
+  result: { yes: number; no: number; newBossId: string; voidReason: VoidReason | null } | null;
+  /** OPEN, viewer in the snapshot and still a member. */
+  viewerCanVote: boolean;
 }
