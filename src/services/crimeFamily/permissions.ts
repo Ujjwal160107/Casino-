@@ -88,7 +88,11 @@ export function can(actor: { role: FamilyRole; joinedAt: Date }, action: FamilyA
   }
 }
 
-/** start_vote by rank, or for voteOfficerGraceSeconds after a demotion out of Underboss or Capo (A41). Tenure is checked apart. */
+/**
+ * start_vote by rank, or for voteOfficerGraceSeconds after a demotion out of
+ * Underboss or Capo (A41). Never the Boss, even one still inside an
+ * officerUntil from before the chair moved to them. Tenure is checked apart.
+ */
 export function mayStartVote(member: { role: FamilyRole; joinedAt: Date; officerUntil: Date }, now: Date): boolean {
-  return can(member, "start_vote", now) || member.officerUntil > now;
+  return member.role !== "BOSS" && (can(member, "start_vote", now) || member.officerUntil > now);
 }

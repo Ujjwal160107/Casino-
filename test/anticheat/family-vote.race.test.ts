@@ -86,6 +86,16 @@ describe("no-confidence vote: start (amendment 4.3)", () => {
     expect(await voteStartBlock(prisma, f.id, c1, new Date(+t + 8 * DAY))).toBe("Only the Underboss or a Capo can start a no-confidence vote.");
   });
 
+  it("a Boss still inside a demotion's officerUntil cannot start a vote against himself", async () => {
+    const { f, boss, ids: [c1] } = await voteFamily({ size: 6, capos: 1, bossSince: daysAgo(30) });
+    await testPrisma.familyMember.update({ where: { userId: c1 }, data: { bossedOnce: true, firstBossAt: daysAgo(30) } });
+    await demoteMember(boss, c1);                                        // Capo → Soldier, officerUntil = now + 7 d
+    await handOverChair(boss, c1);
+    expect(await voteStartBlock(prisma, f.id, c1, new Date())).toBe("Only the Underboss or a Capo can start a no-confidence vote.");
+    await expect(startVote(c1)).rejects.toThrow("Only the Underboss or a Capo can start a no-confidence vote.");
+    expect(await openVotes(f.id)).toHaveLength(0);
+  });
+
   it("the Boss's 7-day grace and the 7-day cooldown, each at its boundary", async () => {
     const now = new Date();
     const fresh = await voteFamily({ size: 6, capos: 1, bossSince: new Date(+now - 7 * DAY + 1_000), tag: "AAA" });
