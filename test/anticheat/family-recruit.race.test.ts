@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { acceptApplication, applyToFamily, declineApplication, editListing, withdrawApplication } from "../../src/services/crimeFamily/recruitService";
 import { disbandFamily } from "../../src/services/crimeFamily/disbandService";
+import { createFamily } from "../../src/services/crimeFamily/familyService";
+import { containerText } from "../dm/helpers";
 import { announceDisband } from "../../src/ui/crimeFamily/announce";
 import { fakeClient } from "../crimeFamily/fakeClient";
 import { acceptInvite, acceptInviteByTag, declineInviteByTag, inviteMember, listPendingInvites } from "../../src/services/crimeFamily/membershipService";
@@ -137,6 +139,15 @@ describe("applications (amendment 8.4)", () => {
     await acceptInvite(inv.id, p);
     for (const id of [x.id, y.id]) expect(await testPrisma.familyInvite.findUniqueOrThrow({ where: { id } })).toMatchObject({ status: "WITHDRAWN", slot: id });
   });
+
+  it("founding a family withdraws the founder's PENDING applications", async () => {
+    const a = await recruiting();
+    const p = await seedApplicant({ wallet: 15_000_000 });
+    const x = await apply(p, a.f.id);
+    await createFamily({ uid: p, username: "p", name: "Velvet Ante", tag: "VLA", guildId: "g1", channelId: "c1" });
+    expect(await testPrisma.familyInvite.findUniqueOrThrow({ where: { id: x.id } })).toMatchObject({ status: "WITHDRAWN", slot: x.id });
+    expect(await pending({ familyId: a.f.id })).toBe(0);
+  });
 });
 
 /** An officer (Capo) seated in a recruiting family; the officer is returned with the family. */
@@ -213,7 +224,13 @@ describe("accept and decline (amendment 8.5)", () => {
     expect(await testPrisma.familyInvite.count({ where: { kind: "APPLICATION", status: "EXPIRED" } })).toBe(25);
     const c = fakeClient();
     await announceDisband(c.client as any, r);
-    for (const a of r.expiredApplications) expect(c.dm.get(a.inviteeId)).toBe(1);
+    for (const a of r.expiredApplications) {
+      expect(c.dm.get(a.inviteeId)).toBe(1);
+      const text = containerText((c.dmLast.get(a.inviteeId) as any).components[0]);
+      expect(text).toContain(`**[${tag}] `);
+      expect(text).toContain("disbanded, so your application was closed.");
+      expect(text).not.toMatch(/expired after|apply again/);
+    }
   });
 
   it("the weekly caps count both kinds", async () => {

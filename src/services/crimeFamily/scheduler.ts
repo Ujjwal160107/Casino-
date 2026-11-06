@@ -62,7 +62,7 @@ export async function sweepInvites(client: Client, now: Date): Promise<void> {
   await announceExpiredApplications(client, applications.flatMap((application) => {
     const label = labels.get(application.familyId);
     return label ? [{ application, familyLabel: label }] : [];
-  }));
+  }), "expired");
 }
 
 /** Hourly: the once-a-day dues charge (the duesDayKey CAS); the first missed day DMs the Boss and Underboss. */

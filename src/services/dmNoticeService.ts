@@ -455,7 +455,13 @@ export function applicationDeclinedNotice(v: { familyLabel: string; reapplyAt: D
   return familyNotice("rank_associate", "Application declined", body);
 }
 
-export function applicationExpiredNotice(v: { familyLabel: string }): ContainerBuilder {
+/** Why a PENDING application closed without an answer: its 72 hours ran out, or its family disbanded. */
+export type ApplicationCloseReason = "expired" | "disbanded";
+
+export function applicationExpiredNotice(v: { familyLabel: string; reason: ApplicationCloseReason }): ContainerBuilder {
+  if (v.reason === "disbanded") {
+    return familyNotice("rank_associate", "Application closed", `**${v.familyLabel}** disbanded, so your application was closed.`);
+  }
   const { applicationTtlSeconds: ttl, reapplyAfterWithdrawSeconds: wait } = CRIME_FAMILY_CONFIG;
   const body = `Your application to **${v.familyLabel}** expired after ${hours(ttl)}. You can apply again in ${hours(wait)}.`;
   return familyNotice("rank_associate", "Application expired", body);

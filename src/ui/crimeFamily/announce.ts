@@ -114,7 +114,7 @@ export async function announceRoleChange(
   });
 }
 
-/** A DM to every former member, with their final payday net when they were paid; then each applicant's expiry DM. */
+/** A DM to every former member, with their final payday net when they were paid; then each applicant's closed-by-disband DM. */
 export async function announceDisband(client: Client, result: Awaited<ReturnType<typeof disbandFamily>>): Promise<void> {
   return safely("announceDisband", async () => {
     const label = familyLabel(result.family);
@@ -124,7 +124,7 @@ export async function announceDisband(client: Client, result: Awaited<ReturnType
       finalNet: paid.has(id) && result.split ? result.split.net : null,
       burned: result.burned,
     }));
-    await announceExpiredApplications(client, result.expiredApplications.map((application) => ({ application, familyLabel: label })));
+    await announceExpiredApplications(client, result.expiredApplications.map((application) => ({ application, familyLabel: label })), "disbanded");
   });
 }
 

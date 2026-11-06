@@ -125,11 +125,20 @@ export async function joinFamilyInTx(
   });
   await tx.family.update({ where: { id: familyId }, data: { memberCount: { increment: 1 } } });
   await touchFamily(tx, familyId, now);
-  const others = await tx.familyInvite.findMany({ where: { inviteeId: uid, kind: "APPLICATION", status: "PENDING" }, select: { id: true } });
-  for (const { id } of others) {
+  await withdrawPendingApplications(tx, uid, now);
+  return { family: await tx.family.findUniqueOrThrow({ where: { id: familyId } }), member };
+}
+
+/**
+ * Withdraws every PENDING application of a player who was just seated in a
+ * family (a join or a founding), inside the caller's transaction, so no other
+ * family's inbox keeps a dead row.
+ */
+export async function withdrawPendingApplications(tx: Prisma.TransactionClient, uid: string, now: Date): Promise<void> {
+  const pending = await tx.familyInvite.findMany({ where: { inviteeId: uid, kind: "APPLICATION", status: "PENDING" }, select: { id: true } });
+  for (const { id } of pending) {
     await tx.familyInvite.updateMany({ where: { id, status: "PENDING" }, data: { status: "WITHDRAWN", slot: id, resolvedAt: now } });
   }
-  return { family: await tx.family.findUniqueOrThrow({ where: { id: familyId } }), member };
 }
 
 /**

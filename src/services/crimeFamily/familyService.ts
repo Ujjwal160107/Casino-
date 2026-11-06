@@ -7,6 +7,7 @@ import { debitWalletInTx } from "../walletService";
 import { checkMemberEligibility, eligibilityError } from "./eligibility";
 import { getFamilyByTag, requireMembership } from "./familyQueries";
 import { writeLedger } from "./ledger";
+import { withdrawPendingApplications } from "./membershipService";
 import { checkFamilyName, checkFamilyTag } from "./names";
 import { can, NO_PERMISSION } from "./permissions";
 import { FamilyError, invalidateUsers, isUniqueViolation, runFamilyTx } from "./tx";
@@ -15,7 +16,7 @@ import type { FamilyRole } from "../../data/crimeFamilyCatalog";
 
 /**
  * Spec 6.1: burns the creation fee and seats the founder as Boss in one
- * transaction. The unique indexes on nameKey, tagKey and FamilyMember.userId
+ * transaction, withdrawing the founder's PENDING applications. The unique indexes on nameKey, tagKey and FamilyMember.userId
  * are the backstops; their P2002 is mapped here, outside the transaction.
  */
 export async function createFamily(input: {
@@ -45,6 +46,7 @@ export async function createFamily(input: {
         data: { familyId: family.id, userId: input.uid, role: "BOSS", roleSlot: "BOSS", seat: 1, joinedAt: now, lastActiveAt: now,
           bossedOnce: true, firstBossAt: now },
       });
+      await withdrawPendingApplications(tx, input.uid, now);
       await writeLedger(tx, {
         familyId: family.id, actorId: input.uid, type: "create_fee", amount: 0, treasuryAfter: 0, earningsAfter: 0, meta: { paid: fee },
       });

@@ -61,5 +61,5 @@ export function fakeClient(o: { dead?: boolean; failSend?: Set<string>; failEdit
       return { id: channelId, isTextBased: () => true };
     }),
   };
-  return { client: dm.client, dm: dm.sent, sent, edits, calls };
+  return { client: dm.client, dm: dm.sent, dmLast: dm.last, sent, edits, calls };
 }

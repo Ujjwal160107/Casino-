@@ -11,6 +11,7 @@ import { can } from "../../services/crimeFamily/permissions";
 import { claimDigest, familiesDueDigest } from "../../services/crimeFamily/recruitService";
 import {
   applicationAcceptedNotice, applicationDeclinedNotice, applicationExpiredNotice, notifyMany, recruitDigestNotice, sendOptOutDm,
+  type ApplicationCloseReason,
 } from "../../services/dmNoticeService";
 import { safely } from "./caperFlow";
 import { CREW_IDS } from "./ids";
@@ -34,11 +35,13 @@ export async function announceApplicationAnswer(
   });
 }
 
-/** One expiry DM per application (the sweeper and a disband). */
-export async function announceExpiredApplications(client: Client, rows: { application: FamilyInvite; familyLabel: string }[]): Promise<void> {
+/** One closing DM per application: "expired" from the sweeper, "disbanded" from a disband. */
+export async function announceExpiredApplications(
+  client: Client, rows: { application: FamilyInvite; familyLabel: string }[], reason: ApplicationCloseReason,
+): Promise<void> {
   return safely("announceExpiredApplications", async () => {
     for (const { application, familyLabel: label } of rows) {
-      await sendOptOutDm(client, application.inviteeId, "recruit", applicationExpiredNotice({ familyLabel: label }));
+      await sendOptOutDm(client, application.inviteeId, "recruit", applicationExpiredNotice({ familyLabel: label, reason }));
     }
   });
 }

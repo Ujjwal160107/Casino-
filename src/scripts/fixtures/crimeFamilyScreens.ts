@@ -166,7 +166,8 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
     { label: "DM application digest (with the row)", max: 8, payload: cfPayload(recruitDigestNotice({ familyLabel: label, count: 25 }, inboxRow(OWNER))) },
     { label: "DM application accepted", max: 6, payload: cfPayload(applicationAcceptedNotice({ familyLabel: label })) },
     { label: "DM application declined", max: 6, payload: cfPayload(applicationDeclinedNotice({ familyLabel: label, reapplyAt: SOON() })) },
-    { label: "DM application expired", max: 6, payload: cfPayload(applicationExpiredNotice({ familyLabel: label })) },
+    { label: "DM application expired", max: 6, payload: cfPayload(applicationExpiredNotice({ familyLabel: label, reason: "expired" })) },
+    { label: "DM application closed by a disband", max: 6, payload: cfPayload(applicationExpiredNotice({ familyLabel: label, reason: "disbanded" })) },
     ...caperWorstCases(),
     ...turfWorstCases(),
   ];
