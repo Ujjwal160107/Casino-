@@ -247,7 +247,7 @@ const crimeFamilies: ModuleDoc = {
       heading: "Applying to a family",
       body: [
         "Apply on a family's card opens a short form for your message. Applying checks the base join gates (including hop cooldowns), each requirement with your net worth counted fresh, and that the family is still recruiting and not full.",
-        "A Capo or higher sees applications in the inbox (Applications on the recruitment panel), 5 to a page, each with your message and your numbers checked live, and presses Accept or Decline. Accepting runs exactly the same checks as accepting an invite, takes the lowest free seat and counts towards the weekly join caps. If a check fails, the application stays pending and the officer sees why. When you join any family, your other pending applications are withdrawn.",
+        "A Capo or higher sees applications in the inbox (Applications on the recruitment panel), 5 to a page, each with your message and your numbers checked when the officer opens the inbox (net worth can be up to 10 minutes old), and presses Accept or Decline. Accepting runs exactly the same checks as accepting an invite, takes the lowest free seat and counts towards the weekly join caps. If a check fails, the application stays pending and the officer sees why. When you join any family, your other pending applications are withdrawn.",
         "You get a \"Family applications\" DM when you're accepted, declined or your application expires. Officers get one digest DM when new applications have come in, at most once every 6 hours. Both can be turned off in !settings. !crew board then My applications lists yours and lets you withdraw one.",
       ],
       table: {
@@ -829,7 +829,7 @@ const crimeFamilies: ModuleDoc = {
       body: [
         "Recruit players who will actually play. Payday pays only members who were active in the last 7 days, and the split is per eligible member, so a big roster of idle friends earns nothing and dilutes nothing either. Twenty members who play are worth more than thirty names.",
         "Recruit by activity. The board's Activity sort is the census of members who played in the last 7 days, so it shows which families actually run crew heists and wars; as a family, the same number is what applicants see of you.",
-        "Grow into your caps. Every 3 members past 12 add a crew heist a day and every 5 members add a Capo seat, but per member nothing rises: seats stay at 2 a player a day and Payday at 950,000 net a week. A bigger family earns more in total, not more each.",
+        "Grow into your caps. Every 3 members past 12 add a crew heist a day and every 5 members from 10 add a Capo seat, but per member nothing rises: seats stay at 2 a player a day and Payday at 950,000 net a week. A bigger family earns more in total, not more each.",
         "Keep a free Capo seat for the member you want to promote, since seats never free themselves: nobody is demoted when the family shrinks or a Capo's net worth falls, so only a demotion, a leave or a kick opens one.",
         "A vote needs two thirds of everyone eligible, not of those who voted: chase ballots. Every voter who stays silent counts like a NO.",
         "Deposit to keep pace with your XP, not ahead of it. A level needs its XP before the fee matters, and the fee is all the treasury is for. Parking money in the vault before the family has the XP only locks it away for good.",
