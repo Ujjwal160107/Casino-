@@ -62,8 +62,8 @@ export function dashboardView(): FamilyDashboardView {
     capos: 6, capoCap: 6, crestKey: "crest_3",
     roster: MEMBERS.map((userId, i) => ({ userId, role: ROLES[i], associateUntil: i === 1 || i >= 20 ? SOON() : null })),
     duesArrears: 999, nextCaperAt: SOON(), underInvestigation: true, racketsHeld: 3, showTurf: true,
-    vote: { voteId: VOTE_ID, closesAt: SOON(), viewerEligible: true },
-    viewer: { userId: OWNER, role: "UNDERBOSS", canManage: true, canClaim: true, canStartVote: true },
+    vote: { voteId: VOTE_ID, closesAt: SOON(), viewerEligible: true }, recruiting: true,
+    viewer: { userId: OWNER, role: "UNDERBOSS", canManage: true, canClaim: true, canStartVote: true, canRecruit: true },
   };
 }
 
@@ -173,9 +173,9 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
   const dash = dashboardView();
   const label = `[WXYZ] ${LONG_NAME}`;
   return [
-    { label: "S1 no-family card", max: 13, payload: buildNoFamilyCard(OWNER, failingResult(9), failingResult(10)) },
-    { label: "S2 dashboard (claim and vote, 30 members)", max: 20, payload: buildDashboard(dash, { art: true }) },
-    { label: "S2 dashboard (visitor)", max: 20, payload: buildDashboard({ ...dash, vote: null, viewer: { userId: OWNER, role: null, canManage: false, canClaim: false, canStartVote: false } }, { art: true }) },
+    { label: "S1 no-family card", max: 14, payload: buildNoFamilyCard(OWNER, failingResult(9), failingResult(10)) },
+    { label: "S2 dashboard (claim, vote and recruit, 30 members)", max: 20, payload: buildDashboard(dash, { art: true }) },
+    { label: "S2 dashboard (visitor)", max: 20, payload: buildDashboard({ ...dash, vote: null, viewer: { userId: OWNER, role: null, canManage: false, canClaim: false, canStartVote: false, canRecruit: false } }, { art: true }) },
     { label: "S3 create confirm", max: 7, payload: buildCreateConfirm(OWNER, { name: LONG_NAME, tag: "WXYZ", fee: 10_000_000 }) },
     { label: "S4 invite card", max: 9, payload: buildInviteCard(inviteView(1)) },
     { label: "S4 invite resolved", max: 9, payload: buildInviteResolved(inviteView(1), "Expired") },

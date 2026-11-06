@@ -163,3 +163,11 @@ describe("payday at 30 members (amendment 2.5)", () => {
     expect(s6).toContain("+20 more: see the payday preview");
   });
 });
+
+it("S1 carries Find a family within 14 components; S2 with claim, vote and recruit buttons stays within 20", () => {
+  const byLabel = (l: string) => crimeFamilyWorstCases().find((c) => c.label === l)!;
+  const s1 = byLabel("S1 no-family card");
+  expect(JSON.stringify(s1.payload.components.map((c) => c.toJSON()))).toContain("Find a family");
+  expect(countComponents(s1.payload)).toBeLessThanOrEqual(14);
+  expect(countComponents(byLabel("S2 dashboard (claim, vote and recruit, 30 members)").payload)).toBeLessThanOrEqual(20);
+});

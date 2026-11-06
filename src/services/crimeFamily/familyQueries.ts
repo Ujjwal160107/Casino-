@@ -119,12 +119,14 @@ export async function buildDashboardView(familyId: string, viewerId: string, now
     racketsHeld: rackets?.get(familyId) ?? null,
     showTurf: CRIME_FAMILY_CONFIG.turfEnabled,
     vote: vote ? { voteId: vote.id, closesAt: vote.closesAt, viewerEligible: !!viewer && vote.eligibleIds.includes(viewerId) } : null,
+    recruiting: family.recruiting,
     viewer: {
       userId: viewerId,
       role: viewerActor?.role ?? null,
       canManage: !!viewerActor && can(viewerActor, "manage", now),
       canClaim: !!viewerActor && can(viewerActor, "claim_chair", now) && bossAway,
       canStartVote: !!viewer && mayStartVote({ role: viewer.role as FamilyRole, joinedAt: viewer.joinedAt, officerUntil: viewer.officerUntil }, now),
+      canRecruit: !!viewerActor && can(viewerActor, "review_apps", now),
     },
   };
 }

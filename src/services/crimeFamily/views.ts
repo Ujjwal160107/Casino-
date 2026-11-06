@@ -31,8 +31,10 @@ export interface FamilyDashboardView {
   showTurf: boolean;
   /** The open no-confidence vote; viewerEligible when the viewer is in its snapshot (amendment 4.6). */
   vote: { voteId: string; closesAt: Date; viewerEligible: boolean } | null;
-  /** canStartVote: start_vote by rank, or a demoted officer inside officerUntil (A41). */
-  viewer: { userId: string; role: FamilyRole | null; canManage: boolean; canClaim: boolean; canStartVote: boolean };
+  /** The family's recruitment listing is on (amendment 8.2). */
+  recruiting: boolean;
+  /** canStartVote: start_vote by rank, or a demoted officer inside officerUntil (A41). canRecruit: review_apps (S2's Recruit button). */
+  viewer: { userId: string; role: FamilyRole | null; canManage: boolean; canClaim: boolean; canStartVote: boolean; canRecruit: boolean };
 }
 
 /** S6: the vault as an officer or member sees it (the only screen with vault amounts, D59). */

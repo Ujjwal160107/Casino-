@@ -147,3 +147,20 @@ describe("!crew", () => {
     expect(card).toContain(`"custom_id":"${CREW_IDS.ballot("yes", v.id)}"`);
   });
 });
+
+describe("!crew board and !crew recruit (Task 15)", () => {
+  it("!crew board replies S29 publicly; !crew board <TAG> replies the card opener", async () => {
+    const boss = await seedEligibleUser();
+    const f = await seedFamily({ bossId: boss, tag: "VLA", data: { recruiting: true, recruitPitch: "We run heists every night." } });
+    const uid = await seedEligibleUser();
+    expect((await crew(uid, "board")).said()).toContain("Families recruiting");
+    expect((await crew(uid, "board VLA")).said()).toContain(CREW_IDS.familyCard(f.id, uid));
+    expect((await crew(uid, "board NOPE")).said()).toContain("No family with that tag.");
+  });
+  it("!crew recruit: a Soldier is refused, a Capo gets the opener", async () => {
+    const boss = await seedEligibleUser(); const capo = await seedEligibleUser(); const soldier = await seedEligibleUser();
+    await seedFamily({ bossId: boss, members: [{ userId: capo, role: "CAPO" }, { userId: soldier, role: "SOLDIER" }] });
+    expect((await crew(soldier, "recruit")).said()).toContain("Only a Capo or above can open recruitment.");
+    expect((await crew(capo, "recruit")).said()).toContain(CREW_IDS.recruit("home", capo));
+  });
+});

@@ -12,7 +12,8 @@ import {
 } from "../../src/ui/crimeFamily/announce";
 import { leaveFamily } from "../../src/services/crimeFamily/membershipService";
 import { fakeClient } from "./fakeClient";
-import { testPrisma, seedEligibleUser, seedFamily, seedVote, resetFamilies, ensureUniqueIndexes, daysAgo, withCfConfig } from "../helpers";
+import { applyToFamily } from "../../src/services/crimeFamily/recruitService";
+import { testPrisma, seedEligibleUser, seedFamily, seedVote, seedApplication, resetFamilies, ensureUniqueIndexes, daysAgo, withCfConfig } from "../helpers";
 
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "FamilyInvite", "FamilyVote", "FamilyBallot"]));
 beforeEach(resetFamilies);
@@ -276,5 +277,78 @@ describe("no-confidence vote routes (Review Focus 4)", () => {
     expect(v).toMatchObject({ announced: true, channelId: "c-home", messageId: "m1" });
     for (const id of ids) expect(c.dm.get(id), id).toBe(1);
     expect(c.dm.get(boss)).toBe(1);
+  });
+});
+
+describe("recruitment routes (Task 15)", () => {
+  const REQ = { netWorth: 10_000_000, shifts: 300, ageDays: 45, heists: 5 };
+  it.each([() => CREW_IDS.applyOpen("65f0000000000000000000ff", "u1"), () => CREW_IDS.recruitEdit(REQ, "u1")])(
+    "%s opens its modal before any Prisma or Redis call", async (id) => {
+      const findUnique = prisma.familyMember.findUnique;
+      const db = vi.spyOn(prisma.familyMember, "findUnique");
+      const redis = vi.spyOn(redisService, "getInstance");
+      const i = fakeButton(id(), { userId: "u1" });
+      i.showModal.mockImplementation(async () => { expect(db).not.toHaveBeenCalled(); expect(redis).not.toHaveBeenCalled(); i.order.push("showModal"); });
+      await handleCrimeFamilyInteraction(i as any);
+      expect(i.order[0]).toBe("showModal");
+      db.mockRestore(); redis.mockRestore();
+      Object.assign(prisma.familyMember, { findUnique });
+    });
+
+  it("the listing modal is pre-filled from its customId (F10)", async () => {
+    const i = fakeButton(CREW_IDS.recruitEdit(REQ, "u1"), { userId: "u1" });
+    await handleCrimeFamilyInteraction(i as any);
+    const modal = JSON.stringify(i.showModal.mock.calls[0][0].toJSON());
+    for (const v of ["10000000", "300", "45", "5"]) expect(modal).toContain(`"value":"${v}"`);
+  });
+
+  it("apply → inbox → accept seats the applicant once", async () => {
+    const boss = await seedEligibleUser(); const p = await seedEligibleUser({ wallet: 1_000_000 });   // family_join needs 1,000,000 net worth
+    const f = await seedFamily({ bossId: boss, data: { recruiting: true, recruitPitch: "We run heists every night." } });
+    await withCfConfig({ enabled: true }, async () => {
+      const m = fakeModal(CREW_IDS.applyModal(f.id, p), { message: "I run heists daily" }, { userId: p });
+      await handleCrimeFamilyInteraction(m as any);
+      expect(said(m)).toContain("Application sent. Officers see it in their inbox.");
+      const app = await testPrisma.familyInvite.findFirstOrThrow({ where: { familyId: f.id, inviteeId: p, kind: "APPLICATION" } });
+      const b = fakeButton(CREW_IDS.appAnswer("accept", app.id, boss), { userId: boss, ephemeralSource: true, client: fakeClient().client });
+      await handleCrimeFamilyInteraction(b as any);
+      expect(said(b)).toContain(`Accepted <@${p}>.`);
+    });
+    expect(await testPrisma.familyMember.count({ where: { userId: p, familyId: f.id } })).toBe(1);
+  });
+
+  it("Review Focus 4: stale answers and a demoted officer change nothing", async () => {
+    const boss = await seedEligibleUser(); const capo = await seedEligibleUser();
+    const f = await seedFamily({ bossId: boss, members: [{ userId: capo, role: "CAPO", joinedAt: daysAgo(10) }], data: { recruiting: true, recruitPitch: "We run heists every night." } });
+    const rows = await Promise.all([
+      seedApplication({ familyId: f.id, applicantId: "711", expiresAt: new Date(Date.now() - 1_000) }),
+      seedApplication({ familyId: f.id, applicantId: "712", status: "WITHDRAWN", resolvedAt: new Date() }),
+      seedApplication({ familyId: f.id, applicantId: "713", status: "DECLINED", resolvedAt: new Date(), inviterId: boss }),
+    ]);
+    await withCfConfig({ enabled: true }, async () => {
+      for (const r of rows) for (const answer of ["accept", "decline"] as const) {
+        const b = fakeButton(CREW_IDS.appAnswer(answer, r.id, capo), { userId: capo, ephemeralSource: true });
+        await handleCrimeFamilyInteraction(b as any);
+        expect(said(b)).toContain("Application no longer pending.");
+      }
+      await testPrisma.familyMember.update({ where: { userId: capo }, data: { role: "SOLDIER", roleSlot: capo } });
+      for (const id of [CREW_IDS.recruit("home", capo), CREW_IDS.recruit("inbox", capo), CREW_IDS.recruit("toggle", capo), CREW_IDS.inboxPage(0, capo)]) {
+        const b = fakeButton(id, { userId: capo, ephemeralSource: true });
+        await handleCrimeFamilyInteraction(b as any);
+        expect(said(b)).toContain("You don't have permission to do that.");
+      }
+    });
+    expect((await Promise.all(rows.map((r) => testPrisma.familyInvite.findUniqueOrThrow({ where: { id: r.id } })))).map((r) => r.status)).toEqual(["PENDING", "WITHDRAWN", "DECLINED"]);
+    expect((await testPrisma.family.findUniqueOrThrow({ where: { id: f.id } })).recruiting).toBe(true);
+  });
+
+  it("a board page past the end clamps (Review Focus 5)", async () => {
+    const uid = await seedEligibleUser();
+    for (let k = 0; k < 7; k++) await seedFamily({ bossId: await seedEligibleUser(), data: { recruiting: true, recruitPitch: "We run heists every night." } });
+    await withCfConfig({ enabled: true }, async () => {
+      const b = fakeButton(CREW_IDS.board("lvl", false, 99, uid), { userId: uid, ephemeralSource: true });
+      await handleCrimeFamilyInteraction(b as any);
+      expect(said(b)).toContain("page 2/2");
+    });
   });
 });

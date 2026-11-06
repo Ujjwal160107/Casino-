@@ -245,14 +245,14 @@ export async function acceptApplication(
   }), { alreadyInFamily });
 }
 
-/** S32 Decline: CAS PENDING → DECLINED (slot = id); the applicant may reapply after reapplyAfterDeclineSeconds. */
+/** S32 Decline: CAS PENDING and unexpired → DECLINED (slot = id); the applicant may reapply after reapplyAfterDeclineSeconds. */
 export async function declineApplication(appId: string, officerId: string, now: Date = new Date()): Promise<FamilyInvite> {
   const app = await readApplication(appId);
   return runFamilyTx(async (tx) => {
     await assertMayInTx(tx, app.familyId, officerId, "review_apps", now);
     await touchFamily(tx, app.familyId, now);
     const { count } = await tx.familyInvite.updateMany({
-      where: { id: appId, kind: "APPLICATION", status: "PENDING" },
+      where: { id: appId, kind: "APPLICATION", status: "PENDING", expiresAt: { gt: now } },
       data: { status: "DECLINED", slot: appId, inviterId: officerId, resolvedAt: now },
     });
     if (count !== 1) throw new FamilyError(NOT_PENDING);

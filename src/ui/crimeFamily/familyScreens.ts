@@ -49,9 +49,10 @@ export function buildNoFamilyCard(ownerId: string, join: EligibilityResult, foun
     .addTextDisplayComponents(
       text(`**Join a family**\n${checklist(join)}`),
       text(`**Found one** (costs ${fmtFortunes(CRIME_FAMILY_CONFIG.createFee)})\n${checklist(found)}`),
-      text("-# Ask a family's Capo for an invite; `!crew top` lists families; crew heist lobbies and results post in this server."),
+      text("-# Browse families with `!crew board` or ask a Capo for an invite; crew heist lobbies and results post in this server."),
     )
     .addActionRowComponents(buttonRow(
+      cfButton(CREW_IDS.board("lvl", false, 0, ownerId), "Find a family", ButtonStyle.Primary),
       cfButton(CREW_IDS.createOpen(ownerId), "Create", ButtonStyle.Primary, { disabled: !found.ok }),
       cfButton(CREW_IDS.view("invites", ownerId), "My invites"),
       cfButton(CREW_IDS.view("top", ownerId), "Top families"),
@@ -106,6 +107,7 @@ export function buildDashboard(view: FamilyDashboardView, opts: { art: boolean }
   status.push(`Next crew heist ${rel(view.nextCaperAt)}`);
   if (view.underInvestigation) status.push("Under investigation");
   if (view.vote) status.push(`Vote open, closes ${rel(view.vote.closesAt)}`);
+  if (view.recruiting) status.push("Recruiting");
 
   container
     .addSeparatorComponents(sep())
@@ -130,6 +132,7 @@ export function buildDashboard(view: FamilyDashboardView, opts: { art: boolean }
     const second = [
       ...(view.viewer.canClaim ? [cfButton(CREW_IDS.claim(view.familyId), "Claim the chair", ButtonStyle.Danger)] : []),
       ...(view.vote?.viewerEligible || (!view.vote && view.viewer.canStartVote) ? [cfButton(CREW_IDS.voteStart(owner), "Vote", ButtonStyle.Danger)] : []),
+      ...(view.viewer.canRecruit ? [cfButton(CREW_IDS.recruit("home", owner), "Recruit")] : []),
     ];
     if (second.length > 0) container.addActionRowComponents(buttonRow(...second));
   }

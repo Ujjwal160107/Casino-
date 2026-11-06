@@ -14,7 +14,8 @@ import { LEADERBOARD_SORTS } from "../../services/crimeFamily/leaderboard";
 import {
   acceptInviteByTag, declineInviteByTag, inviteMember, setInviteMessage,
 } from "../../services/crimeFamily/membershipService";
-import { mayStartVote } from "../../services/crimeFamily/permissions";
+import { can, mayStartVote } from "../../services/crimeFamily/permissions";
+import { getBoardView } from "../../services/crimeFamily/recruitQueries";
 import { FamilyError } from "../../services/crimeFamily/tx";
 import { depositToVault, resolveDepositAmount } from "../../services/crimeFamily/vaultService";
 import { getVoteStartView, getVoteView } from "../../services/crimeFamily/voteService";
@@ -24,6 +25,7 @@ import { buildDashboard, buildInviteCard } from "../../ui/crimeFamily/familyScre
 import { CREW_IDS, type CrewOpenKind } from "../../ui/crimeFamily/ids";
 import { buildNotice, buildOpener, type CfPayload } from "../../ui/crimeFamily/kit";
 import { missingBotPermissions } from "../../ui/crimeFamily/post";
+import { buildBoard } from "../../ui/crimeFamily/recruitScreens";
 import { buildVoteSeatCard } from "../../ui/crimeFamily/voteScreens";
 import { errorContainer, successContainer, v2Quiet } from "../../utils/componentsV2";
 import { isCrimeFamilyOpen } from "../../utils/economyConfig";
@@ -151,6 +153,24 @@ async function vote(ctx: CrewCtx) {
   throw new FamilyError(start.block);
 }
 
+/** `!crew board`: S29 in this channel (owner-scoped buttons); `!crew board <TAG>`: the opener for that family's S30. */
+async function board(ctx: CrewCtx) {
+  const tag = ctx.args[0];
+  if (!tag) return show(ctx, buildBoard(await getBoardView(ctx.uid, "lvl", false, 0, new Date())));
+  const family = await getFamilyByTag(tag);
+  if (!family) throw new FamilyError("No family with that tag.");
+  return show(ctx, buildOpener(`<@${ctx.uid}>: [${family.tag}]'s recruiting card.`, { customId: CREW_IDS.familyCard(family.id, ctx.uid), label: "Open card" }));
+}
+
+/** `!crew recruit`: the opener for S31, Capo and up. */
+async function recruit(ctx: CrewCtx) {
+  const { member } = await requireMembership(ctx.uid);
+  if (!can({ role: member.role as FamilyRole, joinedAt: member.joinedAt }, "review_apps", new Date())) {
+    throw new FamilyError("Only a Capo or above can open recruitment.");
+  }
+  return show(ctx, buildOpener(`<@${ctx.uid}>: your family's recruitment.`, { customId: CREW_IDS.recruit("home", ctx.uid), label: "Open recruitment" }));
+}
+
 export const CREW_SUBACTIONS: Readonly<Record<string, (ctx: CrewCtx) => Promise<unknown>>> = {
   dashboard: async (ctx) => show(ctx, await homeScreen(ctx.uid)),
   create: async (ctx) => show(ctx, buildOpener(`<@${ctx.uid}>: found your own crime family.`, { customId: CREW_IDS.createOpen(ctx.uid), label: "Create…" })),
@@ -174,6 +194,8 @@ export const CREW_SUBACTIONS: Readonly<Record<string, (ctx: CrewCtx) => Promise<
   disband: opener("disband", "disband the family.", "Disband…"),
   claim,
   vote,
+  board,
+  recruit,
 };
 
 /** Runs one subaction; a FamilyError or a short wallet is a public one-line refusal titled `title`. */
