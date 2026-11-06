@@ -1,5 +1,7 @@
 # Crime Families + Capers (the family heist): Product Requirements
 
+> **Amended 2026-11-05** by `docs/superpowers/specs/2026-11-05-crime-families-scale-design.md`, which wins where they differ: sections 0 (summary items 1, 2, 4, 6; D7, D18, D23, D25, D48, D55, D58, D67), 2, 3, 6.3–6.5, 6.7, 7.3, 8.4, 8.9, 9.1–9.5, 10.1, 10.2, 10.4, 11, 12.1, 12.2, 13, 14, 15, 17 (edges 30, 35, 65), 18, 19.2–19.4 and 23; player copy now says "Crew Heist" (`!heist`) for the Caper.
+
 - **Date:** 2026-10-28
 - **Status:** Approved by the owner on 2026-10-29, with Q1–Q4 (section 22) settled on their defaults
 - **Repo:** `/home/ujjwal/dev/Casino-` (Fortuna: discord.js v14, TypeScript, Prisma on MongoDB, ioredis, node-cron, node `canvas`, vitest)
