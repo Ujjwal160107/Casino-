@@ -247,3 +247,18 @@ export interface WarResultView {
   xp: { label: string; xp: number }[];
   heated: number;
 }
+
+/** S35: the no-confidence vote start confirm as one would-be starter sees it. */
+export interface VoteStartView {
+  ownerId: string;
+  familyLabel: string;
+  bossId: string;
+  /** The snapshot a Start now would take. */
+  eligible: number;
+  /** votePassNeed(eligible). */
+  need: number;
+  /** Set when a vote is already open (S2's Vote button then shows the S25 vote card, F20). */
+  openVoteId: string | null;
+  /** voteStartBlock's refusal, shown on S35 with Start disabled. */
+  block: string | null;
+}

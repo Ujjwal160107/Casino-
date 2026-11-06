@@ -28,6 +28,9 @@ describe("permissions (6.3)", () => {
     ["UNDERBOSS", "payday", undefined, true], ["CAPO", "payday", undefined, false],
     ["UNDERBOSS", "claim_chair", undefined, true], ["BOSS", "claim_chair", undefined, false],
     ["BOSS", "disband", undefined, true], ["UNDERBOSS", "set_home", undefined, false], ["CAPO", "plan_caper", undefined, true],
+    ["UNDERBOSS", "start_vote", undefined, true], ["CAPO", "start_vote", undefined, true],
+    ["SOLDIER", "start_vote", undefined, false], ["BOSS", "start_vote", undefined, false],
+    ["SOLDIER", "cast_vote", undefined, true], ["BOSS", "cast_vote", undefined, false],
   ] as const)("%s %s %s → %s", (role, action, target, want) =>
     expect(can(as(role), action, now, target ? { role: target } : undefined)).toBe(want));
   it("Associates can deposit but cannot take a seat or act in a war", () => {

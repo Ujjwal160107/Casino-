@@ -42,7 +42,8 @@ export async function createFamily(input: {
         },
       });
       await tx.familyMember.create({
-        data: { familyId: family.id, userId: input.uid, role: "BOSS", roleSlot: "BOSS", seat: 1, joinedAt: now, lastActiveAt: now },
+        data: { familyId: family.id, userId: input.uid, role: "BOSS", roleSlot: "BOSS", seat: 1, joinedAt: now, lastActiveAt: now,
+          bossedOnce: true, firstBossAt: now },
       });
       await writeLedger(tx, {
         familyId: family.id, actorId: input.uid, type: "create_fee", amount: 0, treasuryAfter: 0, earningsAfter: 0, meta: { paid: fee },

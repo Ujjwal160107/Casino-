@@ -4,6 +4,7 @@
 import { Prisma } from "@prisma/client";
 import { CAPER_ACTIVITY_RULE, CAPER_FAMILY_HOOK } from "./caperHooks";
 import { TURF_FAMILY_HOOK, WAR_HITS_RULE } from "./turfHooks";
+import { VOTE_FAMILY_HOOK } from "./voteHooks";
 
 /** One way a member counts as active in the last 7 days (spec 7.3). */
 export interface ActivityRule {
@@ -30,9 +31,15 @@ export interface FamilyHook {
   disbandPreview?(familyId: string): Promise<{ returnedToEarnings: number }>;
   /** Plan 3; with no provider, or a provider returning null, views show no racket count (P23). */
   racketsHeld?(familyIds: string[]): Promise<Map<string, number> | null>;
+  /** Inside changeRank after touchFamily; a string refuses the promotion or demotion. */
+  rankChangeBlock?(tx: Prisma.TransactionClient, familyId: string): Promise<string | null>;
+  /** Inside handOverChair after touchFamily; a string refuses the handover. */
+  handoverBlock?(tx: Prisma.TransactionClient, familyId: string): Promise<string | null>;
+  /** Inside moveChair after the new Boss is seated (every chair path: handover, claim, succession, vote). */
+  onChairMove?(tx: Prisma.TransactionClient, familyId: string, now: Date): Promise<void>;
 }
 
-export const FAMILY_HOOKS: FamilyHook[] = [CAPER_FAMILY_HOOK, TURF_FAMILY_HOOK];
+export const FAMILY_HOOKS: FamilyHook[] = [CAPER_FAMILY_HOOK, TURF_FAMILY_HOOK, VOTE_FAMILY_HOOK];
 
 /** Rackets held per family from the first hook that provides them, or null when none does (or it is switched off). */
 export async function racketsHeldFor(familyIds: string[]): Promise<Map<string, number> | null> {

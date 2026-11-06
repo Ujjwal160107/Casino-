@@ -9,18 +9,27 @@ import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { CAPO_SLOTS, type FamilyRole } from "../../data/crimeFamilyCatalog";
 import { fmtFortunes } from "../../utils/format";
 import { computeNetWorth } from "../netWorthService";
+import { FAMILY_HOOKS } from "./extensions";
 import { readActorAndTarget, requireMembership } from "./familyQueries";
 import { can, nextRoleDown, nextRoleUp, NO_PERMISSION, ROLE_RANK, type FamilyAction } from "./permissions";
 import { capoCapFor } from "./sizeRules";
 import { FamilyError, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
 
-type ChairMove = { family: Family; oldBossId: string; newBossId: string };
+export type ChairMove = { family: Family; oldBossId: string; newBossId: string };
 
 const CAPO_FULL = "Capo seats are full.";
 const UNDERBOSS_TAKEN = "The Underboss seat is taken.";
 
 const actorOf = (m: FamilyMember) => ({ role: m.role as FamilyRole, joinedAt: m.joinedAt });
 const secondsAgo = (now: Date, seconds: number) => new Date(now.getTime() - seconds * 1000);
+
+/** The first refusal of a FAMILY_HOOKS block (rankChangeBlock or handoverBlock), thrown as a FamilyError. */
+async function assertNoHookBlock(tx: Prisma.TransactionClient, familyId: string, which: "rankChangeBlock" | "handoverBlock"): Promise<void> {
+  for (const hook of FAMILY_HOOKS) {
+    const block = await hook[which]?.(tx, familyId);
+    if (block) throw new FamilyError(block);
+  }
+}
 
 /**
  * The role and roleSlot a member takes in newRole, read inside the transaction.
@@ -71,6 +80,7 @@ async function changeRank(
   try {
     await runFamilyTx(async (tx) => {
       await touchFamily(tx, family.id, now);
+      await assertNoHookBlock(tx, family.id, "rankChangeBlock");
       const { actor, target } = await readActorAndTarget(tx, family.id, actorId, targetId);
       const targetRole = target.role as FamilyRole;
       if (!can(actorOf(actor), action, now, { role: targetRole })) throw new FamilyError(NO_PERMISSION);
@@ -100,15 +110,18 @@ export function demoteMember(actorId: string, targetId: string, now: Date = new 
 }
 
 /**
- * The one chair move: CAS the family's bossId, then the old Boss becomes a
- * Soldier before the new Boss takes the BOSS slot, so the roleSlot index
- * never collides (6.7, P12).
+ * The one chair move (handover, claim, succession, vote): CAS the family's
+ * bossId, then the old Boss becomes a Soldier before the new Boss takes the
+ * BOSS slot, so the roleSlot index never collides (6.7, P12). A first-time
+ * Boss gets firstBossAt once (A40); then every onChairMove hook runs.
  */
-async function moveChair(tx: Prisma.TransactionClient, familyId: string, oldBossId: string, newBossId: string): Promise<ChairMove> {
+export async function moveChair(tx: Prisma.TransactionClient, familyId: string, oldBossId: string, newBossId: string, now: Date): Promise<ChairMove> {
   const { count } = await tx.family.updateMany({ where: { id: familyId, bossId: oldBossId }, data: { bossId: newBossId } });
   if (count !== 1) throw new FamilyError("The chair already changed hands.");
   await tx.familyMember.updateMany({ where: { familyId, userId: oldBossId }, data: { role: "SOLDIER", roleSlot: oldBossId } });
   await tx.familyMember.updateMany({ where: { familyId, userId: newBossId }, data: { role: "BOSS", roleSlot: "BOSS" } });
+  await tx.familyMember.updateMany({ where: { familyId, userId: newBossId, bossedOnce: false }, data: { bossedOnce: true, firstBossAt: now } });
+  for (const hook of FAMILY_HOOKS) await hook.onChairMove?.(tx, familyId, now);
   const family = await tx.family.findUniqueOrThrow({ where: { id: familyId } });
   return { family, oldBossId, newBossId };
 }
@@ -118,9 +131,11 @@ export async function handOverChair(bossId: string, targetId: string, now: Date 
   const { family } = await requireMembership(bossId);
   if (targetId === bossId) throw new FamilyError("You already hold the chair.");
   return runFamilyTx(async (tx) => {
+    await touchFamily(tx, family.id, now);
+    await assertNoHookBlock(tx, family.id, "handoverBlock");
     const { actor } = await readActorAndTarget(tx, family.id, bossId, targetId);
     if (!can(actorOf(actor), "handover", now)) throw new FamilyError(NO_PERMISSION);
-    return moveChair(tx, family.id, bossId, targetId);
+    return moveChair(tx, family.id, bossId, targetId, now);
   });
 }
 
@@ -136,7 +151,7 @@ export async function claimChair(familyId: string, claimerId: string, now: Date 
     const { actor, target } = await readActorAndTarget(tx, familyId, claimerId, family.bossId);
     if (!can(actorOf(actor), "claim_chair", now)) throw new FamilyError(NO_PERMISSION);
     if (target.lastActiveAt > cutoff) throw new FamilyError("The Boss is back.");
-    return moveChair(tx, familyId, family.bossId, claimerId);
+    return moveChair(tx, familyId, family.bossId, claimerId, now);
   });
 }
 
@@ -165,7 +180,7 @@ export async function autoHandover(familyId: string, now: Date): Promise<ChairMo
     if (!boss || boss.lastActiveAt > cutoff) return null;
     const heir = pickHeir(members, now);
     if (!heir) return null;
-    return moveChair(tx, familyId, boss.userId, heir.userId);
+    return moveChair(tx, familyId, boss.userId, heir.userId, now);
   });
 }
 

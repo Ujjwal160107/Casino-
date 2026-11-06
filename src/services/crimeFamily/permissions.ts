@@ -6,7 +6,8 @@ import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 
 export type FamilyAction =
   | "view" | "deposit" | "invite" | "kick" | "promote" | "demote" | "handover" | "plan_caper" | "take_seat"
-  | "payday" | "level_up" | "bid" | "war_act" | "set_home" | "rename" | "disband" | "claim_chair" | "manage";
+  | "payday" | "level_up" | "bid" | "war_act" | "set_home" | "rename" | "disband" | "claim_chair" | "manage"
+  | "start_vote" | "cast_vote";
 
 /** The one permission refusal every family service uses. */
 export const NO_PERMISSION = "You don't have permission to do that.";
@@ -38,6 +39,8 @@ const ROLE_ACTIONS: Readonly<Record<FamilyAction, readonly FamilyRole[]>> = {
   disband: BOSS_ONLY,
   claim_chair: ["UNDERBOSS"],
   manage: CAPO_UP,
+  start_vote: ["UNDERBOSS", "CAPO"],
+  cast_vote: ["UNDERBOSS", "CAPO", "SOLDIER"],
 };
 
 /** The only actions the Associate column removes from a non-Boss role (P20). */
