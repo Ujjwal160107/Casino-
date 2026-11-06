@@ -1,8 +1,8 @@
 // Disband (spec 6.4, 6.8): the Boss types the tag; one transaction re-checks
 // the hook blocks, runs the hooks' side effects, reserves a capped final
-// payday when one is due (no minimum, D61), burns everything left, expires invites,
+// payday when one is due (no minimum, D61), burns everything left, expires invites and applications,
 // records the exits and hard-deletes the family, freeing its name and tag.
-import type { Family } from "@prisma/client";
+import type { Family, FamilyInvite } from "@prisma/client";
 import prisma from "../../utils/prisma";
 import { FAMILY_HOOKS } from "./extensions";
 import { requireMembership } from "./familyQueries";
@@ -39,7 +39,7 @@ export async function previewDisband(
 }
 
 export async function disbandFamily(bossId: string, typedTag: string, now: Date = new Date()): Promise<{
-  family: Family; formerMembers: string[]; paid: PaidShare[]; split: Split | null; burned: number;
+  family: Family; formerMembers: string[]; paid: PaidShare[]; split: Split | null; burned: number; expiredApplications: FamilyInvite[];
 }> {
   const { family } = await requireMembership(bossId);
   if (family.bossId !== bossId) throw new FamilyError(ONLY_BOSS);
@@ -74,18 +74,23 @@ export async function disbandFamily(bossId: string, typedTag: string, now: Date 
       data: { guildId: final.homeGuildId, userId: bossId, type: "family_disband", meta: { familyId: family.id, name: final.name, tag: final.tag, burned } },
     });
     const pending = await tx.familyInvite.findMany({ where: { familyId: family.id, status: "PENDING" }, select: { id: true } });
+    const expiredApplications: FamilyInvite[] = [];
     for (const { id } of pending) {
-      await tx.familyInvite.update({ where: { id }, data: { status: "EXPIRED", slot: id, resolvedAt: now } });
+      const row = await tx.familyInvite.update({ where: { id }, data: { status: "EXPIRED", slot: id, resolvedAt: now } });
+      if (row.kind === "APPLICATION") expiredApplications.push(row);
     }
     await tx.familyExit.createMany({
       data: members.map((m) => ({ userId: m.userId, familyId: family.id, reason: "DISBANDED", wasBoss: m.userId === final.bossId, leftAt: now })),
     });
     await tx.familyMember.deleteMany({ where: { familyId: family.id } });
     await tx.family.delete({ where: { id: family.id } });
-    return { family: final, formerMembers: members.map((m) => m.userId), reserved, burned };
+    return { family: final, formerMembers: members.map((m) => m.userId), reserved, burned, expiredApplications };
   }, DISBAND_ATTEMPTS);
 
   // The shares are credited after the family is gone, so a clamp burns (F5).
   const paid = outcome.reserved ? await payPaydayShares(outcome.reserved.runKey, now) : [];
-  return { family: outcome.family, formerMembers: outcome.formerMembers, paid, split: outcome.reserved?.split ?? null, burned: outcome.burned };
+  return {
+    family: outcome.family, formerMembers: outcome.formerMembers, paid, split: outcome.reserved?.split ?? null, burned: outcome.burned,
+    expiredApplications: outcome.expiredApplications,
+  };
 }

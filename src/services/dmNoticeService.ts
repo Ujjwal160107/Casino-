@@ -2,6 +2,7 @@ import { Client, ContainerBuilder, type ActionRowBuilder, type ButtonBuilder } f
 import { Mascot } from "../config/branding";
 import { noticeContainer, v2Reply } from "../utils/componentsV2";
 import { fmtAmount, fmtCurrency, fmtFortunes } from "../utils/format";
+import { CRIME_FAMILY_CONFIG } from "../utils/economyConfig";
 import { FAMILY_ROLES, type FamilyRole } from "../data/crimeFamilyCatalog";
 import { cfNoticeEmote } from "../utils/crimeFamilyAssets";
 import { isTester } from "../utils/developerAccess";
@@ -327,7 +328,7 @@ export async function notifyMany(
   }
 }
 
-// ---- Crime Families: the `family`, `caper_lobby` and `turf` account notices (spec 13.4). ----
+// ---- Crime Families: the `family`, `caper_lobby`, `turf` and `recruit` account notices (spec 13.4). ----
 
 const FAMILY_HINT = `-# ${SETTINGS_HINT}.`;
 
@@ -432,6 +433,32 @@ export function familyVoteResultNotice(v: { familyLabel: string; line: string })
 
 export function familyNewBossNotice(v: { familyLabel: string }): ContainerBuilder {
   return familyNotice("rank_boss", "You are now the Boss", `You are now the Boss of **${v.familyLabel}**. The family voted the old Boss out.`);
+}
+
+// Recruitment (`recruit`, amendment 8.10): the officers' digest and the applicant's answers.
+
+const hours = (seconds: number) => `${seconds / 3600} hours`;
+
+/** Officers' digest of new applications, with the Open inbox row the announcer builds (F19). */
+export function recruitDigestNotice(v: { familyLabel: string; count: number }, row: ActionRowBuilder<ButtonBuilder>): ContainerBuilder {
+  const title = `${v.count} new application${v.count === 1 ? "" : "s"} to ${v.familyLabel}`;
+  const body = `Accept or decline them in the inbox. Applications expire after ${hours(CRIME_FAMILY_CONFIG.applicationTtlSeconds)}.`;
+  return familyNotice("crest_1", title, body).addActionRowComponents(row);
+}
+
+export function applicationAcceptedNotice(v: { familyLabel: string }): ContainerBuilder {
+  return familyNotice("rank_associate", "Application accepted", `You joined **${v.familyLabel}**. Open it with \`!crew\`.`);
+}
+
+export function applicationDeclinedNotice(v: { familyLabel: string; reapplyAt: Date }): ContainerBuilder {
+  const body = `**${v.familyLabel}** declined your application. You can apply again ${relTime(v.reapplyAt)}.`;
+  return familyNotice("rank_associate", "Application declined", body);
+}
+
+export function applicationExpiredNotice(v: { familyLabel: string }): ContainerBuilder {
+  const { applicationTtlSeconds: ttl, reapplyAfterWithdrawSeconds: wait } = CRIME_FAMILY_CONFIG;
+  const body = `Your application to **${v.familyLabel}** expired after ${hours(ttl)}. You can apply again in ${hours(wait)}.`;
+  return familyNotice("rank_associate", "Application expired", body);
 }
 
 const jumpLine = (url: string | null, label: string) => (url ? `\n[${label}](${url})` : "");

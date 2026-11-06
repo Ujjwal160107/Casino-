@@ -24,6 +24,7 @@ import { fmtFortunes } from "../../utils/format";
 import { buildClaimResolved, buildInviteResolved } from "./familyScreens";
 import { buildNotice } from "./kit";
 import { editChannelMessage, jumpLink, sendToChannel } from "./post";
+import { announceExpiredApplications } from "./recruitAnnounce";
 import { announcePendingVoteResults } from "./voteAnnounce";
 
 /** Runs one announcer, logging instead of throwing so a committed action never reads as failed. */
@@ -113,7 +114,7 @@ export async function announceRoleChange(
   });
 }
 
-/** A DM to every former member, with their final payday net when they were paid. */
+/** A DM to every former member, with their final payday net when they were paid; then each applicant's expiry DM. */
 export async function announceDisband(client: Client, result: Awaited<ReturnType<typeof disbandFamily>>): Promise<void> {
   return safely("announceDisband", async () => {
     const label = familyLabel(result.family);
@@ -123,6 +124,7 @@ export async function announceDisband(client: Client, result: Awaited<ReturnType
       finalNet: paid.has(id) && result.split ? result.split.net : null,
       burned: result.burned,
     }));
+    await announceExpiredApplications(client, result.expiredApplications.map((application) => ({ application, familyLabel: label })));
   });
 }
 

@@ -1,6 +1,7 @@
 // customIds for the three Crime Families prefixes (spec 13.2). Owner-scoped
 // ids end with the owner's id; shared cards carry a DB id instead. Plans 2
 // and 3 add their builders to CPR_IDS and TURF_IDS.
+import type { BoardSort, Requirements } from "../../services/crimeFamily/recruitService";
 import type { WarBlockKey } from "../../services/crimeFamily/warMath";
 
 export type CfPrefix = "crew" | "cpr" | "turf";
@@ -63,6 +64,22 @@ export const CREW_IDS = {
   voteCancel: (owner: string) => cfId("crew", "vt", "cancel", owner),
   /** Shared: authorised against the vote's snapshot and membership. */
   ballot: (choice: "yes" | "no", voteId: string) => cfId("crew", "vote", choice, voteId),
+  // Recruitment (amendment 8.8): every id is owner-scoped; the routes re-read the permission.
+  board: (sort: BoardSort, qualify: boolean, page: number, owner: string) => cfId("crew", "bd", sort, qualify ? 1 : 0, page, owner),
+  /** S29's select; the value is the familyId. */
+  boardSelect: (owner: string) => cfId("crew", "bd", "sel", owner),
+  myApps: (owner: string) => cfId("crew", "app", "mine", owner),
+  /** S33's select; the value is the applicationId. */
+  withdraw: (owner: string) => cfId("crew", "app", "wd", owner),
+  familyCard: (familyId: string, owner: string) => cfId("crew", "fc", familyId, owner),
+  applyOpen: (familyId: string, owner: string) => cfId("crew", "app", "open", familyId, owner),
+  applyModal: (familyId: string, owner: string) => cfId("crew", "modal", "apply", familyId, owner),
+  recruit: (kind: "home" | "toggle" | "inbox", owner: string) => cfId("crew", "rc", kind, owner),
+  /** The listing modal opener carries the current requirements so M2 can pre-fill them without I/O (F10). */
+  recruitEdit: (r: Requirements, owner: string) => cfId("crew", "rc", "edit", r.netWorth, r.shifts, r.ageDays, r.heists, owner),
+  recruitModal: (owner: string) => cfId("crew", "modal", "recruit", owner),
+  appAnswer: (answer: "accept" | "decline", appId: string, owner: string) => cfId("crew", "ap", answer, appId, owner),
+  inboxPage: (page: number, owner: string) => cfId("crew", "ap", "pg", page, owner),
 } as const;
 
 /** Caper ids (spec 13.2): S2's Caper button and S11's select are owner-scoped; the shared cards carry the caper id. */

@@ -1,8 +1,9 @@
 // The recruitment board's writes (amendment 8): the listing (pitch, stat
-// requirements, recruiting on or off), applying and withdrawing. Every write is
+// requirements, recruiting on or off), applying, withdrawing, accepting through
+// the shared join path, declining, and the officers' digest CAS. Every write is
 // one runFamilyTx: an apply touches the family (its 25-pending cap) and the
 // applicant's User document (their 3-pending cap, A35).
-import type { Family, FamilyInvite, Prisma } from "@prisma/client";
+import type { Family, FamilyInvite, FamilyMember, Prisma } from "@prisma/client";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { fmtFortunes } from "../../utils/format";
@@ -11,6 +12,7 @@ import { computeNetWorth } from "../netWorthService";
 import { parseBidAmount } from "./bidService";
 import { checkMemberEligibility, eligibilityError } from "./eligibility";
 import { requireMembership } from "./familyQueries";
+import { joinFamilyInTx, withSeatRetry } from "./membershipService";
 import { checkPublicText } from "./names";
 import { can, NO_PERMISSION, type FamilyAction } from "./permissions";
 import { FamilyError, isUniqueViolation, runFamilyTx, touchFamily, touchUser } from "./tx";
@@ -187,4 +189,79 @@ export async function withdrawApplication(appId: string, applicantId: string, no
     if (count !== 1) throw new FamilyError(NOT_PENDING);
     return tx.familyInvite.findUniqueOrThrow({ where: { id: appId } });
   });
+}
+
+/** Reads an application for an officer's answer; anything else reads as no longer pending. */
+async function readApplication(appId: string): Promise<FamilyInvite> {
+  const app = await prisma.familyInvite.findUnique({ where: { id: appId } });
+  if (!app || app.kind !== "APPLICATION") throw new FamilyError(NOT_PENDING);
+  return app;
+}
+
+/**
+ * S32 Accept (amendment 8.5): CAS the application, then the shared join, in one
+ * transaction; any refusal rolls the row back to PENDING. The presser is the
+ * officer, so a player who joined elsewhere reads as "<@x> is already in a family.".
+ */
+export async function acceptApplication(
+  appId: string, officerId: string, now: Date = new Date(),
+): Promise<{ family: Family; member: FamilyMember; application: FamilyInvite }> {
+  const app = await readApplication(appId);
+  const alreadyInFamily = `<@${app.inviteeId}> is already in a family.`;
+  return withSeatRetry(() => runFamilyTx(async (tx) => {
+    await assertMayInTx(tx, app.familyId, officerId, "review_apps", now);
+    const joined = await tx.familyMember.findUnique({ where: { userId: app.inviteeId }, select: { familyId: true } });
+    if (joined && joined.familyId !== app.familyId) throw new FamilyError(alreadyInFamily);
+    const { count } = await tx.familyInvite.updateMany({
+      where: { id: appId, kind: "APPLICATION", status: "PENDING", expiresAt: { gt: now } },
+      data: { status: "ACCEPTED", slot: appId, inviterId: officerId, resolvedAt: now },
+    });
+    if (count !== 1) throw new FamilyError(NOT_PENDING);
+    if (joined) throw new FamilyError(alreadyInFamily);
+    const { family, member } = await joinFamilyInTx(tx, { familyId: app.familyId, uid: app.inviteeId, inviterId: officerId, now });
+    return { family, member, application: await tx.familyInvite.findUniqueOrThrow({ where: { id: appId } }) };
+  }), { alreadyInFamily });
+}
+
+/** S32 Decline: CAS PENDING → DECLINED (slot = id); the applicant may reapply after reapplyAfterDeclineSeconds. */
+export async function declineApplication(appId: string, officerId: string, now: Date = new Date()): Promise<FamilyInvite> {
+  const app = await readApplication(appId);
+  return runFamilyTx(async (tx) => {
+    await assertMayInTx(tx, app.familyId, officerId, "review_apps", now);
+    await touchFamily(tx, app.familyId, now);
+    const { count } = await tx.familyInvite.updateMany({
+      where: { id: appId, kind: "APPLICATION", status: "PENDING" },
+      data: { status: "DECLINED", slot: appId, inviterId: officerId, resolvedAt: now },
+    });
+    if (count !== 1) throw new FamilyError(NOT_PENDING);
+    return tx.familyInvite.findUniqueOrThrow({ where: { id: appId } });
+  });
+}
+
+/** Families whose last digest is a window old and that have a PENDING application newer than it (A36). */
+export async function familiesDueDigest(now: Date): Promise<string[]> {
+  const newest = await prisma.familyInvite.groupBy({
+    by: ["familyId"], where: { kind: "APPLICATION", status: "PENDING" }, _max: { createdAt: true },
+  });
+  if (newest.length === 0) return [];
+  const families = await prisma.family.findMany({
+    where: { id: { in: newest.map((n) => n.familyId) }, appDigestAt: { lte: secondsAfter(now, -CRIME_FAMILY_CONFIG.appDigestEverySeconds) } },
+    select: { id: true, appDigestAt: true },
+  });
+  const digestAt = new Map(families.map((f) => [f.id, f.appDigestAt]));
+  return newest.filter((n) => {
+    const at = digestAt.get(n.familyId);
+    return at !== undefined && n._max.createdAt !== null && n._max.createdAt > at;
+  }).map((n) => n.familyId);
+}
+
+/** The digest CAS on appDigestAt: the new applications since the last digest, or 0 when there are none or another run won. */
+export async function claimDigest(familyId: string, now: Date): Promise<number> {
+  const family = await prisma.family.findUnique({ where: { id: familyId }, select: { appDigestAt: true } });
+  if (!family) return 0;
+  const since = family.appDigestAt;
+  const n = await prisma.familyInvite.count({ where: { familyId, kind: "APPLICATION", status: "PENDING", createdAt: { gt: since } } });
+  if (n === 0) return 0;
+  const { count } = await prisma.family.updateMany({ where: { id: familyId, appDigestAt: since }, data: { appDigestAt: now } });
+  return count === 1 ? n : 0;
 }

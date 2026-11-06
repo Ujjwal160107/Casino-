@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest";
 import { DM_NOTICE_TYPES, isCooldownReminderType } from "../../src/services/dmPrefsService";
 import { caperGoNotice, caperLobbyNotice, familyArrearsNotice, familyInviteNotice, notifyMany } from "../../src/services/dmNoticeService";
 import { containerText, containerThumb, fakeDmClient } from "./helpers";
-import { seedUser } from "../helpers";
+import { seedUser, seedEligibleUser, seedFamily, seedApplication, resetFamilies, daysAgo } from "../helpers";
+import { sendApplicationDigests } from "../../src/ui/crimeFamily/recruitAnnounce";
+import { buildSettingsPayload } from "../../src/commands/general/settings";
+import { fakeClient } from "../crimeFamily/fakeClient";
+
+const count = (n: any): number => 1 + (n.components ?? []).reduce((s: number, c: any) => s + count(c), 0) + (n.accessory ? 1 : 0);
 import { setEmojiRecord } from "../../src/utils/emojiRegistry";
 
 describe("family DM notices (13.4)", () => {
@@ -50,5 +55,33 @@ describe("caper DM notices (13.4)", () => {
     expect(containerThumb(caperGoNotice({ tierName: "x", goEndsAt: new Date(), jumpUrl: null }))).toContain("1456729243399753752");
     setEmojiRecord("cf_caper", { id: "1234567890123456780", name: "cf_caper" });
     expect(containerThumb(caperGoNotice({ tierName: "x", goEndsAt: new Date(), jumpUrl: null }))).toContain("1234567890123456780");
+  });
+});
+
+describe("recruit DM notices (amendment 8.10)", () => {
+  it("recruit is an account notice with no command", () => {
+    expect(DM_NOTICE_TYPES.recruit).toEqual({ label: "Family applications", group: "account" });
+    expect(isCooldownReminderType("recruit")).toBe(false);
+  });
+  it("the settings panel is 31 components with DMs on and 32 off", () => {
+    expect(count(buildSettingsPayload("o", { remindersEnabled: true, disabledReminders: [] }).components[0].toJSON())).toBe(31);
+    expect(count(buildSettingsPayload("o", { remindersEnabled: false, disabledReminders: [] }).components[0].toJSON())).toBe(32);
+  });
+  it("officer digests: one DM per officer per 6-hour window, and only for new applications", async () => {
+    await resetFamilies();
+    const boss = await seedEligibleUser(); const ub = await seedEligibleUser(); const capo = await seedEligibleUser(); const soldier = await seedEligibleUser();
+    const f = await seedFamily({ bossId: boss, members: [{ userId: ub, role: "UNDERBOSS" }, { userId: capo, role: "CAPO" }, { userId: soldier, role: "SOLDIER" }],
+      data: { recruiting: true, recruitPitch: "We run heists every night.", appDigestAt: daysAgo(1) } });
+    const t0 = new Date();
+    await seedApplication({ familyId: f.id, applicantId: "701", createdAt: t0 });
+    const c = fakeClient();
+    await sendApplicationDigests(c.client as any, new Date(+t0 + 1_000));
+    await sendApplicationDigests(c.client as any, new Date(+t0 + 2_000));
+    expect(Object.fromEntries(c.dm)).toEqual({ [boss]: 1, [ub]: 1, [capo]: 1 });
+    await sendApplicationDigests(c.client as any, new Date(+t0 + 6 * 3_600_000 + 2_000));    // a window later, nothing new
+    expect(c.dm.get(boss)).toBe(1);
+    await seedApplication({ familyId: f.id, applicantId: "702", createdAt: new Date(+t0 + 6 * 3_600_000 + 3_000) });
+    await sendApplicationDigests(c.client as any, new Date(+t0 + 12 * 3_600_000 + 4_000));
+    expect(Object.fromEntries(c.dm)).toEqual({ [boss]: 2, [ub]: 2, [capo]: 2 });
   });
 });

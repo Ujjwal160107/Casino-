@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { applyToFamily, editListing, withdrawApplication } from "../../src/services/crimeFamily/recruitService";
+import { acceptApplication, applyToFamily, declineApplication, editListing, withdrawApplication } from "../../src/services/crimeFamily/recruitService";
+import { disbandFamily } from "../../src/services/crimeFamily/disbandService";
+import { announceDisband } from "../../src/ui/crimeFamily/announce";
+import { fakeClient } from "../crimeFamily/fakeClient";
 import { acceptInvite, acceptInviteByTag, declineInviteByTag, inviteMember, listPendingInvites } from "../../src/services/crimeFamily/membershipService";
 import { redisService } from "../../src/services/redisService";
 import { testPrisma, seedEligibleUser, seedFamily, seedApplication, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
@@ -133,5 +136,97 @@ describe("applications (amendment 8.4)", () => {
     const inv = await inviteMember({ inviterId: inviter.boss, inviteeId: p, guildId: "g1", channelId: "c1" });
     await acceptInvite(inv.id, p);
     for (const id of [x.id, y.id]) expect(await testPrisma.familyInvite.findUniqueOrThrow({ where: { id } })).toMatchObject({ status: "WITHDRAWN", slot: id });
+  });
+});
+
+/** An officer (Capo) seated in a recruiting family; the officer is returned with the family. */
+async function withOfficer(o: Parameters<typeof recruiting>[0] = {}) {
+  const r = await recruiting(o);
+  const capo = await seedEligibleUser();
+  await testPrisma.familyMember.create({ data: { familyId: r.f.id, userId: capo, role: "CAPO", roleSlot: "CAPO1", seat: (o.size ?? 1) + 1, joinedAt: daysAgo(10) } });
+  await testPrisma.family.update({ where: { id: r.f.id }, data: { memberCount: { increment: 1 } } });
+  return { ...r, capo };
+}
+const row = (id: string) => testPrisma.familyInvite.findUniqueOrThrow({ where: { id } });
+const NOT_PENDING = "Application no longer pending.";
+
+describe("accept and decline (amendment 8.5)", () => {
+  it("edge 3: two officers accept one application at once → one member row", async () => {
+    const { f, boss, capo } = await withOfficer();
+    const p = await seedApplicant();
+    const a = await apply(p, f.id);
+    const r = await Promise.allSettled([acceptApplication(a.id, boss), acceptApplication(a.id, capo)]);
+    for (const x of r) if (x.status === "rejected") expect(x.reason.message).toMatch(BUSY_OR(NOT_PENDING));
+    if (r.every((x) => x.status === "rejected")) await acceptApplication(a.id, boss);   // both busy: the retry seats once
+    expect(await testPrisma.familyMember.count({ where: { userId: p } })).toBe(1);
+    expect(await row(a.id)).toMatchObject({ status: "ACCEPTED", slot: a.id });
+  });
+
+  it("edge 4: two families accept the same player at once → one membership, honest refusal text, counts match rows", async () => {
+    const A = await withOfficer(); const B = await withOfficer();
+    const p = await seedApplicant();
+    const [x, y] = [await apply(p, A.f.id), await apply(p, B.f.id)];
+    const r = await Promise.allSettled([acceptApplication(x.id, A.boss), acceptApplication(y.id, B.boss)]);
+    for (const z of r) if (z.status === "rejected") expect(z.reason.message).toMatch(BUSY_OR(`<@${p}> is already in a family.`));
+    expect(await testPrisma.familyMember.count({ where: { userId: p } })).toBe(1);
+    const statuses = [(await row(x.id)).status, (await row(y.id)).status].sort();
+    expect(statuses.filter((s) => s === "ACCEPTED")).toHaveLength(1);
+    expect(statuses.every((s) => ["ACCEPTED", "PENDING", "WITHDRAWN"].includes(s))).toBe(true);
+    for (const fam of [A.f, B.f]) {
+      const after = await testPrisma.family.findUniqueOrThrow({ where: { id: fam.id } });
+      expect(after.memberCount).toBe(await testPrisma.familyMember.count({ where: { familyId: fam.id } }));
+    }
+  });
+
+  it("edges 5 and 6: a full family and a jailed applicant roll the row back to PENDING", async () => {
+    const full = await withOfficer({ size: 9, level: 1 });                // 9 + the Capo = 10 = the L1 cap
+    const p = await seedApplicant();
+    const a = await seedApplication({ familyId: full.f.id, applicantId: p });
+    await expect(acceptApplication(a.id, full.boss)).rejects.toThrow("Family is full.");
+    expect(await row(a.id)).toMatchObject({ status: "PENDING", slot: "PENDING" });
+    const open = await withOfficer();
+    const jailed = await seedApplicant({ jailedUntil: new Date(Date.now() + HOUR) });
+    const b = await seedApplication({ familyId: open.f.id, applicantId: jailed });
+    await expect(acceptApplication(b.id, open.boss)).rejects.toThrow(/jailed/);
+    expect(await row(b.id)).toMatchObject({ status: "PENDING" });
+    expect(await testPrisma.familyMember.findUnique({ where: { userId: jailed } })).toBeNull();
+  });
+
+  it("stale answers: expired, withdrawn or already answered → 'Application no longer pending.'", async () => {
+    const { f, boss } = await withOfficer();
+    const p = await seedApplicant();
+    const expired = await seedApplication({ familyId: f.id, applicantId: p, expiresAt: new Date(Date.now() - 1_000) });
+    await expect(acceptApplication(expired.id, boss)).rejects.toThrow(NOT_PENDING);
+    await testPrisma.familyInvite.delete({ where: { id: expired.id } });
+    const a = await apply(p, f.id);
+    await declineApplication(a.id, boss);
+    await expect(acceptApplication(a.id, boss)).rejects.toThrow(NOT_PENDING);
+    await expect(declineApplication(a.id, boss)).rejects.toThrow(NOT_PENDING);
+    expect(await row(a.id)).toMatchObject({ status: "DECLINED", inviterId: boss });
+  });
+
+  it("edge 11: disband with 25 PENDING applications expires them all and DMs each applicant once", async () => {
+    const { f, boss, tag } = await withOfficer();
+    for (let k = 0; k < 25; k++) await apply(await seedApplicant(), f.id);
+    const r = await disbandFamily(boss, tag);
+    expect(r.expiredApplications).toHaveLength(25);
+    expect(await testPrisma.familyInvite.count({ where: { kind: "APPLICATION", status: "EXPIRED" } })).toBe(25);
+    const c = fakeClient();
+    await announceDisband(c.client as any, r);
+    for (const a of r.expiredApplications) expect(c.dm.get(a.inviteeId)).toBe(1);
+  });
+
+  it("the weekly caps count both kinds", async () => {
+    const { f, boss, capo } = await withOfficer();                         // L1: 5 joins per 7 days
+    for (let k = 0; k < 4; k++) await seedApplication({ familyId: f.id, applicantId: `9${k}`, status: "ACCEPTED", resolvedAt: daysAgo(1), inviterId: boss });
+    await testPrisma.familyInvite.updateMany({ where: { familyId: f.id }, data: { kind: "INVITE" } });
+    const [p1, p2] = [await seedApplicant(), await seedApplicant()];
+    const [a1, a2] = [await apply(p1, f.id), await apply(p2, f.id)];
+    await acceptApplication(a1.id, capo);
+    await expect(acceptApplication(a2.id, capo)).rejects.toThrow("Your family can take 5 new members per 7 days.");
+    const other = await withOfficer();
+    for (let k = 0; k < 3; k++) await seedApplication({ familyId: other.f.id, applicantId: `8${k}`, status: "ACCEPTED", resolvedAt: daysAgo(1), inviterId: other.capo });
+    const a3 = await apply(await seedApplicant(), other.f.id);
+    await expect(acceptApplication(a3.id, other.capo)).rejects.toThrow("You can bring in 3 members per 7 days.");
   });
 });

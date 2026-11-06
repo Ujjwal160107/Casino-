@@ -20,6 +20,12 @@ describe("customIds", () => {
     // Turf at max lengths: 16-char racket keys, 20-digit owners, 24-char ObjectIds.
     TURF_IDS.viewWar(U), TURF_IDS.select(U), TURF_IDS.openRacket("laundromat_front", U), TURF_IDS.bid("laundromat_front", U),
     TURF_IDS.bidModal("laundromat_front", U), TURF_IDS.scout(O), TURF_IDS.hit(O, "alleys"), TURF_IDS.hitAnswer(O, 3),
+    // Votes and recruitment at their longest: 20-digit owners, 24-char ObjectIds, page 999.
+    CREW_IDS.voteStart(U), CREW_IDS.voteOk(U), CREW_IDS.voteCancel(U), CREW_IDS.ballot("yes", O),
+    CREW_IDS.board("act", true, 999, U), CREW_IDS.boardSelect(U), CREW_IDS.myApps(U), CREW_IDS.withdraw(U),
+    CREW_IDS.familyCard(O, U), CREW_IDS.applyOpen(O, U), CREW_IDS.applyModal(O, U), CREW_IDS.recruit("toggle", U),
+    CREW_IDS.recruitEdit({ netWorth: 10_000_000_000, shifts: 5_000, ageDays: 730, heists: 1_000 }, U), CREW_IDS.recruitModal(U),
+    CREW_IDS.appAnswer("decline", O, U), CREW_IDS.inboxPage(999, U),
   ];
 
   it.each(all)("%s fits in 100 characters and round-trips", (id) => {
@@ -35,6 +41,9 @@ describe("customIds", () => {
     expect(decodeName(parseCfId(id)!.args[2])).toBe("x".repeat(24));
     expect(decodeName(encodeName("Velvet Ante's"))).toBe("Velvet Ante's");
   });
+
+  it("the longest new id is recruitEdit at 59 characters (F10)", () =>
+    expect(CREW_IDS.recruitEdit({ netWorth: 10_000_000_000, shifts: 5_000, ageDays: 730, heists: 1_000 }, U)).toHaveLength(59));
 
   it("pins the S2 Caper and Turf ids", () => {
     expect(CPR_IDS.viewPlan(U)).toBe(`cpr:v:plan:${U}`);

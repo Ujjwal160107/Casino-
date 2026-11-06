@@ -8,7 +8,8 @@ import type { EligibilityResult } from "../../services/crimeFamily/eligibility";
 import type { LedgerLine, LedgerType } from "../../services/crimeFamily/ledger";
 import type { FamilyDashboardView, InviteView, LeaderboardView, PaydayPreview, VaultView, VoteView } from "../../services/crimeFamily/views";
 import {
-  familyNewBossNotice, familyVoteAgainstYouNotice, familyVoteOpenedNotice, familyVoteResultNotice,
+  applicationAcceptedNotice, applicationDeclinedNotice, applicationExpiredNotice,
+  familyNewBossNotice, familyVoteAgainstYouNotice, familyVoteOpenedNotice, familyVoteResultNotice, recruitDigestNotice,
 } from "../../services/dmNoticeService";
 import {
   buildClaimNotice, buildClaimResolved, buildConfirm, buildCreateConfirm, buildDashboard, buildDisbandConfirm, buildInviteCard,
@@ -17,6 +18,7 @@ import {
 } from "../../ui/crimeFamily/familyScreens";
 import { CREW_IDS } from "../../ui/crimeFamily/ids";
 import { buildNotice, buildOpener, cfPayload, type CfPayload } from "../../ui/crimeFamily/kit";
+import { inboxRow } from "../../ui/crimeFamily/recruitAnnounce";
 import { ballotRow, buildVoteCard, buildVoteSeatCard, buildVoteStartConfirm, voteResultLine } from "../../ui/crimeFamily/voteScreens";
 import { caperWorstCases } from "./caperScreens";
 import { turfWorstCases } from "./turfScreens";
@@ -161,6 +163,10 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
     { label: "DM vote against you", max: 6, payload: cfPayload(familyVoteAgainstYouNotice({ familyLabel: label, starterId: MEMBERS[2], closesAt: SOON() })) },
     { label: "DM vote result", max: 6, payload: cfPayload(familyVoteResultNotice({ familyLabel: label, line: voteResultLine(voteView(true)) })) },
     { label: "DM new Boss", max: 6, payload: cfPayload(familyNewBossNotice({ familyLabel: label })) },
+    { label: "DM application digest (with the row)", max: 8, payload: cfPayload(recruitDigestNotice({ familyLabel: label, count: 25 }, inboxRow(OWNER))) },
+    { label: "DM application accepted", max: 6, payload: cfPayload(applicationAcceptedNotice({ familyLabel: label })) },
+    { label: "DM application declined", max: 6, payload: cfPayload(applicationDeclinedNotice({ familyLabel: label, reapplyAt: SOON() })) },
+    { label: "DM application expired", max: 6, payload: cfPayload(applicationExpiredNotice({ familyLabel: label })) },
     ...caperWorstCases(),
     ...turfWorstCases(),
   ];

@@ -1,5 +1,6 @@
-// The family jobs (spec 15): invite expiry, the caper sweep, the hit timeout,
-// the vote sweep and tickWars every minute; dues, succession and the automatic payday hourly;
+// The family jobs (spec 15): invite and application expiry, the caper sweep, the hit timeout,
+// the vote sweep and tickWars every minute; dues, succession, the automatic payday and the
+// officers' application digests hourly;
 // tickRackets at :05. Each schedule is its own cron task in UTC with
 // noOverlap, each job and each family has its own try/catch, and every write
 // is a CAS in the service it calls, so a missed or doubled run is harmless.
@@ -13,8 +14,10 @@ import { isJobShard } from "../../utils/shard";
 import { announceArrears, announceChairChange, announcePayday, announceResumedShares, resolveInviteCard } from "../../ui/crimeFamily/announce";
 import { buildClaimNotice, buildClaimResolved } from "../../ui/crimeFamily/familyScreens";
 import { editChannelMessage, sendToChannel } from "../../ui/crimeFamily/post";
+import { announceExpiredApplications, sendApplicationDigests } from "../../ui/crimeFamily/recruitAnnounce";
 import { SWEEP_CAPERS_JOB } from "./caperSweeper";
 import { autoHandover, clearClaimNotice, markClaimNotice, setClaimMessage } from "./chairService";
+import { familyLabel } from "./familyQueries";
 import { expireInvites } from "./membershipService";
 import { executePayday, resumeUnpaidShares } from "./paydayService";
 import { seedRackets } from "./racketService";
@@ -41,10 +44,25 @@ async function eachSafely<T>(job: string, items: T[], idOf: (item: T) => string,
 
 const allFamilyIds = async () => (await prisma.family.findMany({ select: { id: true } })).map((f) => f.id);
 
-/** Minute: PENDING invites past expiresAt → EXPIRED, and their S4 cards edited once. */
+/**
+ * Minute: PENDING invites and applications past expiresAt → EXPIRED; each
+ * invite's S4 card is edited once and each applicant gets the expiry DM. An
+ * application whose family is gone is skipped (the disband DMed it).
+ */
 export async function sweepInvites(client: Client, now: Date): Promise<void> {
-  const expired = (await expireInvites(now)).filter((invite) => invite.messageId !== "");
-  await eachSafely("sweepInvites", expired, (invite) => invite.id, (invite) => resolveInviteCard(client, invite.id, "Expired"));
+  const expired = await expireInvites(now);
+  const cards = expired.filter((row) => row.kind === "INVITE" && row.messageId !== "");
+  await eachSafely("sweepInvites", cards, (invite) => invite.id, (invite) => resolveInviteCard(client, invite.id, "Expired"));
+  const applications = expired.filter((row) => row.kind === "APPLICATION");
+  if (applications.length === 0) return;
+  const families = await prisma.family.findMany({
+    where: { id: { in: [...new Set(applications.map((a) => a.familyId))] } }, select: { id: true, tag: true, name: true },
+  });
+  const labels = new Map(families.map((f) => [f.id, familyLabel(f)]));
+  await announceExpiredApplications(client, applications.flatMap((application) => {
+    const label = labels.get(application.familyId);
+    return label ? [{ application, familyLabel: label }] : [];
+  }));
 }
 
 /** Hourly: the once-a-day dues charge (the duesDayKey CAS); the first missed day DMs the Boss and Underboss. */
@@ -133,6 +151,7 @@ export const CF_SCHEDULES: { cron: string; jobs: CfJob[] }[] = [
       { name: "chargeFamilyDues", run: chargeFamilyDues },
       { name: "runSuccession", run: runSuccession },
       { name: "autoPayday", run: autoPayday },
+      { name: "sendApplicationDigests", run: sendApplicationDigests },
     ],
   },
   { cron: "* * * * *", jobs: [{ name: "tickWars", run: tickWars }] },

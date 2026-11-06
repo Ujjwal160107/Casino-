@@ -17,7 +17,7 @@ import {
 describe("DM_NOTICE_TYPES registry", () => {
   it("splits cooldown types (with a command) from account types (without)", () => {
     expect(noticeTypesInGroup("cooldown")).toEqual(["daily", "weekly", "monthly", "crime", "caper", "hunt", "work", "vote"]);
-    expect(noticeTypesInGroup("account")).toEqual(["card", "market", "investment", "family", "caper_lobby", "turf"]);
+    expect(noticeTypesInGroup("account")).toEqual(["card", "market", "investment", "family", "caper_lobby", "turf", "recruit"]);
     for (const t of noticeTypesInGroup("cooldown")) expect(isCooldownReminderType(t)).toBe(true);
     for (const t of noticeTypesInGroup("account")) expect(isCooldownReminderType(t)).toBe(false);
   });

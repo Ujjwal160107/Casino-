@@ -4,7 +4,7 @@ vi.mock("node-cron", () => ({ default: { schedule }, schedule }));
 const { CF_SCHEDULES, registerCrimeFamilyJobs, runJobs, chargeFamilyDues, runSuccession, autoPayday, sweepInvites } = await import("../../src/services/crimeFamily/scheduler");
 import { ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
 import { fakeClient } from "./fakeClient";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, seedApplication, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
 
 const DAY = 864e5;
 const fam = (id: string) => testPrisma.family.findUnique({ where: { id } });
@@ -111,6 +111,22 @@ describe("crime family jobs (15)", () => {
     expect(JSON.stringify(c.edits[0][1])).toContain("Expired");
     expect((await testPrisma.familyInvite.findUnique({ where: { id: inv.id } }))!.status).toBe("EXPIRED");
   });
+
+  it("sweepInvites expires a due application once and DMs the applicant, editing no card", async () => {
+    const now = new Date();
+    const f = await seedFamily({ bossId: await seedEligibleUser() });
+    const p = await seedEligibleUser();
+    const app = await seedApplication({ familyId: f.id, applicantId: p, expiresAt: new Date(+now - 1_000) });
+    const c = fakeClient();
+    await sweepInvites(c.client, now); await sweepInvites(c.client, now);
+    expect(c.edits).toEqual([]);
+    expect(Object.fromEntries(c.dm)).toEqual({ [p]: 1 });
+    expect((await testPrisma.familyInvite.findUnique({ where: { id: app.id } }))!.status).toBe("EXPIRED");
+  });
+});
+
+it("sendApplicationDigests runs in the hourly schedule after autoPayday", () => {
+  expect(CF_SCHEDULES.find((s) => s.cron === "10 * * * *")!.jobs.map((j) => j.name)).toEqual(["chargeFamilyDues", "runSuccession", "autoPayday", "sendApplicationDigests"]);
 });
 
 it("sweepCapers runs in the minute schedule after sweepInvites", () => {

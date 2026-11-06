@@ -8,14 +8,14 @@ import { containerText, containerThumb } from "./helpers";
 const count = (n: any): number => 1 + (n.components ?? []).reduce((s: number, c: any) => s + count(c), 0) + (n.accessory ? 1 : 0);
 
 describe("turf DM notices (13.4)", () => {
-  it("turf is the last account notice, with no command", () => {
+  it("turf is an account notice, with no command", () => {
     expect(DM_NOTICE_TYPES.turf).toEqual({ label: "Turf wars", group: "account" });
     expect(isCooldownReminderType("turf")).toBe(false);
-    expect(noticeTypesInGroup("account").at(-1)).toBe("turf");
+    expect(noticeTypesInGroup("account").slice(-2)).toEqual(["turf", "recruit"]);
   });
-  it("the settings panel is 30 components with DMs on and 31 off (13.4)", () => {
-    expect(count(buildSettingsPayload("o", { remindersEnabled: true, disabledReminders: [] }).components[0].toJSON())).toBe(30);
-    expect(count(buildSettingsPayload("o", { remindersEnabled: false, disabledReminders: [] }).components[0].toJSON())).toBe(31);
+  it("the settings panel is 31 components with DMs on and 32 off (13.4, amendment 8.10)", () => {
+    expect(count(buildSettingsPayload("o", { remindersEnabled: true, disabledReminders: [] }).components[0].toJSON())).toBe(31);
+    expect(count(buildSettingsPayload("o", { remindersEnabled: false, disabledReminders: [] }).components[0].toJSON())).toBe(32);
   });
   it("outbid and neglect copy carry the facts; the thumbnail falls back to the Gun emote", () => {
     const c = turfOutbidNotice({ racketName: "Casino Row Protection", amount: 10_010_000, refunded: 9_100_000, bidClosesAt: new Date() });
