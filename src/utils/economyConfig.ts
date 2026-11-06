@@ -263,8 +263,36 @@ export const CRIME_FAMILY_CONFIG = {
   ledgerPageSize: 15,
   vaultLedgerLines: 10,
   underInvestigationHeat: 100,
-  underInvestigationMembers: 3,
+  underInvestigationMembers: 3, // the minimum of the size-scaled investigation threshold
   maxLevel: 10,
+  // Families at scale (amendment 11.1)
+  heistCapMin: 4,
+  heistCapDivisor: 3,
+  capoPerMembers: 5,
+  capoMinNetWorth: 10_000_000,
+  investigationDivisor: 4,
+  joinsPerFamilyPer7dMin: 5,
+  joinsPerFamilyDivisor: 3,
+  paydayShareResumeSeconds: 60,
+  voteSeconds: 172_800,
+  voteCooldownSeconds: 604_800,
+  voteBossGraceSeconds: 604_800, // from FamilyMember.firstBossAt (A40)
+  voteOfficerGraceSeconds: 604_800, // officerUntil after a demotion (A41)
+  voteAnnounceGraceSeconds: 60, // sweeper announces a silent start or result (A42)
+  voteMinEligible: 3,
+  voteRenderDebounceSeconds: 2,
+  applicationTtlSeconds: 259_200,
+  maxPendingApplicationsPerApplicant: 3,
+  maxPendingApplicationsPerFamily: 25,
+  reapplyAfterDeclineSeconds: 604_800,
+  reapplyAfterWithdrawSeconds: 86_400, // withdrawn or expired (A44)
+  appDigestEverySeconds: 21_600,
+  pitchChars: { min: 10, max: 150 },
+  applicationChars: { min: 1, max: 200 },
+  recruitLimits: { netWorth: 10_000_000_000, shifts: 5_000, ageDays: 730, heists: 1_000 },
+  boardPageSize: 6,
+  inboxPageSize: 5,
+  managePageSize: 15,
 } as const;
 
 /** Whether !crew, creation and invites are open in this guild (sweepers and payouts ignore it). */

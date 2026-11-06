@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { PrismaClient, Prisma, User, Family, Racket, War, WarContribution } from "@prisma/client";
+import { PrismaClient, Prisma, User, Family, FamilyInvite, FamilyVote, Racket, War, WarContribution } from "@prisma/client";
 import { CRIME_FAMILY_CONFIG } from "../src/utils/economyConfig";
 import { CAPO_SLOTS, RACKETS, RACKET_CLASSES, type FamilyRole } from "../src/data/crimeFamilyCatalog";
 import { baselineScores, warWindow, type RacketClass, type ScoreField, type WarSide } from "../src/services/crimeFamily/warMath";
@@ -149,7 +149,9 @@ export interface SeedFamilyOpts {
   lastPaydayAt?: Date;
   homeGuildId?: string;
   homeChannelId?: string;
-  members?: { userId: string; role: FamilyRole; joinedAt?: Date; lastActiveAt?: Date; capers?: number }[];
+  bossSince?: Date; // the Boss's firstBossAt (default 30 days ago)
+  data?: Partial<Prisma.FamilyUncheckedCreateInput>; // spread into the family create last
+  members?: { userId: string; role: FamilyRole; joinedAt?: Date; lastActiveAt?: Date; capers?: number; officerUntil?: Date }[];
 }
 
 let familySeq = 0;
@@ -173,11 +175,16 @@ export async function seedFamily(opts: SeedFamilyOpts): Promise<Family> {
       duesArrears: opts.duesArrears ?? 0,
       homeGuildId: opts.homeGuildId ?? "g1",
       homeChannelId: opts.homeChannelId ?? "c-home",
+      memberCount: 1 + (opts.members ?? []).length,
       ...(opts.lastPaydayAt ? { lastPaydayAt: opts.lastPaydayAt } : {}),
+      ...opts.data,
     },
   });
   await testPrisma.familyMember.create({
-    data: { familyId: family.id, userId: opts.bossId, role: "BOSS", roleSlot: "BOSS", seat: 1, joinedAt: daysAgo(30) },
+    data: {
+      familyId: family.id, userId: opts.bossId, role: "BOSS", roleSlot: "BOSS", seat: 1, joinedAt: daysAgo(30),
+      bossedOnce: true, firstBossAt: opts.bossSince ?? daysAgo(30),
+    },
   });
   let capos = 0;
   for (const [i, m] of (opts.members ?? []).entries()) {
@@ -188,6 +195,7 @@ export async function seedFamily(opts: SeedFamilyOpts): Promise<Family> {
         ...(m.joinedAt ? { joinedAt: m.joinedAt } : {}),
         ...(m.lastActiveAt ? { lastActiveAt: m.lastActiveAt } : {}),
         ...(m.capers !== undefined ? { capers: m.capers } : {}),
+        ...(m.officerUntil ? { officerUntil: m.officerUntil } : {}),
       },
     });
   }
@@ -196,6 +204,11 @@ export async function seedFamily(opts: SeedFamilyOpts): Promise<Family> {
 
 /** Empties the family collections (plans 2/3 extend this list). */
 export async function resetFamilies(): Promise<void> {
+  await testPrisma.familyBallot.deleteMany({});
+  await testPrisma.familyVote.deleteMany({});
+  await testPrisma.paydayShare.deleteMany({});
+  await testPrisma.cfJobRun.deleteMany({});
+  await testPrisma.botProcessBoot.deleteMany({});
   await testPrisma.warHit.deleteMany({});
   await testPrisma.warContribution.deleteMany({});
   await testPrisma.war.deleteMany({});
@@ -207,6 +220,51 @@ export async function resetFamilies(): Promise<void> {
   await testPrisma.familyExit.deleteMany({});
   await testPrisma.familyMember.deleteMany({});
   await testPrisma.family.deleteMany({});
+}
+
+let sentinelSeq = 0;
+/** A unique placeholder for a slot that the seed rewrites to the row id right after create. */
+const tmpSlot = () => `seed-${process.pid}-${++sentinelSeq}`;
+
+/** A recruitment application (`kind: "APPLICATION"`); a resolved status rewrites `slot` to the row id. */
+export async function seedApplication(o: {
+  familyId: string; applicantId: string; status?: string; message?: string;
+  createdAt?: Date; resolvedAt?: Date; expiresAt?: Date; inviterId?: string;
+}): Promise<FamilyInvite> {
+  const status = o.status ?? "PENDING";
+  const pending = status === "PENDING";
+  const row = await testPrisma.familyInvite.create({
+    data: {
+      familyId: o.familyId, kind: "APPLICATION", inviterId: o.inviterId ?? "", inviteeId: o.applicantId,
+      message: o.message ?? "", status, slot: pending ? "PENDING" : tmpSlot(), guildId: "g1", channelId: "c1",
+      expiresAt: o.expiresAt ?? new Date(Date.now() + CRIME_FAMILY_CONFIG.applicationTtlSeconds * 1000),
+      ...(o.createdAt ? { createdAt: o.createdAt } : {}),
+      ...(o.resolvedAt ? { resolvedAt: o.resolvedAt } : {}),
+    },
+  });
+  return pending ? row : testPrisma.familyInvite.update({ where: { id: row.id }, data: { slot: row.id } });
+}
+
+/** A FamilyVote row only (no ballots); a closed status rewrites `liveSlot` to the row id. */
+export async function seedVote(o: {
+  familyId: string; bossId: string; starterId: string; eligibleIds: string[]; status?: string;
+  closesAt?: Date; createdAt?: Date; cooldownUntil?: Date; closedAt?: Date; announced?: boolean; resultAnnounced?: boolean;
+}): Promise<FamilyVote> {
+  const status = o.status ?? "OPEN";
+  const open = status === "OPEN";
+  const row = await testPrisma.familyVote.create({
+    data: {
+      familyId: o.familyId, bossId: o.bossId, starterId: o.starterId, eligibleIds: o.eligibleIds, status,
+      liveSlot: open ? "LIVE" : tmpSlot(),
+      closesAt: o.closesAt ?? new Date(Date.now() + CRIME_FAMILY_CONFIG.voteSeconds * 1000),
+      ...(o.createdAt ? { createdAt: o.createdAt } : {}),
+      ...(o.cooldownUntil ? { cooldownUntil: o.cooldownUntil } : {}),
+      ...(o.closedAt ? { closedAt: o.closedAt } : {}),
+      ...(o.announced !== undefined ? { announced: o.announced } : {}),
+      ...(o.resultAnnounced !== undefined ? { resultAnnounced: o.resultAnnounced } : {}),
+    },
+  });
+  return open ? row : testPrisma.familyVote.update({ where: { id: row.id }, data: { liveSlot: row.id } });
 }
 
 // ── Turf (plan 3) ────────────────────────────────────────────────────────────

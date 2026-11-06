@@ -768,10 +768,24 @@ model Family {
   claimNoticeFor String   @default("")        // bossId whose inactivity S23 was posted for (CAS, once per episode)
   claimChannelId String   @default("")
   claimMessageId String   @default("")
+  memberCount        Int      @default(1)     // denormalized; written with every member create/delete (A9)
+  activeMembers      Int      @default(0)     // written by the daily census (A22)
+  censusAt           DateTime @default(now())
+  recruiting         Boolean  @default(false)
+  recruitPitch       String   @default("")
+  recruitMinNetWorth Float    @default(0)
+  recruitMinShifts   Int      @default(0)
+  recruitMinAgeDays  Int      @default(0)
+  recruitMinHeists   Int      @default(0)
+  recruitEditedAt    DateTime @default(now())
+  appDigestAt        DateTime @default(now()) // CAS: officer digest
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt          // touched by create/plan/accept/invite/leave/kick/promote so payday and disband conflict
   @@index([xp])
   @@index([warWins])
+  @@index([recruiting, level])
+  @@index([recruiting, memberCount])
+  @@index([recruiting, activeMembers])
 }
 
 model FamilyMember {
@@ -779,8 +793,8 @@ model FamilyMember {
   familyId       String   @db.ObjectId
   userId         String   @unique             // one family per account
   role           String                       // BOSS|UNDERBOSS|CAPO|SOLDIER
-  roleSlot       String                       // "BOSS"|"UNDERBOSS"|"CAPO1".."CAPO3"|userId
-  seat           Int                          // 1..memberCap
+  roleSlot       String                       // "BOSS"|"UNDERBOSS"|"CAPO1".."CAPO6"|userId
+  seat           Int                          // 1..30
   joinedAt       DateTime @default(now())
   lastActiveAt   DateTime @default(now())
   depositDayKey  String   @default("")
@@ -788,6 +802,9 @@ model FamilyMember {
   deposited      Float    @default(0)         // lifetime, display only
   capers         Int      @default(0)         // lifetime started seats
   correctHits    Int      @default(0)         // lifetime
+  bossedOnce     Boolean  @default(false)     // CAS: firstBossAt written once (A40)
+  firstBossAt    DateTime @default(now())     // read only with bossedOnce:true
+  officerUntil   DateTime @default(now())     // start_vote after a demotion out of Underboss/Capo (A41)
   @@unique([familyId, roleSlot])
   @@unique([familyId, seat])
   @@index([familyId])
@@ -809,7 +826,9 @@ model FamilyInvite {
   familyId   String   @db.ObjectId
   inviterId  String
   inviteeId  String
-  status     String   @default("PENDING")     // PENDING|ACCEPTED|DECLINED|EXPIRED
+  kind       String   @default("INVITE")      // INVITE|APPLICATION
+  message    String   @default("")
+  status     String   @default("PENDING")     // PENDING|ACCEPTED|DECLINED|EXPIRED|WITHDRAWN
   slot       String   @default("PENDING")     // rewritten to id when resolved
   guildId    String
   channelId  String
@@ -822,13 +841,15 @@ model FamilyInvite {
   @@index([inviterId, status, resolvedAt])
   @@index([familyId, status, resolvedAt])
   @@index([status, expiresAt])
+  @@index([familyId, kind, status, createdAt])
+  @@index([inviteeId, kind, status])
 }
 
 model FamilyLedger {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
   familyId      String   @db.ObjectId
   actorId       String                        // discordId or "system"
-  type          String   // create_fee|deposit|deposit_tax|payday|payday_tax|caper_cut|racket_income|racket_neglect|dues|dues_missed|level_fee|rename_fee|bid_escrow|bid_refund|war_bid_burn|disband_burn
+  type          String   // create_fee|deposit|deposit_tax|payday|payday_tax|caper_cut|racket_income|racket_neglect|dues|dues_missed|level_fee|rename_fee|bid_escrow|bid_refund|war_bid_burn|disband_burn|payday_clamp_return
   amount        Float                         // signed, vault perspective
   treasuryAfter Float
   earningsAfter Float
@@ -895,6 +916,7 @@ model CaperCrew {
   @@unique([userId, liveSlot])
   @@index([userId, started, startedAt])
   @@index([caperId, settled])
+  @@index([started, startedAt])               // the census groupBy (§6.4)
 }
 
 model Racket {
@@ -983,4 +1005,74 @@ model WarHit {
   @@index([state, deadline])
   @@index([userId, state, createdAt])
   @@index([warId, userId])
+  @@index([state, createdAt])                 // the census groupBy (§6.4)
+}
+
+model PaydayShare {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  familyId  String   @db.ObjectId
+  runKey    String                         // the id of this payday's FamilyLedger "payday" row
+  userId    String
+  gross     Float
+  tax       Float
+  net       Float
+  paid      Boolean  @default(false)        // CAS: wallet credited
+  createdAt DateTime @default(now())
+  @@unique([runKey, userId])
+  @@index([paid, createdAt])
+  @@index([familyId, createdAt])
+}
+
+model FamilyVote {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  familyId        String   @db.ObjectId
+  status          String   @default("OPEN")   // OPEN|PASSED|FAILED|VOID
+  liveSlot        String   @default("LIVE")   // rewritten to id at close: one open vote per family
+  announced       Boolean  @default(false)    // CAS: S34 posted and start DMs sent (A42)
+  resultAnnounced Boolean  @default(false)    // CAS: result edit and close DMs sent (A42)
+  reposted        Boolean  @default(false)    // the one S34 repost of F9 is spent
+  cooldownUntil   DateTime @default(now())    // rewritten at close: closedAt + 7 d on FAILED and counted VOIDs (A46), else closedAt
+  bossId          String                      // the Boss the vote targets
+  starterId       String
+  eligibleIds     String[]                    // snapshot at open; never filtered
+  closesAt        DateTime
+  ballotsVersion  Int      @default(0)        // written by every ballot so ballot and close conflict
+  closedAt        DateTime @default(now())    // rewritten at close; read only with status ≠ OPEN
+  yes             Int      @default(0)        // written at close
+  no              Int      @default(0)
+  eligibleAtClose Int      @default(0)
+  newBossId       String   @default("")
+  channelId       String   @default("")
+  messageId       String   @default("")       // S34; "" = dead or never posted
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@unique([familyId, liveSlot])
+  @@index([status, closesAt])
+  @@index([familyId, cooldownUntil])
+  @@index([announced, createdAt])
+  @@index([resultAnnounced, closedAt])
+}
+
+model FamilyBallot {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  voteId   String   @db.ObjectId
+  familyId String   @db.ObjectId
+  userId   String
+  choice   String                              // YES|NO
+  castAt   DateTime @default(now())
+  @@unique([voteId, userId])
+}
+
+model CfJobRun {
+  id     String   @id @default(auto()) @map("_id") @db.ObjectId
+  key    String   @unique                     // "turf_census"
+  dayKey String   @default("")
+  ranAt  DateTime @default(now())
+}
+
+model BotProcessBoot {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  shardIds Int[]                              // [] when unsharded
+  bootedAt DateTime @default(now())
+  @@index([bootedAt])
 }
