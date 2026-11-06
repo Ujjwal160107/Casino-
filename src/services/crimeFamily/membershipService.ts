@@ -59,7 +59,11 @@ export async function inviteMember(input: {
       await touchFamily(tx, family.id, now);
       const inviter = await tx.familyMember.findUnique({ where: { userId: input.inviterId } });
       if (!inviter || inviter.familyId !== family.id || !can(actorOf(inviter), "invite", now)) throw new FamilyError(NO_PERMISSION);
-      const pendingCount = await tx.familyInvite.count({ where: { familyId: family.id, status: "PENDING" } });
+      const applied = await tx.familyInvite.findFirst({
+        where: { familyId: family.id, inviteeId: input.inviteeId, kind: "APPLICATION", status: "PENDING" }, select: { id: true },
+      });
+      if (applied) throw new FamilyError(`<@${input.inviteeId}> already applied: accept it in the inbox.`);
+      const pendingCount = await tx.familyInvite.count({ where: { familyId: family.id, kind: "INVITE", status: "PENDING" } });
       if (pendingCount >= CRIME_FAMILY_CONFIG.maxPendingInvites) {
         throw new FamilyError(`Too many pending invites (max ${CRIME_FAMILY_CONFIG.maxPendingInvites}).`);
       }
@@ -86,7 +90,7 @@ export async function setInviteMessage(inviteId: string, messageId: string): Pro
 
 async function readOwnInvite(inviteId: string, uid: string): Promise<FamilyInvite> {
   const invite = await prisma.familyInvite.findUnique({ where: { id: inviteId } });
-  if (!invite) throw new FamilyError(INVITE_EXPIRED);
+  if (!invite || invite.kind !== "INVITE") throw new FamilyError(INVITE_EXPIRED);   // an application never passes as an invite
   if (invite.inviteeId !== uid) throw new FamilyError("This invite is not for you.");
   return invite;
 }
@@ -101,7 +105,8 @@ function lowestFreeSeat(taken: number[], cap: number): number | null {
 /**
  * The shared join (amendment 8.5): run the join gate, re-check the caps and
  * seat the player as a Soldier in the lowest free seat, inside the caller's
- * transaction (whose own invite or application is already ACCEPTED).
+ * transaction (whose own invite or application is already ACCEPTED), then
+ * withdraw the joiner's other PENDING applications.
  */
 export async function joinFamilyInTx(
   tx: Prisma.TransactionClient, i: { familyId: string; uid: string; inviterId: string; now: Date },
@@ -120,6 +125,10 @@ export async function joinFamilyInTx(
   });
   await tx.family.update({ where: { id: familyId }, data: { memberCount: { increment: 1 } } });
   await touchFamily(tx, familyId, now);
+  const others = await tx.familyInvite.findMany({ where: { inviteeId: uid, kind: "APPLICATION", status: "PENDING" }, select: { id: true } });
+  for (const { id } of others) {
+    await tx.familyInvite.updateMany({ where: { id, status: "PENDING" }, data: { status: "WITHDRAWN", slot: id, resolvedAt: now } });
+  }
   return { family: await tx.family.findUniqueOrThrow({ where: { id: familyId } }), member };
 }
 
@@ -154,7 +163,7 @@ export async function acceptInvite(inviteId: string, uid: string, now: Date = ne
 
   return withSeatRetry(() => runFamilyTx(async (tx) => {
     const { count } = await tx.familyInvite.updateMany({
-      where: { id: inviteId, status: "PENDING", expiresAt: { gt: now } },
+      where: { id: inviteId, kind: "INVITE", status: "PENDING", expiresAt: { gt: now } },
       data: { status: "ACCEPTED", slot: inviteId, resolvedAt: now },
     });
     if (count !== 1) throw new FamilyError(INVITE_EXPIRED);
@@ -165,7 +174,7 @@ export async function acceptInvite(inviteId: string, uid: string, now: Date = ne
 async function pendingInviteFromTag(uid: string, tag: string): Promise<FamilyInvite> {
   const family = await getFamilyByTag(tag);
   if (!family) throw new FamilyError("No family with that tag.");
-  const invite = await prisma.familyInvite.findFirst({ where: { familyId: family.id, inviteeId: uid, status: "PENDING" } });
+  const invite = await prisma.familyInvite.findFirst({ where: { familyId: family.id, inviteeId: uid, kind: "INVITE", status: "PENDING" } });
   if (!invite) throw new FamilyError("You have no pending invite from that family.");
   return invite;
 }
@@ -182,7 +191,7 @@ export async function acceptInviteByTag(
 export async function declineInvite(inviteId: string, uid: string, now: Date = new Date()): Promise<FamilyInvite> {
   await readOwnInvite(inviteId, uid);
   const { count } = await prisma.familyInvite.updateMany({
-    where: { id: inviteId, status: "PENDING" },
+    where: { id: inviteId, kind: "INVITE", status: "PENDING" },
     data: { status: "DECLINED", slot: inviteId, resolvedAt: now },
   });
   if (count !== 1) throw new FamilyError(INVITE_EXPIRED);
@@ -198,7 +207,7 @@ export async function declineInviteByTag(uid: string, tag: string, now: Date = n
 /** The player's live invites, newest first. */
 export async function listPendingInvites(uid: string, now: Date = new Date()): Promise<(FamilyInvite & { family: Family })[]> {
   const invites = await prisma.familyInvite.findMany({
-    where: { inviteeId: uid, status: "PENDING", expiresAt: { gt: now } },
+    where: { inviteeId: uid, kind: "INVITE", status: "PENDING", expiresAt: { gt: now } },
     orderBy: { createdAt: "desc" },
   });
   if (invites.length === 0) return [];

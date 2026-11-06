@@ -57,6 +57,15 @@ export async function touchFamily(tx: Prisma.TransactionClient, familyId: string
   await tx.family.update({ where: { id: familyId }, data: { updatedAt: new Date(Math.max(now.getTime(), updatedAt.getTime() + 1)) } });
 }
 
+/**
+ * Writes the user document so one player's concurrent writers conflict (A35),
+ * with the touchFamily rule: the new updatedAt is always later than the stored one.
+ */
+export async function touchUser(tx: Prisma.TransactionClient, discordId: string, now: Date): Promise<void> {
+  const { updatedAt } = await tx.user.findUniqueOrThrow({ where: { discordId }, select: { updatedAt: true } });
+  await tx.user.update({ where: { discordId }, data: { updatedAt: new Date(Math.max(now.getTime(), updatedAt.getTime() + 1)) } });
+}
+
 /** A P2002, optionally on the named unique index (Prisma's `<Model>_<fields>_key`). Never catch it inside a transaction. */
 export function isUniqueViolation(err: unknown, indexName?: string): boolean {
   const e = err as { code?: unknown; meta?: { target?: unknown } } | null;

@@ -36,6 +36,9 @@ export const FAMILY_NAME_SLURS: readonly string[] = [
   "nigger", "nigga", "faggot", "retard", "tranny", "kike", "chink", "wetback", "gook", "raghead", "towelhead", "beaner",
 ];
 
+/** Impersonation words refused as whole words in a recruitment pitch or application message (amendment 8.6). */
+export const PITCH_DENYLIST: readonly string[] = ["fortuna", "admin", "staff", "mod", "moderator", "discord"];
+
 // ── Caper roles (8.2, 8.3) ───────────────────────────────────────────────────
 
 export type CaperRoleKey = "MASTERMIND" | "LOOKOUT" | "SAFECRACKER" | "DRIVER" | "MUSCLE" | "HACKER";
