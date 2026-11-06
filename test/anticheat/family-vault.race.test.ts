@@ -173,10 +173,10 @@ describe("payday (7.3)", () => {
   it("pays eligible members equally, taxes inline and names the ineligible", async () => {
     const { family, bossId, soldiers, newbie } = await payFam(3_000_000, { newbie: true });
     const r = await executePayday(family.id, bossId, expect3);
-    expect(r).toMatchObject({ status: "paid", split: { gross: 1_000_000, tax: 50_000, net: 950_000 }, clampedBack: 0 });
+    expect(r).toMatchObject({ status: "paid", split: { gross: 1_000_000, tax: 50_000, net: 950_000 } });
     for (const id of [bossId, ...soldiers]) expect(await wallet(id)).toBe(950_000);
     expect(await wallet(newbie!)).toBe(0);
-    expect((r as any).ineligible).toEqual([{ userId: newbie, reason: expect.stringMatching(/7 days/) }]);
+    expect((r as any).ineligible).toEqual([{ userId: newbie, reason: expect.stringMatching(/7 days/), need: "≥ 7 days in the family" }]);
     const after = (await fam(family.id))!;
     expect(after.earnings).toBe(0);
     expect(Math.abs(+after.lastPaydayAt - Date.now())).toBeLessThan(60_000);
@@ -226,8 +226,11 @@ describe("payday (7.3)", () => {
   it("returns a clamped excess to earnings", async () => {
     const { family, bossId, soldiers } = await payFam(3_000_000);
     await testPrisma.wallet.update({ where: { userId: soldiers[0] }, data: { balance: MAX_SAFE_BALANCE - 100 } });
-    expect(await executePayday(family.id, bossId, expect3)).toMatchObject({ status: "paid", clampedBack: 949_900 });
+    expect(await executePayday(family.id, bossId, expect3)).toMatchObject({ status: "paid" });
     expect((await fam(family.id))!.earnings).toBe(949_900);
+    const back = await testPrisma.familyLedger.findMany({ where: { familyId: family.id, type: "payday_clamp_return" } });
+    expect(back).toHaveLength(1);
+    expect(back[0]).toMatchObject({ amount: 949_900 });
   });
 
   it("refuses a Soldier and a demoted Underboss", async () => {
@@ -246,5 +249,106 @@ describe("payday (7.3)", () => {
       await executePayday(family.id, bossId, expect3);
       for (const id of [bossId, ...soldiers]) expect(emit).toHaveBeenCalledWith("economy:earn", { discordId: id, amount: 950_000 });
     } finally { emit.mockRestore(); }
+  });
+});
+
+import { payPaydayShares, resumeUnpaidShares } from "../../src/services/crimeFamily/paydayService";
+import { disbandFamily } from "../../src/services/crimeFamily/disbandService";
+
+// Throws on chosen credits: `on` holds 1-based call numbers, `all` throws on every call.
+const fail = vi.hoisted(() => ({ calls: 0, on: new Set<number>(), all: false }));
+vi.mock("../../src/services/walletService", async (orig) => {
+  const real = await orig<typeof import("../../src/services/walletService")>();
+  return {
+    ...real,
+    creditWalletInTx: vi.fn(async (...a: Parameters<typeof real.creditWalletInTx>) => {
+      fail.calls += 1;
+      if (fail.all || fail.on.has(fail.calls)) throw new Error(`injected credit failure ${fail.calls}`);
+      return real.creditWalletInTx(...a);
+    }),
+  };
+});
+const resetFail = () => { fail.calls = 0; fail.on.clear(); fail.all = false; };
+const later = () => new Date(Date.now() + 61_000);                       // past paydayShareResumeSeconds (60)
+const shares = (runKey: string) => testPrisma.paydayShare.findMany({ where: { runKey }, orderBy: { id: "asc" } });
+
+/** A due family of 30 payday-eligible members (the Boss plus 29), earnings E. */
+async function bigPayFam(earnings: number, o: { tag?: string } = {}) {
+  const bossId = await seedEligibleUser();
+  const ids: string[] = [];
+  for (let k = 0; k < 29; k++) ids.push(await seedEligibleUser());
+  for (const u of [bossId, ...ids]) active.add(u);
+  const family = await seedFamily({ bossId, level: 10, earnings, lastPaydayAt: daysAgo(8), ...(o.tag ? { tag: o.tag } : {}),
+    members: ids.map((userId) => ({ userId, role: "SOLDIER" as const, joinedAt: daysAgo(10) })) });
+  return { family, bossId, ids, all: [bossId, ...ids] };
+}
+
+describe("two-phase payday (amendment 2.4)", () => {
+  beforeEach(() => { active.clear(); ACTIVITY_RULES.push(rule); resetFail(); });
+  afterEach(() => { ACTIVITY_RULES.splice(ACTIVITY_RULES.indexOf(rule), 1); resetFail(); });
+
+  it("a 30-member payday reserves once and pays 30 shares", async () => {
+    const { family, bossId, all } = await bigPayFam(40_000_000);
+    const r = await executePayday(family.id, bossId, { earnings: 40_000_000, count: 30 });
+    expect(r).toMatchObject({ status: "paid", split: { gross: 1_000_000, tax: 50_000, net: 950_000 } });
+    const payday = await testPrisma.familyLedger.findFirstOrThrow({ where: { familyId: family.id, type: "payday" } });
+    expect(payday).toMatchObject({ amount: -30_000_000, meta: { gross: 1_000_000, tax: 50_000, net: 950_000, members: 30 } });
+    expect(await testPrisma.familyLedger.findFirstOrThrow({ where: { familyId: family.id, type: "payday_tax" } })).toMatchObject({ amount: 0, meta: { burned: 1_500_000 } });
+    expect(await testPrisma.familyLedger.count({ where: { familyId: family.id, type: { in: ["payday", "payday_tax"] } } })).toBe(2);
+    const rows = await shares(payday.id);                                // F6: the payday row's id is the runKey
+    expect(rows).toHaveLength(30);
+    expect(rows.every((s) => s.paid && s.gross === 1_000_000 && s.tax === 50_000 && s.net === 950_000)).toBe(true);
+    expect((r as any).runKey).toBe(payday.id);
+    expect((r as any).paid).toHaveLength(30);
+    expect((await fam(family.id))!.earnings).toBe(10_000_000);           // 40,000,000 − 30 × 1,000,000
+    for (const id of all) expect(await wallet(id)).toBe(950_000);
+  });
+
+  it("a crash on share 7 is paid once by the resume job", async () => {
+    const { family, bossId, all } = await bigPayFam(40_000_000);
+    fail.on.add(7);
+    const r = await executePayday(family.id, bossId, { earnings: 40_000_000, count: 30 });
+    expect((r as any).paid).toHaveLength(29);
+    const runKey = (r as any).runKey as string;
+    const unpaid = (await shares(runKey)).filter((s) => !s.paid);
+    expect(unpaid).toHaveLength(1);
+    expect(await wallet(unpaid[0].userId)).toBe(0);
+    expect(await resumeUnpaidShares(new Date())).toEqual([]);            // younger than 60 s: not yet
+    const resumed = await resumeUnpaidShares(later());
+    expect(resumed.map((p) => p.userId)).toEqual([unpaid[0].userId]);
+    expect(await resumeUnpaidShares(later())).toEqual([]);
+    for (const id of all) expect(await wallet(id)).toBe(950_000);
+    expect((await fam(family.id))!.earnings).toBe(10_000_000);           // the reservation never moves again
+  });
+
+  it("payer and resume race on one share: exactly one credit per share", async () => {
+    const { family, bossId, all } = await bigPayFam(40_000_000);
+    fail.all = true;
+    const r = await executePayday(family.id, bossId, { earnings: 40_000_000, count: 30 });
+    expect((r as any).paid).toEqual([]);
+    resetFail();
+    const runKey = (r as any).runKey as string;
+    const [a, b] = await Promise.all([payPaydayShares(runKey, later()), resumeUnpaidShares(later())]);
+    expect(a.length + b.length).toBe(30);
+    expect(new Set([...a, ...b].map((p) => p.userId)).size).toBe(30);
+    for (const id of all) expect(await wallet(id)).toBe(950_000);
+    expect((await shares(runKey)).every((s) => s.paid)).toBe(true);
+  });
+
+  it("a share that clamps after the family disbanded burns the excess into an audit row", async () => {
+    const { family, bossId, ids } = await bigPayFam(40_000_000, { tag: "VLA" });
+    const rich = ids[0];
+    await testPrisma.wallet.update({ where: { userId: rich }, data: { balance: MAX_SAFE_BALANCE - 100 } });
+    // disbandFamily pays its shares after the commit that deleted the family, so the clamp has no vault to return to.
+    const r = await disbandFamily(bossId, "VLA");
+    expect(r.burned).toBe(10_000_000);                                   // 40,000,000 − 30 × 1,000,000 reserved before the burn read
+    expect(r.paid).toHaveLength(30);
+    expect(r.paid.find((p) => p.userId === rich)!.credit.appliedAmount).toBe(100);
+    expect(await testPrisma.family.findUnique({ where: { id: family.id } })).toBeNull();
+    expect(await resumeUnpaidShares(later())).toEqual([]);
+    expect(await wallet(rich)).toBe(MAX_SAFE_BALANCE);
+    const audit = await testPrisma.audit.findFirstOrThrow({ where: { userId: rich, type: "family_payday_clamp_burn" } });
+    expect(audit.meta).toMatchObject({ familyId: family.id, burned: 950_000 - 100 });
+    expect(await testPrisma.familyLedger.count({ where: { type: "payday_clamp_return" } })).toBe(0);
   });
 });

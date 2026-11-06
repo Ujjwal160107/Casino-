@@ -4,10 +4,11 @@
 // announcer runs after its service committed, so a failure is only logged.
 import type { Family, FamilyInvite } from "@prisma/client";
 import type { Client } from "discord.js";
+import prisma from "../../utils/prisma";
 import type { FamilyRole } from "../../data/crimeFamilyCatalog";
 import { familyLabel, getInviteCard, listMembers } from "../../services/crimeFamily/familyQueries";
 import type { disbandFamily } from "../../services/crimeFamily/disbandService";
-import type { PaydayPaid } from "../../services/crimeFamily/paydayService";
+import type { PaidShare, PaydayPaid } from "../../services/crimeFamily/paydayService";
 import { arrearsOwed } from "../../services/crimeFamily/vaultService";
 import {
   familyArrearsNotice,
@@ -49,6 +50,24 @@ export async function announcePayday(client: Client, result: PaydayPaid): Promis
     await notifyMany(client, "family", [...reasons.keys()], (id) => familyMissedPaydayNotice({ familyLabel: label, reason: reasons.get(id)! }));
   });
   return { cardPosted };
+}
+
+/**
+ * The minute job's resumed shares (amendment 2.4): a payday DM to each member
+ * it paid, naming the family as it is now, or "your former family" once it is
+ * gone. The S28 card is not reposted.
+ */
+export async function announceResumedShares(client: Client, paid: PaidShare[]): Promise<void> {
+  if (paid.length === 0) return;
+  return safely("announceResumedShares", async () => {
+    const families = await prisma.family.findMany({ where: { id: { in: [...new Set(paid.map((p) => p.familyId))] } }, select: { id: true, tag: true, name: true } });
+    const labels = new Map(families.map((f) => [f.id, familyLabel(f)]));
+    const shares = new Map(paid.map((p) => [p.userId, p]));
+    await notifyMany(client, "family", [...shares.keys()], (id) => {
+      const p = shares.get(id)!;
+      return familyPaydayNotice({ familyLabel: labels.get(p.familyId) ?? "your former family", gross: p.gross, tax: p.tax, net: p.net });
+    });
+  });
 }
 
 /** Edits the S23 claim notice when one was posted, then DMs: a claim tells the old Boss, a hand-over tells every member. */

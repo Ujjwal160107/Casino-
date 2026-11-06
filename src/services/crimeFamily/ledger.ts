@@ -4,8 +4,9 @@ import { Prisma } from "@prisma/client";
 import prisma from "../../utils/prisma";
 
 export type LedgerType =
-  | "create_fee" | "deposit" | "deposit_tax" | "payday" | "payday_tax" | "caper_cut" | "racket_income" | "racket_neglect"
-  | "dues" | "dues_missed" | "level_fee" | "rename_fee" | "bid_escrow" | "bid_refund" | "war_bid_burn" | "disband_burn" | "xp";
+  | "create_fee" | "deposit" | "deposit_tax" | "payday" | "payday_tax" | "payday_clamp_return" | "caper_cut" | "racket_income"
+  | "racket_neglect" | "dues" | "dues_missed" | "level_fee" | "rename_fee" | "bid_escrow" | "bid_refund" | "war_bid_burn"
+  | "disband_burn" | "xp";
 
 export type LedgerRow = {
   familyId: string;
@@ -27,9 +28,13 @@ export type LedgerLine = {
   meta: Record<string, unknown> | null;
 };
 
-export async function writeLedger(tx: Prisma.TransactionClient, row: LedgerRow): Promise<void> {
+/** Writes one row and returns its id (F6: the payday row's id is the payday's runKey). */
+export async function writeLedger(tx: Prisma.TransactionClient, row: LedgerRow): Promise<string> {
   const { meta, ...rest } = row;
-  await tx.familyLedger.create({ data: { ...rest, ...(meta ? { meta: meta as Prisma.InputJsonObject } : {}) } });
+  const { id } = await tx.familyLedger.create({
+    data: { ...rest, ...(meta ? { meta: meta as Prisma.InputJsonObject } : {}) }, select: { id: true },
+  });
+  return id;
 }
 
 /** One page of the family's ledger, newest first; page is clamped into [0, pages - 1]. */

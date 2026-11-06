@@ -1,18 +1,17 @@
 // Disband (spec 6.4, 6.8): the Boss types the tag; one transaction re-checks
-// the hook blocks, runs the hooks' side effects, pays a capped final payday
-// when one is due (no minimum, D61), burns everything left, expires invites,
+// the hook blocks, runs the hooks' side effects, reserves a capped final
+// payday when one is due (no minimum, D61), burns everything left, expires invites,
 // records the exits and hard-deletes the family, freeing its name and tag.
 import type { Family } from "@prisma/client";
 import prisma from "../../utils/prisma";
-import { afterEarnedCredit, type CreditResult } from "../walletService";
 import { FAMILY_HOOKS } from "./extensions";
 import { requireMembership } from "./familyQueries";
 import { writeLedger } from "./ledger";
-import { evaluatePaydayMembers, isPaydayDue, payMembersInTx, previewPayday, splitPayday } from "./paydayService";
+import {
+  evaluatePaydayMembers, isPaydayDue, payPaydayShares, previewPayday, reservePaydayInTx, splitPayday, type PaidShare, type Split,
+} from "./paydayService";
 import { FamilyError, runFamilyTx, touchFamily } from "./tx";
 import type { PaydayPreview } from "./views";
-
-type Split = { gross: number; tax: number; net: number };
 
 const DISBAND_ATTEMPTS = 5;
 const ONLY_BOSS = "Only the Boss can disband the family.";
@@ -40,7 +39,7 @@ export async function previewDisband(
 }
 
 export async function disbandFamily(bossId: string, typedTag: string, now: Date = new Date()): Promise<{
-  family: Family; formerMembers: string[]; paid: { userId: string; credit: CreditResult }[]; split: Split | null; burned: number;
+  family: Family; formerMembers: string[]; paid: PaidShare[]; split: Split | null; burned: number;
 }> {
   const { family } = await requireMembership(bossId);
   if (family.bossId !== bossId) throw new FamilyError(ONLY_BOSS);
@@ -59,10 +58,10 @@ export async function disbandFamily(bossId: string, typedTag: string, now: Date 
 
     const members = await tx.familyMember.findMany({ where: { familyId: family.id } });
     const beforePay = await tx.family.findUniqueOrThrow({ where: { id: family.id } });
-    let payout: Awaited<ReturnType<typeof payMembersInTx>> | null = null;
+    let reserved: { runKey: string; split: Split } | null = null;
     if (isPaydayDue(beforePay.lastPaydayAt, now)) {
       const { eligible } = await evaluatePaydayMembers(members.map((m) => m.userId), now);
-      if (paysOut(beforePay.earnings, eligible.length)) payout = await payMembersInTx(tx, beforePay, eligible, beforePay.earnings, bossId, now);
+      if (paysOut(beforePay.earnings, eligible.length)) reserved = await reservePaydayInTx(tx, beforePay, eligible, beforePay.earnings, bossId, now);
     }
 
     const final = await tx.family.findUniqueOrThrow({ where: { id: family.id } });
@@ -83,10 +82,10 @@ export async function disbandFamily(bossId: string, typedTag: string, now: Date 
     });
     await tx.familyMember.deleteMany({ where: { familyId: family.id } });
     await tx.family.delete({ where: { id: family.id } });
-    return { family: final, formerMembers: members.map((m) => m.userId), payout, burned };
+    return { family: final, formerMembers: members.map((m) => m.userId), reserved, burned };
   }, DISBAND_ATTEMPTS);
 
-  const paid = outcome.payout?.paid ?? [];
-  for (const p of paid) p.credit = await afterEarnedCredit(p.userId, p.credit, true);
-  return { family: outcome.family, formerMembers: outcome.formerMembers, paid, split: outcome.payout?.split ?? null, burned: outcome.burned };
+  // The shares are credited after the family is gone, so a clamp burns (F5).
+  const paid = outcome.reserved ? await payPaydayShares(outcome.reserved.runKey, now) : [];
+  return { family: outcome.family, formerMembers: outcome.formerMembers, paid, split: outcome.reserved?.split ?? null, burned: outcome.burned };
 }

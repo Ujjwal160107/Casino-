@@ -1,8 +1,12 @@
-// Payday (spec 7.3): the only way vault money reaches a wallet. An equal,
-// capped, taxed split of earnings to the members who pass the payday gate;
-// manual (Boss or Underboss), automatic ("system") and disband's final payday
-// all pay through payMembersInTx.
-import type { Family, Prisma } from "@prisma/client";
+// Payday (spec 7.3, amendment 2.4): the only way vault money reaches a wallet.
+// An equal, capped, taxed split of earnings to the members who pass the payday
+// gate, in two phases: one transaction reserves the whole payday and writes a
+// PaydayShare per member, then each share is credited in its own small
+// transaction behind a paid:false → true CAS. Manual (Boss or Underboss),
+// automatic ("system") and disband's final payday all reserve through
+// reservePaydayInTx and pay through payPaydayShares; the minute job pays any
+// share a crash left behind.
+import type { Family, PaydayShare, Prisma } from "@prisma/client";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { fmtFortunes } from "../../utils/format";
@@ -11,15 +15,19 @@ import { afterEarnedCredit, creditWalletInTx, type CreditResult } from "../walle
 import { checkMemberEligibility } from "./eligibility";
 import { listMembers } from "./familyQueries";
 import { writeLedger } from "./ledger";
+import { creditEarnings } from "./vaultService";
 import { can } from "./permissions";
 import { FamilyError, runFamilyTx } from "./tx";
 import type { PaydayPreview } from "./views";
 
-type Split = { gross: number; tax: number; net: number };
-type Paid = { userId: string; credit: CreditResult }[];
+export type Split = { gross: number; tax: number; net: number };
+/** One credited share: what the member was owed and what their wallet took. */
+export type PaidShare = { userId: string; familyId: string; gross: number; tax: number; net: number; credit: CreditResult };
 type ChangedReason = "Members changed." | "Earnings changed." | "Payday is not due yet.";
 
-export type PaydayPaid = { status: "paid"; family: Family; split: Split; paid: Paid; ineligible: PaydayPreview["ineligible"]; clampedBack: number };
+export type PaydayPaid = {
+  status: "paid"; family: Family; split: Split; runKey: string; paid: PaidShare[]; ineligible: PaydayPreview["ineligible"];
+};
 export type PaydayResult = PaydayPaid | { status: "changed"; reason: ChangedReason; preview: PaydayPreview };
 
 const PAYDAY_ATTEMPTS = 5;
@@ -40,7 +48,7 @@ export async function evaluatePaydayMembers(userIds: string[], now: Date): Promi
   const ineligible: PaydayPreview["ineligible"] = [];
   results.forEach((r, i) => {
     if (r.ok) eligible.push(userIds[i]);
-    else ineligible.push({ userId: userIds[i], reason: `${r.failures[0].need} (you have ${r.failures[0].have})` });
+    else ineligible.push({ userId: userIds[i], reason: `${r.failures[0].need} (you have ${r.failures[0].have})`, need: r.failures[0].need });
   });
   return { eligible, ineligible };
 }
@@ -86,37 +94,89 @@ export async function previewPayday(familyId: string, now: Date = new Date()): P
 }
 
 /**
- * Pays each eligible member net, takes gross × N from earnings and returns
- * any MAX_SAFE_BALANCE clamp to earnings, inside the caller's transaction
- * (which has already guarded earnings and the interval). Run afterEarnedCredit
- * per paid member once it commits.
+ * Phase 1, inside the caller's transaction (which has already won the earnings
+ * and interval CAS): takes gross × N from earnings, writes the payday and
+ * payday_tax rows and one unpaid PaydayShare per eligible member, in order.
+ * No wallet is touched; payPaydayShares(runKey) credits them after the commit.
  */
-export async function payMembersInTx(
+export async function reservePaydayInTx(
   tx: Prisma.TransactionClient, family: Family, eligible: string[], earnings: number, actorId: string, now: Date,
-): Promise<{ split: Split; paid: Paid; clampedBack: number }> {
+): Promise<{ runKey: string; split: Split }> {
   const split = splitPayday(earnings, eligible.length);
-  const users = await tx.user.findMany({ where: { discordId: { in: eligible } }, select: { discordId: true, username: true } });
-  const names = new Map(users.map((u) => [u.discordId, u.username]));
-  const paid: Paid = [];
-  let clampedBack = 0;
-  for (const userId of eligible) {
-    const credit = await creditWalletInTx(
-      tx, userId, names.get(userId) ?? userId, split.net, "family_payday", { familyId: family.id, gross: split.gross, tax: split.tax }, true,
-    );
-    clampedBack += split.net - credit.appliedAmount;
-    paid.push({ userId, credit });
-  }
   const total = split.gross * eligible.length;
-  const after = await tx.family.update({ where: { id: family.id }, data: { earnings: { increment: clampedBack - total } } });
-  await writeLedger(tx, {
+  const after = await tx.family.update({ where: { id: family.id }, data: { earnings: { increment: -total } } });
+  const runKey = await writeLedger(tx, {
     familyId: family.id, actorId, type: "payday", amount: -total, treasuryAfter: after.treasury, earningsAfter: after.earnings,
-    meta: { ...split, members: eligible.length, clampedBack },
+    meta: { ...split, members: eligible.length },
   });
   await writeLedger(tx, {
     familyId: family.id, actorId, type: "payday_tax", amount: 0, treasuryAfter: after.treasury, earningsAfter: after.earnings,
     meta: { burned: split.tax * eligible.length },
   });
-  return { split, paid, clampedBack };
+  await tx.paydayShare.createMany({ data: eligible.map((userId) => ({ familyId: family.id, runKey, userId, ...split, createdAt: now })) });
+  return { runKey, split };
+}
+
+/**
+ * Phase 2 for one share, in its own transaction: the paid CAS, the wallet
+ * credit, and any MAX_SAFE_BALANCE clamp back to earnings, or, when the family
+ * is gone (a disband's final payday), burned into an audit row (F5). Null when
+ * another payer already took the share.
+ */
+async function payShare(share: PaydayShare): Promise<PaidShare | null> {
+  const credit = await runFamilyTx(async (tx) => {
+    const { count } = await tx.paydayShare.updateMany({ where: { id: share.id, paid: false }, data: { paid: true } });
+    if (count !== 1) return null;
+    const user = await tx.user.findUnique({ where: { discordId: share.userId }, select: { username: true } });
+    const credit = await creditWalletInTx(
+      tx, share.userId, user?.username ?? share.userId, share.net, "family_payday", { familyId: share.familyId, gross: share.gross, tax: share.tax }, true,
+    );
+    const clamp = share.net - credit.appliedAmount;
+    if (clamp > 0) {
+      const family = await tx.family.findUnique({ where: { id: share.familyId }, select: { id: true } });
+      if (family) {
+        await creditEarnings(tx, share.familyId, clamp, "payday_clamp_return", "system", { userId: share.userId, runKey: share.runKey }, { retryArrears: false });
+      } else {
+        await tx.audit.create({
+          data: { userId: share.userId, type: "family_payday_clamp_burn", meta: { familyId: share.familyId, runKey: share.runKey, burned: clamp } },
+        });
+      }
+    }
+    return credit;
+  });
+  if (!credit) return null;
+  const { userId, familyId, gross, tax, net } = share;
+  return { userId, familyId, gross, tax, net, credit: await afterEarnedCredit(userId, credit, true) };
+}
+
+/**
+ * Credits every unpaid share of one payday, in member order. A share that
+ * throws is logged and left unpaid for resumeUnpaidShares; the result is only
+ * the shares this call paid. `now` is unused: a payer pays whatever its age.
+ */
+export async function payPaydayShares(runKey: string, _now: Date = new Date()): Promise<PaidShare[]> {
+  const unpaid = await prisma.paydayShare.findMany({ where: { runKey, paid: false }, orderBy: { id: "asc" } });
+  const paid: PaidShare[] = [];
+  for (const share of unpaid) {
+    try {
+      const done = await payShare(share);
+      if (done) paid.push(done);
+    } catch (err) {
+      console.error(`[crimeFamily] payday share ${share.id} failed; the resume job retries it`, err);
+    }
+  }
+  return paid;
+}
+
+/** The minute job: every share still unpaid paydayShareResumeSeconds after its reserve, one payday at a time. */
+export async function resumeUnpaidShares(now: Date): Promise<PaidShare[]> {
+  const cutoff = new Date(now.getTime() - CRIME_FAMILY_CONFIG.paydayShareResumeSeconds * 1000);
+  const due = await prisma.paydayShare.findMany({
+    where: { paid: false, createdAt: { lte: cutoff } }, select: { runKey: true }, orderBy: { createdAt: "asc" },
+  });
+  const paid: PaidShare[] = [];
+  for (const runKey of new Set(due.map((s) => s.runKey))) paid.push(...await payPaydayShares(runKey, now));
+  return paid;
 }
 
 /**
@@ -132,7 +192,7 @@ export async function executePayday(
   const preview = await previewPayday(familyId, now);
   if (preview.lockedReason) throw new FamilyError(preview.lockedReason);
 
-  const outcome = await runFamilyTx(async (tx): Promise<{ changed: ChangedReason } | Omit<PaydayPaid, "status">> => {
+  const outcome = await runFamilyTx(async (tx): Promise<{ changed: ChangedReason } | Omit<PaydayPaid, "status" | "paid">> => {
     if (manual) await assertPaydayActor(tx, familyId, actorId, now);
     const family = await tx.family.findUnique({ where: { id: familyId } });
     if (!family) throw new FamilyError("That family no longer exists.");
@@ -150,11 +210,11 @@ export async function executePayday(
       const fresh = await tx.family.findUniqueOrThrow({ where: { id: familyId }, select: { lastPaydayAt: true } });
       return { changed: isPaydayDue(fresh.lastPaydayAt, now) ? "Earnings changed." : "Payday is not due yet." };
     }
-    const result = await payMembersInTx(tx, family, eligible, earnings, actorId, now);
-    return { ...result, ineligible, family: await tx.family.findUniqueOrThrow({ where: { id: familyId } }) };
+    const reserved = await reservePaydayInTx(tx, family, eligible, earnings, actorId, now);
+    return { ...reserved, ineligible, family: await tx.family.findUniqueOrThrow({ where: { id: familyId } }) };
   }, PAYDAY_ATTEMPTS);
 
   if ("changed" in outcome) return { status: "changed", reason: outcome.changed, preview: await previewPayday(familyId, now) };
-  for (const p of outcome.paid) p.credit = await afterEarnedCredit(p.userId, p.credit, true);
-  return { status: "paid", ...outcome };
+  // A share this call fails to pay is paid, and DMed, by the minute job.
+  return { status: "paid", ...outcome, paid: await payPaydayShares(outcome.runKey, now) };
 }

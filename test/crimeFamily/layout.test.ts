@@ -153,3 +153,13 @@ describe("30-member rosters (amendment 2.5)", () => {
     expect(selectOf(p).options.some((o: any) => o.default)).toBe(false);
   });
 });
+
+describe("payday at 30 members (amendment 2.5)", () => {
+  it("S7 groups 30 unpaid members by need; S6 shows 10 ineligible lines and +20 more", () => {
+    const text = (label: string) => JSON.stringify(crimeFamilyWorstCases().find((c) => c.label === label)!.payload.components.map((c) => c.toJSON()));
+    const s7 = text("S7 payday preview (30 paid, 30 unpaid)");
+    expect(s7.match(/\*\*[^*]+:\*\*/g)!.length).toBeLessThanOrEqual(7);
+    const s6 = text("S6 vault (30 ineligible)");
+    expect(s6).toContain("+20 more: see the payday preview");
+  });
+});

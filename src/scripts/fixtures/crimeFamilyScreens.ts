@@ -27,8 +27,15 @@ const SOON = () => new Date(Date.now() + 3_600_000);
 const MEMBERS = Array.from({ length: 30 }, (_, i) => (i === 0 ? OWNER : `9876543210987654${String(3200 + i)}`));
 /** Boss, Underboss, 6 Capos, 12 Soldiers, then 10 Soldiers inside their 72 h (indexes 20..29). */
 const ROLES: FamilyRole[] = ["BOSS", "UNDERBOSS", ...Array<FamilyRole>(6).fill("CAPO"), ...Array<FamilyRole>(22).fill("SOLDIER")];
-/** The first 12 members: the screens whose 30-member worst case a later task sets (S6, S7, S28). */
+/** The first 12 members: S28 with a button (the heist crews it pings stay small). */
 const TWELVE = MEMBERS.slice(0, 12);
+/** 30 more members, none of them paid: S7's worst case lists 30 paid and 30 unpaid. */
+const UNPAID = Array.from({ length: 30 }, (_, i) => `9876543210987655${String(3200 + i)}`);
+/** The seven needs checkMemberEligibility can report for the payday gate: S7's worst case groups by all of them. */
+const PAYDAY_NEEDS = [
+  "not banned", "≥ 90 days Discord age", "≥ 14 days Fortuna age", "≥ 20 shifts", "a member of a family", "≥ 7 days in the family",
+  "≥ 2 crew heist seats or ≥ 3 correct war hits in 7 days",
+];
 
 function failingResult(n: number): EligibilityResult {
   const checks = Array.from({ length: n }, (_, i) => ({
@@ -62,12 +69,13 @@ function ledgerLines(n: number): LedgerLine[] {
 
 function paydayPreview(locked: boolean): PaydayPreview {
   return {
-    familyId: FAMILY_ID, earnings: BIG, count: locked ? 0 : 6,
+    familyId: FAMILY_ID, earnings: BIG, count: locked ? 0 : 30,
     split: { gross: 1_000_000, tax: 50_000, net: 950_000 },
-    eligible: locked ? [] : TWELVE.slice(0, 6),
-    ineligible: (locked ? TWELVE : TWELVE.slice(6)).map((userId) => ({
-      userId, reason: "≥ 2 crew heist seats or ≥ 3 correct war hits in 7 days (you have 0 crew heist seats, 0 correct war hits)",
-    })),
+    eligible: locked ? [] : MEMBERS,
+    ineligible: (locked ? MEMBERS : UNPAID).map((userId, i) => {
+      const need = PAYDAY_NEEDS[i % PAYDAY_NEEDS.length];
+      return { userId, need, reason: `${need} (you have 0 crew heist seats, 0 correct war hits, 999,999,999 days)` };
+    }),
     dueAt: SOON(),
     lockedReason: locked ? "Payday locked: nobody qualifies yet." : null,
   };
@@ -111,9 +119,9 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
     { label: "S4 invite card", max: 9, payload: buildInviteCard(inviteView(1)) },
     { label: "S4 invite resolved", max: 9, payload: buildInviteResolved(inviteView(1), "Expired") },
     { label: "S5 manage (page 2 of 2, one selected)", max: 16, payload: buildManagePanel(OWNER, { ...dash, viewer: { ...dash.viewer, role: "BOSS" } }, MEMBERS[19], 1, `<@${MEMBERS[1]}> is now a Soldier (no Capo seat was free).`) },
-    { label: "S6 vault (payday locked, 12 ineligible)", max: 12, payload: buildVaultPanel(OWNER, vaultView(true), "Deposited 25,000,000.") },
+    { label: "S6 vault (30 ineligible)", max: 12, payload: buildVaultPanel(OWNER, vaultView(true), "Deposited 25,000,000.") },
     { label: "S6 vault (payday open)", max: 12, payload: buildVaultPanel(OWNER, vaultView(false)) },
-    { label: "S7 payday preview (12 members)", max: 6, payload: buildPaydayPreview(OWNER, paydayPreview(false), "Members changed.") },
+    { label: "S7 payday preview (30 paid, 30 unpaid)", max: 6, payload: buildPaydayPreview(OWNER, paydayPreview(false), "Members changed.") },
     { label: "S8 level-up confirm", max: 6, payload: buildLevelUpConfirm(OWNER, vaultView(false)) },
     { label: "S9 log (15 lines)", max: 7, payload: buildLedgerPage(OWNER, { rows: ledgerLines(15), page: 98, pages: 999 }) },
     { label: "S10 leaderboard (3 sorts)", max: 13, payload: buildLeaderboard(OWNER, leaderboardView(), { art: true }) },
@@ -123,7 +131,7 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
     { label: "S24 my invites (5)", max: 7, payload: buildMyInvites(OWNER, [1, 2, 3, 4, 5].map(inviteView)) },
     { label: "S26 confirm (hand over)", max: 6, payload: buildConfirm(OWNER, "chair", MEMBERS[1], "You become a Soldier. They become the Boss and hold every Boss power. This cannot be undone.") },
     { label: "S27 opener", max: 4, payload: buildOpener(`<@${OWNER}>, open your family vault.`, { customId: CREW_IDS.open("vault", OWNER), label: "Open vault" }) },
-    { label: "S28 notice", max: 2, payload: buildNotice(`Payday: 12 members paid 950,000 each\n${TWELVE.map((m) => `<@${m}>`).join(" ")}`) },
+    { label: "S28 notice", max: 2, payload: buildNotice(`## Payday: 30 members paid 950,000 each\n**[WXYZ] ${LONG_NAME}**\n${MEMBERS.map((m) => `<@${m}>`).join(" ")}`) },
     { label: "S28 notice with button", max: 4, payload: buildNotice("Your family's crew heist is GO.", { customId: CREW_IDS.view("home", OWNER), label: "Open" }, TWELVE) },
     ...caperWorstCases(),
     ...turfWorstCases(),

@@ -10,13 +10,13 @@ import type { Client } from "discord.js";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { isJobShard } from "../../utils/shard";
-import { announceArrears, announceChairChange, announcePayday, resolveInviteCard } from "../../ui/crimeFamily/announce";
+import { announceArrears, announceChairChange, announcePayday, announceResumedShares, resolveInviteCard } from "../../ui/crimeFamily/announce";
 import { buildClaimNotice, buildClaimResolved } from "../../ui/crimeFamily/familyScreens";
 import { editChannelMessage, sendToChannel } from "../../ui/crimeFamily/post";
 import { SWEEP_CAPERS_JOB } from "./caperSweeper";
 import { autoHandover, clearClaimNotice, markClaimNotice, setClaimMessage } from "./chairService";
 import { expireInvites } from "./membershipService";
-import { executePayday } from "./paydayService";
+import { executePayday, resumeUnpaidShares } from "./paydayService";
 import { seedRackets } from "./racketService";
 import { tickRackets, tickWars } from "./turfJobs";
 import { FamilyError } from "./tx";
@@ -122,6 +122,7 @@ export const CF_SCHEDULES: { cron: string; jobs: CfJob[] }[] = [
       { name: "sweepInvites", run: sweepInvites },
       SWEEP_CAPERS_JOB,
       { name: "sweepWarHits", run: (_c, now) => sweepWarHits(now).then(() => {}) },
+      { name: "resumePaydayShares", run: async (c, now) => announceResumedShares(c, await resumeUnpaidShares(now)) },
     ],
   },
   {

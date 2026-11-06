@@ -237,6 +237,7 @@ export function buildManagePanel(ownerId: string, view: FamilyDashboardView, sel
 
 const LEDGER_LABELS: Readonly<Record<LedgerType, string>> = {
   create_fee: "Founded", deposit: "Deposit", deposit_tax: "Deposit tax", payday: "Payday", payday_tax: "Payday tax",
+  payday_clamp_return: "Payday clamp return",
   caper_cut: "Crew heist cut", racket_income: "Racket income", racket_neglect: "Racket neglect", dues: "Dues", dues_missed: "Dues missed",
   level_fee: "Level up", rename_fee: "Rename", bid_escrow: "Bid escrow", bid_refund: "Bid refund", war_bid_burn: "War bid burned",
   disband_burn: "Disband burn", xp: "XP",
@@ -258,10 +259,22 @@ export function ledgerLine(l: LedgerLine): string {
 
 // ── S6 ───────────────────────────────────────────────────────────────────────
 
+/** S6 lists at most this many ineligible members under a locked payday (amendment 2.5). */
+const VAULT_INELIGIBLE_LINES = 10;
+
+function lockedPaydayLines(p: PaydayPreview): string {
+  const more = p.ineligible.length - VAULT_INELIGIBLE_LINES;
+  return [
+    `-# ${p.lockedReason}`,
+    ...p.ineligible.slice(0, VAULT_INELIGIBLE_LINES).map((m) => `-# <@${m.userId}>: ${m.reason}`),
+    ...(more > 0 ? [`-# +${more} more: see the payday preview`] : []),
+  ].join("\n");
+}
+
 export function buildVaultPanel(ownerId: string, v: VaultView, note?: string): CfPayload {
   const arrears = v.duesArrears > 0 ? ` · in arrears ${v.duesArrears} days (${fmtFortunes(v.arrearsOwed)} owed)` : "";
   const rules = v.payday.lockedReason
-    ? [`-# ${v.payday.lockedReason}`, ...v.payday.ineligible.slice(0, 12).map((m) => `-# <@${m.userId}>: ${m.reason}`)].join("\n")
+    ? lockedPaydayLines(v.payday)
     : `-# Payday splits the earnings equally, up to ${fmtFortunes(CRIME_FAMILY_CONFIG.paydayGrossCap)} each, ` +
       `taxed ${Math.round(CRIME_FAMILY_CONFIG.vaultTaxRate * 100)}%. Deposits go to the treasury.`;
   const canLevel = v.canOfficer && v.levelUp.next !== null && v.levelUp.blockers.length === 0;
@@ -290,12 +303,19 @@ export function buildVaultPanel(ownerId: string, v: VaultView, note?: string): C
 
 // ── S7 ───────────────────────────────────────────────────────────────────────
 
+/** S7's "Not paid": one line per first failing gate, `**<need>:** <@a> <@b> …` (amendment 2.5). */
+function unpaidByNeed(ineligible: PaydayPreview["ineligible"]): string[] {
+  const groups = new Map<string, string[]>();
+  for (const m of ineligible) groups.set(m.need, [...(groups.get(m.need) ?? []), `<@${m.userId}>`]);
+  return [...groups].map(([need, ids]) => `**${need}:** ${ids.join(" ")}`);
+}
+
 export function buildPaydayPreview(ownerId: string, p: PaydayPreview, note?: string): CfPayload {
-  const paid = p.eligible.slice(0, 12).map((id) => `<@${id}> · ${fmtFortunes(p.split.net)}`);
-  const unpaid = p.ineligible.slice(0, 12).map((m) => `<@${m.userId}>: ${m.reason}`);
   const lines = [
-    paid.length ? `**Paid**\n${paid.join("\n")}` : "**Paid**\nNobody qualifies yet.",
-    ...(unpaid.length ? [`**Not paid**\n${unpaid.join("\n")}`] : []),
+    p.eligible.length
+      ? `**Paid (${p.eligible.length} × ${fmtFortunes(p.split.net)})**\n${p.eligible.map((id) => `<@${id}>`).join(" ")}`
+      : "**Paid**\nNobody qualifies yet.",
+    ...(p.ineligible.length ? [`**Not paid**\n${unpaidByNeed(p.ineligible).join("\n")}`] : []),
   ];
   const container = new ContainerBuilder()
     .addTextDisplayComponents(

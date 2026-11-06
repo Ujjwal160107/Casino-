@@ -60,8 +60,11 @@ export interface PaydayPreview {
   count: number;
   split: { gross: number; tax: number; net: number };
   eligible: string[];
-  /** Each ineligible member's first failing payday gate, e.g. "≥ 7 days in the family (you have 3 days)". */
-  ineligible: { userId: string; reason: string }[];
+  /**
+   * Each ineligible member's first failing payday gate: `reason` with what they have, e.g.
+   * "≥ 7 days in the family (you have 3 days)"; `need` alone ("≥ 7 days in the family"), the S7 group key.
+   */
+  ineligible: { userId: string; reason: string; need: string }[];
   dueAt: Date;
   /** "Earnings must reach 500,000." | "Payday locked: nobody qualifies yet." | null. */
   lockedReason: string | null;
