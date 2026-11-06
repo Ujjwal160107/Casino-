@@ -94,12 +94,18 @@ export async function setRecruiting(actorId: string, on: boolean, now: Date = ne
   });
 }
 
-/** The applicant's live stats for a requirement gate: net worth uncached, so every retry recomputes it. */
-async function liveStats(tx: Prisma.TransactionClient, uid: string, now: Date): Promise<Requirements> {
+/**
+ * An applicant's four requirement stats, read through db (a transaction or the
+ * client): net worth through `netWorth` (computeNetWorth for a gate, so every
+ * retry recomputes; getNetWorth for display, A33).
+ */
+export async function readApplicantStats(
+  db: Prisma.TransactionClient, uid: string, now: Date, netWorth: (uid: string) => Promise<{ total: number }>,
+): Promise<Requirements> {
   const [user, heists, { total }] = await Promise.all([
-    tx.user.findUnique({ where: { discordId: uid }, select: { shiftsWorked: true, createdAt: true } }),
-    tx.caperCrew.count({ where: { userId: uid, started: true } }),
-    computeNetWorth(uid),
+    db.user.findUnique({ where: { discordId: uid }, select: { shiftsWorked: true, createdAt: true } }),
+    db.caperCrew.count({ where: { userId: uid, started: true } }),
+    netWorth(uid),
   ]);
   return {
     netWorth: total,
@@ -109,29 +115,14 @@ async function liveStats(tx: Prisma.TransactionClient, uid: string, now: Date): 
   };
 }
 
-/** The first refusal of amendment 8.4 step 2 for this applicant and family, read inside the apply transaction. */
-async function applyBlock(tx: Prisma.TransactionClient, family: Family, applicantId: string, now: Date): Promise<string | null> {
-  const tag = `[${family.tag}]`;
-  if (await tx.familyMember.findUnique({ where: { userId: applicantId }, select: { id: true } })) return "You are already in a family.";
-  const gate = await checkMemberEligibility(applicantId, "family_join", { now, familyId: family.id });
-  if (!gate.ok) return eligibilityError(gate.failures).message;
-  if (!family.recruiting) return `${tag} is not recruiting.`;
-  if (family.memberCount >= levelDef(family.level).memberCap) return `${tag} is full.`;
-  const have = await liveStats(tx, applicantId, now);
-  for (const r of REQUIREMENTS) {
-    const need = family[r.field] as number;
-    if (have[r.key] < need) return `${tag} needs ${fmtFortunes(need)} ${r.unit} (you have ${fmtFortunes(have[r.key])}).`;
-  }
-  const mine = await tx.familyInvite.count({ where: { inviteeId: applicantId, kind: "APPLICATION", status: "PENDING" } });
-  if (mine >= CRIME_FAMILY_CONFIG.maxPendingApplicationsPerApplicant) {
-    return `You have ${CRIME_FAMILY_CONFIG.maxPendingApplicationsPerApplicant} pending applications. Withdraw one first.`;
-  }
-  const theirs = await tx.familyInvite.count({ where: { familyId: family.id, kind: "APPLICATION", status: "PENDING" } });
-  if (theirs >= CRIME_FAMILY_CONFIG.maxPendingApplicationsPerFamily) return `${tag}'s inbox is full. Try again later.`;
+/** A recent decline (7 d) or withdraw/expiry (24 h) of this pair (A44), and when it lifts: the apply refusal and S30's status line. */
+export async function reapplyBlock(
+  db: Prisma.TransactionClient, familyId: string, applicantId: string, now: Date,
+): Promise<{ declined: boolean; at: Date } | null> {
   const { reapplyAfterDeclineSeconds: afterDecline, reapplyAfterWithdrawSeconds: afterWithdraw } = CRIME_FAMILY_CONFIG;
-  const prior = await tx.familyInvite.findFirst({
+  const prior = await db.familyInvite.findFirst({
     where: {
-      familyId: family.id, inviteeId: applicantId, kind: "APPLICATION",
+      familyId, inviteeId: applicantId, kind: "APPLICATION",
       OR: [
         { status: "DECLINED", resolvedAt: { gte: secondsAfter(now, -afterDecline) } },
         { status: { in: ["WITHDRAWN", "EXPIRED"] }, resolvedAt: { gte: secondsAfter(now, -afterWithdraw) } },
@@ -139,8 +130,39 @@ async function applyBlock(tx: Prisma.TransactionClient, family: Family, applican
     },
     orderBy: { resolvedAt: "desc" },
   });
-  if (prior?.status === "DECLINED") return `${tag} declined you: you can apply again ${rel(secondsAfter(prior.resolvedAt, afterDecline))}.`;
-  if (prior) return `You can apply to ${tag} again ${rel(secondsAfter(prior.resolvedAt, afterWithdraw))}.`;
+  if (!prior) return null;
+  const declined = prior.status === "DECLINED";
+  return { declined, at: secondsAfter(prior.resolvedAt, declined ? afterDecline : afterWithdraw) };
+}
+
+/**
+ * The first refusal of amendment 8.4 step 2 for this applicant and family.
+ * `stats` is read only when the cheaper gates pass: live inside the apply
+ * transaction, cached on S30.
+ */
+export async function applyBlock(
+  db: Prisma.TransactionClient, family: Family, applicantId: string, now: Date, stats: () => Promise<Requirements>,
+): Promise<string | null> {
+  const tag = `[${family.tag}]`;
+  if (await db.familyMember.findUnique({ where: { userId: applicantId }, select: { id: true } })) return "You are already in a family.";
+  const gate = await checkMemberEligibility(applicantId, "family_join", { now, familyId: family.id });
+  if (!gate.ok) return eligibilityError(gate.failures).message;
+  if (!family.recruiting) return `${tag} is not recruiting.`;
+  if (family.memberCount >= levelDef(family.level).memberCap) return `${tag} is full.`;
+  const have = await stats();
+  for (const r of REQUIREMENTS) {
+    const need = family[r.field] as number;
+    if (have[r.key] < need) return `${tag} needs ${fmtFortunes(need)} ${r.unit} (you have ${fmtFortunes(have[r.key])}).`;
+  }
+  const mine = await db.familyInvite.count({ where: { inviteeId: applicantId, kind: "APPLICATION", status: "PENDING" } });
+  if (mine >= CRIME_FAMILY_CONFIG.maxPendingApplicationsPerApplicant) {
+    return `You have ${CRIME_FAMILY_CONFIG.maxPendingApplicationsPerApplicant} pending applications. Withdraw one first.`;
+  }
+  const theirs = await db.familyInvite.count({ where: { familyId: family.id, kind: "APPLICATION", status: "PENDING" } });
+  if (theirs >= CRIME_FAMILY_CONFIG.maxPendingApplicationsPerFamily) return `${tag}'s inbox is full. Try again later.`;
+  const reapply = await reapplyBlock(db, family.id, applicantId, now);
+  if (reapply?.declined) return `${tag} declined you: you can apply again ${rel(reapply.at)}.`;
+  if (reapply) return `You can apply to ${tag} again ${rel(reapply.at)}.`;
   return null;
 }
 
@@ -157,7 +179,7 @@ export async function applyToFamily(i: {
       await touchFamily(tx, i.familyId, now);
       await touchUser(tx, i.applicantId, now);
       const family = await tx.family.findUniqueOrThrow({ where: { id: i.familyId } });
-      const block = await applyBlock(tx, family, i.applicantId, now);
+      const block = await applyBlock(tx, family, i.applicantId, now, () => readApplicantStats(tx, i.applicantId, now, computeNetWorth));
       if (block) throw new FamilyError(block);
       return tx.familyInvite.create({
         data: {

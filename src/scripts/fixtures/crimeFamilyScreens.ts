@@ -6,7 +6,10 @@ import { MAX_SAFE_BALANCE } from "../../utils/economyConfig";
 import { FAMILY_LEVELS, type FamilyRole } from "../../data/crimeFamilyCatalog";
 import type { EligibilityResult } from "../../services/crimeFamily/eligibility";
 import type { LedgerLine, LedgerType } from "../../services/crimeFamily/ledger";
-import type { FamilyDashboardView, InviteView, LeaderboardView, PaydayPreview, VaultView, VoteView } from "../../services/crimeFamily/views";
+import { REQUIREMENTS, type Requirements } from "../../services/crimeFamily/recruitService";
+import type {
+  BoardView, FamilyCardView, FamilyDashboardView, InboxView, InviteView, LeaderboardView, PaydayPreview, ReqCheck, VaultView, VoteView,
+} from "../../services/crimeFamily/views";
 import {
   applicationAcceptedNotice, applicationDeclinedNotice, applicationExpiredNotice,
   familyNewBossNotice, familyVoteAgainstYouNotice, familyVoteOpenedNotice, familyVoteResultNotice, recruitDigestNotice,
@@ -19,6 +22,7 @@ import {
 import { CREW_IDS } from "../../ui/crimeFamily/ids";
 import { buildNotice, buildOpener, cfPayload, type CfPayload } from "../../ui/crimeFamily/kit";
 import { inboxRow } from "../../ui/crimeFamily/recruitAnnounce";
+import { buildBoard, buildFamilyCard, buildInbox, buildMyApplications, buildRecruitPanel } from "../../ui/crimeFamily/recruitScreens";
 import { ballotRow, buildVoteCard, buildVoteSeatCard, buildVoteStartConfirm, voteResultLine } from "../../ui/crimeFamily/voteScreens";
 import { caperWorstCases } from "./caperScreens";
 import { turfWorstCases } from "./turfScreens";
@@ -126,6 +130,45 @@ function voteView(closed: boolean): VoteView {
   };
 }
 
+/** Every listing requirement at its limit (amendment 8.2). */
+const MAX_REQ = Object.fromEntries(REQUIREMENTS.map((r) => [r.key, r.max])) as Requirements;
+/** Every check failing at its limit, against a viewer with one less. */
+const FAILING_CHECKS: ReqCheck[] = REQUIREMENTS.map((r) => ({ key: r.key, label: r.label, need: r.max, have: r.max - 1, ok: false }));
+/** 150 wide characters with markdown in it: the longest pitch, escaped. */
+const WIDE_PITCH = "**＃Ｗ** <t:0:R> ".repeat(10).slice(0, 150);
+/** A 200-character application message full of characters escapeMarkdown doubles. */
+const LONG_MESSAGE = "*_~|#<".repeat(34).slice(0, 200);
+
+function boardView(empty: boolean): BoardView {
+  return {
+    ownerId: OWNER, sort: "act", qualifyOnly: true, page: 998, pages: 999,
+    rows: empty ? [] : Array.from({ length: 6 }, (_, i) => ({
+      familyId: FAMILY_ID, tag: `WX${String(i).padStart(2, "0")}`, name: LONG_NAME, level: 10, crestKey: "crest_4" as const,
+      members: 29, cap: 30, active: 29, req: MAX_REQ, qualifies: true,
+    })),
+    emptyReason: empty ? "No recruiting family's requirements fit you yet." : null,
+  };
+}
+
+function familyCardView(): FamilyCardView {
+  return {
+    ownerId: OWNER, familyId: FAMILY_ID, label: `[WXYZ] ${LONG_NAME}`, tag: "WXYZ", crestKey: "crest_4", level: 10, members: 29, cap: 30, active: 29,
+    pitch: WIDE_PITCH, recruiting: true, checks: FAILING_CHECKS,
+    joinGate: `≥ 14 days Fortuna age (you have 0 days)`,
+    pending: 3, appliedAt: null, reapplyAt: null,
+    applyBlock: "[WXYZ] needs 10,000,000,000 net worth (you have 9,999,999,999).",
+  };
+}
+
+function inboxView(): InboxView {
+  return {
+    ownerId: OWNER, tag: "WXYZ", page: 4, pages: 5, total: 25,
+    rows: MEMBERS.slice(1, 6).map((applicantId, i) => ({
+      appId: `65f00000000000000000001${i}`, applicantId, createdAt: new Date(), expiresAt: SOON(), message: LONG_MESSAGE, checks: FAILING_CHECKS,
+    })),
+  };
+}
+
 export function crimeFamilyWorstCases(): { label: string; max: number; payload: CfPayload }[] {
   const dash = dashboardView();
   const label = `[WXYZ] ${LONG_NAME}`;
@@ -168,6 +211,16 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
     { label: "DM application declined", max: 6, payload: cfPayload(applicationDeclinedNotice({ familyLabel: label, reapplyAt: SOON() })) },
     { label: "DM application expired", max: 6, payload: cfPayload(applicationExpiredNotice({ familyLabel: label, reason: "expired" })) },
     { label: "DM application closed by a disband", max: 6, payload: cfPayload(applicationExpiredNotice({ familyLabel: label, reason: "disbanded" })) },
+    { label: "S29 board (6 families, page 999/999)", max: 17, payload: buildBoard(boardView(false)) },
+    { label: "S29 board (empty)", max: 15, payload: buildBoard(boardView(true)) },
+    { label: "S30 family card (every check failing)", max: 11, payload: buildFamilyCard(familyCardView(), "Application sent. Officers see it in their inbox.") },
+    { label: "S31 recruitment panel", max: 10, payload: buildRecruitPanel({
+      ownerId: OWNER, tag: "WXYZ", recruiting: true, pitch: WIDE_PITCH, req: MAX_REQ, pending: 25, canEdit: true,
+    }, "Listing saved.") },
+    { label: "S32 inbox (5 applications)", max: 28, payload: buildInbox(inboxView(), `Accepted <@${MEMBERS[6]}>.`) },
+    { label: "S33 my applications (3)", max: 8, payload: buildMyApplications({
+      ownerId: OWNER, rows: [1, 2, 3].map((i) => ({ appId: `65f00000000000000000002${i}`, familyLabel: `[WXY${i}] ${LONG_NAME}`, createdAt: new Date(), expiresAt: SOON() })),
+    }, "Application withdrawn. You can apply there again in 24 hours.") },
     ...caperWorstCases(),
     ...turfWorstCases(),
   ];

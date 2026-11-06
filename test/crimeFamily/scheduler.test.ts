@@ -125,8 +125,8 @@ describe("crime family jobs (15)", () => {
   });
 });
 
-it("sendApplicationDigests runs in the hourly schedule after autoPayday", () => {
-  expect(CF_SCHEDULES.find((s) => s.cron === "10 * * * *")!.jobs.map((j) => j.name)).toEqual(["chargeFamilyDues", "runSuccession", "autoPayday", "sendApplicationDigests"]);
+it("sendApplicationDigests runs in the hourly schedule after autoPayday, then the census", () => {
+  expect(CF_SCHEDULES.find((s) => s.cron === "10 * * * *")!.jobs.map((j) => j.name)).toEqual(["chargeFamilyDues", "runSuccession", "autoPayday", "sendApplicationDigests", "runTurfCensus"]);
 });
 
 it("sweepCapers runs in the minute schedule after sweepInvites", () => {

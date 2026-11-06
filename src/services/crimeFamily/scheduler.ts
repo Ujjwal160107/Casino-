@@ -1,6 +1,6 @@
 // The family jobs (spec 15): invite and application expiry, the caper sweep, the hit timeout,
-// the vote sweep and tickWars every minute; dues, succession, the automatic payday and the
-// officers' application digests hourly;
+// the vote sweep and tickWars every minute; dues, succession, the automatic payday, the
+// officers' application digests and the once-a-day census hourly;
 // tickRackets at :05. Each schedule is its own cron task in UTC with
 // noOverlap, each job and each family has its own try/catch, and every write
 // is a CAS in the service it calls, so a missed or doubled run is harmless.
@@ -11,11 +11,14 @@ import type { Client } from "discord.js";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { isJobShard } from "../../utils/shard";
-import { announceArrears, announceChairChange, announcePayday, announceResumedShares, resolveInviteCard } from "../../ui/crimeFamily/announce";
+import {
+  announceArrears, announceCensusNotices, announceChairChange, announcePayday, announceResumedShares, resolveInviteCard,
+} from "../../ui/crimeFamily/announce";
 import { buildClaimNotice, buildClaimResolved } from "../../ui/crimeFamily/familyScreens";
 import { editChannelMessage, sendToChannel } from "../../ui/crimeFamily/post";
 import { announceExpiredApplications, sendApplicationDigests } from "../../ui/crimeFamily/recruitAnnounce";
 import { SWEEP_CAPERS_JOB } from "./caperSweeper";
+import { runTurfCensus } from "./census";
 import { autoHandover, clearClaimNotice, markClaimNotice, setClaimMessage } from "./chairService";
 import { familyLabel } from "./familyQueries";
 import { expireInvites } from "./membershipService";
@@ -152,6 +155,7 @@ export const CF_SCHEDULES: { cron: string; jobs: CfJob[] }[] = [
       { name: "runSuccession", run: runSuccession },
       { name: "autoPayday", run: autoPayday },
       { name: "sendApplicationDigests", run: sendApplicationDigests },
+      { name: "runTurfCensus", run: async (c, now) => announceCensusNotices(c, (await runTurfCensus(now)).notices) },
     ],
   },
   { cron: "* * * * *", jobs: [{ name: "tickWars", run: tickWars }] },

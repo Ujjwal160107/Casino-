@@ -7,6 +7,7 @@ import type { Client } from "discord.js";
 import prisma from "../../utils/prisma";
 import type { FamilyRole } from "../../data/crimeFamilyCatalog";
 import { familyLabel, getInviteCard, listMembers } from "../../services/crimeFamily/familyQueries";
+import type { CensusNotice } from "../../services/crimeFamily/census";
 import type { disbandFamily } from "../../services/crimeFamily/disbandService";
 import type { PaidShare, PaydayPaid } from "../../services/crimeFamily/paydayService";
 import { arrearsOwed } from "../../services/crimeFamily/vaultService";
@@ -146,5 +147,12 @@ export async function resolveInviteCard(client: Client, inviteId: string, status
   return safely("resolveInviteCard", async () => {
     const card = await getInviteCard(inviteId);
     if (card && card.messageId) await editChannelMessage(client, card.channelId, card.messageId, buildInviteResolved(card.view, status));
+  });
+}
+
+/** The census job's DMs (F3): each step's notices, in step order. Steps never send; the job does. */
+export async function announceCensusNotices(client: Client, notices: CensusNotice[]): Promise<void> {
+  return safely("announceCensusNotices", async () => {
+    for (const n of notices) await notifyMany(client, n.type, n.userIds, n.build);
   });
 }

@@ -2,6 +2,7 @@
 // Each later view type is added by the task that first produces it.
 import type { CaperRoleKey, FamilyLevelDef, FamilyRole } from "../../data/crimeFamilyCatalog";
 import type { LedgerLine } from "./ledger";
+import type { BoardSort, Requirements } from "./recruitService";
 import type { WarSettlement, WarStatus } from "./warService";
 import type { BidPhase, BlockScores, RacketClass } from "./warMath";
 import type { VoidReason, VoteStatus } from "./voteRules";
@@ -293,3 +294,64 @@ export interface VoteView {
   /** OPEN, viewer in the snapshot and still a member. */
   viewerCanVote: boolean;
 }
+
+/** One listing requirement against one player's stats (S30, S32). */
+export type ReqCheck = { key: keyof Requirements; label: string; need: number; have: number; ok: boolean };
+
+/** S29: one page of recruiting, not-full families (amendment 8.3). */
+export interface BoardView {
+  ownerId: string;
+  sort: BoardSort;
+  qualifyOnly: boolean;
+  /** Clamped to the last page. */
+  page: number;
+  pages: number;
+  rows: {
+    familyId: string; tag: string; name: string; level: number; crestKey: FamilyLevelDef["crestKey"];
+    members: number; cap: number; active: number; req: Requirements; qualifies: boolean;
+  }[];
+  /** "No family is recruiting right now." | "No recruiting family's requirements fit you yet." | the first failing family_join need. */
+  emptyReason: string | null;
+}
+
+/** S30: one family's recruiting card as one viewer sees it. */
+export interface FamilyCardView {
+  ownerId: string;
+  familyId: string;
+  label: string;
+  tag: string;
+  crestKey: FamilyLevelDef["crestKey"];
+  level: number;
+  members: number;
+  cap: number;
+  active: number;
+  pitch: string;
+  recruiting: boolean;
+  checks: ReqCheck[];
+  /** The first failing family_join gate; null = every gate passes. */
+  joinGate: string | null;
+  /** The viewer's PENDING applications (of maxPendingApplicationsPerApplicant). */
+  pending: number;
+  /** The viewer's PENDING application to this family. */
+  appliedAt: Date | null;
+  /** A decline (7 d) or withdraw/expiry (24 h) block still running. */
+  reapplyAt: Date | null;
+  /** Why Apply is disabled; null = enabled. */
+  applyBlock: string | null;
+}
+
+/** S31: the recruitment panel (Capo and up; canEdit for Boss and Underboss). */
+export interface RecruitPanelView { ownerId: string; tag: string; recruiting: boolean; pitch: string; req: Requirements; pending: number; canEdit: boolean }
+
+/** S32: the family's PENDING applications, oldest first; checks from cached stats (A33: display, not a gate). */
+export interface InboxView {
+  ownerId: string;
+  tag: string;
+  page: number;
+  pages: number;
+  total: number;
+  rows: { appId: string; applicantId: string; createdAt: Date; expiresAt: Date; message: string; checks: ReqCheck[] }[];
+}
+
+/** S33: the viewer's PENDING applications. */
+export interface MyApplicationsView { ownerId: string; rows: { appId: string; familyLabel: string; createdAt: Date; expiresAt: Date }[] }
