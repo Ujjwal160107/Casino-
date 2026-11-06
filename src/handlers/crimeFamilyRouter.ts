@@ -15,6 +15,7 @@ import { parseCfId, type CfPrefix } from "../ui/crimeFamily/ids";
 import { rejectPress, safeDeferReply, safeDeferUpdate } from "../utils/interactionHelpers";
 import { CAPER_ROUTES } from "./caperInteractionHandler";
 import { CREW_ROUTES } from "./crewInteractionHandler";
+import { VOTE_ROUTES } from "./crewVoteRoutes";
 import { TURF_ROUTES } from "./turfInteractionHandler";
 
 export type CfInteraction = ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction;
@@ -35,7 +36,8 @@ export interface CfRouteEntry {
 /** key = "<action>" or "<action>:<first arg>" (most specific wins). */
 export type CfRouteTable = Readonly<Record<string, CfRouteEntry>>;
 
-const TABLES: Readonly<Record<CfPrefix, CfRouteTable>> = { crew: CREW_ROUTES, cpr: CAPER_ROUTES, turf: TURF_ROUTES };
+/** The router imports every table; no table imports the router's values or another table. */
+const TABLES: Readonly<Record<CfPrefix, CfRouteTable>> = { crew: { ...CREW_ROUTES, ...VOTE_ROUTES }, cpr: CAPER_ROUTES, turf: TURF_ROUTES };
 
 const NO_ROUTE = "This button is no longer active.";
 

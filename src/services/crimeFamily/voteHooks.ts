@@ -3,12 +3,17 @@
 // and any chair move voids it with no cooldown. Imports only Prisma types and
 // the extension types: never familyQueries, chairService, membershipService or
 // disbandService (cycle through extensions.ts).
-import type { Prisma } from "@prisma/client";
+import type { FamilyVote, Prisma } from "@prisma/client";
 import type { FamilyHook } from "./extensions";
 
-/** Whether the family has an OPEN vote, read through db (a transaction client inside a family transaction). */
+/** The family's OPEN vote, or null, read through db (a transaction client inside a family transaction). */
+export function findOpenVote(db: Prisma.TransactionClient, familyId: string): Promise<FamilyVote | null> {
+  return db.familyVote.findFirst({ where: { familyId, status: "OPEN" } });
+}
+
+/** Whether the family has an OPEN vote, read through db. */
 export async function hasOpenVote(db: Prisma.TransactionClient, familyId: string): Promise<boolean> {
-  return (await db.familyVote.count({ where: { familyId, status: "OPEN" } })) > 0;
+  return (await findOpenVote(db, familyId)) !== null;
 }
 
 /**
@@ -17,7 +22,7 @@ export async function hasOpenVote(db: Prisma.TransactionClient, familyId: string
  * so the mover's announceVoteResult edits S34.
  */
 export async function voidOpenVotesInTx(tx: Prisma.TransactionClient, familyId: string, now: Date): Promise<void> {
-  const open = await tx.familyVote.findFirst({ where: { familyId, status: "OPEN" }, select: { id: true } });
+  const open = await findOpenVote(tx, familyId);
   if (!open) return;
   await tx.familyVote.updateMany({
     where: { id: open.id, status: "OPEN" },

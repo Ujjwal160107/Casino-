@@ -7,7 +7,7 @@ import { BOT_DEVELOPER_ID } from "../../src/utils/developerAccess";
 import { CREW_IDS } from "../../src/ui/crimeFamily/ids";
 import { fakeDmClient } from "../dm/helpers";
 import { fakeMessage, replyText } from "../router/fakeMessage";
-import { testPrisma, seedUser, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, withCfConfig } from "../helpers";
+import { testPrisma, seedUser, seedEligibleUser, seedFamily, seedVote, resetFamilies, ensureUniqueIndexes, withCfConfig, daysAgo } from "../helpers";
 
 const CREW_COPY = { verb: "Invite", bot: "Bots can't join a family." };
 
@@ -131,5 +131,19 @@ describe("!crew", () => {
     const dev = fakeMessage("!crew-forcerename VLA New Name", { authorId: BOT_DEVELOPER_ID, guildId: "g1" });
     await routeMessage({} as any, dev.message, "!");
     expect(await testPrisma.family.findUnique({ where: { id: f.id } })).toMatchObject({ name: "New Name", earnings: 1_000_000, treasury: 0 });
+  });
+
+  it("!crew vote: the S25 vote card while a vote is open, the opener for a Capo, the reason for a Soldier", async () => {
+    const boss = await seedEligibleUser();
+    const ids: string[] = [];
+    for (let k = 0; k < 4; k++) ids.push(await seedEligibleUser());
+    const f = await seedFamily({ bossId: boss, level: 5, members: ids.map((userId, k) => ({ userId, role: k === 0 ? "CAPO" as const : "SOLDIER" as const, joinedAt: daysAgo(10) })) });
+    expect((await crew(ids[0], "vote")).said()).toContain(`"custom_id":"${CREW_IDS.open("vote", ids[0])}"`);
+    expect((await crew(ids[1], "vote")).said()).toContain("Only the Underboss or a Capo can start a no-confidence vote.");
+    expect((await crew(ids[1], "vote start")).said()).toContain(`"custom_id":"${CREW_IDS.open("vote", ids[1])}"`);
+    const v = await seedVote({ familyId: f.id, bossId: boss, starterId: ids[0], eligibleIds: ids });
+    const card = (await crew(ids[1], "vote")).said();
+    expect(card).toContain("Ballots are secret.");
+    expect(card).toContain(`"custom_id":"${CREW_IDS.ballot("yes", v.id)}"`);
   });
 });

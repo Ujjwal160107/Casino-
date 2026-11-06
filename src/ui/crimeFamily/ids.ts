@@ -31,7 +31,7 @@ export function decodeName(encoded: string): string {
 }
 
 export type CrewScreen = "home" | "vault" | "manage" | "log" | "top" | "invites";
-export type CrewOpenKind = "vault" | "payday" | "level" | "log" | "disband" | "rename" | "leave";
+export type CrewOpenKind = "vault" | "payday" | "level" | "log" | "disband" | "rename" | "leave" | "vote";
 export type CrewConfirmKind = "leave" | "kick" | "chair";
 export type CrewManageAction = "promote" | "demote" | "kick" | "chair";
 export type CrewModalKind = "create" | "deposit" | "rename" | "disband";
@@ -57,6 +57,12 @@ export const CREW_IDS = {
   inviteSelect: (owner: string) => cfId("crew", "inv", "sel", owner),
   invite: (answer: "accept" | "decline", inviteId: string) => cfId("crew", "inv", answer, inviteId),
   claim: (familyId: string) => cfId("crew", "claim", familyId),
+  /** S2's Vote button and `!crew vote`'s opener target: S35, or the S25 vote card while a vote is open (F20). */
+  voteStart: (owner: string) => cfId("crew", "vt", "start", owner),
+  voteOk: (owner: string) => cfId("crew", "vt", "ok", owner),
+  voteCancel: (owner: string) => cfId("crew", "vt", "cancel", owner),
+  /** Shared: authorised against the vote's snapshot and membership. */
+  ballot: (choice: "yes" | "no", voteId: string) => cfId("crew", "vote", choice, voteId),
 } as const;
 
 /** Caper ids (spec 13.2): S2's Caper button and S11's select are owner-scoped; the shared cards carry the caper id. */

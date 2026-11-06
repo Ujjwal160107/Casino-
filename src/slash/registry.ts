@@ -242,7 +242,7 @@ export const SPECS: Spec[] = [
                 kind: "str", name: "action", desc: "What to do -- leave blank for your dashboard", required: false,
                 choices: [
                     "dashboard", "create", "invite", "accept", "decline", "leave", "kick", "promote", "demote", "handover", "deposit",
-                    "vault", "payday", "levelup", "log", "top", "info", "home", "rename", "disband", "claim",
+                    "vault", "payday", "levelup", "log", "top", "info", "home", "rename", "disband", "claim", "vote",
                 ],
             },
             { kind: "str", name: "target", desc: "Player, tag or amount, when the action needs one", required: false },

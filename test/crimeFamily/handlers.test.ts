@@ -10,9 +10,11 @@ import { ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
 import {
   announceArrears, announceChairChange, announceDisband, announceInvite, announcePayday, announceRoleChange, resolveInviteCard,
 } from "../../src/ui/crimeFamily/announce";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, withCfConfig } from "../helpers";
+import { leaveFamily } from "../../src/services/crimeFamily/membershipService";
+import { fakeClient } from "./fakeClient";
+import { testPrisma, seedEligibleUser, seedFamily, seedVote, resetFamilies, ensureUniqueIndexes, daysAgo, withCfConfig } from "../helpers";
 
-beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "FamilyInvite"]));
+beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "FamilyInvite", "FamilyVote", "FamilyBallot"]));
 beforeEach(resetFamilies);
 
 describe("crime family interactions", () => {
@@ -200,5 +202,79 @@ describe("announcers after a committed action", () => {
       await expect(resolveInviteCard(client, bad, "Declined")).resolves.toBeUndefined();
       expect(error).toHaveBeenCalledTimes(7);
     } finally { error.mockRestore(); }
+  });
+});
+
+describe("no-confidence vote routes (Review Focus 4)", () => {
+  /** Boss + a Capo + 4 Soldiers, everyone joined 10 days ago. */
+  async function voteFamily() {
+    const boss = await seedEligibleUser();
+    const ids: string[] = [];
+    for (let k = 0; k < 5; k++) ids.push(await seedEligibleUser());
+    const f = await seedFamily({ bossId: boss, level: 5, members: ids.map((userId, k) => ({ userId, role: k === 0 ? "CAPO" as const : "SOLDIER" as const, joinedAt: daysAgo(10) })) });
+    return { f, boss, ids };
+  }
+
+  it("a DM YES pressed after the close reads 'Voting closed.' and writes no ballot", async () => {
+    const { f, boss, ids } = await voteFamily();
+    const v = await seedVote({ familyId: f.id, bossId: boss, starterId: ids[0], eligibleIds: ids, closesAt: new Date(Date.now() - 1_000) });
+    await withCfConfig({ enabled: true }, async () => {
+      const i = fakeButton(CREW_IDS.ballot("yes", v.id), { userId: ids[1] });
+      await handleCrimeFamilyInteraction(i as any);
+      expect(said(i)).toContain("Voting closed.");
+    });
+    expect(await testPrisma.familyBallot.count({ where: { voteId: v.id } })).toBe(0);
+  });
+
+  it("a ballot from a member who left reads 'You can't vote in this one.'", async () => {
+    const { f, boss, ids } = await voteFamily();
+    const v = await seedVote({ familyId: f.id, bossId: boss, starterId: ids[0], eligibleIds: ids });
+    await leaveFamily(ids[4]);
+    await withCfConfig({ enabled: true }, async () => {
+      const i = fakeButton(CREW_IDS.ballot("no", v.id), { userId: ids[4] });
+      await handleCrimeFamilyInteraction(i as any);
+      expect(said(i)).toContain("You can't vote in this one.");
+    });
+    expect(await testPrisma.familyBallot.count({ where: { voteId: v.id } })).toBe(0);
+  });
+
+  it("a counted ballot replies with the pressed choice and the close, never anyone else's", async () => {
+    const { f, boss, ids } = await voteFamily();
+    const v = await seedVote({ familyId: f.id, bossId: boss, starterId: ids[0], eligibleIds: ids });
+    await withCfConfig({ enabled: true }, async () => {
+      const i = fakeButton(CREW_IDS.ballot("no", v.id), { userId: ids[2] });
+      await handleCrimeFamilyInteraction(i as any);
+      expect(said(i)).toContain("Your ballot: NO. You can change it until <t:");
+    });
+    expect(await testPrisma.familyBallot.findFirst({ where: { voteId: v.id, userId: ids[2] } })).toMatchObject({ choice: "NO" });
+  });
+
+  it("crew:vt:start shows the S25 vote card while a vote is open and S35 otherwise", async () => {
+    const { f, boss, ids } = await voteFamily();
+    const press = () => fakeButton(CREW_IDS.voteStart(ids[0]), { userId: ids[0], ephemeralSource: true });
+    const none = press();
+    await handleCrimeFamilyInteraction(none as any);
+    expect(said(none)).toContain("Start a no-confidence vote against");
+    expect(said(none)).toContain(CREW_IDS.voteOk(ids[0]));
+    const v = await seedVote({ familyId: f.id, bossId: boss, starterId: ids[0], eligibleIds: ids });
+    const open = press();
+    await handleCrimeFamilyInteraction(open as any);
+    expect(said(open)).toContain("Ballots are secret.");
+    expect(said(open)).toContain(CREW_IDS.ballot("yes", v.id));
+  });
+
+  it("crew:vt:ok posts S34 once in the home channel and DMs every snapshot id once", async () => {
+    const { f, boss, ids } = await voteFamily();
+    const c = fakeClient();
+    await withCfConfig({ enabled: true }, async () => {
+      const i = fakeButton(CREW_IDS.voteOk(ids[0]), { userId: ids[0], ephemeralSource: true, client: c.client });
+      await handleCrimeFamilyInteraction(i as any);
+      expect(said(i)).toContain("Vote started. It closes <t:");
+    });
+    expect(c.calls.filter((x) => x.op === "send")).toEqual([expect.objectContaining({ channelId: "c-home" })]);
+    const v = await testPrisma.familyVote.findFirstOrThrow({ where: { familyId: f.id } });
+    expect(v).toMatchObject({ announced: true, channelId: "c-home", messageId: "m1" });
+    for (const id of ids) expect(c.dm.get(id), id).toBe(1);
+    expect(c.dm.get(boss)).toBe(1);
   });
 });

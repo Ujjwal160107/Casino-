@@ -10,8 +10,9 @@ import type { FamilyRole } from "../../data/crimeFamilyCatalog";
 import { isBanActive } from "../banService";
 import { moveChair, pickHeir } from "./chairService";
 import { assertNotJailed, familyLabel, requireMembership } from "./familyQueries";
-import { can, isAssociate } from "./permissions";
+import { isAssociate, mayStartVote } from "./permissions";
 import { FamilyError, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
+import { findOpenVote, hasOpenVote } from "./voteHooks";
 import { decideVote, voidReasonOf, voteCooldownUntil, votePassNeed, type VoteStatus } from "./voteRules";
 import type { VoteStartView, VoteView } from "./views";
 
@@ -52,11 +53,11 @@ async function readVoteStart(db: Prisma.TransactionClient, familyId: string, act
 
   const gated = await jailOrBanBlock(db, actorId, now);
   if (gated) return done(gated);
-  if (!can({ role: actor.role as FamilyRole, joinedAt: actor.joinedAt }, "start_vote", now) && !(actor.officerUntil > now)) {
+  if (!mayStartVote({ role: actor.role as FamilyRole, joinedAt: actor.joinedAt, officerUntil: actor.officerUntil }, now)) {
     return done("Only the Underboss or a Capo can start a no-confidence vote.");
   }
   if (isAssociate(actor.joinedAt, now)) return done("You need 72 hours in the family to start a vote.");
-  if ((await db.familyVote.count({ where: { familyId, status: "OPEN" } })) > 0) return done(ALREADY_OPEN);
+  if (await hasOpenVote(db, familyId)) return done(ALREADY_OPEN);
   const cooling = await db.familyVote.findFirst({ where: { familyId, cooldownUntil: { gt: now } }, orderBy: { cooldownUntil: "desc" } });
   if (cooling) return done(`A failed vote blocks another until ${rel(cooling.cooldownUntil)}.`);
   const boss = members.find((m) => m.userId === family.bossId);
@@ -102,7 +103,7 @@ export async function startVote(actorId: string, now: Date = new Date()): Promis
 
 /** The family's OPEN vote, or null. */
 export function openVoteOf(familyId: string): Promise<FamilyVote | null> {
-  return prisma.familyVote.findFirst({ where: { familyId, status: "OPEN" } });
+  return findOpenVote(prisma, familyId);
 }
 
 /** S35 for actorId: the snapshot a start now would take and the refusal it would get. */
@@ -198,6 +199,26 @@ export async function claimVoteAnnouncement(voteId: string, which: "start" | "re
 export async function setVoteMessage(voteId: string, expectMessageId: string, channelId: string, messageId: string): Promise<boolean> {
   const { count } = await prisma.familyVote.updateMany({ where: { id: voteId, messageId: expectMessageId }, data: { channelId, messageId } });
   return count === 1;
+}
+
+/** F9: true once per vote, for the render that reposts a dead S34; every later dead render stops. */
+export async function claimVoteRepost(voteId: string): Promise<boolean> {
+  const { count } = await prisma.familyVote.updateMany({ where: { id: voteId, reposted: false }, data: { reposted: true } });
+  return count === 1;
+}
+
+/** The family's closed votes whose result is not announced yet (a chair mover announces the void it caused). */
+export async function unannouncedResultsOf(familyId: string): Promise<string[]> {
+  const rows = await prisma.familyVote.findMany({ where: { familyId, status: { not: "OPEN" }, resultAnnounced: false }, select: { id: true } });
+  return rows.map((r) => r.id);
+}
+
+/** Who a vote's DMs go to: the snapshot (start), and the members now plus the targeted Boss (result). */
+export async function voteRecipients(voteId: string): Promise<{ eligibleIds: string[]; resultIds: string[] } | null> {
+  const vote = await prisma.familyVote.findUnique({ where: { id: voteId }, select: { familyId: true, bossId: true, eligibleIds: true } });
+  if (!vote) return null;
+  const members = await prisma.familyMember.findMany({ where: { familyId: vote.familyId }, select: { userId: true } });
+  return { eligibleIds: vote.eligibleIds, resultIds: [...new Set([...members.map((m) => m.userId), vote.bossId])] };
 }
 
 /** The sweeper's work: due closes, and starts or results still silent after voteAnnounceGraceSeconds (A42). */

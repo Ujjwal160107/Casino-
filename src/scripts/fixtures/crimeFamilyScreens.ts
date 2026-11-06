@@ -6,19 +6,24 @@ import { MAX_SAFE_BALANCE } from "../../utils/economyConfig";
 import { FAMILY_LEVELS, type FamilyRole } from "../../data/crimeFamilyCatalog";
 import type { EligibilityResult } from "../../services/crimeFamily/eligibility";
 import type { LedgerLine, LedgerType } from "../../services/crimeFamily/ledger";
-import type { FamilyDashboardView, InviteView, LeaderboardView, PaydayPreview, VaultView } from "../../services/crimeFamily/views";
+import type { FamilyDashboardView, InviteView, LeaderboardView, PaydayPreview, VaultView, VoteView } from "../../services/crimeFamily/views";
+import {
+  familyNewBossNotice, familyVoteAgainstYouNotice, familyVoteOpenedNotice, familyVoteResultNotice,
+} from "../../services/dmNoticeService";
 import {
   buildClaimNotice, buildClaimResolved, buildConfirm, buildCreateConfirm, buildDashboard, buildDisbandConfirm, buildInviteCard,
   buildInviteResolved, buildLedgerPage, buildLeaderboard, buildLevelUpConfirm, buildManagePanel, buildMyInvites, buildNoFamilyCard,
   buildPaydayPreview, buildVaultPanel,
 } from "../../ui/crimeFamily/familyScreens";
 import { CREW_IDS } from "../../ui/crimeFamily/ids";
-import { buildNotice, buildOpener, type CfPayload } from "../../ui/crimeFamily/kit";
+import { buildNotice, buildOpener, cfPayload, type CfPayload } from "../../ui/crimeFamily/kit";
+import { ballotRow, buildVoteCard, buildVoteSeatCard, buildVoteStartConfirm, voteResultLine } from "../../ui/crimeFamily/voteScreens";
 import { caperWorstCases } from "./caperScreens";
 import { turfWorstCases } from "./turfScreens";
 
 const OWNER = "12345678901234567890";
 const FAMILY_ID = "65f0000000000000000000ff";
+const VOTE_ID = "65f0000000000000000000aa";
 const BIG = MAX_SAFE_BALANCE - 1;
 const LONG_NAME = "Velvet Ante Syndicate Ok"; // 24 characters
 const SOON = () => new Date(Date.now() + 3_600_000);
@@ -51,7 +56,8 @@ export function dashboardView(): FamilyDashboardView {
     capos: 6, capoCap: 6, crestKey: "crest_3",
     roster: MEMBERS.map((userId, i) => ({ userId, role: ROLES[i], associateUntil: i === 1 || i >= 20 ? SOON() : null })),
     duesArrears: 999, nextCaperAt: SOON(), underInvestigation: true, racketsHeld: 3, showTurf: true,
-    viewer: { userId: OWNER, role: "UNDERBOSS", canManage: true, canClaim: true },
+    vote: { voteId: VOTE_ID, closesAt: SOON(), viewerEligible: true },
+    viewer: { userId: OWNER, role: "UNDERBOSS", canManage: true, canClaim: true, canStartVote: true },
   };
 }
 
@@ -109,12 +115,22 @@ function leaderboardView(): LeaderboardView {
   };
 }
 
+/** S34 for a 30-member family: 29 eligible, the Underboss as heir; closed, the longest line (a pass naming a 20-digit id). */
+function voteView(closed: boolean): VoteView {
+  return {
+    voteId: VOTE_ID, familyId: FAMILY_ID, familyLabel: `[WXYZ] ${LONG_NAME}`, tag: "WXYZ", homeChannelId: OWNER, channelId: OWNER, messageId: OWNER,
+    bossId: MEMBERS[0], starterId: MEMBERS[2], status: closed ? "PASSED" : "OPEN", closesAt: SOON(), eligible: 29, need: 20, voted: 29,
+    heirId: MEMBERS[1], result: closed ? { yes: 20, no: 9, newBossId: MEMBERS[1], voidReason: null } : null, viewerCanVote: true,
+  };
+}
+
 export function crimeFamilyWorstCases(): { label: string; max: number; payload: CfPayload }[] {
   const dash = dashboardView();
+  const label = `[WXYZ] ${LONG_NAME}`;
   return [
     { label: "S1 no-family card", max: 13, payload: buildNoFamilyCard(OWNER, failingResult(9), failingResult(10)) },
-    { label: "S2 dashboard (claim row, turf, 30 members)", max: 20, payload: buildDashboard(dash, { art: true }) },
-    { label: "S2 dashboard (visitor)", max: 20, payload: buildDashboard({ ...dash, viewer: { userId: OWNER, role: null, canManage: false, canClaim: false } }, { art: true }) },
+    { label: "S2 dashboard (claim and vote, 30 members)", max: 20, payload: buildDashboard(dash, { art: true }) },
+    { label: "S2 dashboard (visitor)", max: 20, payload: buildDashboard({ ...dash, vote: null, viewer: { userId: OWNER, role: null, canManage: false, canClaim: false, canStartVote: false } }, { art: true }) },
     { label: "S3 create confirm", max: 7, payload: buildCreateConfirm(OWNER, { name: LONG_NAME, tag: "WXYZ", fee: 10_000_000 }) },
     { label: "S4 invite card", max: 9, payload: buildInviteCard(inviteView(1)) },
     { label: "S4 invite resolved", max: 9, payload: buildInviteResolved(inviteView(1), "Expired") },
@@ -133,6 +149,18 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
     { label: "S27 opener", max: 4, payload: buildOpener(`<@${OWNER}>, open your family vault.`, { customId: CREW_IDS.open("vault", OWNER), label: "Open vault" }) },
     { label: "S28 notice", max: 2, payload: buildNotice(`## Payday: 30 members paid 950,000 each\n**[WXYZ] ${LONG_NAME}**\n${MEMBERS.map((m) => `<@${m}>`).join(" ")}`) },
     { label: "S28 notice with button", max: 4, payload: buildNotice("Your family's crew heist is GO.", { customId: CREW_IDS.view("home", OWNER), label: "Open" }, TWELVE) },
+    { label: "S34 vote card (29 eligible)", max: 7, payload: buildVoteCard(voteView(false)) },
+    { label: "S34 vote result", max: 3, payload: buildVoteCard(voteView(true)) },
+    { label: "S35 vote confirm (blocked)", max: 6, payload: buildVoteStartConfirm({
+      ownerId: OWNER, familyLabel: label, bossId: MEMBERS[0], eligible: 29, need: 20, openVoteId: null,
+      block: "A vote needs 3 members besides the Boss with 72 hours in the family (you have 2).",
+    }) },
+    { label: "S25 vote card", max: 5, payload: buildVoteSeatCard(voteView(false)) },
+    { label: "DM vote opened (with the row)", max: 9, payload: cfPayload(familyVoteOpenedNotice(
+      { familyLabel: label, bossId: MEMBERS[0], starterId: MEMBERS[2], closesAt: SOON(), need: 20, eligible: 29 }, ballotRow(VOTE_ID))) },
+    { label: "DM vote against you", max: 6, payload: cfPayload(familyVoteAgainstYouNotice({ familyLabel: label, starterId: MEMBERS[2], closesAt: SOON() })) },
+    { label: "DM vote result", max: 6, payload: cfPayload(familyVoteResultNotice({ familyLabel: label, line: voteResultLine(voteView(true)) })) },
+    { label: "DM new Boss", max: 6, payload: cfPayload(familyNewBossNotice({ familyLabel: label })) },
     ...caperWorstCases(),
     ...turfWorstCases(),
   ];

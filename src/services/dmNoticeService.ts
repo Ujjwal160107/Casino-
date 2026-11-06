@@ -1,4 +1,4 @@
-import { Client, ContainerBuilder } from "discord.js";
+import { Client, ContainerBuilder, type ActionRowBuilder, type ButtonBuilder } from "discord.js";
 import { Mascot } from "../config/branding";
 import { noticeContainer, v2Reply } from "../utils/componentsV2";
 import { fmtAmount, fmtCurrency, fmtFortunes } from "../utils/format";
@@ -406,6 +406,34 @@ export function familyDisbandedNotice(v: { familyLabel: string; finalNet: number
 }
 
 const relTime = (d: Date) => `<t:${Math.floor(d.getTime() / 1000)}:R>`;
+
+// No-confidence vote (amendment 4.7). Ballots are secret: no notice names a choice.
+
+/** To every voter in the snapshot, with the YES/NO row the announcer builds (F19). */
+export function familyVoteOpenedNotice(
+  v: { familyLabel: string; bossId: string; starterId: string; closesAt: Date; need: number; eligible: number },
+  row: ActionRowBuilder<ButtonBuilder>,
+): ContainerBuilder {
+  const body =
+    `<@${v.starterId}> started a no-confidence vote against <@${v.bossId}> in **${v.familyLabel}**.\n` +
+    `A pass needs ${v.need} YES of ${v.eligible} eligible voters. Ballots are secret and can change until it closes ${relTime(v.closesAt)}.`;
+  return familyNotice("rank_boss", "No-confidence vote opened", body).addActionRowComponents(row);
+}
+
+export function familyVoteAgainstYouNotice(v: { familyLabel: string; starterId: string; closesAt: Date }): ContainerBuilder {
+  const body = `<@${v.starterId}> started a no-confidence vote against you in **${v.familyLabel}**. It closes ${relTime(v.closesAt)}.`;
+  return familyNotice("rank_boss", "A no-confidence vote was opened against you", body);
+}
+
+/** `line` is S34's result line: totals only. */
+export function familyVoteResultNotice(v: { familyLabel: string; line: string }): ContainerBuilder {
+  return familyNotice("rank_boss", "No-confidence vote closed", `**${v.familyLabel}**\n${v.line}`);
+}
+
+export function familyNewBossNotice(v: { familyLabel: string }): ContainerBuilder {
+  return familyNotice("rank_boss", "You are now the Boss", `You are now the Boss of **${v.familyLabel}**. The family voted the old Boss out.`);
+}
+
 const jumpLine = (url: string | null, label: string) => (url ? `\n[${label}](${url})` : "");
 
 export function caperLobbyNotice(v: {

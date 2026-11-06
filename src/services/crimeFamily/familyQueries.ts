@@ -6,9 +6,10 @@ import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { FAMILY_LEVELS, levelDef, type FamilyRole } from "../../data/crimeFamilyCatalog";
 import { checkJailStatus } from "../jailService";
 import { racketsHeldFor } from "./extensions";
-import { can, isAssociate, ROLE_RANK } from "./permissions";
+import { can, isAssociate, mayStartVote, ROLE_RANK } from "./permissions";
 import { capoCapFor, investigationThresholdFor } from "./sizeRules";
 import { FamilyError } from "./tx";
+import { findOpenVote } from "./voteHooks";
 import type { FamilyDashboardView, InviteView } from "./views";
 
 /** The user's family and member row, or null when they are in none. */
@@ -82,10 +83,11 @@ export async function isUnderInvestigation(familyId: string): Promise<boolean> {
 export async function buildDashboardView(familyId: string, viewerId: string, now: Date): Promise<FamilyDashboardView> {
   const family = await prisma.family.findUnique({ where: { id: familyId } });
   if (!family) throw new FamilyError("That family no longer exists.");
-  const [members, underInvestigation, rackets] = await Promise.all([
+  const [members, underInvestigation, rackets, vote] = await Promise.all([
     listMembers(familyId),
     isUnderInvestigation(familyId),
     racketsHeldFor([familyId]),
+    findOpenVote(prisma, familyId),
   ]);
   const level = levelDef(family.level);
   const associateMs = CRIME_FAMILY_CONFIG.associateSeconds * 1000;
@@ -116,11 +118,13 @@ export async function buildDashboardView(familyId: string, viewerId: string, now
     underInvestigation,
     racketsHeld: rackets?.get(familyId) ?? null,
     showTurf: CRIME_FAMILY_CONFIG.turfEnabled,
+    vote: vote ? { voteId: vote.id, closesAt: vote.closesAt, viewerEligible: !!viewer && vote.eligibleIds.includes(viewerId) } : null,
     viewer: {
       userId: viewerId,
       role: viewerActor?.role ?? null,
       canManage: !!viewerActor && can(viewerActor, "manage", now),
       canClaim: !!viewerActor && can(viewerActor, "claim_chair", now) && bossAway,
+      canStartVote: !!viewer && mayStartVote({ role: viewer.role as FamilyRole, joinedAt: viewer.joinedAt, officerUntil: viewer.officerUntil }, now),
     },
   };
 }

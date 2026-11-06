@@ -1,5 +1,5 @@
-// The family jobs (spec 15): invite expiry, the caper sweep, the hit timeout
-// and tickWars every minute; dues, succession and the automatic payday hourly;
+// The family jobs (spec 15): invite expiry, the caper sweep, the hit timeout,
+// the vote sweep and tickWars every minute; dues, succession and the automatic payday hourly;
 // tickRackets at :05. Each schedule is its own cron task in UTC with
 // noOverlap, each job and each family has its own try/catch, and every write
 // is a CAS in the service it calls, so a missed or doubled run is harmless.
@@ -21,6 +21,7 @@ import { seedRackets } from "./racketService";
 import { tickRackets, tickWars } from "./turfJobs";
 import { FamilyError } from "./tx";
 import { chargeDues } from "./vaultService";
+import { SWEEP_VOTES_JOB } from "./voteSweeper";
 import { sweepWarHits } from "./warActions";
 
 export interface CfJob { name: string; run(client: Client, now: Date): Promise<void> }
@@ -123,6 +124,7 @@ export const CF_SCHEDULES: { cron: string; jobs: CfJob[] }[] = [
       SWEEP_CAPERS_JOB,
       { name: "sweepWarHits", run: (_c, now) => sweepWarHits(now).then(() => {}) },
       { name: "resumePaydayShares", run: async (c, now) => announceResumedShares(c, await resumeUnpaidShares(now)) },
+      SWEEP_VOTES_JOB,
     ],
   },
   {

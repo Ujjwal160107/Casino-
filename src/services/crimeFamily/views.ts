@@ -28,7 +28,10 @@ export interface FamilyDashboardView {
   /** Null when no FAMILY_HOOKS entry provides racketsHeld (P23). */
   racketsHeld: number | null;
   showTurf: boolean;
-  viewer: { userId: string; role: FamilyRole | null; canManage: boolean; canClaim: boolean };
+  /** The open no-confidence vote; viewerEligible when the viewer is in its snapshot (amendment 4.6). */
+  vote: { voteId: string; closesAt: Date; viewerEligible: boolean } | null;
+  /** canStartVote: start_vote by rank, or a demoted officer inside officerUntil (A41). */
+  viewer: { userId: string; role: FamilyRole | null; canManage: boolean; canClaim: boolean; canStartVote: boolean };
 }
 
 /** S6: the vault as an officer or member sees it (the only screen with vault amounts, D59). */

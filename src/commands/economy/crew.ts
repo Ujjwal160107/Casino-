@@ -4,7 +4,7 @@
 // every refusal is a public one-line errorContainer. Jail is enforced in the
 // services that move money or membership, so viewing works in jail.
 import type { GuildBasedChannel, Message } from "discord.js";
-import { FAMILY_ROLES } from "../../data/crimeFamilyCatalog";
+import { FAMILY_ROLES, type FamilyRole } from "../../data/crimeFamilyCatalog";
 import { BAD_AMOUNT, homeScreen, NOT_OPEN_HERE, topScreen } from "../../handlers/crewInteractionHandler";
 import { touchActivity } from "../../services/crimeFamily/activity";
 import { claimChair, demoteMember, promoteMember } from "../../services/crimeFamily/chairService";
@@ -14,14 +14,17 @@ import { LEADERBOARD_SORTS } from "../../services/crimeFamily/leaderboard";
 import {
   acceptInviteByTag, declineInviteByTag, inviteMember, setInviteMessage,
 } from "../../services/crimeFamily/membershipService";
+import { mayStartVote } from "../../services/crimeFamily/permissions";
 import { FamilyError } from "../../services/crimeFamily/tx";
 import { depositToVault, resolveDepositAmount } from "../../services/crimeFamily/vaultService";
+import { getVoteStartView, getVoteView } from "../../services/crimeFamily/voteService";
 import { InsufficientFundsError } from "../../services/walletService";
 import { announceChairChange, announceInvite, announceRoleChange, resolveInviteCard } from "../../ui/crimeFamily/announce";
 import { buildDashboard, buildInviteCard } from "../../ui/crimeFamily/familyScreens";
 import { CREW_IDS, type CrewOpenKind } from "../../ui/crimeFamily/ids";
 import { buildNotice, buildOpener, type CfPayload } from "../../ui/crimeFamily/kit";
 import { missingBotPermissions } from "../../ui/crimeFamily/post";
+import { buildVoteSeatCard } from "../../ui/crimeFamily/voteScreens";
 import { errorContainer, successContainer, v2Quiet } from "../../utils/componentsV2";
 import { isCrimeFamilyOpen } from "../../utils/economyConfig";
 import { fmtFortunes } from "../../utils/format";
@@ -128,6 +131,26 @@ async function claim(ctx: CrewCtx) {
   return notice(ctx, `You are now the Boss of **${familyLabel(move.family)}**.`);
 }
 
+const voteOpener = opener("vote", "start a no-confidence vote.", "Start vote…");
+
+/**
+ * `!crew vote`: the S25 vote card while a vote is open; else the opener for
+ * an Underboss, a Capo or a recently demoted officer; else why a vote can't
+ * start. `!crew vote start` always replies with the opener.
+ */
+async function vote(ctx: CrewCtx) {
+  if (ctx.args[0]?.toLowerCase() === "start") return voteOpener(ctx);
+  const now = new Date();
+  const { member } = await requireMembership(ctx.uid);
+  const start = await getVoteStartView(ctx.uid, now);
+  const open = start.openVoteId ? await getVoteView(start.openVoteId, ctx.uid, now) : null;
+  if (open) return show(ctx, buildVoteSeatCard(open));
+  const officer = mayStartVote({ role: member.role as FamilyRole, joinedAt: member.joinedAt, officerUntil: member.officerUntil }, now);
+  // A non-officer always has a block: the rank refusal at the latest.
+  if (officer || !start.block) return voteOpener(ctx);
+  throw new FamilyError(start.block);
+}
+
 export const CREW_SUBACTIONS: Readonly<Record<string, (ctx: CrewCtx) => Promise<unknown>>> = {
   dashboard: async (ctx) => show(ctx, await homeScreen(ctx.uid)),
   create: async (ctx) => show(ctx, buildOpener(`<@${ctx.uid}>: found your own crime family.`, { customId: CREW_IDS.createOpen(ctx.uid), label: "Create…" })),
@@ -150,6 +173,7 @@ export const CREW_SUBACTIONS: Readonly<Record<string, (ctx: CrewCtx) => Promise<
   rename: opener("rename", "rename the family.", "Rename…"),
   disband: opener("disband", "disband the family.", "Disband…"),
   claim,
+  vote,
 };
 
 /** Runs one subaction; a FamilyError or a short wallet is a public one-line refusal titled `title`. */

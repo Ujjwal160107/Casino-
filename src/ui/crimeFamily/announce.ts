@@ -24,6 +24,7 @@ import { fmtFortunes } from "../../utils/format";
 import { buildClaimResolved, buildInviteResolved } from "./familyScreens";
 import { buildNotice } from "./kit";
 import { editChannelMessage, jumpLink, sendToChannel } from "./post";
+import { announcePendingVoteResults } from "./voteAnnounce";
 
 /** Runs one announcer, logging instead of throwing so a committed action never reads as failed. */
 async function safely(name: string, run: () => Promise<void>): Promise<void> {
@@ -70,7 +71,11 @@ export async function announceResumedShares(client: Client, paid: PaidShare[]): 
   });
 }
 
-/** Edits the S23 claim notice when one was posted, then DMs: a claim tells the old Boss, a hand-over tells every member. */
+/**
+ * Edits the S23 claim notice when one was posted, then DMs: a claim tells the
+ * old Boss, a hand-over tells every member. Last, the result of any vote the
+ * move voided (F4).
+ */
 export async function announceChairChange(
   client: Client, family: Family, kind: "claimed" | "handed", oldBossId: string, newBossId: string,
 ): Promise<void> {
@@ -82,10 +87,11 @@ export async function announceChairChange(
     const label = familyLabel(family);
     if (kind === "claimed") {
       await sendOptOutDm(client, oldBossId, "family", familyRoleNotice("chair_claimed", { familyLabel: label, newBossId }));
-      return;
+    } else {
+      const members = await listMembers(family.id);
+      await notifyMany(client, "family", members.map((m) => m.userId), () => familyRoleNotice("chair_handed", { familyLabel: label, newBossId }));
     }
-    const members = await listMembers(family.id);
-    await notifyMany(client, "family", members.map((m) => m.userId), () => familyRoleNotice("chair_handed", { familyLabel: label, newBossId }));
+    await announcePendingVoteResults(client, family.id);
   });
 }
 

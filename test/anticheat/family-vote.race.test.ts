@@ -1,10 +1,18 @@
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { castBallot, claimVoteAnnouncement, closeVote, startVote, voteStartBlock } from "../../src/services/crimeFamily/voteService";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import * as voteService from "../../src/services/crimeFamily/voteService";
+import { castBallot, claimVoteAnnouncement, closeVote, getVoteView, startVote, voteStartBlock } from "../../src/services/crimeFamily/voteService";
+import { sweepVotes } from "../../src/services/crimeFamily/voteSweeper";
+import { familyVoteResultNotice } from "../../src/services/dmNoticeService";
+import { announceChairChange } from "../../src/ui/crimeFamily/announce";
+import { announceVoteResult, announceVoteStart, requestVoteRender } from "../../src/ui/crimeFamily/voteAnnounce";
+import { buildVoteCard, buildVoteSeatCard } from "../../src/ui/crimeFamily/voteScreens";
+import { visibleText } from "../crimeFamily/visibleText";
+import { fakeClient } from "../crimeFamily/fakeClient";
 import { autoHandover, claimChair, demoteMember, handOverChair, promoteMember } from "../../src/services/crimeFamily/chairService";
 import { kickMember, leaveFamily } from "../../src/services/crimeFamily/membershipService";
 import { disbandFamily } from "../../src/services/crimeFamily/disbandService";
 import prisma from "../../src/utils/prisma";
-import { testPrisma, seedEligibleUser, seedFamily, seedVote, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
+import { testPrisma, testRedis, seedEligibleUser, seedFamily, seedVote, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
 
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "FamilyVote", "FamilyBallot"]));
 beforeEach(resetFamilies);
@@ -230,5 +238,106 @@ describe("no-confidence vote: ballots and the close (amendment 4.3 steps 2-4)", 
     expect(await claimVoteAnnouncement(v.id, "result")).toBe(false);
     await closeVote(v.id, v.closesAt);
     expect((await Promise.all([claimVoteAnnouncement(v.id, "result"), claimVoteAnnouncement(v.id, "result")])).filter(Boolean)).toHaveLength(1);
+  });
+});
+
+describe("no-confidence vote: secrecy and announcements (A16, A42, F9)", () => {
+  /** Runs fn with announceVoteStart/Result's CAS crashing once, as if the process died before it. */
+  async function crashOnce(fn: () => Promise<void>) {
+    const spy = vi.spyOn(voteService, "claimVoteAnnouncement").mockRejectedValueOnce(new Error("crash"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try { await fn(); } finally { spy.mockRestore(); error.mockRestore(); }
+  }
+
+  it("no S34, S25 vote card or result DM ever pairs a voter with a choice (A16)", async () => {
+    const { f, boss, ids } = await voteFamily({ size: 6, underboss: true, capos: 1 });
+    const v = await openOn(f, boss, ids[1], ids);
+    const [a, b] = [ids[2], ids[3]];
+    await castBallot(v.id, a, "YES");
+    await castBallot(v.id, b, "NO");
+    const now = new Date();
+    const views = await Promise.all([a, b, null].map((viewer) => getVoteView(v.id, viewer, now)));
+    const texts = views.map((view) => visibleText(buildVoteCard(view!)) + visibleText(buildVoteSeatCard(view!)));
+    expect(new Set(texts.map((t) => t.replace(/<t:\d+:R>/g, ""))).size).toBe(1);       // identical for A, B and no viewer
+    await closeVote(v.id, v.closesAt);
+    const closed = (await getVoteView(v.id, a, now))!;
+    const result = visibleText(buildVoteCard(closed));
+    const dm = visibleText(familyVoteResultNotice({ familyLabel: "[VLA] Velvet Ante", line: result }));
+    for (const t of [...texts, result, dm]) {
+      for (const who of [a, b]) expect(t).not.toMatch(new RegExp(`<@${who}>[^\\n]{0,40}\\b(YES|NO)\\b|\\b(YES|NO)\\b[^\\n]{0,40}<@${who}>`));
+    }
+    expect(Object.keys(closed)).not.toContain("ballots");
+  });
+
+  it("a dead S34 is reposted once for the life of the vote, then renders stop (F9)", async () => {
+    const { f, boss, ids } = await voteFamily({ size: 6, capos: 1 });
+    const v = await openOn(f, boss, ids[0], ids);
+    await testPrisma.familyVote.update({ where: { id: v.id }, data: { channelId: "c-home", messageId: "m-old" } });
+    const c = fakeClient({ failEdit: new Set(["c-home"]) });                 // every edit is refused: the board stays dead
+    for (let k = 0; k < 3; k++) {
+      await castBallot(v.id, ids[1 + k], "YES");
+      await testRedis().del(`cf:render:vote:${v.id}`);                       // each call is the first event of its window: it renders at once
+      await requestVoteRender(c.client as any, v.id);
+    }
+    expect(c.calls.filter((x) => x.op === "send")).toHaveLength(1);
+    expect(await vote(v.id)).toMatchObject({ reposted: true });
+  });
+
+  it("edge 13: a start whose announcer died before its CAS is announced once by two sweeps", async () => {
+    const { boss, ids } = await voteFamily({ size: 6, capos: 1 });
+    const v = await startVote(ids[0]);
+    const c = fakeClient();
+    await crashOnce(() => announceVoteStart(c.client as any, v.id));
+    expect(c.calls).toHaveLength(0);
+    const at = new Date(+v.createdAt + 61_000);
+    await sweepVotes(c.client as any, at);
+    await sweepVotes(c.client as any, at);
+    expect(c.calls.filter((x) => x.op === "send" && x.channelId === "c-home")).toHaveLength(1);
+    for (const id of v.eligibleIds) expect(c.dm.get(id), id).toBe(1);
+    expect(c.dm.get(boss)).toBe(1);
+    expect(await vote(v.id)).toMatchObject({ announced: true, channelId: "c-home", messageId: "m1" });
+  });
+
+  it("edge 13: a close whose announcer died before its CAS is announced once by two sweeps", async () => {
+    const { f, boss, ids } = await voteFamily({ size: 6, underboss: true, capos: 1 });
+    const v = await openOn(f, boss, ids[1], ids);
+    await testPrisma.familyVote.update({ where: { id: v.id }, data: { announced: true, channelId: "c-home", messageId: "m-old" } });
+    await ballots(v, ids.slice(2), "YES");
+    await closeVote(v.id, v.closesAt);
+    const c = fakeClient();
+    await crashOnce(() => announceVoteResult(c.client as any, v.id));
+    expect(c.calls).toHaveLength(0);
+    const at = new Date(+v.closesAt + 61_000);
+    await sweepVotes(c.client as any, at);
+    await sweepVotes(c.client as any, at);
+    const edits = c.calls.filter((x) => x.op === "edit" && x.messageId === "m-old");
+    expect(edits).toHaveLength(1);
+    expect(visibleText(edits[0].payload)).toContain(`Passed: <@${ids[0]}> is Boss (YES 4, NO 0, eligible 5)`);
+    for (const id of [boss, ...ids.slice(1)]) expect(c.dm.get(id), id).toBe(1);
+    expect(c.dm.get(ids[0])).toBe(2);                                    // the result and "You are now the Boss"
+  });
+
+  it("the sweeper closes a due vote and announces it in the same run", async () => {
+    const { f, boss, ids } = await voteFamily({ size: 5, capos: 1 });
+    const v = await openOn(f, boss, ids[0], ids);
+    await testPrisma.familyVote.update({ where: { id: v.id }, data: { announced: true, channelId: "c-home", messageId: "m-old" } });
+    const c = fakeClient();
+    await sweepVotes(c.client as any, v.closesAt);
+    expect(await vote(v.id)).toMatchObject({ status: "FAILED", resultAnnounced: true });
+    expect(c.calls.filter((x) => x.op === "edit" && x.messageId === "m-old")).toHaveLength(1);
+  });
+
+  it("announceChairChange after a claim edits S34 to 'Void: the chair changed hands.' once", async () => {
+    const { f, boss, ids: [ub, capo] } = await voteFamily({ size: 6, underboss: true, capos: 1 });
+    const v = await startVote(capo);
+    await testPrisma.familyVote.update({ where: { id: v.id }, data: { announced: true, channelId: "c-home", messageId: "m-old" } });
+    await testPrisma.familyMember.update({ where: { userId: boss }, data: { lastActiveAt: daysAgo(8) } });
+    const move = await claimChair(f.id, ub);
+    const c = fakeClient();
+    await announceChairChange(c.client as any, move.family, "claimed", move.oldBossId, move.newBossId);
+    await announceChairChange(c.client as any, move.family, "claimed", move.oldBossId, move.newBossId);
+    const edits = c.calls.filter((x) => x.op === "edit" && x.messageId === "m-old");
+    expect(edits).toHaveLength(1);
+    expect(visibleText(edits[0].payload)).toContain("Void: the chair changed hands.");
   });
 });

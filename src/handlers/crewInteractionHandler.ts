@@ -31,37 +31,21 @@ import {
   buildLevelUpConfirm, buildManagePanel, buildMyInvites, buildNoFamilyCard, buildPaydayPreview, buildVaultPanel,
 } from "../ui/crimeFamily/familyScreens";
 import { CREW_IDS, decodeName, type CrewConfirmKind, type CrewModalKind } from "../ui/crimeFamily/ids";
-import { buildNotice, type CfPayload } from "../ui/crimeFamily/kit";
+import type { CfPayload } from "../ui/crimeFamily/kit";
 import { CRIME_FAMILY_CONFIG, isCrimeFamilyOpen } from "../utils/economyConfig";
 import { fmtFortunes } from "../utils/format";
-import { safeEditReply } from "../utils/interactionHelpers";
 import type { CfInteraction, CfRoute, CfRouteEntry, CfRouteTable } from "./crimeFamilyRouter";
+import { assertEnabled, auto, notice, owner, show, showThenAnnounce, update } from "./crewRouteKit";
 
 export const NOT_OPEN_HERE = "Crime Families are not open in this server yet.";
-const NOT_OPEN = "Crime Families are not open yet.";
 const ONLY_OFFICERS = "Only the Boss or Underboss can run payday.";
 const ONLY_BOSS_DISBAND = "Only the Boss can disband the family.";
 export const BAD_AMOUNT = "Enter a positive amount like 250k or 5m";
 
 const days = (seconds: number) => Math.round(seconds / 86_400);
-const show = async (i: CfInteraction, payload: CfPayload) => { await safeEditReply(i, payload); };
-/** Shows the result, then runs its announcer (which never throws) even if the edit failed: the action has committed. */
-const showThenAnnounce = async (i: CfInteraction, payload: CfPayload | Promise<CfPayload>, announce: () => Promise<unknown>) => {
-  try {
-    await show(i, await payload);
-  } finally {
-    await announce();
-  }
-};
-const notice = (text: string) => buildNotice(text);
-const owner = (args: string[]) => args[args.length - 1];
 
 function assertCreateOpen(i: CfInteraction): void {
   if (!isCrimeFamilyOpen(i.guildId)) throw new FamilyError(NOT_OPEN_HERE);
-}
-
-function assertInvitesOpen(): void {
-  if (!CRIME_FAMILY_CONFIG.enabled) throw new FamilyError(NOT_OPEN);
 }
 
 // ── Modals (opened with no I/O before showModal) ─────────────────────────────
@@ -258,7 +242,7 @@ const createOkRoute: CfRoute = async (i, [, tag, encodedName, uid]) => {
 
 /** `crew:inv:<accept|decline>:<inviteId>` (S4, shared: the service checks the invitee). */
 const inviteRoute: CfRoute = async (i, [answer, inviteId]) => {
-  assertInvitesOpen();
+  assertEnabled();
   const uid = i.user.id;
   if (answer === "accept") {
     const { family } = await acceptInvite(inviteId, uid);
@@ -272,7 +256,7 @@ const inviteRoute: CfRoute = async (i, [answer, inviteId]) => {
 
 /** `crew:inv:sel:<owner>` (S24 select). */
 const inviteSelectRoute: CfRoute = async (i, [, uid]) => {
-  assertInvitesOpen();
+  assertEnabled();
   const inviteId = i.isStringSelectMenu() ? i.values[0] : undefined;
   if (!inviteId) throw new FamilyError("Pick an invite.");
   await acceptInvite(inviteId, uid);
@@ -322,9 +306,6 @@ const modalRoute: CfRoute = async (i, [kind, uid]) => {
 };
 
 const cancelled: CfRoute = (i) => show(i, notice("Cancelled."));
-
-const auto = (run: CfRoute): CfRouteEntry => ({ scope: "owner", ack: "auto", run });
-const update = (run: CfRoute): CfRouteEntry => ({ scope: "owner", ack: "update", run });
 
 export const CREW_ROUTES: CfRouteTable = {
   "create:open": modalOpener("create"),

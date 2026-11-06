@@ -114,5 +114,5 @@ describe("crime family jobs (15)", () => {
 });
 
 it("sweepCapers runs in the minute schedule after sweepInvites", () => {
-  expect(CF_SCHEDULES.find((s) => s.cron === "* * * * *")!.jobs.map((j) => j.name)).toEqual(["sweepInvites", "sweepCapers", "sweepWarHits", "resumePaydayShares"]);
+  expect(CF_SCHEDULES.find((s) => s.cron === "* * * * *")!.jobs.map((j) => j.name)).toEqual(["sweepInvites", "sweepCapers", "sweepWarHits", "resumePaydayShares", "sweepVotes"]);
 });

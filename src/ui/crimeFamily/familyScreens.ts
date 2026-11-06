@@ -105,6 +105,7 @@ export function buildDashboard(view: FamilyDashboardView, opts: { art: boolean }
   if (view.racketsHeld !== null) status.push(`Rackets ${view.racketsHeld}`);
   status.push(`Next crew heist ${rel(view.nextCaperAt)}`);
   if (view.underInvestigation) status.push("Under investigation");
+  if (view.vote) status.push(`Vote open, closes ${rel(view.vote.closesAt)}`);
 
   container
     .addSeparatorComponents(sep())
@@ -128,6 +129,7 @@ export function buildDashboard(view: FamilyDashboardView, opts: { art: boolean }
     container.addActionRowComponents(buttonRow(...buttons));
     const second = [
       ...(view.viewer.canClaim ? [cfButton(CREW_IDS.claim(view.familyId), "Claim the chair", ButtonStyle.Danger)] : []),
+      ...(view.vote?.viewerEligible || (!view.vote && view.viewer.canStartVote) ? [cfButton(CREW_IDS.voteStart(owner), "Vote", ButtonStyle.Danger)] : []),
     ];
     if (second.length > 0) container.addActionRowComponents(buttonRow(...second));
   }
