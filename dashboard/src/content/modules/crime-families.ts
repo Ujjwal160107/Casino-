@@ -4,16 +4,18 @@ import type { ModuleDoc } from "../types";
 // src/data/crimeFamilyCatalog.ts; the expected-value tables are pinned by
 // test/crimeFamily/caper-math.test.ts. Turf numbers come from RACKETS,
 // RACKET_CLASSES, WAR_RULES and WAR_BLOCKS in the same catalog, and the war
-// and bid math from src/services/crimeFamily/warMath.ts.
+// and bid math from src/services/crimeFamily/warMath.ts. Size rules come from
+// src/services/crimeFamily/sizeRules.ts, the vote math from voteRules.ts and
+// the recruitment limits from recruitService.ts.
 const crimeFamilies: ModuleDoc = {
   slug: "crime-families",
   title: "Crime Families",
-  tagline: "A crew of up to 12 players with ranks, a vault nobody can rob, ten family levels to buy, crew heists you can only pull off together, and ten rackets to fight over in weekly turf wars.",
+  tagline: "A crew of 10 to 30 players with ranks, a vault nobody can rob, ten family levels to buy, crew heists you can only pull off together, and ten rackets to fight over in weekly turf wars.",
   icon: "Users",
   forBeginners: {
-    what: "A crime family is a crew of 6 to 12 players. Members pay into a shared vault, the vault pays the family's dues and level fees, and once a week the earned part of the vault is split between the members who played. Deposits never come back out: the vault is for the family, not for parking cash.",
+    what: "A crime family is a crew of 10 to 30 players. Members pay into a shared vault, the vault pays the family's dues and level fees, and once a week the earned part of the vault is split between the members who played. Deposits never come back out: the vault is for the family, not for parking cash.",
     firstCommands: ["!crew", "!heist", "!turf"],
-    tip: "You don't need to found a family to play. Joining needs 1,000,000 net worth and 20 shifts; founding needs 15,000,000, 60 shifts and 10,000,000 to burn. Get invited first.",
+    tip: "You don't need to found a family to play. Joining needs 1,000,000 net worth and 20 shifts; founding needs 15,000,000, 60 shifts and 10,000,000 to burn. Get invited, or apply to a recruiting family from !crew board.",
   },
   screenshot: {
     src: "/art/cf-caper-t4.png",
@@ -72,8 +74,8 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Ranks and permissions",
       body: [
-        "Every family has one Boss, at most one Underboss, at most three Capos and any number of Soldiers. A member who joined less than 72 hours ago shows as an Associate: they can view and deposit but can't take a crew heist seat or act in a war yet. The Boss is never an Associate.",
-        "!crew promote and !crew demote move a member one rank at a time, and only to a rank below your own. The chair itself moves only by !crew handover, a claim, or the automatic handover. Your rank is re-read on every press, so an old button never carries a rank you've since lost.",
+        "Every family has one Boss, at most one Underboss, one to six Capos depending on its size (see Capos) and any number of Soldiers. A member who joined less than 72 hours ago shows as an Associate: they can view and deposit but can't take a crew heist seat or act in a war yet. The Boss is never an Associate.",
+        "!crew promote and !crew demote move a member one rank at a time, and only to a rank below your own. The chair itself moves only by !crew handover, a claim, the automatic handover or a no-confidence vote. Your rank is re-read on every press, so an old button never carries a rank you've since lost.",
       ],
       table: {
         title: "Who can do what",
@@ -84,6 +86,7 @@ const crimeFamilies: ModuleDoc = {
           ["Invite", "yes", "yes", "yes", "no", "no"],
           ["Kick", "anyone", "Capo and below", "Soldier only", "no", "no"],
           ["Promote / demote", "up to Underboss", "up to Capo", "no", "no", "no"],
+          ["Promote to Capo (needs 10,000,000 net worth on the member and a free Capo seat)", "yes", "yes", "no", "no", "no"],
           ["Hand over the chair", "yes", "no", "no", "no", "no"],
           ["Plan a crew heist", "yes", "yes", "yes", "no", "no"],
           ["Take a crew heist seat", "yes", "yes", "yes", "yes", "no"],
@@ -91,14 +94,116 @@ const crimeFamilies: ModuleDoc = {
           ["Scout and hit in a war", "yes", "yes", "yes", "yes", "no"],
           ["Home channel, rename, disband", "yes", "no", "no", "no", "no"],
           ["Claim the chair from an inactive Boss", "no", "after 7 days", "no", "no", "no"],
+          ["Start a no-confidence vote", "no", "yes", "yes", "only within 7 days of a demotion out of Underboss or Capo", "no"],
+          ["Vote in a no-confidence vote", "no", "yes", "yes", "yes", "no"],
+          ["Edit the recruitment listing, recruiting on or off", "yes", "yes", "no", "no", "no"],
+          ["Review applications (accept, decline)", "yes", "yes", "yes", "no", "no"],
         ],
       },
     },
     {
+      heading: "Family size",
+      body: [
+        "A family's level sets how many members it can hold, from 10 at L1 to 30 at L10. Its current member count then sets three more limits: how many crew heists it can start a day, how many Capo seats it has, and how many hot members put it under investigation. The table shows each level with a full roster.",
+        "Crew heists a day = 4, or the member count ÷ 3 rounded up when that is more: 4 at 1–12 members, 5 at 13–15, 6 at 16–18, 7 at 19–21, 8 at 22–24, 9 at 25–27 and 10 at 28–30. The count is checked when a crew heist is planned and again at Start, so a family that loses members simply waits until the rolling 24 hours frees a slot; nothing already started is cancelled. The refusal names the cap and when the next slot opens.",
+        "Investigation threshold = 3, or the member count ÷ 4 rounded up when that is more. A family with that many members at heat 100 or above is under investigation: it can't plan crew heists or bid on turf until enough of them cool down. 8 hot members put a 30-member family under investigation; 7 don't.",
+        "Size changes nothing else: dues, the payday cap and minimum, the 2 seats per player a day, the 3 lobby DMs a day and the 3 racket-eligible members a racket needs are the same for a family of 10 or 30.",
+      ],
+      table: {
+        title: "Size limits at a full roster",
+        columns: ["Level", "Member cap", "Crew heists per 24 h", "Capo seats", "Investigation threshold", "New members per 7 days"],
+        rows: [
+          ["1", "10", "4", "2", "3", "5"],
+          ["2", "12", "4", "2", "3", "5"],
+          ["3", "14", "5", "2", "4", "5"],
+          ["4", "16", "6", "3", "4", "6"],
+          ["5", "18", "6", "3", "5", "6"],
+          ["6", "20", "7", "4", "5", "7"],
+          ["7", "23", "8", "4", "6", "8"],
+          ["8", "25", "9", "5", "7", "9"],
+          ["9", "28", "10", "5", "7", "10"],
+          ["10", "30", "10", "6", "8", "10"],
+        ],
+      },
+      note: "New members per 7 days goes by level (5, or the member cap ÷ 3 rounded up). The other three columns go by the members the family has right now, so a level 10 family with 12 members still gets 4 crew heists a day and 2 Capo seats.",
+    },
+    {
+      heading: "Capos",
+      body: [
+        "Capo seats = the member count ÷ 5 rounded down, and never fewer than 1. A promotion to Capo needs a free seat under that cap and 10,000,000 net worth on the member being promoted. A promotion to Underboss needs the same 10,000,000. Net worth is counted fresh at the moment of the promotion, never the cached leaderboard figure. Handing over the chair, a claim, the automatic handover and a vote check neither.",
+        "Nothing ever demotes a Capo for you. A Capo whose net worth falls below 10,000,000 keeps the seat, and a family that shrinks below its Capo count keeps every Capo with every Capo power. Only new promotions to Capo wait until the family has fewer Capos than its cap. A demoted Capo who is promoted again has to pass both checks again.",
+        "Demoting the Underboss is not a promotion, so it skips both checks: the Underboss becomes a Capo even if that puts the family over its cap. Only when all six Capo seats are held does the Underboss go straight to Soldier, and the reply says \"(no Capo seat was free)\". Every demotion out of Underboss or Capo gives that member 7 days in which they can still start a no-confidence vote.",
+      ],
+      table: {
+        title: "Capo seats by member count",
+        columns: ["Members", "Capo seats"],
+        rows: [
+          ["1–9", "1"],
+          ["10–14", "2"],
+          ["15–19", "3"],
+          ["20–24", "4"],
+          ["25–29", "5"],
+          ["30", "6"],
+        ],
+      },
+      note: "Refusals name the numbers: \"Capo seats are full (4/4 for 22 members).\" or \"Promotion needs 10,000,000 net worth (@member has 6,200,000).\"",
+    },
+    {
+      heading: "No-confidence vote",
+      body: [
+        "The members can remove a Boss who is still around. The Underboss or a Capo starts the vote with !crew vote start or the Vote button on the dashboard; so can a member demoted out of Underboss or Capo in the last 7 days. The starter needs 72 hours in the family and can't be jailed or banned. Their YES is recorded the moment the vote opens.",
+        "Who votes is fixed when the vote opens: every member except the Boss who has been in the family 72 hours or more. Nobody who joins later can vote. At least 3 members must qualify or the vote can't start. The vote card posts in the home channel, every voter gets a DM with YES and NO buttons, and the Boss gets a DM naming the starter.",
+        "The vote runs 48 hours and only closes then. Ballots are secret and can be changed until the close: cards and DMs show only how many have voted, and at the close only the YES, NO and eligible totals. Jailed or banned members can't cast a ballot while that lasts, but still count as eligible.",
+        "While the vote is open the family is frozen: no kicks by anyone, no promotions or demotions, no disband and no handover (so the Boss can't leave either, since leaving needs a handover first). Leaving, invites, accepts, deposits, crew heists, Payday, bids and level-ups carry on.",
+        "If it passes, the Underboss at the close takes the chair. With no Underboss, the automatic heir does (the Capo who joined first, then the Soldier with the most crew heists, active in the last 7 days). The old Boss becomes a Soldier and every member gets a DM with the result.",
+      ],
+      table: {
+        title: "Vote rules",
+        columns: ["Rule", "Value"],
+        rows: [
+          ["Who starts", "Underboss or Capo, or a member demoted out of either in the last 7 days; 72 hours in the family; not jailed or banned"],
+          ["Target", "The current Boss, once they have held this family's chair for 7 days"],
+          ["Voters", "Every member but the Boss with 72 hours in the family when the vote opens; at least 3"],
+          ["Window", "48 hours; closes only at the end"],
+          ["Ballot", "YES or NO, secret, changeable until the close"],
+          ["Counted at the close", "Voters from the opening list who are still in the family"],
+          ["Pass", "YES from two thirds of the voters still counted, rounded up (see Counting a vote)"],
+          ["Void", "The chair changed hands (a claim or the automatic handover), fewer than 3 voters still counted, or no heir on a pass"],
+          ["Cooldown", "7 days after a failed vote, or one voided for too few voters or no heir; none after a pass or a void by a chair change"],
+          ["One at a time", "Only one open vote per family"],
+          ["Frozen while open", "Kicks, promotions, demotions, disband and handover"],
+        ],
+      },
+      note: "The Boss's 7 days of grace count from the first time that member ever held this family's chair, and later handovers never restart them. A Boss who hands the chair to a friend and takes it straight back gets no new grace.",
+    },
+    {
+      heading: "Counting a vote",
+      body: [
+        "A vote needs YES from two thirds of the voters still counted at the close, rounded up, not two thirds of the ballots cast. A voter who never votes counts against the Boss's removal exactly like a NO. A voter who leaves the family drops out of both sides.",
+        "The Underboss claim (after 7 days away) and the 14-day automatic handover still run during a vote, and either one voids it with no cooldown. A vote that passes against a Boss who was also inactive edits the claim notice to say the chair was taken by vote.",
+      ],
+      table: {
+        title: "YES ballots needed",
+        columns: ["Voters counted", "YES needed", "Voters counted", "YES needed", "Voters counted", "YES needed"],
+        rows: [
+          ["3", "2", "12", "8", "21", "14"],
+          ["4", "3", "13", "9", "22", "15"],
+          ["5", "4", "14", "10", "23", "16"],
+          ["6", "4", "15", "10", "24", "16"],
+          ["7", "5", "16", "11", "25", "17"],
+          ["8", "6", "17", "12", "26", "18"],
+          ["9", "6", "18", "12", "27", "18"],
+          ["10", "7", "19", "13", "28", "19"],
+          ["11", "8", "20", "14", "29", "20"],
+        ],
+      },
+      note: "Fewer than 3 voters still counted at the close voids the vote, with the 7-day cooldown.",
+    },
+    {
       heading: "Joining a family",
       body: [
-        "A Capo or higher runs !crew invite <user> with a mention, an ID or an exact username. The invite card pings only you and you get a DM. Press Accept on the card, or type !crew accept <TAG> from any server; !crew decline <TAG> turns it down. An invite lasts 24 hours.",
-        "Invites are capped so nobody can stuff a family with alts: at most 5 pending invites per family, at most 3 accepted invites per inviter in any 7 days, and at most 5 new members per family in any 7 days. You can't invite yourself, a bot, someone already in your family or someone in another family.",
+        "There are two ways in: an invite, or an application from the recruitment board (see The recruitment board). A Capo or higher runs !crew invite <user> with a mention, an ID or an exact username. The invite card pings only you and you get a DM. Press Accept on the card, or type !crew accept <TAG> from any server; !crew decline <TAG> turns it down. An invite lasts 24 hours.",
+        "Joins are capped so nobody can stuff a family with alts: at most 5 pending invites per family, at most 3 accepted invites or applications per inviting or accepting officer in any 7 days, and at most 5 to 10 new members per family in any 7 days, by level (the table below). Accepted invites and accepted applications count towards the same caps. You can't invite yourself, a bot, someone already in your family, someone in another family, or a player who already applied (accept their application in the inbox instead).",
         "Accepting checks the join gates below and takes the lowest free seat. If the family is full you get \"Family is full\" and the invite stays open until it expires.",
       ],
       table: {
@@ -112,7 +217,51 @@ const crimeFamilies: ModuleDoc = {
           ["Jail / ban", "not jailed, not banned"],
           ["Hop cooldown", "clear"],
           ["Same family again", "14 days after you left or were kicked"],
-          ["Member cap", "6 at L1, 7 at L2, 8 at L3–4, 10 at L5–6, 12 at L7–10"],
+          ["Member cap", "10 at L1, 12 at L2, 14 at L3, 16 at L4, 18 at L5, 20 at L6, 23 at L7, 25 at L8, 28 at L9, 30 at L10"],
+          ["New members per family, rolling 7 days", "5 at L1–3, 6 at L4–5, 7 at L6, 8 at L7, 9 at L8, 10 at L9–10"],
+          ["Accepted joins per officer, rolling 7 days", "3 (invites and applications together)"],
+        ],
+      },
+    },
+    {
+      heading: "The recruitment board",
+      body: [
+        "!crew board (or Find a family on the Create card) lists every family that is recruiting and has a free seat, 6 to a page. A full family drops off the board and comes back by itself when a seat frees up. Sort by Level (level, then members, then the oldest family), by Members (members, then level) or by Activity (active members, then members). Active members is a daily count of the members with 2 started crew heist seats or 3 correct war hits in the last 7 days, the same rule Payday uses.",
+        "I qualify keeps only the families whose four requirements you meet. If you fail a base join gate (see Joining a family) it shows nothing and names the gate. The board reads your net worth from the cached figure, which can be up to 10 minutes old; applying checks it fresh. !crew board <TAG> opens one family's card: its pitch, level, members, active members, and each requirement with your own number and a tick or a cross.",
+        "The Boss or Underboss writes the listing from !crew recruit (Capo and up can open it) with Edit listing, and turns recruiting on or off. Recruiting can't be turned on without a pitch. Turning it off stops new applications; pending ones can still be accepted or declined.",
+      ],
+      table: {
+        title: "The listing",
+        columns: ["Field", "Rule"],
+        rows: [
+          ["Pitch", "10–150 characters; spaces and line breaks collapse to one space; no mentions, pings, links or server invites, no slurs, and none of the words fortuna, admin, staff, mod, moderator or discord"],
+          ["Min net worth", "0–10,000,000,000; shorthand like 10m or 2.5b works"],
+          ["Min lifetime shifts", "0–5,000"],
+          ["Min Fortuna account age", "0–730 days"],
+          ["Min lifetime crew heists", "0–1,000 started crew heist seats, in any family"],
+          ["Blank requirement", "0 (no requirement)"],
+        ],
+      },
+    },
+    {
+      heading: "Applying to a family",
+      body: [
+        "Apply on a family's card opens a short form for your message. Applying checks the base join gates (including hop cooldowns), each requirement with your net worth counted fresh, and that the family is still recruiting and not full.",
+        "A Capo or higher sees applications in the inbox (Applications on the recruitment panel), 5 to a page, each with your message and your numbers checked live, and presses Accept or Decline. Accepting runs exactly the same checks as accepting an invite, takes the lowest free seat and counts towards the weekly join caps. If a check fails, the application stays pending and the officer sees why. When you join any family, your other pending applications are withdrawn.",
+        "You get a \"Family applications\" DM when you're accepted, declined or your application expires. Officers get one digest DM when new applications have come in, at most once every 6 hours. Both can be turned off in !settings. !crew board then My applications lists yours and lets you withdraw one.",
+      ],
+      table: {
+        title: "Application limits",
+        columns: ["Rule", "Value"],
+        rows: [
+          ["Message", "1–200 characters, the same text rules as the pitch"],
+          ["Pending applications per player", "3"],
+          ["Pending applications per family", "25"],
+          ["Expires", "72 hours after you apply"],
+          ["Apply again after a decline", "7 days"],
+          ["Apply again after a withdraw or expiry", "24 hours"],
+          ["One at a time per family", "No second application, and no application while an invite from that family is pending"],
+          ["Officer digest", "Every Boss, Underboss and Capo; at most once every 6 hours, checked hourly"],
         ],
       },
     },
@@ -189,7 +338,7 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Payday",
       body: [
-        "Payday is the only way money leaves the vault for a wallet. The Boss or Underboss opens !crew payday to see a preview: every eligible member with their gross, tax and net, and every ineligible member with the reason. Confirm pays them all at once.",
+        "Payday is the only way money leaves the vault for a wallet. The Boss or Underboss opens !crew payday to see a preview: every eligible member with their gross, tax and net, and every ineligible member with the reason. Confirm sets the whole payday aside in one step, so the vault is charged exactly once, then credits each member's wallet separately. If a credit doesn't land (a restart, say), a job that runs every minute pays it once the share is 60 seconds old, and that member still gets their DM. A member who leaves between the two steps is still paid: who is eligible was decided when Payday was confirmed.",
         "The split is equal: gross = the lower of earnings ÷ eligible members (rounded down) and 1,000,000. Each share is taxed 5%, so the most anyone takes home is 950,000 a week. Whatever the cap leaves behind stays in earnings for next week or for level fees.",
         "If nobody presses Payday within 24 hours of it falling due (8 days after the last one) and earnings are at least 500,000, the bot pays it automatically with the same rules. Paid members get a DM; members who missed out get a DM naming the gate they missed.",
       ],
@@ -213,22 +362,22 @@ const crimeFamilies: ModuleDoc = {
       heading: "Levels",
       body: [
         "A level needs both its XP and its fee. XP is cumulative and never spent; the fee comes from the vault, earnings first, and is burned. Only the Boss or Underboss can level up, and not while dues are in arrears. The full climb from L2 to L10 costs 172,000,000 in fees.",
-        "Levels give capacity, unlocks, faster family cooldowns and a better crest. No level ever multiplies income, raises a payout or cuts a stake.",
+        "Levels give capacity (members, and with them crew heists a day and Capo seats; see Family size), unlocks, faster family cooldowns and a better crest. No level ever multiplies income, raises a payout or cuts a stake.",
       ],
       table: {
         title: "Family levels",
         columns: ["Level", "XP to reach", "Fee", "Members", "Racket cap", "Crew heist tier unlocked", "Family crew heist cooldown", "Crest"],
         rows: [
-          ["1", "0", "—", "6", "1", "Tier 1", "3h00", "Bronze"],
-          ["2", "1,000", "2,000,000", "7", "1", "—", "3h00", "Bronze"],
-          ["3", "3,000", "4,000,000", "8", "1", "Tier 2", "3h00", "Bronze"],
-          ["4", "6,000", "6,000,000", "8", "2", "—", "2h45", "Silver"],
-          ["5", "10,000", "10,000,000", "10", "2", "Tier 3", "2h45", "Silver"],
-          ["6", "16,000", "14,000,000", "10", "2", "—", "2h30", "Silver"],
-          ["7", "24,000", "20,000,000", "12", "3", "—", "2h30", "Gold"],
-          ["8", "34,000", "28,000,000", "12", "3", "Tier 4", "2h30", "Gold"],
-          ["9", "46,000", "38,000,000", "12", "3", "—", "2h00", "Gold"],
-          ["10", "60,000", "50,000,000", "12", "3", "—", "2h00", "Crowned gold"],
+          ["1", "0", "—", "10", "1", "Tier 1", "3h00", "Bronze"],
+          ["2", "1,000", "2,000,000", "12", "1", "—", "3h00", "Bronze"],
+          ["3", "3,000", "4,000,000", "14", "1", "Tier 2", "3h00", "Bronze"],
+          ["4", "6,000", "6,000,000", "16", "2", "—", "2h45", "Silver"],
+          ["5", "10,000", "10,000,000", "18", "2", "Tier 3", "2h45", "Silver"],
+          ["6", "16,000", "14,000,000", "20", "2", "—", "2h30", "Silver"],
+          ["7", "24,000", "20,000,000", "23", "3", "—", "2h30", "Gold"],
+          ["8", "34,000", "28,000,000", "25", "3", "Tier 4", "2h30", "Gold"],
+          ["9", "46,000", "38,000,000", "28", "3", "—", "2h00", "Gold"],
+          ["10", "60,000", "50,000,000", "30", "3", "—", "2h00", "Crowned gold"],
         ],
       },
     },
@@ -325,13 +474,13 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "A crew heist, step by step",
       body: [
-        "Plan. A Capo, Underboss or Boss runs !heist and picks a tier, or types !heist plan <1-4>. The family's level must unlock the tier, the family can't be under investigation (3 or more members at heat 100 or above), the family cooldown must be over, the family must have started fewer than 4 crew heists in the last 24 hours, and the planner must pass every seat gate for the Mastermind seat. The planner's stake is taken at once. If the bot can't post in the channel, the lobby goes to the family's home channel when it is in the same server; otherwise the plan is refused with the missing permission.",
+        "Plan. A Capo, Underboss or Boss runs !heist and picks a tier, or types !heist plan <1-4>. The family's level must unlock the tier, the family can't be under investigation (its investigation threshold of members at heat 100 or above: 3, or a quarter of the members rounded up when that is more), the family cooldown must be over, the family must have started fewer crew heists in the last 24 hours than its cap (4, or the member count ÷ 3 rounded up when that is more; see Family size), and the planner must pass every seat gate for the Mastermind seat. The planner's stake is taken at once. If the bot can't post in the channel, the lobby goes to the family's home channel when it is in the same server; otherwise the plan is refused with the missing permission.",
         "Lobby: 10 minutes. The card lists every open role. Members who aren't seated, are in this server, pass the tier's gates and have a free seat get a \"Crew heist lobby open\" DM with a link (at most 3 lobby calls a day, and none for 2 hours after a lobby is cancelled). Joining works from the card or with !heist join <role> anywhere in the lobby's server; another channel gets a small \"joined\" card with a link back. Role names ignore case and spaces, so \"safe cracker\" works.",
         "Leave before Start with the Leave button or !heist leave, and your stake comes straight back. If the Mastermind leaves, the whole crew heist is cancelled and every stake is refunded.",
         "Start. The planner presses Start (or types !heist start) once the required roles are filled; the crew heist also starts on its own when the last seat up to the maximum fills, or when the lobby closes with the required roles filled. Start re-checks every seat: jail, ban, heat, net worth (your paid stake counts towards it), prep items and your seat count. A seat that fails is removed and refunded and the card says it \"got pinched\". If that leaves a required role empty, the lobby stays open until its 10 minutes are up. From Start the stakes are spent, and the family cooldown begins.",
         "GO: 120 seconds. A new message mentions every crew member with an Open brief button, and each member gets a \"Crew heist GO\" DM. Open your brief (the button or !heist brief), press Refresh to see the time left and any leaked intel, and lock one of the 4 options. One answer per member, and it can't be changed. The card shows how many have locked in, never who is right.",
         "Result. The crew heist resolves the moment the last answer locks, or when the GO ends. The result card lists every seat's cut, fine and jail time. There is no result DM.",
-        "If the lobby closes without its required roles, or the planner or the Boss cancels it (!heist cancel), every stake is refunded and the family waits 30 minutes before the next crew heist. If the bot restarts during a GO before every seat has answered, the run is void: every stake is refunded and nothing else happens (no heat, fine, jail, XP or vault cut), and the void run doesn't count towards anyone's seat limit or the family's 4 a day.",
+        "If the lobby closes without its required roles, or the planner or the Boss cancels it (!heist cancel), every stake is refunded and the family waits 30 minutes before the next crew heist. If the bot restarts during a GO before every seat has answered, the run is void: every stake is refunded and nothing else happens (no heat, fine, jail, XP or vault cut), and the void run doesn't count towards anyone's seat limit or the family's daily cap.",
       ],
       table: {
         title: "Seat gates, checked in this order",
@@ -410,7 +559,7 @@ const crimeFamilies: ModuleDoc = {
         columns: ["Limit", "Value"],
         rows: [
           ["Seats per player", "2 started seats per rolling 24 hours; 1 live seat at a time"],
-          ["Crew heists per family", "4 started per rolling 24 hours; 1 live at a time"],
+          ["Crew heists per family", "max(4, members ÷ 3 rounded up) started per rolling 24 hours: 4 at 1–12 members up to 10 at 28–30; 1 live at a time"],
           ["Family cooldown, from Start", "3h00 at L1–3, 2h45 at L4–5, 2h30 at L6–8, 2h00 at L9–10"],
           ["Cancelled or expired lobby", "30 minutes"],
           ["Lobby / GO / leak point", "10 minutes / 120 seconds / the last 30 seconds of the GO"],
@@ -647,7 +796,7 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Succession",
       body: [
-        "Any !crew command or family button keeps you marked active. A Boss who goes quiet doesn't freeze the family.",
+        "Any !crew command or family button keeps you marked active. A Boss who goes quiet doesn't freeze the family. A Boss who is around but has lost the family can be removed by a no-confidence vote instead (see No-confidence vote).",
         "The automatic heir is the Underboss; if there isn't one, the Capo who joined first; then the Soldier with the most crew heists, ties to who joined first. The heir must have been active in the last 7 days; if nobody qualifies, nothing changes. The old Boss becomes a Soldier.",
       ],
       table: {
@@ -656,6 +805,7 @@ const crimeFamilies: ModuleDoc = {
         rows: [
           ["7 days", "A notice posts in the home channel and the Underboss gets a Claim the chair button (!crew claim). If the Boss comes back first, the notice says so."],
           ["14 days", "The chair passes to the heir automatically and every member gets a DM."],
+          ["During a no-confidence vote", "The claim and the automatic handover still run, and either one voids the vote with no cooldown."],
         ],
       },
     },
@@ -663,7 +813,7 @@ const crimeFamilies: ModuleDoc = {
       heading: "Disbanding",
       body: [
         "!crew disband (Boss only) shows the exact amount that will be burned, then asks you to type the family tag to confirm.",
-        "If the last payday was 7 or more days ago, eligible members get one final payday with the normal 1,000,000 cap and 5% tax; tenure still counts, but the 500,000 minimum does not. Everything else in treasury and earnings is burned. Nobody gets their deposits back. Pending invites expire, every member gets a DM, and the name and tag are freed.",
+        "If the last payday was 7 or more days ago, eligible members get one final payday with the normal 1,000,000 cap and 5% tax; tenure still counts, but the 500,000 minimum does not. Everything else in treasury and earnings is burned. Nobody gets their deposits back. Pending invites and applications expire (each applicant gets a DM), every member gets a DM, and the name and tag are freed. A family can't disband while a no-confidence vote is open.",
       ],
       note: "A Boss who disbands waits 7 days before founding again. Members wait 24 hours before joining anywhere.",
     },
@@ -677,7 +827,11 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Getting better at Crime Families",
       body: [
-        "Recruit players who will actually play. Payday pays only members who were active in the last 7 days, and the split is per eligible member, so a big roster of idle friends earns nothing and dilutes nothing either. Twelve members who play are worth more than twelve names.",
+        "Recruit players who will actually play. Payday pays only members who were active in the last 7 days, and the split is per eligible member, so a big roster of idle friends earns nothing and dilutes nothing either. Twenty members who play are worth more than thirty names.",
+        "Recruit by activity. The board's Activity sort is the census of members who played in the last 7 days, so it shows which families actually run crew heists and wars; as a family, the same number is what applicants see of you.",
+        "Grow into your caps. Every 3 members past 12 add a crew heist a day and every 5 members add a Capo seat, but per member nothing rises: seats stay at 2 a player a day and Payday at 950,000 net a week. A bigger family earns more in total, not more each.",
+        "Keep a free Capo seat for the member you want to promote, since seats never free themselves: nobody is demoted when the family shrinks or a Capo's net worth falls, so only a demotion, a leave or a kick opens one.",
+        "A vote needs two thirds of everyone eligible, not of those who voted: chase ballots. Every voter who stays silent counts like a NO.",
         "Deposit to keep pace with your XP, not ahead of it. A level needs its XP before the fee matters, and the fee is all the treasury is for. Parking money in the vault before the family has the XP only locks it away for good.",
         "Keep dues paid. At L10 dues are 400,000 a day; a few dry days put the family in arrears and block levelling until a deposit or a payout of earnings clears them. A steady stream of small deposits is cheaper than one rescue.",
         "Decide each week: pay out or level up. Earnings pay the fee or go out as Payday, never both. A young family usually levels first, since each level unlocks bigger crew heists and more members; a family at L8 or above can pay out the 950,000-a-member cap and still fund the last fees from what the cap leaves behind.",

@@ -39,4 +39,22 @@ describe("help and tutorial (19.3)", () => {
     expect(cat.commands.find((c) => c.name === "heist")).toMatchObject({ aliases: ["crewheist", "caper", "capers"] });
     expect(JSON.stringify(help.buildModuleView(cat, "!").toJSON())).toContain("!heist join lookout");
   });
+
+  it("the crew entry lists board, recruit and vote and says families hold up to 30 members", async () => {
+    vi.resetModules();
+    const help = await import("../../src/commands/general/help");
+    const crew = help.CATEGORIES.find((c) => c.id === "crimefamilies")!.commands.find((c) => c.name === "crew")!;
+    const subs = (crew.subcommands ?? []).join("\n");
+    expect(subs).toContain("board [TAG]");
+    expect(subs).toContain("recruit —");
+    expect(subs).toContain("vote [start]");
+    expect(crew.description).toContain("up to 30 members");
+  });
+
+  it("the tutorial lesson says 10 to 30 players and points to {p}crew board", async () => {
+    const { LESSONS } = await import("../../src/commands/general/tutorial");
+    const l = LESSONS.find((x) => x.id === "crimefamilies")!;
+    expect(l.howItWorks).toContain("10 to 30 players");
+    expect(l.howToUse.join(" ")).toContain("`{p}crew board`");
+  });
 });

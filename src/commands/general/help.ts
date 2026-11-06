@@ -288,7 +288,7 @@ export const CATEGORIES: CategoryData[] = [
     description: "Found or join a crime family, fill its vault and climb the family board",
     commands: [
       {
-        name: "crew", aliases: ["mob"], description: "Open your family dashboard, or the Create card when you have no family.",
+        name: "crew", aliases: ["mob"], description: "Open your family dashboard, or the Create card when you have no family. Families hold up to 30 members.",
         usage: "{p}crew [subcommand]",
         subcommands: [
           "create — found a family (10,000,000 from your wallet)",
@@ -297,7 +297,7 @@ export const CATEGORIES: CategoryData[] = [
           "decline <TAG> — decline an invite",
           "leave — leave your family",
           "kick <user> — remove a member below your rank",
-          "promote <user> — move a member up one rank",
+          "promote <user> — move a member up one rank (Capo needs 10,000,000 net worth)",
           "demote <user> — move a member down one rank",
           "handover <user> — hand the Boss chair to a member",
           "deposit <amount|all> — add wallet money to the vault (5% tax)",
@@ -310,7 +310,10 @@ export const CATEGORIES: CategoryData[] = [
           "home — post family cards in this channel (Boss)",
           "rename — rename the family (2,000,000 from the vault, Boss)",
           "disband — close the family for good (Boss)",
-          "claim — take the chair from a Boss inactive 7 days (Underboss)"
+          "claim — take the chair from a Boss inactive 7 days (Underboss)",
+          "vote [start] — the no-confidence vote (Underboss and Capos start it)",
+          "board [TAG] — browse families that are recruiting, or open one's card",
+          "recruit — your family's listing and applications (Capo and up)"
         ],
         example: "{p}crew deposit 5m"
       },

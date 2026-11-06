@@ -19,6 +19,8 @@ import {
   MapPin,
   Gavel,
   Crosshair,
+  Vote,
+  Megaphone,
 } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -154,9 +156,12 @@ export default async function ChangelogPage() {
               </h2>
               <p className="mt-2 leading-relaxed text-muted">
                 Fortuna&apos;s first real group play. Found or join a crime
-                family of up to 12 players, fill a shared vault, and run crew
-                heists that only work when the whole crew talks to each other. Rolling
-                out to servers in stages.
+                family of 10 to 30 players, fill a shared vault, and run crew
+                heists that only work when the whole crew talks to each other.
+                Big families get more crew heists a day and more Capo seats,
+                members can vote out a Boss who has lost the room, and a
+                recruitment board matches families with players. Rolling out to
+                servers in stages.
               </p>
 
               <div className="mt-8 space-y-8">
@@ -177,7 +182,9 @@ export default async function ChangelogPage() {
                   </div>
                   <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <FeatureItem>Founding costs 10,000,000, burned</FeatureItem>
-                    <FeatureItem>Up to 12 members at level 7</FeatureItem>
+                    <FeatureItem>10 members at level 1, up to 30 at level 10</FeatureItem>
+                    <FeatureItem>1 to 6 Capo seats, one per 5 members</FeatureItem>
+                    <FeatureItem>Capo and Underboss need 10,000,000 net worth</FeatureItem>
                     <FeatureItem>Daily dues of 40,000 × level</FeatureItem>
                     <FeatureItem>Automatic handover after 14 days away</FeatureItem>
                   </ul>
@@ -200,6 +207,7 @@ export default async function ChangelogPage() {
                   <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <FeatureItem>5% tax on deposits and on Payday</FeatureItem>
                     <FeatureItem>Payday capped at 1,000,000 gross a member</FeatureItem>
+                    <FeatureItem>Each member&apos;s share is credited on its own</FeatureItem>
                   </ul>
                 </div>
 
@@ -226,7 +234,57 @@ export default async function ChangelogPage() {
                     <FeatureItem>Cuts up to 960,000 a seat on a Clean Tier 4</FeatureItem>
                     <FeatureItem>10% of every pool goes to the family vault</FeatureItem>
                     <FeatureItem>2 seats per player per rolling 24 hours</FeatureItem>
+                    <FeatureItem>4 to 10 crew heists a family a day, by size</FeatureItem>
                     <FeatureItem>An AFK seat leaks its intel instead of sinking the job</FeatureItem>
+                  </ul>
+                </div>
+
+                <div className="border-t border-line pt-8">
+                  <div className="flex items-start gap-4">
+                    <Vote className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        The no-confidence vote
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        <strong className="text-ink">!crew vote</strong> lets the
+                        Underboss or a Capo put the Boss to a vote. Every member
+                        with 72 hours in the family votes in secret for 48 hours;
+                        two thirds of them voting YES hands the chair to the
+                        Underboss, or the next heir. Kicks, rank changes, handover and disband are
+                        frozen while it runs.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>Secret ballots you can change until the close</FeatureItem>
+                    <FeatureItem>A new Boss gets 7 days before the first vote</FeatureItem>
+                    <FeatureItem>A failed vote blocks the next for 7 days</FeatureItem>
+                    <FeatureItem>A demoted Underboss or Capo can still start one for 7 days</FeatureItem>
+                  </ul>
+                </div>
+
+                <div className="border-t border-line pt-8">
+                  <div className="flex items-start gap-4">
+                    <Megaphone className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        The recruitment board
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        <strong className="text-ink">!crew board</strong> lists
+                        every family that is recruiting, sorted by level, size or
+                        how many members actually play. Families set a pitch and
+                        requirements; players apply with a short message and
+                        officers accept or decline from an inbox.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>An &quot;I qualify&quot; filter on your own numbers</FeatureItem>
+                    <FeatureItem>3 pending applications per player, 25 per family</FeatureItem>
+                    <FeatureItem>Applications expire after 72 hours</FeatureItem>
+                    <FeatureItem>A &quot;Family applications&quot; DM you can turn off</FeatureItem>
                   </ul>
                 </div>
               </div>
