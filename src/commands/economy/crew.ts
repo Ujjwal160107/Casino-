@@ -63,9 +63,9 @@ function targetOpener(kind: "kick" | "chair", verb: string, summary: (target: st
 function rankChange(action: "promote" | "demote") {
   return async (ctx: CrewCtx) => {
     const target = await targetOf(ctx, action === "promote" ? "Promote" : "Demote");
-    const { family, newRole } = await (action === "promote" ? promoteMember : demoteMember)(ctx.uid, target);
+    const { family, newRole, fellBack } = await (action === "promote" ? promoteMember : demoteMember)(ctx.uid, target);
     await announceRoleChange(ctx.message.client, family, action === "promote" ? "promoted" : "demoted", target, newRole);
-    return notice(ctx, `<@${target}> is now **${FAMILY_ROLES[newRole].name}** of **${familyLabel(family)}**.`);
+    return notice(ctx, `<@${target}> is now **${FAMILY_ROLES[newRole].name}** of **${familyLabel(family)}**${fellBack ? " (no Capo seat was free)" : ""}.`);
   };
 }
 

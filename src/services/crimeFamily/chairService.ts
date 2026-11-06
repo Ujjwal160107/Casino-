@@ -1,13 +1,17 @@
 // Ranks and the chair (spec 6.3, 6.7): promote, demote, hand over, claim,
 // the succession heir and the automatic hand-over, plus the once-per-episode
-// claim notice CAS. Role caps are the unique (familyId, roleSlot) index; every
-// rank change re-reads both rows inside its transaction.
+// claim notice CAS. The Capo cap is a count against capoCapFor (amendment 3.2)
+// with the unique (familyId, roleSlot) index as the backstop; every rank
+// change re-reads both rows inside its transaction.
 import type { Family, FamilyMember, Prisma } from "@prisma/client";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { CAPO_SLOTS, type FamilyRole } from "../../data/crimeFamilyCatalog";
+import { fmtFortunes } from "../../utils/format";
+import { computeNetWorth } from "../netWorthService";
 import { readActorAndTarget, requireMembership } from "./familyQueries";
 import { can, nextRoleDown, nextRoleUp, NO_PERMISSION, ROLE_RANK, type FamilyAction } from "./permissions";
+import { capoCapFor } from "./sizeRules";
 import { FamilyError, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
 
 type ChairMove = { family: Family; oldBossId: string; newBossId: string };
@@ -18,47 +22,80 @@ const UNDERBOSS_TAKEN = "The Underboss seat is taken.";
 const actorOf = (m: FamilyMember) => ({ role: m.role as FamilyRole, joinedAt: m.joinedAt });
 const secondsAgo = (now: Date, seconds: number) => new Date(now.getTime() - seconds * 1000);
 
-/** The roleSlot a member takes in newRole, read inside the transaction. */
-async function slotFor(tx: Prisma.TransactionClient, familyId: string, member: FamilyMember, newRole: FamilyRole): Promise<string> {
-  if (newRole === "SOLDIER") return member.userId;
+/**
+ * The role and roleSlot a member takes in newRole, read inside the transaction.
+ * With every Capo slot held, `fallBack` lands the member on Soldier instead of
+ * throwing (A45: a demoted Underboss).
+ */
+async function slotFor(
+  tx: Prisma.TransactionClient, familyId: string, member: FamilyMember, newRole: FamilyRole, opts: { fallBack: boolean },
+): Promise<{ role: FamilyRole; roleSlot: string }> {
+  if (newRole === "SOLDIER") return { role: "SOLDIER", roleSlot: member.userId };
   const held = new Set((await tx.familyMember.findMany({ where: { familyId }, select: { roleSlot: true } })).map((m) => m.roleSlot));
   if (newRole === "UNDERBOSS") {
     if (held.has("UNDERBOSS")) throw new FamilyError(UNDERBOSS_TAKEN);
-    return "UNDERBOSS";
+    return { role: "UNDERBOSS", roleSlot: "UNDERBOSS" };
   }
   const free = CAPO_SLOTS.find((slot) => !held.has(slot));
-  if (!free) throw new FamilyError(CAPO_FULL);
-  return free;
+  if (free) return { role: "CAPO", roleSlot: free };
+  if (opts.fallBack) return { role: "SOLDIER", roleSlot: member.userId };
+  throw new FamilyError(CAPO_FULL);
 }
 
-/** One rank step for target, up or down, by an actor the 6.3 table allows. */
+/**
+ * The promotion gates (amendment 3.2), inside the transaction so a retry
+ * re-reads both: a free Capo seat under capoCapFor(memberCount), and the
+ * target's live net worth for Capo and Underboss (A10).
+ */
+async function assertPromotable(tx: Prisma.TransactionClient, familyId: string, targetId: string, newRole: FamilyRole): Promise<void> {
+  if (newRole === "CAPO") {
+    const { memberCount } = await tx.family.findUniqueOrThrow({ where: { id: familyId }, select: { memberCount: true } });
+    const capos = await tx.familyMember.count({ where: { familyId, role: "CAPO" } });
+    const cap = capoCapFor(memberCount);
+    if (capos >= cap) throw new FamilyError(`Capo seats are full (${capos}/${cap} for ${memberCount} members).`);
+  }
+  const bar = CRIME_FAMILY_CONFIG.capoMinNetWorth;
+  const { total } = await computeNetWorth(targetId);
+  if (total < bar) throw new FamilyError(`Promotion needs ${fmtFortunes(bar)} net worth (<@${targetId}> has ${fmtFortunes(total)}).`);
+}
+
+type RankChange = { family: Family; newRole: FamilyRole; fellBack: boolean };
+
+/** One rank step for target, up or down, by an actor the 6.3 table allows. No rule ever demotes for net worth or size. */
 async function changeRank(
   action: Extract<FamilyAction, "promote" | "demote">, actorId: string, targetId: string, now: Date,
-): Promise<{ family: Family; newRole: FamilyRole }> {
+): Promise<RankChange> {
   const { family } = await requireMembership(actorId);
   let newRole: FamilyRole | null = null;
+  let fellBack = false;
   try {
     await runFamilyTx(async (tx) => {
       await touchFamily(tx, family.id, now);
       const { actor, target } = await readActorAndTarget(tx, family.id, actorId, targetId);
       const targetRole = target.role as FamilyRole;
       if (!can(actorOf(actor), action, now, { role: targetRole })) throw new FamilyError(NO_PERMISSION);
-      newRole = (action === "promote" ? nextRoleUp(targetRole) : nextRoleDown(targetRole))!;
-      const roleSlot = await slotFor(tx, family.id, target, newRole);
-      await tx.familyMember.update({ where: { id: target.id }, data: { role: newRole, roleSlot } });
+      const stepped = (action === "promote" ? nextRoleUp(targetRole) : nextRoleDown(targetRole))!;
+      if (action === "promote") await assertPromotable(tx, family.id, targetId, stepped);
+      const slot = await slotFor(tx, family.id, target, stepped, { fallBack: action === "demote" && targetRole === "UNDERBOSS" });
+      newRole = slot.role;
+      fellBack = stepped === "CAPO" && slot.role === "SOLDIER";
+      const officerUntil = action === "demote" && (targetRole === "UNDERBOSS" || targetRole === "CAPO")
+        ? { officerUntil: new Date(now.getTime() + CRIME_FAMILY_CONFIG.voteOfficerGraceSeconds * 1000) }
+        : {};
+      await tx.familyMember.update({ where: { id: target.id }, data: { ...slot, ...officerUntil } });
     });
   } catch (err) {
     if (isUniqueViolation(err, "FamilyMember_familyId_roleSlot_key")) throw new FamilyError(newRole === "UNDERBOSS" ? UNDERBOSS_TAKEN : CAPO_FULL);
     throw err;
   }
-  return { family, newRole: newRole! };
+  return { family, newRole: newRole!, fellBack };
 }
 
-export function promoteMember(actorId: string, targetId: string, now: Date = new Date()): Promise<{ family: Family; newRole: FamilyRole }> {
+export function promoteMember(actorId: string, targetId: string, now: Date = new Date()): Promise<RankChange> {
   return changeRank("promote", actorId, targetId, now);
 }
 
-export function demoteMember(actorId: string, targetId: string, now: Date = new Date()): Promise<{ family: Family; newRole: FamilyRole }> {
+export function demoteMember(actorId: string, targetId: string, now: Date = new Date()): Promise<RankChange> {
   return changeRank("demote", actorId, targetId, now);
 }
 

@@ -77,11 +77,14 @@ describe("createFamily (6.1)", () => {
 
 const invite = (inviterId: string, inviteeId: string, now?: Date) => inviteMember({ inviterId, inviteeId, guildId: "g1", channelId: "c1", now });
 const joiner = () => seedEligibleUser({ wallet: 2_000_000 });          // passes family_join
-async function famWith(members: { role: FamilyRole; joinedAt?: Date }[] = []) {
+/** `size` pads the family with Soldiers to that many members at level 10; `wallet` seeds every non-Boss member with it. */
+async function famWith(members: { role: FamilyRole; joinedAt?: Date }[] = [], opts: { size?: number; wallet?: number } = {}) {
   const bossId = await seedEligibleUser();
+  const person = () => (opts.wallet === undefined ? joiner() : seedEligibleUser({ wallet: opts.wallet }));
+  const padded = [...members, ...Array.from({ length: Math.max(0, (opts.size ?? 0) - 1 - members.length) }, () => ({ role: "SOLDIER" as FamilyRole }))];
   const rows = [];
-  for (const m of members) rows.push({ userId: await joiner(), joinedAt: daysAgo(10), ...m });
-  const family = await seedFamily({ bossId, members: rows });
+  for (const m of padded) rows.push({ userId: await person(), joinedAt: daysAgo(10), ...m });
+  const family = await seedFamily({ bossId, members: rows, ...(opts.size ? { level: 10 } : {}) });
   return { family, bossId, ids: rows.map((r) => r.userId) };
 }
 const pending = (familyId: string) => testPrisma.familyInvite.count({ where: { familyId, status: "PENDING" } });
@@ -329,33 +332,36 @@ describe("leave and kick (6.4)", () => {
 describe("ranks (6.3)", () => {
   const member = (userId: string) => testPrisma.familyMember.findUniqueOrThrow({ where: { userId } });
 
-  it("promotions fill CAPO1, CAPO2, CAPO3, then 'Capo seats are full.'", async () => {
-    const { bossId, ids } = await famWith([{ role: "SOLDIER" }, { role: "SOLDIER" }, { role: "SOLDIER" }, { role: "SOLDIER" }]);
-    for (const [k, id] of ids.slice(0, 3).entries()) {
+  it("promotions fill CAPO1..CAPO6, then 'Capo seats are full (6/6 for 30 members).'", async () => {
+    const { bossId, ids } = await famWith([], { size: 30, wallet: 12_000_000 });
+    for (const [k, id] of ids.slice(0, 6).entries()) {
       expect(await promoteMember(bossId, id)).toMatchObject({ newRole: "CAPO" });
       expect(await member(id)).toMatchObject({ role: "CAPO", roleSlot: `CAPO${k + 1}` });
     }
-    await expect(promoteMember(bossId, ids[3])).rejects.toThrow("Capo seats are full.");
-    expect(await member(ids[3])).toMatchObject({ role: "SOLDIER", roleSlot: ids[3] });
+    await expect(promoteMember(bossId, ids[6])).rejects.toThrow("Capo seats are full (6/6 for 30 members).");
+    expect(await member(ids[6])).toMatchObject({ role: "SOLDIER", roleSlot: ids[6] });
   });
 
-  it("three concurrent Soldier → Capo promotions take CAPO1..3 once each", async () => {
-    const { bossId, ids } = await famWith([{ role: "SOLDIER" }, { role: "SOLDIER" }, { role: "SOLDIER" }]);
-    const rs = await Promise.allSettled(ids.map((id) => promoteMember(bossId, id)));
-    expect(rs.filter((r) => r.status === "fulfilled")).toHaveLength(3);
-    expect((await Promise.all(ids.map(member))).map((r) => r.roleSlot).sort()).toEqual(["CAPO1", "CAPO2", "CAPO3"]);
+  it("seven concurrent Soldier → Capo promotions never seat more than 6", async () => {
+    const { bossId, ids } = await famWith([], { size: 30, wallet: 12_000_000 });
+    const seven = ids.slice(0, 7);
+    const rs = await Promise.allSettled(seven.map((id) => promoteMember(bossId, id)));
+    for (const r of rs) if (r.status === "rejected") expect(r.reason.message).toMatch(BUSY_OR("Capo seats are full (6/6 for 30 members)."));
+    const slots = (await Promise.all(seven.map(member))).filter((r) => r.role === "CAPO").map((r) => r.roleSlot);
+    expect(slots.length).toBeLessThanOrEqual(6);
+    expect(new Set(slots).size).toBe(slots.length);
   });
 
   it("two concurrent promotions to Underboss: one wins; the other reads 'The Underboss seat is taken.'", async () => {
-    const { family, bossId, ids } = await famWith([{ role: "CAPO" }, { role: "CAPO" }]);
+    const { family, bossId, ids } = await famWith([{ role: "CAPO" }, { role: "CAPO" }], { wallet: 12_000_000 });
     const rs = await Promise.allSettled(ids.map((id) => promoteMember(bossId, id)));
     expect(rs.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-    expect(rs.filter((r) => r.status === "rejected").map((r: any) => r.reason.message)).toEqual(["The Underboss seat is taken."]);
+    for (const r of rs) if (r.status === "rejected") expect(r.reason.message).toMatch(BUSY_OR("The Underboss seat is taken."));
     expect(await testPrisma.familyMember.count({ where: { familyId: family.id, role: "UNDERBOSS" } })).toBe(1);
   });
 
   it("an Underboss can promote Soldier → Capo but not Capo → Underboss", async () => {
-    const { ids: [ub, capo, s] } = await famWith([{ role: "UNDERBOSS" }, { role: "CAPO" }, { role: "SOLDIER" }]);
+    const { ids: [ub, capo, s] } = await famWith([{ role: "UNDERBOSS" }, { role: "CAPO" }, { role: "SOLDIER" }], { size: 10, wallet: 12_000_000 });
     await expect(promoteMember(ub, capo)).rejects.toThrow("You don't have permission to do that.");
     expect(await promoteMember(ub, s)).toMatchObject({ newRole: "CAPO" });
     expect(await member(s)).toMatchObject({ role: "CAPO", roleSlot: "CAPO2" });

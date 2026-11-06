@@ -115,12 +115,12 @@ async function vaultScreen(uid: string, note?: string): Promise<CfPayload> {
 }
 
 /** S5 at `page`; a null page opens the page that holds `selected` in the rank-sorted roster. */
-async function manageScreen(uid: string, selected: string | null, page: number | null): Promise<CfPayload> {
+async function manageScreen(uid: string, selected: string | null, page: number | null, note?: string): Promise<CfPayload> {
   const { family } = await requireMembership(uid);
   const view = await buildDashboardView(family.id, uid, new Date());
   if (!view.viewer.canManage) throw new FamilyError("Only a Capo or above can manage members.");
   const at = page ?? Math.max(0, Math.floor(view.roster.findIndex((m) => m.userId === selected) / CRIME_FAMILY_CONFIG.managePageSize));
-  return buildManagePanel(uid, view, selected, at);
+  return buildManagePanel(uid, view, selected, at, note);
 }
 
 async function logScreen(uid: string, page: number): Promise<CfPayload> {
@@ -210,9 +210,9 @@ const manageRoute: CfRoute = async (i, args) => {
   if (action === "pg") return show(i, await manageScreen(uid, null, Number(args[1]) || 0));
   if (action === "kick" || action === "chair") return show(i, confirmScreen(uid, action, target));
   const kind = action === "promote" ? "promoted" : "demoted";
-  const { family, newRole } = await (action === "promote" ? promoteMember : demoteMember)(uid, target);
+  const { family, newRole, fellBack } = await (action === "promote" ? promoteMember : demoteMember)(uid, target);
   await announceRoleChange(i.client, family, kind, target, newRole);
-  return show(i, await manageScreen(uid, target, null));
+  return show(i, await manageScreen(uid, target, null, fellBack ? `<@${target}> is now a Soldier (no Capo seat was free).` : undefined));
 };
 
 /** `crew:cf:<kind>:<ok|no>:<target|0>:<owner>` (S26). */

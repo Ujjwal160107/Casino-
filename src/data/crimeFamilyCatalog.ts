@@ -18,8 +18,8 @@ export const FAMILY_ROLES: Readonly<Record<FamilyRole | "ASSOCIATE", { name: str
   ASSOCIATE: { name: "Associate", emojiKey: "rank_associate" },
 };
 
-/** Capo role slots, filled lowest free first (spec 6.3). */
-export const CAPO_SLOTS = ["CAPO1", "CAPO2", "CAPO3"] as const;
+/** Capo role slots, filled lowest free first (amendment 3.2). The cap is a count check (capoCapFor), not the slot list. */
+export const CAPO_SLOTS = ["CAPO1", "CAPO2", "CAPO3", "CAPO4", "CAPO5", "CAPO6"] as const;
 
 // ── Names and tags (6.2) ─────────────────────────────────────────────────────
 

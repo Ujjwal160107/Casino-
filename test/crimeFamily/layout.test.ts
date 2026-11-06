@@ -43,7 +43,7 @@ describe.each([true, false])("family screens, art present = %s", (present) => {
 describe("screen details", () => {
   const view = (o: Partial<FamilyDashboardView> = {}, viewer: Partial<FamilyDashboardView["viewer"]> = {}): FamilyDashboardView => ({
     familyId: "65f000000000000000000001", name: "Velvet Ante", tag: "VLA", level: 1, xp: 0, nextLevelXp: 1_000, memberCount: 2, memberCap: 6,
-    crestKey: "crest_1", roster: [{ userId: "1", role: "BOSS", associateUntil: null }, { userId: "2", role: "UNDERBOSS", associateUntil: null }],
+    capos: 0, capoCap: 1, crestKey: "crest_1", roster: [{ userId: "1", role: "BOSS", associateUntil: null }, { userId: "2", role: "UNDERBOSS", associateUntil: null }],
     duesArrears: 0, nextCaperAt: new Date(), underInvestigation: false, racketsHeld: null, showTurf: false, ...o,
     viewer: { userId: "2", role: "UNDERBOSS", canManage: true, canClaim: false, ...viewer },
   });
@@ -136,6 +136,14 @@ describe("30-member rosters (amendment 2.5)", () => {
     expect(prev.custom_id).toBe(CREW_IDS.managePage(0, v.viewer.userId));
     expect(JSON.stringify(p.components.map((c) => c.toJSON()))).toContain("#16");
     expect(countComponents(p)).toBeLessThanOrEqual(16);
+  });
+
+  it("S2's Capos line and the S5 legend name the Capo seats and the promotion bar (amendment 3.4)", () => {
+    const v = { ...dashboardView(), capos: 4, capoCap: 3 };
+    expect(rosterText(buildDashboard(v, { art: false }))).toContain("**Capos (4/3)**");
+    const s5 = JSON.stringify(buildManagePanel(v.viewer.userId, v, null, 0, "<@1> is now a Soldier (no Capo seat was free).").components.map((c) => c.toJSON()));
+    expect(s5).toContain("Capo seats 4/3; promotion needs 10,000,000 net worth.");
+    expect(s5).toContain("<@1> is now a Soldier (no Capo seat was free).");
   });
 
   it("S5 clamps a page past the end to the last page; a selection off the page counts as none", () => {

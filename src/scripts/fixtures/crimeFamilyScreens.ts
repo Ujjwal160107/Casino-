@@ -41,7 +41,7 @@ function failingResult(n: number): EligibilityResult {
 export function dashboardView(): FamilyDashboardView {
   return {
     familyId: FAMILY_ID, name: LONG_NAME, tag: "WXYZ", level: 9, xp: 46_000, nextLevelXp: 60_000, memberCount: 30, memberCap: 30,
-    crestKey: "crest_3",
+    capos: 6, capoCap: 6, crestKey: "crest_3",
     roster: MEMBERS.map((userId, i) => ({ userId, role: ROLES[i], associateUntil: i === 1 || i >= 20 ? SOON() : null })),
     duesArrears: 999, nextCaperAt: SOON(), underInvestigation: true, racketsHeld: 3, showTurf: true,
     viewer: { userId: OWNER, role: "UNDERBOSS", canManage: true, canClaim: true },
@@ -110,7 +110,7 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
     { label: "S3 create confirm", max: 7, payload: buildCreateConfirm(OWNER, { name: LONG_NAME, tag: "WXYZ", fee: 10_000_000 }) },
     { label: "S4 invite card", max: 9, payload: buildInviteCard(inviteView(1)) },
     { label: "S4 invite resolved", max: 9, payload: buildInviteResolved(inviteView(1), "Expired") },
-    { label: "S5 manage (page 2 of 2, one selected)", max: 16, payload: buildManagePanel(OWNER, { ...dash, viewer: { ...dash.viewer, role: "BOSS" } }, MEMBERS[19], 1) },
+    { label: "S5 manage (page 2 of 2, one selected)", max: 16, payload: buildManagePanel(OWNER, { ...dash, viewer: { ...dash.viewer, role: "BOSS" } }, MEMBERS[19], 1, `<@${MEMBERS[1]}> is now a Soldier (no Capo seat was free).`) },
     { label: "S6 vault (payday locked, 12 ineligible)", max: 12, payload: buildVaultPanel(OWNER, vaultView(true), "Deposited 25,000,000.") },
     { label: "S6 vault (payday open)", max: 12, payload: buildVaultPanel(OWNER, vaultView(false)) },
     { label: "S7 payday preview (12 members)", max: 6, payload: buildPaydayPreview(OWNER, paydayPreview(false), "Members changed.") },

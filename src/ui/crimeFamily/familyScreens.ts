@@ -73,19 +73,21 @@ const isAssociateSoldier = (m: RosterEntry) => m.role === "SOLDIER" && m.associa
 
 const mention = (m: RosterEntry) => `<@${m.userId}>`;
 
-const ROSTER_GROUPS: readonly { icon: FamilyRole | "ASSOCIATE"; label: string; holds: (m: RosterEntry) => boolean; entry: (m: RosterEntry) => string }[] = [
-  { icon: "BOSS", label: "Boss", holds: (m) => m.role === "BOSS", entry: mention },
-  { icon: "UNDERBOSS", label: "Underboss", holds: (m) => m.role === "UNDERBOSS", entry: mention },
-  { icon: "CAPO", label: "Capos", holds: (m) => m.role === "CAPO", entry: mention },
-  { icon: "SOLDIER", label: "Soldiers", holds: (m) => m.role === "SOLDIER" && !isAssociateSoldier(m), entry: mention },
-  { icon: "ASSOCIATE", label: "Associates", holds: isAssociateSoldier, entry: (m) => `${mention(m)} ${rel(m.associateUntil!)}` },
+const ROSTER_GROUPS: readonly {
+  icon: FamilyRole | "ASSOCIATE"; label: (v: FamilyDashboardView) => string; holds: (m: RosterEntry) => boolean; entry: (m: RosterEntry) => string;
+}[] = [
+  { icon: "BOSS", label: () => "Boss", holds: (m) => m.role === "BOSS", entry: mention },
+  { icon: "UNDERBOSS", label: () => "Underboss", holds: (m) => m.role === "UNDERBOSS", entry: mention },
+  { icon: "CAPO", label: (v) => `Capos (${v.capos}/${v.capoCap})`, holds: (m) => m.role === "CAPO", entry: mention },
+  { icon: "SOLDIER", label: () => "Soldiers", holds: (m) => m.role === "SOLDIER" && !isAssociateSoldier(m), entry: mention },
+  { icon: "ASSOCIATE", label: () => "Associates", holds: isAssociateSoldier, entry: (m) => `${mention(m)} ${rel(m.associateUntil!)}` },
 ];
 
 /** S2's roster (amendment 2.5): one line per non-empty rank group. */
-function groupedRoster(roster: readonly RosterEntry[]): string {
+function groupedRoster(view: FamilyDashboardView): string {
   return ROSTER_GROUPS.flatMap((g) => {
-    const held = roster.filter(g.holds);
-    return held.length > 0 ? [`${roleEmoji(g.icon)}**${g.label}** ${held.map(g.entry).join(" ")}`] : [];
+    const held = view.roster.filter(g.holds);
+    return held.length > 0 ? [`${roleEmoji(g.icon)}**${g.label(view)}** ${held.map(g.entry).join(" ")}`] : [];
   }).join("\n");
 }
 
@@ -106,7 +108,7 @@ export function buildDashboard(view: FamilyDashboardView, opts: { art: boolean }
 
   container
     .addSeparatorComponents(sep())
-    .addTextDisplayComponents(text(groupedRoster(view.roster)))
+    .addTextDisplayComponents(text(groupedRoster(view)))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       text(status.join(" · ")),
@@ -184,12 +186,13 @@ export function buildInviteResolved(v: InviteView, status: string): CfPayload {
 
 // ── S5 ───────────────────────────────────────────────────────────────────────
 
-const MANAGE_LEGEND =
+const manageLegend = (view: FamilyDashboardView) =>
   "-# Boss: everything. Underboss: promote, demote, payday and level up. Capo: invite and kick Soldiers. " +
-  "Associates (first 72 h) can't take crew heist seats or war actions.";
+  "Associates (first 72 h) can't take crew heist seats or war actions." +
+  ` Capo seats ${view.capos}/${view.capoCap}; promotion needs ${fmtFortunes(CRIME_FAMILY_CONFIG.capoMinNetWorth)} net worth.`;
 
 /** S5, `managePageSize` members a page; `page` is clamped and a selection off the page counts as none. */
-export function buildManagePanel(ownerId: string, view: FamilyDashboardView, selected: string | null, page: number): CfPayload {
+export function buildManagePanel(ownerId: string, view: FamilyDashboardView, selected: string | null, page: number, note?: string): CfPayload {
   const size = CRIME_FAMILY_CONFIG.managePageSize;
   const pages = Math.max(1, Math.ceil(view.roster.length / size));
   const at = Math.min(Math.max(0, page), pages - 1);
@@ -211,9 +214,9 @@ export function buildManagePanel(ownerId: string, view: FamilyDashboardView, sel
     }));
   const t = target ?? "0";
   const container = new ContainerBuilder()
-    .addTextDisplayComponents(text(`## Manage [${view.tag}]\n${roster.map((m, i) => `\`#${start + i + 1}\` ${rosterLine(m)}`).join("\n")}`))
+    .addTextDisplayComponents(text(`${withNote(`## Manage [${view.tag}]`, note)}\n${roster.map((m, i) => `\`#${start + i + 1}\` ${rosterLine(m)}`).join("\n")}`))
     .addSeparatorComponents(sep())
-    .addTextDisplayComponents(text(MANAGE_LEGEND))
+    .addTextDisplayComponents(text(manageLegend(view)))
     .addActionRowComponents(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select))
     .addActionRowComponents(buttonRow(
       cfButton(CREW_IDS.manage("promote", t, ownerId), "Promote", ButtonStyle.Secondary, { disabled: !target }),

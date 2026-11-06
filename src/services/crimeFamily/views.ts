@@ -15,6 +15,9 @@ export interface FamilyDashboardView {
   nextLevelXp: number | null;
   memberCount: number;
   memberCap: number;
+  /** Capos seated and the Capo cap for this size (amendment 3.2); capos may exceed capoCap (grandfathered). */
+  capos: number;
+  capoCap: number;
   crestKey: FamilyLevelDef["crestKey"];
   /** Rank desc, then joinedAt asc. associateUntil is always null for the BOSS row (P20). */
   roster: { userId: string; role: FamilyRole; associateUntil: Date | null }[];

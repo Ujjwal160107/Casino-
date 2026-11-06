@@ -7,7 +7,7 @@ import { FAMILY_LEVELS, levelDef, type FamilyRole } from "../../data/crimeFamily
 import { checkJailStatus } from "../jailService";
 import { racketsHeldFor } from "./extensions";
 import { can, isAssociate, ROLE_RANK } from "./permissions";
-import { investigationThresholdFor } from "./sizeRules";
+import { capoCapFor, investigationThresholdFor } from "./sizeRules";
 import { FamilyError } from "./tx";
 import type { FamilyDashboardView, InviteView } from "./views";
 
@@ -103,6 +103,8 @@ export async function buildDashboardView(familyId: string, viewerId: string, now
     nextLevelXp: FAMILY_LEVELS.find((l) => l.level === family.level + 1)?.xpToReach ?? null,
     memberCount: members.length,
     memberCap: level.memberCap,
+    capos: members.filter((m) => m.role === "CAPO").length,
+    capoCap: capoCapFor(members.length),
     crestKey: level.crestKey,
     roster: members.map((m) => ({
       userId: m.userId,
