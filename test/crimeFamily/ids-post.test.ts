@@ -11,7 +11,7 @@ const O = "65f0000000000000000000ff"; // 24-char ObjectId
 describe("customIds", () => {
   const all = [
     CREW_IDS.view("invites", U), CREW_IDS.createOpen(U), CREW_IDS.createOk("WXYZ", "x".repeat(24), U), CREW_IDS.createNo(U),
-    CREW_IDS.manageSelect(U), CREW_IDS.manage("promote", T, U), CREW_IDS.manage("demote", T, U), CREW_IDS.manage("kick", T, U),
+    CREW_IDS.manageSelect(99, U), CREW_IDS.managePage(99, U), CREW_IDS.manage("promote", T, U), CREW_IDS.manage("demote", T, U), CREW_IDS.manage("kick", T, U),
     CREW_IDS.manage("chair", T, U), CREW_IDS.confirm("chair", "ok", T, U), CREW_IDS.confirm("leave", "no", "0", U),
     CREW_IDS.open("payday", U), CREW_IDS.openTarget("kick", T, U), CREW_IDS.openTarget("chair", T, U),
     CREW_IDS.vault("deposit", U), CREW_IDS.paydayOk(9_000_000_000_000_000, 12, U), CREW_IDS.levelOk(10, U),

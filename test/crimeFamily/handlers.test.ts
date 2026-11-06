@@ -4,7 +4,7 @@ import { redisService } from "../../src/services/redisService";
 import { handleCrimeFamilyInteraction } from "../../src/handlers/crimeFamilyRouter";
 import { rejectPress } from "../../src/utils/interactionHelpers";
 import { CREW_IDS, CPR_IDS } from "../../src/ui/crimeFamily/ids";
-import { fakeButton, fakeModal, said } from "./fakeInteraction";
+import { fakeButton, fakeModal, fakeSelect, said } from "./fakeInteraction";
 import { inviteMember } from "../../src/services/crimeFamily/membershipService";
 import { ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
 import {
@@ -127,6 +127,25 @@ describe("crime family interactions", () => {
     await handleCrimeFamilyInteraction(acc as any);
     expect(said(acc)).toContain("Crime Families are not open yet.");
     expect(await testPrisma.familyMember.findUnique({ where: { userId: invitee } })).toBeNull();
+  });
+
+  it("the S5 pager and a select on page 2 keep the page", async () => {
+    const boss = await seedEligibleUser();
+    const ids: string[] = [];
+    for (let k = 0; k < 19; k++) ids.push(await seedEligibleUser());
+    await seedFamily({ bossId: boss, level: 6, members: ids.map((userId) => ({ userId, role: "SOLDIER" as const, joinedAt: daysAgo(10) })) });
+    await withCfConfig({ enabled: true }, async () => {
+      const pg = fakeButton(CREW_IDS.managePage(1, boss), { userId: boss, ephemeralSource: true });
+      await handleCrimeFamilyInteraction(pg as any);
+      const page2 = JSON.stringify(pg.editReply.mock.calls.at(-1)![0]);
+      expect(page2).toContain(CREW_IDS.manageSelect(1, boss));
+      const pick = ids[17];                                                // roster #19: page 2 (index 1)
+      const sel = fakeSelect(CREW_IDS.manageSelect(1, boss), [pick], { userId: boss, ephemeralSource: true });
+      await handleCrimeFamilyInteraction(sel as any);
+      const out = JSON.stringify(sel.editReply.mock.calls.at(-1)![0]);
+      expect(out).toContain(CREW_IDS.manageSelect(1, boss));
+      expect(out).toContain(CREW_IDS.manage("promote", pick, boss));
+    });
   });
 });
 

@@ -23,9 +23,12 @@ const BIG = MAX_SAFE_BALANCE - 1;
 const LONG_NAME = "Velvet Ante Syndicate Ok"; // 24 characters
 const SOON = () => new Date(Date.now() + 3_600_000);
 
-/** 12 distinct 20-digit member ids; the owner is the first (the Boss). */
-const MEMBERS = Array.from({ length: 12 }, (_, i) => (i === 0 ? OWNER : `9876543210987654${String(3200 + i)}`));
-const ROLES: FamilyRole[] = ["BOSS", "UNDERBOSS", "CAPO", "CAPO", "CAPO", "SOLDIER", "SOLDIER", "SOLDIER", "SOLDIER", "SOLDIER", "SOLDIER", "SOLDIER"];
+/** 30 distinct 20-digit member ids; the owner is the first (the Boss). */
+const MEMBERS = Array.from({ length: 30 }, (_, i) => (i === 0 ? OWNER : `9876543210987654${String(3200 + i)}`));
+/** Boss, Underboss, 6 Capos, 12 Soldiers, then 10 Soldiers inside their 72 h (indexes 20..29). */
+const ROLES: FamilyRole[] = ["BOSS", "UNDERBOSS", ...Array<FamilyRole>(6).fill("CAPO"), ...Array<FamilyRole>(22).fill("SOLDIER")];
+/** The first 12 members: the screens whose 30-member worst case a later task sets (S6, S7, S28). */
+const TWELVE = MEMBERS.slice(0, 12);
 
 function failingResult(n: number): EligibilityResult {
   const checks = Array.from({ length: n }, (_, i) => ({
@@ -34,11 +37,12 @@ function failingResult(n: number): EligibilityResult {
   return { ok: false, checks, failures: checks.filter((c) => !c.ok) };
 }
 
-function dashboardView(): FamilyDashboardView {
+/** S2's worst case: 30 members, 10 Associates, and an Underboss inside its 72 h (F8: listed on its rank line). */
+export function dashboardView(): FamilyDashboardView {
   return {
-    familyId: FAMILY_ID, name: LONG_NAME, tag: "WXYZ", level: 9, xp: 46_000, nextLevelXp: 60_000, memberCount: 12, memberCap: 12,
+    familyId: FAMILY_ID, name: LONG_NAME, tag: "WXYZ", level: 9, xp: 46_000, nextLevelXp: 60_000, memberCount: 30, memberCap: 30,
     crestKey: "crest_3",
-    roster: MEMBERS.map((userId, i) => ({ userId, role: ROLES[i], associateUntil: i === 0 ? null : SOON() })),
+    roster: MEMBERS.map((userId, i) => ({ userId, role: ROLES[i], associateUntil: i === 1 || i >= 20 ? SOON() : null })),
     duesArrears: 999, nextCaperAt: SOON(), underInvestigation: true, racketsHeld: 3, showTurf: true,
     viewer: { userId: OWNER, role: "UNDERBOSS", canManage: true, canClaim: true },
   };
@@ -60,8 +64,8 @@ function paydayPreview(locked: boolean): PaydayPreview {
   return {
     familyId: FAMILY_ID, earnings: BIG, count: locked ? 0 : 6,
     split: { gross: 1_000_000, tax: 50_000, net: 950_000 },
-    eligible: locked ? [] : MEMBERS.slice(0, 6),
-    ineligible: (locked ? MEMBERS : MEMBERS.slice(6)).map((userId) => ({
+    eligible: locked ? [] : TWELVE.slice(0, 6),
+    ineligible: (locked ? TWELVE : TWELVE.slice(6)).map((userId) => ({
       userId, reason: "≥ 2 crew heist seats or ≥ 3 correct war hits in 7 days (you have 0 crew heist seats, 0 correct war hits)",
     })),
     dueAt: SOON(),
@@ -101,12 +105,12 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
   const dash = dashboardView();
   return [
     { label: "S1 no-family card", max: 13, payload: buildNoFamilyCard(OWNER, failingResult(9), failingResult(10)) },
-    { label: "S2 dashboard (claim row, turf, 12 members)", max: 18, payload: buildDashboard(dash, { art: true }) },
-    { label: "S2 dashboard (visitor)", max: 16, payload: buildDashboard({ ...dash, viewer: { userId: OWNER, role: null, canManage: false, canClaim: false } }, { art: true }) },
+    { label: "S2 dashboard (claim row, turf, 30 members)", max: 20, payload: buildDashboard(dash, { art: true }) },
+    { label: "S2 dashboard (visitor)", max: 20, payload: buildDashboard({ ...dash, viewer: { userId: OWNER, role: null, canManage: false, canClaim: false } }, { art: true }) },
     { label: "S3 create confirm", max: 7, payload: buildCreateConfirm(OWNER, { name: LONG_NAME, tag: "WXYZ", fee: 10_000_000 }) },
     { label: "S4 invite card", max: 9, payload: buildInviteCard(inviteView(1)) },
     { label: "S4 invite resolved", max: 9, payload: buildInviteResolved(inviteView(1), "Expired") },
-    { label: "S5 manage (12 members, one selected)", max: 12, payload: buildManagePanel(OWNER, { ...dash, viewer: { ...dash.viewer, role: "BOSS" } }, MEMBERS[5]) },
+    { label: "S5 manage (page 2 of 2, one selected)", max: 16, payload: buildManagePanel(OWNER, { ...dash, viewer: { ...dash.viewer, role: "BOSS" } }, MEMBERS[19], 1) },
     { label: "S6 vault (payday locked, 12 ineligible)", max: 12, payload: buildVaultPanel(OWNER, vaultView(true), "Deposited 25,000,000.") },
     { label: "S6 vault (payday open)", max: 12, payload: buildVaultPanel(OWNER, vaultView(false)) },
     { label: "S7 payday preview (12 members)", max: 6, payload: buildPaydayPreview(OWNER, paydayPreview(false), "Members changed.") },
@@ -119,8 +123,8 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
     { label: "S24 my invites (5)", max: 7, payload: buildMyInvites(OWNER, [1, 2, 3, 4, 5].map(inviteView)) },
     { label: "S26 confirm (hand over)", max: 6, payload: buildConfirm(OWNER, "chair", MEMBERS[1], "You become a Soldier. They become the Boss and hold every Boss power. This cannot be undone.") },
     { label: "S27 opener", max: 4, payload: buildOpener(`<@${OWNER}>, open your family vault.`, { customId: CREW_IDS.open("vault", OWNER), label: "Open vault" }) },
-    { label: "S28 notice", max: 2, payload: buildNotice(`Payday: 12 members paid 950,000 each\n${MEMBERS.map((m) => `<@${m}>`).join(" ")}`) },
-    { label: "S28 notice with button", max: 4, payload: buildNotice("Your family's crew heist is GO.", { customId: CREW_IDS.view("home", OWNER), label: "Open" }, MEMBERS) },
+    { label: "S28 notice", max: 2, payload: buildNotice(`Payday: 12 members paid 950,000 each\n${TWELVE.map((m) => `<@${m}>`).join(" ")}`) },
+    { label: "S28 notice with button", max: 4, payload: buildNotice("Your family's crew heist is GO.", { customId: CREW_IDS.view("home", OWNER), label: "Open" }, TWELVE) },
     ...caperWorstCases(),
     ...turfWorstCases(),
   ];

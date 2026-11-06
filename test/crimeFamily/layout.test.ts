@@ -5,6 +5,7 @@ import { CF_ASSETS } from "../../src/utils/crimeFamilyAssets";
 import type { FamilyDashboardView } from "../../src/services/crimeFamily/views";
 import type { CfPayload } from "../../src/ui/crimeFamily/kit";
 import { CREW_IDS, TURF_IDS } from "../../src/ui/crimeFamily/ids";
+import { count, chars, walk, countComponents } from "./layoutHelpers";
 
 const art = vi.hoisted(() => ({ present: true }));
 vi.mock("../../src/utils/assetPaths", async (orig) => {
@@ -12,11 +13,9 @@ vi.mock("../../src/utils/assetPaths", async (orig) => {
   return { ...m, findAsset: (n: string) => (art.present ? m.findAsset(n) : null) };
 });
 const { crimeFamilyWorstCases } = await import("../../src/scripts/fixtures/crimeFamilyScreens");
-const { buildDashboard, buildInviteCard, buildInviteResolved, buildLeaderboard } = await import("../../src/ui/crimeFamily/familyScreens");
+const { buildDashboard, buildInviteCard, buildInviteResolved, buildLeaderboard, buildManagePanel } = await import("../../src/ui/crimeFamily/familyScreens");
+const { dashboardView } = await import("../../src/scripts/fixtures/crimeFamilyScreens");
 
-const count = (n: any): number => 1 + (n.components ?? []).reduce((s: number, c: any) => s + count(c), 0) + (n.accessory ? 1 : 0);
-const chars = (n: any): number => (typeof n.content === "string" ? n.content.length : 0) + (n.components ?? []).reduce((s: number, c: any) => s + chars(c), 0) + (n.accessory ? chars(n.accessory) : 0);
-const walk = (n: any, f: (x: any) => void) => { f(n); (n.components ?? []).forEach((c: any) => walk(c, f)); };
 
 beforeAll(() => { for (const k of Object.keys(CF_ASSETS)) setEmojiRecord(`cf_${k}`, { id: "1456569047758929931", name: `cf_${k}` }); });
 
@@ -79,7 +78,8 @@ describe("screen details", () => {
 
   it("S2 never labels the Boss an Associate and hides rackets with no provider", () => {
     const t = text(buildDashboard(view({ roster: [{ userId: "1", role: "BOSS", associateUntil: null }, { userId: "2", role: "SOLDIER", associateUntil: new Date(Date.now() + 3600_000) }] }), { art: false }));
-    expect(t.match(/Associate until/g)).toHaveLength(1);
+    expect(t.match(/\*\*Associates\*\* <@2> <t:\d+:R>/g)).toHaveLength(1);
+    expect(t).not.toMatch(/\*\*Associates\*\*[^"]*<@1>/);
     expect(t).not.toMatch(/Rackets/);
     expect(text(buildDashboard(view({ racketsHeld: 2 }), { art: false }))).toMatch(/Rackets 2/);
   });
@@ -91,5 +91,57 @@ describe("screen details", () => {
     expect(t.match(/Made Family/g)).toHaveLength(1);
     expect(t).not.toMatch(/rackets/i);
     expect(text(buildLeaderboard("u", lb(3), { art: false }))).toMatch(/3 rackets/);
+  });
+});
+
+const rosterText = (p: CfPayload) => {
+  let text = "";
+  p.components.forEach((c) => walk(c.toJSON(), (n) => { if (typeof n.content === "string" && n.content.includes("**Boss**")) text = n.content; }));
+  return text;
+};
+const selectOf = (p: CfPayload) => {
+  let sel: any = null;
+  p.components.forEach((c) => walk(c.toJSON(), (n) => { if (n.type === ComponentType.StringSelect) sel = n; }));
+  return sel;
+};
+const buttons = (p: CfPayload) => {
+  const out: any[] = [];
+  p.components.forEach((c) => walk(c.toJSON(), (n) => { if (n.type === ComponentType.Button) out.push(n); }));
+  return out;
+};
+
+describe("30-member rosters (amendment 2.5)", () => {
+  it("S2 groups a 30-member roster into five lines under 1,400 characters", () => {
+    const v = dashboardView();
+    const text = rosterText(buildDashboard(v, { art: false }));
+    const lines = text.split("\n");
+    expect(lines).toHaveLength(5);
+    expect(lines.map((l) => l.match(/\*\*(\w+)/)![1])).toEqual(["Boss", "Underboss", "Capos", "Soldiers", "Associates"]);
+    expect(text.length).toBeLessThan(1_400);
+    const ub = v.roster.find((r) => r.role === "UNDERBOSS")!;
+    expect(lines[1]).toContain(`<@${ub.userId}>`);                       // F8: inside 72 h, still on its rank line
+    expect(lines[4]).not.toContain(`<@${ub.userId}>`);
+  });
+
+  it("S5 page 2 of 2 lists #16..#30 and a select of 15", () => {
+    const v = dashboardView();
+    const target = v.roster[19].userId;
+    const p = buildManagePanel(v.viewer.userId, v, target, 1);
+    const sel = selectOf(p);
+    expect(sel.custom_id).toBe(CREW_IDS.manageSelect(1, v.viewer.userId));
+    expect(sel.options).toHaveLength(15);
+    expect(sel.options.find((o: any) => o.default)?.value).toBe(target);
+    const [prev, page, next] = buttons(p).filter((b) => /^(Prev|Page|Next)/.test(b.label));
+    expect([prev.disabled ?? false, page.label, page.disabled, next.disabled]).toEqual([false, "Page 2/2", true, true]);
+    expect(prev.custom_id).toBe(CREW_IDS.managePage(0, v.viewer.userId));
+    expect(JSON.stringify(p.components.map((c) => c.toJSON()))).toContain("#16");
+    expect(countComponents(p)).toBeLessThanOrEqual(16);
+  });
+
+  it("S5 clamps a page past the end to the last page; a selection off the page counts as none", () => {
+    const v = dashboardView();
+    const p = buildManagePanel(v.viewer.userId, v, v.roster[2].userId, 9);
+    expect(selectOf(p).custom_id).toBe(CREW_IDS.manageSelect(1, v.viewer.userId));
+    expect(selectOf(p).options.some((o: any) => o.default)).toBe(false);
   });
 });

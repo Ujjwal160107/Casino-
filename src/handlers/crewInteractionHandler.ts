@@ -114,11 +114,13 @@ async function vaultScreen(uid: string, note?: string): Promise<CfPayload> {
   return buildVaultPanel(uid, await getVaultView(family.id, uid, new Date()), note);
 }
 
-async function manageScreen(uid: string, selected: string | null): Promise<CfPayload> {
+/** S5 at `page`; a null page opens the page that holds `selected` in the rank-sorted roster. */
+async function manageScreen(uid: string, selected: string | null, page: number | null): Promise<CfPayload> {
   const { family } = await requireMembership(uid);
   const view = await buildDashboardView(family.id, uid, new Date());
   if (!view.viewer.canManage) throw new FamilyError("Only a Capo or above can manage members.");
-  return buildManagePanel(uid, view, selected);
+  const at = page ?? Math.max(0, Math.floor(view.roster.findIndex((m) => m.userId === selected) / CRIME_FAMILY_CONFIG.managePageSize));
+  return buildManagePanel(uid, view, selected, at);
 }
 
 async function logScreen(uid: string, page: number): Promise<CfPayload> {
@@ -170,7 +172,7 @@ const confirmScreen = (uid: string, kind: CrewConfirmKind, target: string | null
 const viewRoute: CfRoute = async (i, [screen, uid]) => {
   switch (screen) {
     case "vault": return show(i, await vaultScreen(uid));
-    case "manage": return show(i, await manageScreen(uid, null));
+    case "manage": return show(i, await manageScreen(uid, null, 0));
     case "log": return show(i, await logScreen(uid, 0));
     case "top": return show(i, await topScreen(uid, LEADERBOARD_SORTS[0].key, true));
     case "invites": return show(i, await invitesScreen(uid));
@@ -200,16 +202,17 @@ const vaultRoute: CfRoute = async (i, [action, uid]) => {
   return show(i, action === "level" ? await levelScreen(uid) : await paydayScreen(uid));
 };
 
-/** `crew:mg:sel:<owner>` (select) and `crew:mg:<action>:<target>:<owner>` (S5 buttons). */
+/** `crew:mg:sel:<page>:<owner>` (select), `crew:mg:pg:<page>:<owner>` (pager) and `crew:mg:<action>:<target>:<owner>` (S5 buttons). */
 const manageRoute: CfRoute = async (i, args) => {
   const uid = owner(args);
   const [action, target] = args;
-  if (action === "sel") return show(i, await manageScreen(uid, i.isStringSelectMenu() ? i.values[0] ?? null : null));
+  if (action === "sel") return show(i, await manageScreen(uid, i.isStringSelectMenu() ? i.values[0] ?? null : null, Number(args[1]) || 0));
+  if (action === "pg") return show(i, await manageScreen(uid, null, Number(args[1]) || 0));
   if (action === "kick" || action === "chair") return show(i, confirmScreen(uid, action, target));
   const kind = action === "promote" ? "promoted" : "demoted";
   const { family, newRole } = await (action === "promote" ? promoteMember : demoteMember)(uid, target);
   await announceRoleChange(i.client, family, kind, target, newRole);
-  return show(i, await manageScreen(uid, target));
+  return show(i, await manageScreen(uid, target, null));
 };
 
 /** `crew:cf:<kind>:<ok|no>:<target|0>:<owner>` (S26). */

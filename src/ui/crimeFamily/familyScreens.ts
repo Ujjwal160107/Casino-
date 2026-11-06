@@ -67,6 +67,28 @@ function rosterLine(m: FamilyDashboardView["roster"][number]): string {
   return associate ? `${line} · Associate until ${rel(m.associateUntil!)}` : line;
 }
 
+type RosterEntry = FamilyDashboardView["roster"][number];
+/** Only a Soldier inside their 72 h is listed as an Associate; an officer stays on its rank line (F8). */
+const isAssociateSoldier = (m: RosterEntry) => m.role === "SOLDIER" && m.associateUntil !== null;
+
+const mention = (m: RosterEntry) => `<@${m.userId}>`;
+
+const ROSTER_GROUPS: readonly { icon: FamilyRole | "ASSOCIATE"; label: string; holds: (m: RosterEntry) => boolean; entry: (m: RosterEntry) => string }[] = [
+  { icon: "BOSS", label: "Boss", holds: (m) => m.role === "BOSS", entry: mention },
+  { icon: "UNDERBOSS", label: "Underboss", holds: (m) => m.role === "UNDERBOSS", entry: mention },
+  { icon: "CAPO", label: "Capos", holds: (m) => m.role === "CAPO", entry: mention },
+  { icon: "SOLDIER", label: "Soldiers", holds: (m) => m.role === "SOLDIER" && !isAssociateSoldier(m), entry: mention },
+  { icon: "ASSOCIATE", label: "Associates", holds: isAssociateSoldier, entry: (m) => `${mention(m)} ${rel(m.associateUntil!)}` },
+];
+
+/** S2's roster (amendment 2.5): one line per non-empty rank group. */
+function groupedRoster(roster: readonly RosterEntry[]): string {
+  return ROSTER_GROUPS.flatMap((g) => {
+    const held = roster.filter(g.holds);
+    return held.length > 0 ? [`${roleEmoji(g.icon)}**${g.label}** ${held.map(g.entry).join(" ")}`] : [];
+  }).join("\n");
+}
+
 export function buildDashboard(view: FamilyDashboardView, opts: { art: boolean }): CfPayload {
   const member = view.viewer.role !== null;
   const owner = view.viewer.userId;
@@ -84,7 +106,7 @@ export function buildDashboard(view: FamilyDashboardView, opts: { art: boolean }
 
   container
     .addSeparatorComponents(sep())
-    .addTextDisplayComponents(text(view.roster.map(rosterLine).join("\n")))
+    .addTextDisplayComponents(text(groupedRoster(view.roster)))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       text(status.join(" · ")),
@@ -102,9 +124,10 @@ export function buildDashboard(view: FamilyDashboardView, opts: { art: boolean }
       cfButton(CREW_IDS.view("log", owner), "Log"),
     ];
     container.addActionRowComponents(buttonRow(...buttons));
-    if (view.viewer.canClaim) {
-      container.addActionRowComponents(buttonRow(cfButton(CREW_IDS.claim(view.familyId), "Claim the chair", ButtonStyle.Danger)));
-    }
+    const second = [
+      ...(view.viewer.canClaim ? [cfButton(CREW_IDS.claim(view.familyId), "Claim the chair", ButtonStyle.Danger)] : []),
+    ];
+    if (second.length > 0) container.addActionRowComponents(buttonRow(...second));
   }
   return cfPayload(container, { files: files(opts.art, file), freshAttachments: opts.art });
 }
@@ -165,15 +188,20 @@ const MANAGE_LEGEND =
   "-# Boss: everything. Underboss: promote, demote, payday and level up. Capo: invite and kick Soldiers. " +
   "Associates (first 72 h) can't take crew heist seats or war actions.";
 
-export function buildManagePanel(ownerId: string, view: FamilyDashboardView, selected: string | null): CfPayload {
-  const roster = view.roster.slice(0, 12);
+/** S5, `managePageSize` members a page; `page` is clamped and a selection off the page counts as none. */
+export function buildManagePanel(ownerId: string, view: FamilyDashboardView, selected: string | null, page: number): CfPayload {
+  const size = CRIME_FAMILY_CONFIG.managePageSize;
+  const pages = Math.max(1, Math.ceil(view.roster.length / size));
+  const at = Math.min(Math.max(0, page), pages - 1);
+  const start = at * size;
+  const roster = view.roster.slice(start, start + size);
   const target = selected && roster.some((m) => m.userId === selected) && selected !== ownerId ? selected : null;
   const select = new StringSelectMenuBuilder()
-    .setCustomId(CREW_IDS.manageSelect(ownerId))
+    .setCustomId(CREW_IDS.manageSelect(at, ownerId))
     .setPlaceholder("Pick a member")
     .addOptions(roster.map((m, i) => {
       const option = new StringSelectMenuOptionBuilder()
-        .setLabel(`#${i + 1} · ${FAMILY_ROLES[m.role].name}`)
+        .setLabel(`#${start + i + 1} · ${FAMILY_ROLES[m.role].name}`)
         .setDescription(m.userId)
         .setValue(m.userId)
         .setDefault(m.userId === target);
@@ -183,7 +211,7 @@ export function buildManagePanel(ownerId: string, view: FamilyDashboardView, sel
     }));
   const t = target ?? "0";
   const container = new ContainerBuilder()
-    .addTextDisplayComponents(text(`## Manage [${view.tag}]\n${roster.map((m, i) => `\`#${i + 1}\` ${rosterLine(m)}`).join("\n")}`))
+    .addTextDisplayComponents(text(`## Manage [${view.tag}]\n${roster.map((m, i) => `\`#${start + i + 1}\` ${rosterLine(m)}`).join("\n")}`))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(text(MANAGE_LEGEND))
     .addActionRowComponents(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select))
@@ -193,6 +221,11 @@ export function buildManagePanel(ownerId: string, view: FamilyDashboardView, sel
       cfButton(CREW_IDS.manage("kick", t, ownerId), "Kick", ButtonStyle.Danger, { disabled: !target }),
       cfButton(CREW_IDS.manage("chair", t, ownerId), "Hand over", ButtonStyle.Danger, { disabled: !target || view.viewer.role !== "BOSS" }),
       cfButton(CREW_IDS.view("home", ownerId), "Back"),
+    ))
+    .addActionRowComponents(buttonRow(
+      cfButton(CREW_IDS.managePage(at - 1, ownerId), "Prev", ButtonStyle.Secondary, { disabled: at === 0 }),
+      cfButton(CREW_IDS.managePage(at, ownerId), `Page ${at + 1}/${pages}`, ButtonStyle.Secondary, { disabled: true }),
+      cfButton(CREW_IDS.managePage(at + 1, ownerId), "Next", ButtonStyle.Secondary, { disabled: at === pages - 1 }),
     ));
   return cfPayload(container);
 }
