@@ -245,6 +245,9 @@ export const CRIME_FAMILY_CONFIG = {
   pairRuleSeconds: 1_209_600,
   racketCycleHours: 24,
   racketEligibleMin: 3,
+  familiesPerCity: 40, // amendment 6.3: cities per league = max(1, ceil(active families / 40))
+  citySurplusDaysToClose: 14, // 6.3: consecutive censuses with a surplus city before the highest closes
+  cityRebalanceSlack: 2, // A43: the rebalance stops with every city within ±2 of the league average
   neglectStrikesToRelease: 3,
   activeCorrectHits: 3, // 7.3: correct war hits in the window that make a member active
   warBoardRefreshSeconds: 50,

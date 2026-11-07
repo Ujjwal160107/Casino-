@@ -214,6 +214,49 @@ export function racketDef(key: string): RacketDef | undefined {
   return RACKETS.find((r) => r.key === key);
 }
 
+// ── Leagues (amendment 6.2, 6.5) ─────────────────────────────────────────────
+
+export type LeagueKey = "BRONZE" | "SILVER" | "GOLD";
+
+export interface LeagueDef {
+  key: LeagueKey;
+  name: "Bronze" | "Silver" | "Gold";
+  minLevel: number;
+  maxLevel: number;
+  cityName: "Low Town" | "Midtown" | "Uptown";
+  crestKey: "crest_1" | "crest_2" | "crest_3";
+}
+
+export const TURF_LEAGUES: readonly LeagueDef[] = [
+  { key: "BRONZE", name: "Bronze", minLevel: 1, maxLevel: 3, cityName: "Low Town", crestKey: "crest_1" },
+  { key: "SILVER", name: "Silver", minLevel: 4, maxLevel: 6, cityName: "Midtown", crestKey: "crest_2" },
+  { key: "GOLD", name: "Gold", minLevel: 7, maxLevel: 10, cityName: "Uptown", crestKey: "crest_3" },
+];
+
+/** A racket's daily income by league and class (A25). */
+export const LEAGUE_RACKET_INCOME: Readonly<Record<LeagueKey, Readonly<Record<RacketClass, number>>>> = {
+  BRONZE: { CORNER: 100_000, DISTRICT: 200_000, CROWN: 300_000 },
+  SILVER: { CORNER: 200_000, DISTRICT: 450_000, CROWN: 850_000 },
+  GOLD: { CORNER: 300_000, DISTRICT: 650_000, CROWN: 1_300_000 },
+};
+
+export function leagueOf(level: number): LeagueDef {
+  const def = TURF_LEAGUES.find((l) => level >= l.minLevel && level <= l.maxLevel);
+  if (!def) throw new Error(`Unknown family level ${level}`);
+  return def;
+}
+
+export function leagueDef(key: string): LeagueDef {
+  const def = TURF_LEAGUES.find((l) => l.key === key);
+  if (!def) throw new Error(`Unknown league ${key}`);
+  return def;
+}
+
+/** "Uptown #2" (A26). */
+export function cityLabel(league: string, number: number): string {
+  return `${leagueDef(league).cityName} #${number}`;
+}
+
 // ── Wars (9.4) ───────────────────────────────────────────────────────────────
 
 export const WAR_BLOCKS: readonly { key: "docks" | "main" | "alleys"; name: string; emojiKey: string; approaches: readonly string[] }[] = [
