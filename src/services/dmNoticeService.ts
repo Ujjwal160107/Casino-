@@ -540,3 +540,8 @@ export function turfNeglectNotice(v: { racketName: string; strikes: number; max:
 export function turfReleasedNotice(v: { racketName: string }): ContainerBuilder {
   return familyNotice("war", "Racket released", `**${v.racketName}** went back to the Street after too many neglect strikes.`);
 }
+
+/** A census move (amendment 6.9): a rebalance, or a re-placement after the family's city closed. */
+export function turfCityMovedNotice(v: { cityLabel: string }): ContainerBuilder {
+  return familyNotice("war", "New city", `The league opened or closed a city; your family now plays in **${v.cityLabel}**.`);
+}

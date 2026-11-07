@@ -9,7 +9,7 @@ import type { RacketDetailView, TurfMapView, TurfRacketLine, WarBoardView } from
 import {
   buildHitCall, buildHitResult, buildRacketDetail, buildScoutReport, buildTurfMap, buildWarBoard, buildWarCard, buildWarResult, warActionRow,
 } from "../../ui/crimeFamily/turfScreens";
-import { turfWarSoonNotice } from "../../services/dmNoticeService";
+import { turfCityMovedNotice, turfWarSoonNotice } from "../../services/dmNoticeService";
 import { cfPayload, type CfPayload } from "../../ui/crimeFamily/kit";
 import { jumpLink } from "../../ui/crimeFamily/post";
 
@@ -80,5 +80,6 @@ export function turfWorstCases(): { label: string; max: number; payload: CfPaylo
     { label: "DM turf war soon", max: 12, payload: cfPayload(turfWarSoonNotice(
       { racketName: "Construction Union Kickbacks", side: "DEF", startsAt: SOON(), channelUrl: jumpLink(OWNER, OWNER, OWNER).replace(/\/\d+$/, "") },
       warActionRow(WAR_ID))) },
+    { label: "DM turf city moved", max: 8, payload: cfPayload(turfCityMovedNotice({ cityLabel: "Midtown #9999" })) },
   ];
 }

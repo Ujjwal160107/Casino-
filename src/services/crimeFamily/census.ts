@@ -1,13 +1,14 @@
 // The daily census (amendment 6.4, A22): an hourly job that runs once per UTC
 // day, claimed through the CfJobRun{ key: "turf_census" } dayKey. It runs the
-// ordered CENSUS_STEPS registry; this plan's only step writes each family's
-// activeMembers (the recruitment board sorts on it). Plan 6 appends its turf
-// steps as entries. Steps never DM: they return notices and the job sends them.
+// ordered CENSUS_STEPS registry: each family's activeMembers (the recruitment
+// board sorts on it), then the turf steps (cities, placement, rebalance). Steps
+// never DM: they return notices and the job sends them.
 import type { ContainerBuilder } from "discord.js";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { isBanActive } from "../banService";
 import type { DmNoticeType } from "../dmPrefsService";
+import { TURF_CENSUS_STEPS } from "./turfCensus";
 import { isUniqueViolation } from "./tx";
 import { utcDayKey } from "./vaultService";
 
@@ -60,8 +61,8 @@ const ACTIVE_MEMBERS_STEP: CensusStep = {
   },
 };
 
-/** The ordered census steps (F3); plan 6 appends its turf steps, each gating itself on turfEnabled. */
-export const CENSUS_STEPS: CensusStep[] = [ACTIVE_MEMBERS_STEP];
+/** The ordered census steps (F3); the turf steps each gate themselves on turfEnabled. */
+export const CENSUS_STEPS: CensusStep[] = [ACTIVE_MEMBERS_STEP, ...TURF_CENSUS_STEPS];
 
 /**
  * Once per UTC day: every step in order, then the dayKey CAS. A step that

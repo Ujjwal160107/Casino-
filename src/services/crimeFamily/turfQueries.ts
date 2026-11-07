@@ -9,13 +9,14 @@ import { familyLabel } from "./familyQueries";
 import { pickPlacementCity } from "./leagueRules";
 import { can } from "./permissions";
 import { FamilyError } from "./tx";
-import { bidFloor, bidPhase, isBlackout, minNextBid, nextWarStart, scoresOf, soonestWar, type WarSide } from "./warMath";
+import { bidFloor, bidPhase, isBlackout, minNextBid, nextWarStart, scoresOf, soonestWar, warWindow, type WarSide } from "./warMath";
 import type { WarStatus } from "./warService";
 import type { RacketDetailView, TurfMapView, TurfRacketLine, WarBoardView } from "./views";
 
 const STREET = "the Street";
 const LIVE_STATUSES: WarStatus[] = ["BIDDING", "ARMED", "ACTIVE"];
 const TOP_HITTERS = 5;
+const WEEK_MS = 7 * 86_400_000;
 
 export type TurfCityRef = { id: string; league: LeagueKey; number: number; label: string };
 export type ViewerCity = { city: TurfCityRef; placed: boolean; family: { id: string; level: number } | null };
@@ -86,7 +87,12 @@ export function racketInCity(cityId: string, key: string): Promise<Racket | null
   return prisma.racket.findUnique({ where: { cityId_key: { cityId, key } } });
 }
 
-/** The lines of one city's rackets (all, or the given ids) in `RACKETS` order, in 3 queries. */
+/**
+ * The lines of one city's rackets (all, or the given ids) in `RACKETS` order,
+ * in 4 queries. H16: a racket whose upcoming period's War row is CANCELLED
+ * while its window is open (its city closed and reopened this week) reports
+ * bidding CLOSED until next week's window.
+ */
 async function racketLines(cityId: string, now: Date, racketIds?: string[]): Promise<TurfRacketLine[]> {
   const ids = racketIds ? { id: { in: racketIds } } : {};
   const rows = await prisma.racket.findMany({ where: { cityId, ...ids } });
@@ -97,12 +103,22 @@ async function racketLines(cityId: string, now: Date, racketIds?: string[]): Pro
   const latest = new Map<string, War>();
   for (const w of wars) if (!latest.has(w.racketId)) latest.set(w.racketId, w);
   const labels = await labelsOf([...rows.map((r) => r.ownerFamilyId), ...wars.map((w) => w.topBidderFamilyId)]);
+  const periodOf = (r: Racket) => warWindow(nextWarStart(r, now)).periodKey;
+  const cancelled = await prisma.war.findMany({
+    where: { cityId, status: "CANCELLED", periodKey: { in: [...new Set(rows.map(periodOf))] }, ...(racketIds ? { racketId: { in: racketIds } } : {}) },
+    select: { racketId: true, periodKey: true },
+  });
+  const cancelledThisPeriod = new Set(cancelled.map((w) => `${w.racketId}:${w.periodKey}`));
   const order = (key: string) => RACKETS.findIndex((d) => d.key === key);
 
   return [...rows].sort((a, b) => order(a.key) - order(b.key)).map((row) => {
     const owner = row.ownerFamilyId;
     const war = latest.get(row.id);
     const nextWarAt = nextWarStart(row, now);
+    const phase = bidPhase(nextWarAt, now);
+    const bidding = phase.phase === "OPEN" && cancelledThisPeriod.has(`${row.id}:${periodOf(row)}`)
+      ? { phase: "CLOSED" as const, nextOpensAt: warWindow(new Date(nextWarAt.getTime() + WEEK_MS)).bidOpensAt }
+      : phase;
     return {
       racketId: row.id, cityId: row.cityId, key: row.key, name: row.name, class: row.class as TurfRacketLine["class"], income: row.incomePerCycle,
       ownerFamilyId: owner, ownerLabel: (owner && labels.get(owner)) || STREET, strikes: row.neglectStrikes,
@@ -114,7 +130,7 @@ async function racketLines(cityId: string, now: Date, racketIds?: string[]): Pro
         }
         : null,
       nextWarAt,
-      bidding: bidPhase(nextWarAt, now),
+      bidding,
     };
   });
 }
