@@ -17,6 +17,8 @@ const RECENT_EVENTS_CACHE_KEY = "stocks:recent_events";
 // Short TTL as a safety net between ticks; explicitly invalidated whenever
 // marketTick() actually moves a price so views never lag behind a real tick.
 const MARKET_CACHE_TTL = 30;
+/** How long the website's price history is kept (StockPricePoint). */
+const PRICE_HISTORY_MS = 7 * 24 * 60 * 60 * 1000;
 
 function invalidateMarketCache() {
   return Promise.all([
@@ -244,6 +246,9 @@ export async function marketTick(): Promise<void> {
       console.error(`Stock tick failed for ${stock.symbol}:`, err);
     }
   }
+  await prisma.stockPricePoint.deleteMany({ where: { at: { lt: new Date(Date.now() - PRICE_HISTORY_MS) } } }).catch((err) => {
+    console.error("Price history prune failed:", err);
+  });
   await invalidateMarketCache();
 }
 
@@ -332,6 +337,11 @@ async function processStockTick(stock: NonNullable<StockRow>, tick: number): Pro
       delistWatch: watch, status,
       lastUpdate: new Date(),
     },
+  });
+
+  // The website's live chart reads these; losing one point only leaves a gap.
+  await prisma.stockPricePoint.create({ data: { symbol: stock.symbol, price: newPrice } }).catch((err) => {
+    console.error(`Price point for ${stock.symbol} not recorded:`, err);
   });
 
   if (status === "DELISTED") {

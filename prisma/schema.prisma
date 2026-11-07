@@ -550,6 +550,16 @@ model Stock {
   events        StockEvent[]
 }
 
+/// One price per stock per market tick (every 30 min), for the website's live chart. Pruned after 7 days.
+model StockPricePoint {
+  id     String   @id @default(auto()) @map("_id") @db.ObjectId
+  symbol String
+  price  Float
+  at     DateTime @default(now())
+
+  @@index([symbol, at])
+}
+
 model StockEvent {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   stock        Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
