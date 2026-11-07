@@ -4,6 +4,7 @@ import { LandingNavbar } from "@/components/LandingNavbar";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/landing/Hero";
 import { Marquees } from "@/components/landing/Marquees";
+import { LaunchVideo } from "@/components/landing/LaunchVideo";
 import { ModulesRail } from "@/components/landing/ModulesRail";
 import { HowItPlays } from "@/components/landing/HowItPlays";
 import { CrimeFamilies } from "@/components/landing/CrimeFamilies";
@@ -13,7 +14,7 @@ import { TopGGReviews } from "@/components/landing/TopGGReviews";
 import { Faq } from "@/components/landing/Faq";
 import { FinalCta } from "@/components/landing/FinalCta";
 
-// Order: the pitch and a live demo, the systems, how they play, the new
+// Order: the pitch and a live demo, the launch trailer, the systems, how they play, the new
 // Crime Families mode, then how to start, what changed, proof, questions, ask.
 export default async function Home() {
   const session = await getServerSession(authOptions);
@@ -23,6 +24,7 @@ export default async function Home() {
       <LandingNavbar user={session?.user} />
       <Hero />
       <Marquees />
+      <LaunchVideo />
       <ModulesRail />
       <HowItPlays />
       <CrimeFamilies />
