@@ -177,7 +177,7 @@ export const LESSONS: SystemLesson[] = [
     emote: Mascot.Emotes.Gun,
     teaser: "Run a crew with a shared vault.",
     howItWorks: "A crime family is a crew of 10 to 30 players with ranks, a shared vault and family levels. Deposits are locked in the vault for good; only vault earnings go out, as a weekly payday split between active members. Crew heists and turf wars work from any server, and their DMs carry the buttons.",
-    howToUse: ["`{p}crew` — your family, or the Create card", "`{p}crew create` — found one (10,000,000)", "`{p}crew board` — find a family that is recruiting", "`{p}crew accept <TAG>` — join after an invite", "`{p}crew deposit <amount>` · `{p}crew top`", "`{p}heist` — plan or join a crew heist", "`{p}heist brief` — open your brief and Share the intel you hold", "`{p}turf` shows the 10 rackets; officers bid from earnings, and members scout and hit in the weekly war."],
+    howToUse: ["`{p}crew` — your family, or the Create card", "`{p}crew create` — found one (10,000,000)", "`{p}crew board` — find a family that is recruiting", "`{p}crew accept <TAG>` — join after an invite", "`{p}crew deposit <amount>` · `{p}crew top`", "`{p}heist` — plan or join a crew heist", "`{p}heist brief` — open your brief and Share the intel you hold", "`{p}turf` shows your league's city of 10 rackets; officers bid from earnings, and members scout and hit in the weekly war."],
     tip: "Founding needs 15,000,000 net worth, 60 shifts and a 30-day-old profile. Joining needs 1,000,000 net worth, 20 shifts and a 14-day-old profile, so most players start as a Soldier.",
     next: "Full command list: `{p}help`",
   },

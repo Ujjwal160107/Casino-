@@ -216,7 +216,7 @@ Card notes:
 
 ## Crime Families
 
-Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`, amended by `docs/superpowers/specs/2026-11-05-crime-families-scale-design.md` (families at scale; the amendment wins where they differ). Shipped behind `CRIME_FAMILY_CONFIG.enabled` (off by default); Turf (rackets, bids and wars) also needs `CRIME_FAMILY_CONFIG.turfEnabled` (off by default). Families are global per `discordId`; a player is in at most one.
+Design: `docs/superpowers/specs/2026-10-28-crime-families-heists-design.md`, amended by `docs/superpowers/specs/2026-11-05-crime-families-scale-design.md` (families at scale; the amendment wins where they differ). Shipped behind `CRIME_FAMILY_CONFIG.enabled` (off by default); Turf (league cities, rackets, bids and wars) also needs `CRIME_FAMILY_CONFIG.turfEnabled` (off by default). Families are global per `discordId`; a player is in at most one.
 
 - **Founding** burns 10,000,000 from the wallet. Gates: net worth ≥ 15M (uncached), ≥ 60 lifetime shifts, Fortuna age ≥ 30 days, Discord age ≥ 180 days, heat < 70, not jailed or banned, hop cooldown clear, 7 days after disbanding as Boss.
 - **Joining** (by invite, or by an accepted application from the recruitment board) needs net worth ≥ 1M, ≥ 20 shifts, Fortuna ≥ 14 days, Discord ≥ 90 days, not jailed or banned. Join caps: 5 pending invites per family; per rolling 7 days, 3 accepted joins per inviting or accepting officer and `joinsPerFamilyFor(level) = max(5, ceil(memberCap / 3))` joins per family (5 at L1–3, 6 at L4–5, 7 at L6, 8 at L7, 9 at L8, 10 at L9–10). Invites and applications count together.
@@ -298,35 +298,46 @@ A level needs both XP and fee, so the fee sets the pace:
 
 A full 30-member family levels faster than a full 12-member one because it has 2.5 times the players; per member the effort is the same. Fees (172,000,000) are unchanged.
 
-**Daily income per member by band** (p = 0.90, edge 0.10; payday is a range because earnings either pay level fees or go out as Payday, never both; share is of the band floor; racket income is today's best holding at that level):
+**Daily income per member by band** (p = 0.90, edge 0.10; payday is a range because earnings either pay level fees or go out as Payday, never both; share is of the band floor; racket income is the league's best holding per family, `LEAGUE_RACKET_INCOME`):
 
-| Band | Band income/day | Assumed family | Crew heists/day (cap) | Crew heist net/day | Payday net/day | Feature total/day | Share of band floor |
+| Band | Band income/day | League, family | Crew heists/day (cap) | Crew heist net/day | Payday net/day | Feature total/day | Share of band floor |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Week 1 | 1–1.5M | none (14-day Fortuna gate) | — | 0 | 0 | 0 | 0% |
-| Weeks 2–4 | 3–6M | L3, 14 members, T1 n=4, 1 Corner racket | 5 (20 seats for 28) | 205,276 average – 287,386 (both seats) | 0 – 46,404 | 205,276 – 333,790 | 6.8–11.1% |
-| Month 2+ (L5) | 8–15M | L5, 18 members, T3 n=6, 2 District rackets | 6 (36 seats) | 487,836 | 0 – 135,714 (cap) | 487,836 – 623,550 | 6.1–7.8% |
-| Month 2+ (L8) | 8–15M | L8, 25 members, T4 n=6, 1 Crown + 2 District | 9 (54 seats) | 551,584 | 0 – 135,714 (cap) | 551,584 – 687,298 | 6.9–8.6% |
-| Month 2+ (L10, max size) | 8–15M | L10, 30 members, T4 n=6, 1 Crown + 2 District | 10 (60 seats) | 551,584 | 0 – 135,714 (cap) | 551,584 – 687,298 | 6.9–8.6% |
-| Any band, perfect play | — | as the L8 / L10 rows, p = 1.0, best gear | — | 1,049,600 | 135,714 | 1,185,314 | 14.8% of the Month 2+ floor |
+| Weeks 2–4 | 3–6M | Bronze, L3, 14 members, T1 n=4, 1 Bronze Crown | 5 (20 seats for 28) | 205,276 average – 287,386 (both seats) | 0 – 46,404 | 205,276 – 333,790 | 6.8–11.1% |
+| Month 2+ (Silver) | 8–15M | Silver, L5, 18 members, T3 n=6, Crown + District | 6 (36 seats) | 487,836 | 0 – 135,714 (cap) | 487,836 – 623,550 | 6.1–7.8% |
+| Month 2+ (Gold) | 8–15M | Gold, L8, 25 members, T4 n=6, Crown + 2 Districts | 9 (54 seats) | 551,584 | 0 – 135,714 (cap) | 551,584 – 687,298 | 6.9–8.6% |
+| Month 2+ (Gold, max size) | 8–15M | Gold, L10, 30 members, T4 n=6, Crown + 2 Districts | 10 (60 seats) | 551,584 | 0 – 135,714 (cap) | 551,584 – 687,298 | 6.9–8.6% |
+| Any band, perfect play | — | as the Gold rows, p = 1.0, best gear | — | 1,049,600 | 135,714 | 1,185,314 | 14.8% of the Month 2+ floor |
 
 Derivations (pay-out case, earnings not spent on levels):
-- **Weeks 2–4:** crew heist net 143,693 per seat × 20 seats ÷ 14 members = 205,276. Inflow = 5 × 100,769 + 300,000 − 120,000 = 683,845/day = 4,786,915/week; gross = floor(4,786,915 / 14) = 341,922; tax 17,096; net 324,826/week = 46,404/day. Old (L3, 8 members): 287,386 – 356,626 (9.6–11.9%).
-- **L5:** inflow = 6 × 320,132 + 1,300,000 − 200,000 = 3,020,792/day = 21,145,544/week; ÷ 18 = 1,174,752 → capped at 1,000,000 gross, 950,000 net = 135,714/day.
-- **L8:** inflow = 9 × 440,759 + 2,600,000 − 320,000 = 6,246,831/day = 43,727,817/week; ÷ 25 = 1,749,112 → capped.
-- **L10:** inflow = 10 × 440,759 + 2,600,000 − 400,000 = 6,607,590/day = 46,253,130/week; ÷ 30 = 1,541,771 → capped.
+- **Weeks 2–4 (Bronze):** crew heist net 143,693 per seat × 20 seats ÷ 14 members = 205,276. Inflow = 5 × 100,769 + 300,000 (Bronze Crown) − 120,000 = 683,845/day = 4,786,915/week; gross = floor(4,786,915 / 14) = 341,922; tax 17,096; net 324,826/week = 46,404/day. Old (L3, 8 members): 287,386 – 356,626 (9.6–11.9%).
+- **Silver L5:** inflow = 6 × 320,132 + 1,300,000 (Silver Crown 850,000 + District 450,000) − 200,000 = 3,020,792/day = 21,145,544/week; ÷ 18 = 1,174,752 → capped at 1,000,000 gross, 950,000 net = 135,714/day.
+- **Gold L8:** inflow = 9 × 440,759 + 2,600,000 (Gold Crown 1,300,000 + 2 Districts 650,000) − 320,000 = 6,246,831/day = 43,727,817/week; ÷ 25 = 1,749,112 → capped.
+- **Gold L10:** inflow = 10 × 440,759 + 2,600,000 − 400,000 = 6,607,590/day = 46,253,130/week; ÷ 30 = 1,541,771 → capped.
 
 No row rises above the old 12-member figures: the per-member payday is capped and per-member seats are capped, so a bigger family adds members, not income per member.
 
 **Dues** stay 40,000 × level and take a smaller share of a big family's inflow (L10, 30 members: 400,000 of 7,007,590 gross inflow, 5.7%; the old L8 with 12 members: 320,000 of 3,713,036, 8.6%). No change is needed: surplus earnings above the payday cap can only be burned (bids, level fees, dues, rename) or burned at disband; none of it reaches a wallet.
 
-**Worst-case mint audit: 30 accounts played by one person**, L10, perfect play (p = 1.0), best gear (edge 0.1333), T4 n=6, every day:
+**Worst-case mint audit: 30 accounts played by one person**, Gold league L10, perfect play (p = 1.0), best gear (edge 0.1333), T4 n=6, every day:
 - Crew heists per rolling 24 h: max(4, ceil(30 / 3)) = **10**; seats 60 = 30 × 2 (each account's 2-seat cap is the binding limit).
 - Minted per crew heist: crew 4,948,800 + vault 618,600 = 5,567,400. Per day: **55,674,000** (crew 49,488,000, vault 6,186,000).
 - Burned per day: stakes 60 × 300,000 = 18,000,000; dues 400,000.
-- Racket income: at most today's best holding at L7+ (1 Crown + 2 District), 2,600,000/day, and only while ≥ 3 members are racket-eligible.
+- Racket income: at most the Gold best holding (1 Crown + 2 Districts), 2,600,000/day, and only while ≥ 3 members are racket-eligible.
 - Vault inflow: 6,186,000 + 2,600,000 − 400,000 = 8,386,000/day = 58,702,000/week. Payday takes at most 30 × 1,000,000 = 30,000,000 gross/week (1,500,000 tax burned, 28,500,000 net); **28,702,000/week stays in earnings** and can only be burned.
 - **Per account per day: 1,649,600 crew − 600,000 stakes = 1,049,600, plus payday 135,714 = 1,185,314**: 14.8% of the Month 2+ floor (8M), 7.9% of its ceiling. Identical to the old 12-account audit, so a bigger family gives an alt nothing.
 - Gates per account are unchanged (300 lifetime shifts, 45 days Fortuna, 90 days Discord, 40M uncached net worth at join and at Start, a prep item, 72 h tenure), and the family must reach L10 (60,000 XP, 172,000,000 in fees). Every Start re-checks the six seats uncached, so each crew needs 240,000,000 of net worth across its six accounts at that moment (1,200,000,000 for all 30 accounts to be seat-eligible at once).
+
+**Many cities.** Racket mint per day ≤ Σ leagues (OPEN cities × city total), with OPEN cities = max(1, ceil(active / 40)) plus at most the cities kept open by owned rackets, live wars or the 14-census surplus rule.
+
+| Active families (Bronze / Silver / Gold) | Cities | Racket mint ceiling/day | Per active family/day |
+| --- | --- | --- | --- |
+| launch (0 / 0 / 0) | 1 / 1 / 1 | 12,500,000 | — |
+| 40 / 40 / 40 | 1 / 1 / 1 | 12,500,000 | 104,167 |
+| 400 / 300 / 200 | 10 / 8 / 5 | 18,000,000 + 34,400,000 + 32,000,000 = 84,400,000 | 93,778 |
+| 4,000 / 3,000 / 2,000 | 100 / 75 / 50 | 180,000,000 + 322,500,000 + 320,000,000 = 822,500,000 | 91,389 |
+
+Per active family the racket ceiling tends to the city total ÷ 40: 45,000 (Bronze), 107,500 (Silver), 160,000 (Gold) a day, so racket income per family is flat as the player count grows. Per family it never exceeds 300,000 / 1,300,000 / 2,600,000 a day, and per member it reaches a wallet only through the capped payday.
 
 **Crew Heists** (`!heist`, aliases `!crewheist`, `!caper`, `!capers`, `/heist`; "caper" in code; spec section 8). A Capo+ plans a tier; a 600 s lobby fills role seats (each seat pays its stake on join, refunded on leave, cancel or VOID); Start re-validates every seat (the net-worth check counts the stake already paid) and burns the stakes; a 120 s GO follows in which each seat answers one 4-option call whose answer only the next seat in the ring holds. A seat that has not opened its brief before the last 30 s is dark: it is a miss and its partner sees the answer leaked. Seats join, brief and act from any server or a DM. A seat that has opened its brief and is not dark may Share once (`CaperCrew.sharedIntel`, CAS): its held answer appears only in the brief of the seat it answers; no money, XP or heat moves and no outcome rule changes. Misses `k` (wrong, unlocked or dark): BUST at `k ≥ 2` (n ≤ 4) or `k ≥ 3` (n ≥ 5), MESSY at `k ≥ 1`, else MESSY if `roll < q` and CLEAN otherwise, with `q = min(0.60, base × (1 − edge) + 0.002 × H)`, edge = mean best prep bonus over the seats, H = hottest seat's heat at Start, the roll drawn once at settlement. No buff, luck or `applyIncomeModifiers` touches crew heist money and no income tax applies (the fence replaces it). Limits: 2 started seats per player and `heistCapFor(memberCount) = max(4, ceil(memberCount / 3))` started crew heists per family (4–10) per rolling 24 h, re-checked at plan and at Start; 1 live seat and 1 live crew heist; family cooldown from Start 3h00 (L1–3), 2h45 (L4–5), 2h30 (L6–8), 2h00 (L9–10); 30 min after a cancelled or expired lobby. Prep items are checked, never consumed.
 
@@ -389,25 +400,34 @@ Perfect play, p = 1.0 (only the patrol roll):
 
 Every seat is paid the same, so the perfect-play figure is also the planner's ceiling (1,049,600/day at T4). A realistic T4 seat pair (551,584/day) sits below a World Zoo (866,000/day net); perfect T4 play is about a Legendary Rifle (1,459,000/day) minus a third; a T1 seat (287,386/day) is about a City Zoo (388,000) minus a quarter.
 
-**Turf** (`!turf`, aliases `!racket` / `!rackets`, `/turf`; spec section 9; `RACKETS`, `RACKET_CLASSES`, `WAR_BLOCKS`, `WAR_RULES` in `src/data/crimeFamilyCatalog.ts`, math in `src/services/crimeFamily/warMath.ts`). Ten fixed rackets, all starting with the Street (`ownerFamilyId ""`); the only way to take one is to win its weekly war.
+**Turf** (`!turf`, aliases `!racket` / `!rackets`, `/turf`; spec section 9 and amendment section 6; `RACKETS`, `RACKET_CLASSES`, `TURF_LEAGUES`, `LEAGUE_RACKET_INCOME`, `WAR_BLOCKS`, `WAR_RULES` in `src/data/crimeFamilyCatalog.ts`, math in `src/services/crimeFamily/warMath.ts`, city and census rules in `leagueRules.ts` and `turfCensus.ts`). Turf is played per league in cities of the same ten fixed rackets; every racket starts with the Street (`ownerFamilyId ""`) and the only way to take one is to win its weekly war. `!turf` shows the viewer's family city (an unplaced family sees the city it would join, read-only; a non-member sees Low Town #1); `!turf racket` and `!turf bid` resolve the key in the viewer's city.
 
-| # | Key | Name | Class | Income / 24 h cycle | Bid floor (7 × income) | Baseline defence per block | Weekly war start (UTC) |
+| League | Family levels | City name | Racket cap | Corner (×4) | District (×4) | Crown (×2) | City total per day | Bid floors (7 × income) | Best holding per family per day |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Bronze | 1–3 | Low Town #n | 1 | 100,000 | 200,000 | 300,000 | 1,800,000 | 700,000 / 1,400,000 / 2,100,000 | 300,000 (cap 1) |
+| Silver | 4–6 | Midtown #n | 2 | 200,000 | 450,000 | 850,000 | 4,300,000 | 1,400,000 / 3,150,000 / 5,950,000 | 1,300,000 (Crown + District) |
+| Gold | 7–10 | Uptown #n | 3 (at most 1 Crown) | 300,000 | 650,000 | 1,300,000 | 6,400,000 | 2,100,000 / 4,550,000 / 9,100,000 | 2,600,000 (Crown + 2 Districts) |
+
+| # | Key | Name | Class | Income / 24 h cycle (Bronze / Silver / Gold) | Bid floor (7 × income) | Baseline defence per block | Weekly war start (UTC) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | docks_numbers | Dockside Numbers | Corner | 300,000 | 2,100,000 | 30 | Mon 18:00 |
-| 2 | laundromat_front | Laundromat Front | Corner | 300,000 | 2,100,000 | 30 | Tue 12:00 |
-| 3 | harbor_customs | Harbor Customs Skim | District | 650,000 | 4,550,000 | 50 | Tue 18:00 |
-| 4 | neon_strip | Neon Strip Clubs | District | 650,000 | 4,550,000 | 50 | Wed 01:00 |
-| 5 | valet_racket | Valet Parking Racket | Corner | 300,000 | 2,100,000 | 30 | Wed 18:00 |
-| 6 | pawn_row | Pawn Row Fencing | Corner | 300,000 | 2,100,000 | 30 | Thu 01:00 |
-| 7 | union_kickbacks | Construction Union Kickbacks | District | 650,000 | 4,550,000 | 50 | Thu 18:00 |
-| 8 | racetrack_book | Racetrack Bookmaking | District | 650,000 | 4,550,000 | 50 | Fri 12:00 |
-| 9 | casino_row | Casino Row Protection | Crown | 1,300,000 | 9,100,000 | 80 | Sat 18:00 |
-| 10 | city_hall | City Hall Contracts | Crown | 1,300,000 | 9,100,000 | 80 | Sun 12:00 |
+| 1 | docks_numbers | Dockside Numbers | Corner | 100,000 / 200,000 / 300,000 | 700,000 / 1,400,000 / 2,100,000 | 30 | Mon 18:00 |
+| 2 | laundromat_front | Laundromat Front | Corner | 100,000 / 200,000 / 300,000 | 700,000 / 1,400,000 / 2,100,000 | 30 | Tue 12:00 |
+| 3 | harbor_customs | Harbor Customs Skim | District | 200,000 / 450,000 / 650,000 | 1,400,000 / 3,150,000 / 4,550,000 | 50 | Tue 18:00 |
+| 4 | neon_strip | Neon Strip Clubs | District | 200,000 / 450,000 / 650,000 | 1,400,000 / 3,150,000 / 4,550,000 | 50 | Wed 01:00 |
+| 5 | valet_racket | Valet Parking Racket | Corner | 100,000 / 200,000 / 300,000 | 700,000 / 1,400,000 / 2,100,000 | 30 | Wed 18:00 |
+| 6 | pawn_row | Pawn Row Fencing | Corner | 100,000 / 200,000 / 300,000 | 700,000 / 1,400,000 / 2,100,000 | 30 | Thu 01:00 |
+| 7 | union_kickbacks | Construction Union Kickbacks | District | 200,000 / 450,000 / 650,000 | 1,400,000 / 3,150,000 / 4,550,000 | 50 | Thu 18:00 |
+| 8 | racetrack_book | Racetrack Bookmaking | District | 200,000 / 450,000 / 650,000 | 1,400,000 / 3,150,000 / 4,550,000 | 50 | Fri 12:00 |
+| 9 | casino_row | Casino Row Protection | Crown | 300,000 / 850,000 / 1,300,000 | 2,100,000 / 5,950,000 / 9,100,000 | 80 | Sat 18:00 |
+| 10 | city_hall | City Hall Contracts | Crown | 300,000 / 850,000 / 1,300,000 | 2,100,000 / 5,950,000 / 9,100,000 | 80 | Sun 12:00 |
 
-Total racket income (source S3): at most 6,400,000 per day (44,800,000 per week) bot-wide, fixed whatever the player count; neglect only lowers it. Class level to bid: Corner any, District L4+, Crown L7+.
+Each `Racket` row stores its league's `incomePerCycle`, and `bidFloor` reads the row. Every class is open to every family placed in the city: the league is the gate (a Bronze Crown pays what an old Corner did). Total racket income (source S3): at most the city total per OPEN city per day, so it grows with the number of active families; neglect only lowers it.
 
+- **Census** (`runTurfCensus`, the hourly `10 * * * *` job, runs once per UTC day, normally at 00:10; cities, placement and the rebalance only while `turfEnabled`): an active family has `activeMembers ≥ racketEligibleMin` (3), where an active member is a current, unbanned member with ≥ 2 started crew heist seats in this family or ≥ 3 correct war hits for it in the last 7 days. Cities per league `max(1, ceil(active families / familiesPerCity 40))`: 0–40 → 1, 41–80 → 2, 81–120 → 3, 4,000 → 100. Opening reopens the lowest-numbered CLOSED city first, then creates the next number with its 10 rackets; a reopened city's rackets resume at the next weekly period. Closing: only the league's highest-numbered OPEN city, only after `citySurplusDaysToClose` (14) censuses in a row with more OPEN cities than the target (counted once per UTC day, reset at any census with no surplus), and never while a racket in it is owned or a war in it is ARMED, ACTIVE, SETTLING or BIDDING with a bid; city #1 never closes; its families are re-placed by the same census ("New city" DM). Placement: each active family with no city in its league joins the OPEN city of its league with the fewest placed active families (ties to the lowest number), most active members first; no DM; inactive families keep their city; an unplaced family can't bid. Rebalance (`cityRebalanceSlack` 2): families with no owned racket, top bid or live war move, newest placement first, from the fullest city to the emptiest while `full − empty ≥ 2` and (`full > avg + 2` or `empty < avg − 2`) ("New city" DM); a family with turf at stake never moves.
+- **League move:** a level-up from L3 to L4 or L6 to L7 is refused while the family holds a top bid in a BIDDING war or is a side of an ARMED, ACTIVE or SETTLING war. Otherwise, in the level-up transaction, every owned racket goes to the Street (`neglectStrikes 0`, `lastPayoutAt = now`, so the unpaid partial cycle is never minted), `FamilyLedger{type:"league_move", amount:0}` records the released keys, and `cityId` is cleared; the next census places the family in its new league. Every member gets a "League move" DM. Levels never drop.
+- **Post-launch check:** besides the existing counts, read two counts (read-only): OPEN cities per league (`TurfCity{league, status:"OPEN"}`) and active families per league (`Family{level in the league's range, activeMembers ≥ 3}`).
 - **Income:** no manual collection. `tickRackets` (`5 * * * *` UTC) pays `rentCyclesDue(lastPayoutAt, now, 24)` cycles (at most 3 banked, `MAX_BANKED_RENT_CYCLES`) into the owner's `earnings` as `racket_income`, +20 XP per cycle, and retries dues arrears. Needs ≥ 3 racket-eligible members (tenure ≥ 72 h, ≥ 20 shifts, Discord ≥ 90 d, not banned, active member; jail does not block). Fewer: nothing minted (N3), `neglectStrikes += cycles`; at 3 strikes the racket returns to the Street. Capture sets `lastPayoutAt = now`, so the old owner's partial cycle is never minted.
-- **Bidding:** window opens 72 h and closes 1 h before the war start. Boss or Underboss, not jailed, from earnings only (`spendFromVault(..., { earningsOnly: true })`), held in escrow on the War row. First bid ≥ floor; raise ≥ `max(ceil(top × 1.10), top + 100,000)` (9,100,000 → 10,010,000 → 11,011,000). Outbid escrow returns to earnings (`bid_refund`, T3). Refused: own racket, already top bidder, below the class level, dues in arrears, Under investigation, no home channel, held rackets + live bids/attacks + 1 > racket cap (1 / 2 / 3 at L1–3 / L4–6 / L7–10), a second Crown held or bid, or the 14-day pair rule (shared Boss, or ≥ 2 current members who left the other family). At close: a bid arms the war and the escrow is burned at settlement whatever the result (`war_bid_burn`, K9); no bid cancels it and the owner keeps the racket.
+- **Bidding:** window opens 72 h and closes 1 h before the war start. Boss or Underboss, not jailed, from earnings only (`spendFromVault(..., { earningsOnly: true })`), held in escrow on the War row. First bid ≥ the league floor; raise ≥ `max(ceil(top × 1.10), top + 100,000)` (Gold Crown 9,100,000 → 10,010,000 → 11,011,000; Bronze Corner 700,000 → 800,000). Outbid escrow returns to earnings (`bid_refund`, T3). Refused: no city yet, a racket in another city, own racket, already top bidder, dues in arrears, Under investigation, no home channel, held rackets + live bids/attacks + 1 > racket cap (1 / 2 / 3 at L1–3 / L4–6 / L7–10), a second Crown held or bid, or the 14-day pair rule (shared Boss, or ≥ 2 current members who left the other family). At close: a bid arms the war and the escrow is burned at settlement whatever the result (`war_bid_burn`, K9); no bid cancels it and the owner keeps the racket.
 - **War:** 60 minutes; blocks Docks (Crane, Warehouse, Pier 4, Boathouse), Main Street (Bank Steps, Diner, Bus Stop, Hotel Lobby), Back Alleys (Fire Escape, Dumpster Row, Cellar Door, Laundry Line). Fighters: members of either side, from any server or a DM, passing the `war` gate (tenure ≥ 72 h, Discord ≥ 90 d, Fortuna ≥ 14 d, ≥ 20 shifts, not jailed or banned, heat < 100). 12 slots of 300 s; weak point `HMAC_SHA256(seed, block:slot)[0] mod 4`. Scout: free, once per member per slot, one random block. Hit: 25,000 from the wallet, burned (`turf_hit`, K10), 600 s cooldown, ≤ 6 per member per war, 20 s to call (`min(now + 20 s, endsAt)`), judged against the arm-time slot; correct +10 attacking, +12 defending, otherwise 0. Defender (family or Street) starts each block at the class baseline 30 / 50 / 80; the Street never hits. Blackout: the last 600 s hide block scores and show hit counts. Each block to the higher score, ties to the defender; 2 of 3 wins. XP: capture 300 / 450 / 600; defence the same only if the attacker scored on ≥ 2 blocks; +5 per correct hit. +15 heat to every attacking hitter on a loss. No money moves between families.
 - **Downtime cancel:** a war that would go ACTIVE more than 600 s after its start, or whose largest tick gap exceeds 600 s, is CANCELLED: the escrow returns to earnings, no ownership change, XP or heat.
 - **Edges:** a capture by a family already at its racket cap releases the racket to the Street (bid still burned). Disband refunds live top bids to earnings (then burned with the vault) and releases every racket; disband is refused while a war is ARMED, ACTIVE or SETTLING, and kicks while one is ACTIVE.
@@ -418,7 +438,7 @@ Total racket income (source S3): at most 6,400,000 per day (44,800,000 per week)
 | --- | --- | --- | --- | --- |
 | S1 | Crew heist crew cut | mint → wallets | 0.80 × B × n × f | 2 seats/player/rolling 24 h; max(4, ceil(members / 3)) crew heists/family/rolling 24 h |
 | S2 | Crew heist vault cut | mint → earnings | 0.10 × B × n × f | same |
-| S3 | Racket income | mint → earnings | 300k / 650k / 1.3M per cycle | 6,400,000/day bot-wide; needs ≥ 3 eligible members |
+| S3 | Racket income | mint → earnings | 300k / 650k / 1.3M per cycle (Gold); 100k / 200k / 300k (Bronze); 200k / 450k / 850k (Silver) | ≤ 1,800,000 / 4,300,000 / 6,400,000 per OPEN city per day; per family ≤ 300,000 / 1,300,000 / 2,600,000; needs ≥ 3 eligible members |
 | T1 | Payday | earnings → wallets | gross ≤ 1,000,000 per member per week | once per 7 days; equal split; two-phase (one reserve, one credit per member share, unpaid shares resumed after 60 s) |
 | T2 | Stake refund (before Start, cancel, VOID) | return, `earned = false` | 50k–300k | — |
 | T3 | Bid refund on outbid or a cancelled war | return to earnings | escrow | — |
@@ -432,12 +452,13 @@ Total racket income (source S3): at most 6,400,000 per day (44,800,000 per week)
 | K6 | Bust fine | sink | 150k / 300k / 500k / 750k per seat | 0.9–5.2% of runs at p = 0.90 |
 | K7 | Deposit tax | sink | 5% | — |
 | K8 | Payday tax | sink | 5% | — |
-| K9 | Winning war bid | sink, burned at settlement | ≥ 2.1M / 4.55M / 9.1M | per racket-week |
+| K9 | Winning war bid | sink, burned at settlement | ≥ 700k / 1.4M / 2.1M (Bronze); ≥ 1.4M / 3.15M / 5.95M (Silver); ≥ 2.1M / 4.55M / 9.1M (Gold) | per racket-week |
 | K10 | War hits | sink | 25,000 each | ≤ 6 per member per war |
 | K11 | Treasury and earnings on disband | sink | full balance after the capped final payday | — |
 | — | Heat → Fixer and raids | not counted | existing code, unchanged | — |
 | N1 | Fence | never minted | 0.10 × pool | — |
 | N2 | Cut rounding remainder | never minted | < n Fortunes per crew heist | — |
+| — | League move racket release | nothing minted or burned | the partial cycle is forfeited | per league-changing level-up |
 | N3 | Neglected racket cycles | never minted | full cycle | — |
 | N4 | Wallet overflow on a crew heist cut | never minted | excess over `MAX_SAFE_BALANCE` | recorded in `meta.capped` |
 
@@ -452,7 +473,7 @@ Total racket income (source S3): at most 6,400,000 per day (44,800,000 per week)
 - Casino house edge.
 - Card interest on missed payments.
 - Property resale at 75%.
-- Crime Families: creation fee 10,000,000 (K1), rename 2,000,000 per 30 days (K2), level-up fees 2M → 50M, 172M in all (K3), dues 40,000 × level a day (K4), crew heist stakes 50,000 / 100,000 / 175,000 / 300,000 per seat per started run (K5), Bust fines 150,000 / 300,000 / 500,000 / 750,000 per seat (K6), 5% deposit tax (K7), 5% payday tax (K8), the winning war bid, at least 2,100,000 / 4,550,000 / 9,100,000, burned at settlement (K9), war hits 25,000 each, up to 6 per member per war (K10), treasury and earnings burned on disband (K11). Never minted: the 10% crew heist fence (N1), the cut rounding remainder (N2) and neglected racket cycles (N3).
+- Crime Families: creation fee 10,000,000 (K1), rename 2,000,000 per 30 days (K2), level-up fees 2M → 50M, 172M in all (K3), dues 40,000 × level a day (K4), crew heist stakes 50,000 / 100,000 / 175,000 / 300,000 per seat per started run (K5), Bust fines 150,000 / 300,000 / 500,000 / 750,000 per seat (K6), 5% deposit tax (K7), 5% payday tax (K8), the winning war bid, at least 700,000 (Bronze Corner) to 9,100,000 (Gold Crown), burned at settlement (K9), war hits 25,000 each, up to 6 per member per war (K10), treasury and earnings burned on disband (K11). Never minted: the 10% crew heist fence (N1), the cut rounding remainder (N2) and neglected racket cycles (N3).
 
 ## Open Issues (not changed in the 2026-10-11 rebalance)
 

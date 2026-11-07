@@ -1,5 +1,7 @@
 // test/general/help-crime-families.test.ts
 import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { Mascot } from "../../src/config/branding";
 
 const allPages = (h: typeof import("../../src/commands/general/help")) =>
@@ -74,5 +76,27 @@ describe("help and tutorial (19.3)", () => {
     const l = LESSONS.find((x) => x.id === "crimefamilies")!;
     expect(l.howToUse.join(" ")).toContain("`{p}heist brief` — open your brief and Share the intel you hold");
     expect(l.howItWorks).toContain("work from any server");
+  });
+
+  it("the turf entry and the tutorial lesson speak of leagues and the family's city", async () => {
+    vi.resetModules();
+    const help = await import("../../src/commands/general/help");
+    const turf = help.CATEGORIES.find((c) => c.id === "crimefamilies")!.commands.find((c) => c.name === "turf")!;
+    expect(turf.description).toContain("league");
+    const subs = turf.subcommands ?? [];
+    expect(subs.find((s) => s.startsWith("racket"))).toContain("in your family's city");
+    expect(subs.find((s) => s.startsWith("bid"))).toContain("in your family's city");
+    const { LESSONS } = await import("../../src/commands/general/tutorial");
+    const l = LESSONS.find((x) => x.id === "crimefamilies")!;
+    expect(l.howToUse.find((x) => x.startsWith("`{p}turf`"))).toContain("your league's city");
+  });
+
+  it("the website module documents leagues, cities and per-league income", () => {
+    const doc = readFileSync(join(__dirname, "../../dashboard/src/content/modules/crime-families.ts"), "utf8");
+    for (const s of ["Low Town", "Midtown", "Uptown", "1,800,000", "4,300,000", "6,400,000 a day per city", "40 active families"]) {
+      expect(doc).toContain(s);
+    }
+    expect(doc).not.toContain("6,400,000 a day (44,800,000 a week) across the whole bot");
+    expect(doc).not.toContain("District rackets need family level 4");
   });
 });

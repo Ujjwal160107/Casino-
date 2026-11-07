@@ -3,14 +3,16 @@ import type { ModuleDoc } from "../types";
 // Numbers come from CRIME_FAMILY_CONFIG (src/utils/economyConfig.ts) and
 // src/data/crimeFamilyCatalog.ts; the expected-value tables are pinned by
 // test/crimeFamily/caper-math.test.ts. Turf numbers come from RACKETS,
-// RACKET_CLASSES, WAR_RULES and WAR_BLOCKS in the same catalog, and the war
-// and bid math from src/services/crimeFamily/warMath.ts. Size rules come from
+// RACKET_CLASSES, TURF_LEAGUES, LEAGUE_RACKET_INCOME, WAR_RULES and WAR_BLOCKS
+// in the same catalog, the war and bid math from
+// src/services/crimeFamily/warMath.ts and the city and census rules from
+// leagueRules.ts and turfCensus.ts. Size rules come from
 // src/services/crimeFamily/sizeRules.ts, the vote math from voteRules.ts and
 // the recruitment limits from recruitService.ts.
 const crimeFamilies: ModuleDoc = {
   slug: "crime-families",
   title: "Crime Families",
-  tagline: "A crew of 10 to 30 players with ranks, a vault nobody can rob, ten family levels to buy, crew heists you can only pull off together, and ten rackets to fight over in weekly turf wars.",
+  tagline: "A crew of 10 to 30 players with ranks, a vault nobody can rob, ten family levels to buy, crew heists you can only pull off together, and league cities of rackets to fight over in weekly turf wars.",
   icon: "Users",
   forBeginners: {
     what: "A crime family is a crew of 10 to 30 players. Members pay into a shared vault, the vault pays the family's dues and level fees, and once a week the earned part of the vault is split between the members who played. Deposits never come back out: the vault is for the family, not for parking cash.",
@@ -661,27 +663,65 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Rackets",
       body: [
-        "Turf is ten fixed rackets that pay protection money into the owning family's earnings. !turf (aliases !racket and !rackets, or /turf) posts the turf map: every racket with its owner, daily income, weekly war time and the current top bid. Pick a racket from the menu to open its detail card: owner, income, neglect strikes, bidding status, the floor, the smallest bid that would count now, and the next war. Typing !turf racket <key> or its number 1–10 posts a short line with an Open racket button for you; pressing it opens that card where only you can see it.",
+        "Turf is played in cities of ten fixed rackets that pay protection money into the owning family's earnings. !turf (aliases !racket and !rackets, or /turf) posts the turf map of your league's city: every racket with its owner, daily income, weekly war time and the current top bid. The header names the city and its league (for example \"Turf · Uptown #2 (Gold)\") and the league's income per class. The ◀ City and City ▶ buttons page through the cities of the league you are viewing, and the Bronze, Silver and Gold buttons jump to another league; you can look at any city, but you can only bid in your own. Pick a racket from the menu to open its detail card: owner, income, neglect strikes, bidding status, the floor, the smallest bid that would count now, and the next war. Typing !turf racket <key> or its number 1–10 (always a racket in your family's city) posts a short line with an Open racket button for you; pressing it opens that card where only you can see it.",
         "Every racket starts with the Street, the city's unowned turf. There is no way to buy or claim one outright: the only way to take a racket is to win its weekly war. Each racket has one war a week at a fixed time, rotating between 18:00 UTC (EU evening), 01:00 UTC (US evening) and 12:00 UTC (Asia and Oceania evening); both Crown wars fall on the weekend.",
-        "Between them the ten rackets pay at most 6,400,000 a day (44,800,000 a week) across the whole bot, however many families play. Neglect only lowers that.",
+        "Each city's ten rackets pay at most 1,800,000 (Bronze), 4,300,000 (Silver) or 6,400,000 a day per city (Gold). A new city opens for every 40 active families in a league, so racket income grows with the number of active families instead of being split ever thinner. Neglect only lowers it.",
       ],
       table: {
         title: "The ten rackets",
-        columns: ["#", "Key", "Racket", "Class", "Income a day", "Bid floor", "Baseline defence per block", "Weekly war (UTC)"],
+        columns: ["#", "Key", "Racket", "Class", "Income a day (Bronze / Silver / Gold)", "Bid floor (Bronze / Silver / Gold)", "Baseline defence per block", "Weekly war (UTC)"],
         rows: [
-          ["1", "docks_numbers", "Dockside Numbers", "Corner", "300,000", "2,100,000", "30", "Mon 18:00"],
-          ["2", "laundromat_front", "Laundromat Front", "Corner", "300,000", "2,100,000", "30", "Tue 12:00"],
-          ["3", "harbor_customs", "Harbor Customs Skim", "District", "650,000", "4,550,000", "50", "Tue 18:00"],
-          ["4", "neon_strip", "Neon Strip Clubs", "District", "650,000", "4,550,000", "50", "Wed 01:00"],
-          ["5", "valet_racket", "Valet Parking Racket", "Corner", "300,000", "2,100,000", "30", "Wed 18:00"],
-          ["6", "pawn_row", "Pawn Row Fencing", "Corner", "300,000", "2,100,000", "30", "Thu 01:00"],
-          ["7", "union_kickbacks", "Construction Union Kickbacks", "District", "650,000", "4,550,000", "50", "Thu 18:00"],
-          ["8", "racetrack_book", "Racetrack Bookmaking", "District", "650,000", "4,550,000", "50", "Fri 12:00"],
-          ["9", "casino_row", "Casino Row Protection", "Crown", "1,300,000", "9,100,000", "80", "Sat 18:00"],
-          ["10", "city_hall", "City Hall Contracts", "Crown", "1,300,000", "9,100,000", "80", "Sun 12:00"],
+          ["1", "docks_numbers", "Dockside Numbers", "Corner", "100,000 / 200,000 / 300,000", "700,000 / 1,400,000 / 2,100,000", "30", "Mon 18:00"],
+          ["2", "laundromat_front", "Laundromat Front", "Corner", "100,000 / 200,000 / 300,000", "700,000 / 1,400,000 / 2,100,000", "30", "Tue 12:00"],
+          ["3", "harbor_customs", "Harbor Customs Skim", "District", "200,000 / 450,000 / 650,000", "1,400,000 / 3,150,000 / 4,550,000", "50", "Tue 18:00"],
+          ["4", "neon_strip", "Neon Strip Clubs", "District", "200,000 / 450,000 / 650,000", "1,400,000 / 3,150,000 / 4,550,000", "50", "Wed 01:00"],
+          ["5", "valet_racket", "Valet Parking Racket", "Corner", "100,000 / 200,000 / 300,000", "700,000 / 1,400,000 / 2,100,000", "30", "Wed 18:00"],
+          ["6", "pawn_row", "Pawn Row Fencing", "Corner", "100,000 / 200,000 / 300,000", "700,000 / 1,400,000 / 2,100,000", "30", "Thu 01:00"],
+          ["7", "union_kickbacks", "Construction Union Kickbacks", "District", "200,000 / 450,000 / 650,000", "1,400,000 / 3,150,000 / 4,550,000", "50", "Thu 18:00"],
+          ["8", "racetrack_book", "Racetrack Bookmaking", "District", "200,000 / 450,000 / 650,000", "1,400,000 / 3,150,000 / 4,550,000", "50", "Fri 12:00"],
+          ["9", "casino_row", "Casino Row Protection", "Crown", "300,000 / 850,000 / 1,300,000", "2,100,000 / 5,950,000 / 9,100,000", "80", "Sat 18:00"],
+          ["10", "city_hall", "City Hall Contracts", "Crown", "300,000 / 850,000 / 1,300,000", "2,100,000 / 5,950,000 / 9,100,000", "80", "Sun 12:00"],
         ],
       },
-      note: "Corner rackets are open to a family of any level. District rackets need family level 4 and Crown rackets family level 7 before the family can bid.",
+      note: "Every racket class is open to every family in a city: your league is the gate. A Bronze family holds at most one racket, so a Bronze Crown pays what an old Corner did.",
+    },
+    {
+      heading: "Leagues and cities",
+      body: [
+        "Families play turf in three leagues by family level: Bronze (L1–3), Silver (L4–6) and Gold (L7–10). Each league has its own cities, named Low Town #1, #2… (Bronze), Midtown #n (Silver) and Uptown #n (Gold). A city is the same ten rackets, with the same war times and baseline defence, but its own owners, bids and wars: Dockside Numbers in Uptown #1 and Dockside Numbers in Uptown #2 are two different rackets.",
+        "An active family has at least 3 active members: members who, in the last 7 days, started 2 crew heist seats in this family or made 3 correct war hits for it, and aren't banned. The daily census at 00:10 UTC counts them, and every turf city change below happens only at the census.",
+        "Each league needs max(1, ceil(active families / 40)) cities, so it always has at least one. When it needs more, a closed city reopens first (lowest number first), and only then is a new one built. A reopened city's rackets start with the next week's bidding.",
+        "A city closes only when it is the league's highest-numbered open city and the league has had more cities than it needs at 14 censuses in a row, and never while a racket in it is owned or a war in it is live or has a bid. City #1 of each league never closes. The families placed in a closing city get a new city at the same census, and their members get a \"New city\" DM.",
+        "Placement: a family gets a city at the first census where it is active, in the city of its league with the fewest placed active families (ties to the lowest number). Until then !turf shows the city it would join, read-only, and it can't bid. A family that stops being active keeps its city.",
+        "Rebalancing: at every census, families with no turf at stake move from the fullest city to the emptiest, newest arrivals first, until the gap is under 2 families or every city is within 2 families of the league average. A family holding a racket, a top bid or a live war never moves. A moved family's members get a \"New city\" DM.",
+        "Moving up a league: the level-ups from L3 to L4 and from L6 to L7 are refused while the family holds a top bid or fights in a turf war. Otherwise the level-up hands every racket the family holds back to the Street (the Level up screen lists them before you confirm), the unpaid part of the day's cycle is lost, the family has no city until the next census, and every member gets a \"League move\" DM. Levels never drop, so a family never moves down a league.",
+      ],
+      table: {
+        title: "Leagues",
+        columns: ["League", "Family levels", "City name", "Racket cap", "Best holding a day"],
+        rows: [
+          ["Bronze", "1–3", "Low Town #n", "1", "300,000 (a Crown)"],
+          ["Silver", "4–6", "Midtown #n", "2", "1,300,000 (Crown + District)"],
+          ["Gold", "7–10", "Uptown #n", "3", "2,600,000 (Crown + 2 Districts, at most 1 Crown)"],
+        ],
+      },
+    },
+    {
+      heading: "How many cities",
+      body: [
+        "Cities per league = max(1, ceil(active families in the league / 40)). At launch each league has one city: Low Town #1, Midtown #1 and Uptown #1, 30 rackets in all.",
+      ],
+      table: {
+        title: "Cities by active families (per league)",
+        columns: ["Active families in the league", "Cities", "Gold racket income ceiling a day"],
+        rows: [
+          ["0–40", "1", "6,400,000"],
+          ["41–80", "2", "12,800,000"],
+          ["81–120", "3", "19,200,000"],
+          ["4,000", "100", "640,000,000"],
+        ],
+      },
+      note: "A city stays open past the count while a racket in it is owned or a war in it is live, and for 14 censuses after the league stops needing it.",
     },
     {
       heading: "How rackets pay",
@@ -698,7 +738,7 @@ const crimeFamilies: ModuleDoc = {
         rows: [
           ["Cycle", "24 hours, paid by the job at :05 every hour (UTC)"],
           ["Pays into", "Family earnings (only Payday moves it to wallets)"],
-          ["Income per cycle", "300,000 Corner, 650,000 District, 1,300,000 Crown"],
+          ["Income per cycle", "By league and class: Bronze 100,000 / 200,000 / 300,000, Silver 200,000 / 450,000 / 850,000, Gold 300,000 / 650,000 / 1,300,000 (Corner / District / Crown)"],
           ["XP per paid cycle", "20"],
           ["Racket-eligible members needed", "3 or more, checked at every cycle"],
           ["Neglect", "A cycle below 3 eligible members pays 0 and is a strike; 3 strikes release the racket to the Street"],
@@ -709,10 +749,10 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Bidding",
       body: [
-        "A racket's weekly war has exactly one attacker, and bidding decides who. The window opens 72 hours before the war starts and closes 1 hour before it. Example: Dockside Numbers fights on Monday at 18:00 UTC, so its bidding runs from Friday 18:00 to Monday 17:00.",
-        "Only the Boss or the Underboss can bid, and not while jailed. Open the racket's card and press Bid to type an amount, or type !turf bid <key> <amount> (for example !turf bid docks_numbers 2.1m). Amounts take shorthand like 2.1m or 2,100,000, but never \"all\" and never a fraction of a Fortune.",
+        "A racket's weekly war has exactly one attacker, and bidding decides who. The window opens 72 hours before the war starts and closes 1 hour before it. Example: Dockside Numbers in Uptown #1 fights on Monday at 18:00 UTC, so its bidding runs from Friday 18:00 to Monday 17:00.",
+        "Only the Boss or the Underboss can bid, and not while jailed, and only on a racket in the family's own city; a family with no city yet can't bid until the census places it. Open the racket's card and press Bid to type an amount, or type !turf bid <key> <amount> (for example !turf bid docks_numbers 2.1m). Amounts take shorthand like 2.1m or 2,100,000, but never \"all\" and never a fraction of a Fortune.",
         "Bids come from family earnings only, never the treasury. The bid sits in escrow on the war. When another family outbids you, your escrow goes straight back into your earnings and your Boss and Underboss get a DM; the owning family's Boss and Underboss get one for every bid on their racket. When bidding closes, the top bid is the attacker and its escrow is burned when the war settles, win or lose. Bid amounts are public: they are the price of a shot at the racket.",
-        "Every raise must beat the top bid by 10%, or by 100,000 if that is more: max(ceil(top × 1.10), top + 100,000). Since even the smallest floor is 2,100,000, the 10% is always the bigger step. On a Crown racket: 9,100,000, then at least 10,010,000, then at least 11,011,000.",
+        "Every raise must beat the top bid by 10%, or by 100,000 if that is more: max(ceil(top × 1.10), top + 100,000). The 10% is the bigger step once the top bid reaches 1,000,000, so only the first raises on a Bronze Corner go up by 100,000 (700,000 → 800,000 → 900,000 → 1,000,000). On a Gold Crown racket in Uptown #1: 9,100,000, then at least 10,010,000, then at least 11,011,000.",
         "If nobody bids, the war is cancelled and the owner keeps the racket for another week. A family that holds the top bid can't raise its own bid.",
       ],
       table: {
@@ -722,11 +762,11 @@ const crimeFamilies: ModuleDoc = {
           ["Window", "Opens 72 hours before the war, closes 1 hour before"],
           ["Who", "Boss or Underboss, not jailed"],
           ["Paid from", "Family earnings only, held in escrow"],
-          ["First bid", "At least the floor: 7 days of income (2,100,000 Corner, 4,550,000 District, 9,100,000 Crown)"],
+          ["First bid", "At least the floor, 7 days of income: Bronze 700,000 / 1,400,000 / 2,100,000, Silver 1,400,000 / 3,150,000 / 5,950,000, Gold 2,100,000 / 4,550,000 / 9,100,000 (Corner / District / Crown)"],
           ["Raise", "max(ceil(top × 1.10), top + 100,000)"],
           ["Outbid", "Escrow returns to your earnings at once"],
           ["Winning bid", "Burned when the war settles, whatever the result"],
-          ["Class level", "Corner any level, District family L4+, Crown family L7+"],
+          ["City", "Only rackets in your family's city; a family with no city yet can't bid"],
           ["Racket cap", "Rackets held plus live bids and attacks: 1 at L1–3, 2 at L4–6, 3 at L7–10"],
           ["Crown cap", "At most 1 Crown racket held or bid on at a time"],
           ["Family checks", "Not your own racket, no dues in arrears, not under investigation, home channel set"],
@@ -788,7 +828,7 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Decay and caps",
       body: [
-        "Rackets don't stay with a family that stops playing. A family whose members go quiet defends at the baseline only, and neglect hands its rackets to the Street within 3 cycles. A capture is never cheap: the winning bid, at least 7 days of the racket's income, is burned every time.",
+        "Rackets don't stay with a family that stops playing. A family whose members go quiet defends at the baseline only, and neglect hands its rackets to the Street within 3 cycles. A capture is never cheap: the winning bid, at least 7 days of the racket's income in its league, is burned every time.",
         "The racket cap is checked when you bid, counting every racket held and every live bid or attack, so a capture normally always fits. If a family ever does win while already at its cap, the racket goes to the Street instead, and the bid is still burned. Disbanding returns any top bids to earnings, where they are burned with the rest of the vault, and hands every racket the family held to the Street. A family can't disband while one of its wars is armed, live or settling, and nobody can be kicked during a live war.",
       ],
       table: {
@@ -800,9 +840,9 @@ const crimeFamilies: ModuleDoc = {
           ["Upkeep", "Family dues of 40,000 × level a day; defending above the baseline costs attendance and hit spend"],
           ["Banking", "At most 3 cycles after downtime"],
           ["Racket cap", "1 at L1–3, 2 at L4–6, 3 at L7–10"],
-          ["Class level", "District needs family L4+, Crown L7+ to bid"],
+          ["League", "A family bids only in its own league's city; L3 → L4 and L6 → L7 hand its rackets back to the Street"],
           ["Crown cap", "At most 1 Crown racket held or bid on at a time"],
-          ["Capture cost", "The winning bid, at least 7 days of the racket's income, burned"],
+          ["Capture cost", "The winning bid, at least 7 days of the racket's income (700,000 Bronze Corner to 9,100,000 Gold Crown), burned"],
           ["Leaving", "A member who fought in an armed or live war can't leave or be kicked until it resolves"],
         ],
       },
@@ -816,6 +856,9 @@ const crimeFamilies: ModuleDoc = {
         "Save hits for the blackout. Your 6 hits are 600 seconds apart, so a member who hits at the start can still land the sixth at the 50-minute mark, right as the scores go dark. The other side can't see where you're pushing, and a defender who thought a block was safe can't react.",
         "Bid late, but before the close. Bidding shuts 1 hour before the war and a raise must beat the top bid by 10%, so an early bid only sets the price for everyone else. Have the Boss or Underboss ready in the last few hours, with the earnings in the vault (bids can't touch the treasury).",
         "A cycle pays nothing if, when it falls due, fewer than 3 members are racket-eligible (72 h in the family, 20 shifts, and 2 started crew heist seats or 3 correct war hits in the last 7 days), and three such cycles lose the racket without a fight.",
+        "Keep 3 members active every week: the census only places active families, and a family with no city can't bid.",
+        "Move up a league between wars: level-ups that change league are refused while you hold a top bid or fight, and they hand your rackets back. Level up right after your rackets pay at :05 so you lose as little of the cycle as possible.",
+        "Silver and Gold pay far more per racket (a Silver Crown pays 850,000 a day against Bronze's 300,000), but the families there are bigger and older.",
         "Defend above the baseline only when the attacker is scoring. Every defender hit costs 25,000; against an attacker who isn't landing hits the baseline holds on its own, and ties go to you. Watch the board and spend your hits on the blocks they are actually taking, before the blackout hides them.",
       ],
     },
@@ -846,8 +889,8 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "The family leaderboard",
       body: [
-        "!crew top ranks the top 10 families by XP, by rackets held or by war wins, plus your own family's rank. Each line shows the crest, [TAG] Name, level, members and rackets held. No vault and no family net worth is ever shown. !crew info <TAG> opens any family's public dashboard.",
-        "The Rackets sort lists only families that hold at least one racket, so it never has more than 10 lines; a family with none has no Rackets rank. A war win counts when a family captures a racket, or defends one against an attacker who scored on at least 2 blocks (the same rule as the defence XP).",
+        "!crew top ranks the top 10 families by XP, by rackets held or by war wins, plus your own family's rank. Each line shows the crest, [TAG] Name, level and league (for example \"L8 Gold\"), members and rackets held. No vault and no family net worth is ever shown. !crew info <TAG> opens any family's public dashboard.",
+        "The Rackets sort counts the rackets a family holds in every city and lists only families that hold at least one; a family with none has no Rackets rank. A war win counts when a family captures a racket, or defends one against an attacker who scored on at least 2 blocks (the same rule as the defence XP).",
       ],
     },
     {

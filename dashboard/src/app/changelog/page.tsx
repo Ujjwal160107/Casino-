@@ -59,12 +59,13 @@ export default async function ChangelogPage() {
 
             <Panel className="mt-4 p-6">
               <h2 className="font-display text-xl font-bold text-ink">
-                Turf: 10 rackets, weekly bidding and turf wars
+                Turf: league cities of 10 rackets, weekly bidding and turf wars
               </h2>
               <p className="mt-2 leading-relaxed text-muted">
-                Crime families now fight over the city. Ten rackets pay
-                protection money into the family vault, and the only way to
-                take one is to win its weekly turf war. Rolling out to servers
+                Crime families now fight over their league&apos;s city. Each
+                city&apos;s ten rackets pay protection money into the family
+                vault, and the only way to take one is to win its weekly turf
+                war. Rolling out to servers
                 in stages, after Crime Families.
               </p>
 
@@ -77,17 +78,18 @@ export default async function ChangelogPage() {
                         Rackets
                       </h3>
                       <p className="mt-1 leading-relaxed text-muted">
-                        <strong className="text-ink">!turf</strong> shows the
-                        turf map: four Corner, four District and two Crown
-                        rackets, all starting with the Street. An owned racket
+                        <strong className="text-ink">!turf</strong> shows your
+                        league&apos;s city: four Corner, four District and two
+                        Crown rackets, all starting with the Street. An owned racket
                         pays the family&apos;s earnings every 24 hours with no
                         collecting, as long as at least 3 members are playing.
                       </p>
                     </div>
                   </div>
                   <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <FeatureItem>300,000 / 650,000 / 1,300,000 a day</FeatureItem>
-                    <FeatureItem>District at family level 4, Crown at level 7</FeatureItem>
+                    <FeatureItem>Three leagues by family level: Bronze L1–3, Silver L4–6, Gold L7–10</FeatureItem>
+                    <FeatureItem>A new city opens for every 40 active families in a league</FeatureItem>
+                    <FeatureItem>100,000 to 1,300,000 a day per racket, by league and class</FeatureItem>
                     <FeatureItem>Up to 3 rackets a family, 1 Crown</FeatureItem>
                     <FeatureItem>3 neglected days hand a racket back to the Street</FeatureItem>
                   </ul>
@@ -110,7 +112,7 @@ export default async function ChangelogPage() {
                   </div>
                   <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <FeatureItem>Opens 72 hours before the war, closes 1 hour before</FeatureItem>
-                    <FeatureItem>Floor of 7 days&apos; income: 2,100,000 to 9,100,000</FeatureItem>
+                    <FeatureItem>Floor of 7 days&apos; income: 700,000 to 9,100,000</FeatureItem>
                     <FeatureItem>Each raise at least 10% over the top bid</FeatureItem>
                     <FeatureItem>Outbid escrow goes straight back to earnings</FeatureItem>
                   </ul>

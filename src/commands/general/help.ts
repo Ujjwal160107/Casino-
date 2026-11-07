@@ -331,11 +331,11 @@ export const CATEGORIES: CategoryData[] = [
         example: "{p}heist join lookout"
       },
       {
-        name: "turf", aliases: ["racket", "rackets"], description: "The 10 rackets, weekly bidding and turf wars.",
+        name: "turf", aliases: ["racket", "rackets"], description: "Your league's city of 10 rackets, weekly bidding and turf wars.",
         usage: "{p}turf [racket <key>|bid <key> <amount>|war]",
         subcommands: [
-          "racket <key|1-10> — a racket's owner, income and bidding window",
-          "bid <key> <amount> — Boss/Underboss: bid from earnings",
+          "racket <key|1-10> — a racket in your family's city: owner, income and bidding window",
+          "bid <key> <amount> — bid on a racket in your family's city (Boss or Underboss)",
           "war — your war card with Scout and Hit, from any server"
         ],
         example: "{p}turf bid docks_numbers 2.1m"
