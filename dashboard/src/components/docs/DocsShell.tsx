@@ -5,7 +5,7 @@ import { DocsSidebar } from "./DocsSidebar";
 import { DocsToc, type TocItem } from "./DocsToc";
 import { HashFocus } from "./HashFocus";
 import { ModulePicker } from "./ModulePicker";
-import { ReadingProgress } from "./ReadingProgress";
+import { NavHeight } from "./NavHeight";
 import { PaletteProvider } from "./palette/PaletteProvider";
 import { SearchButton } from "./palette/SearchButton";
 import { buildSearchIndex } from "./palette/search-index";
@@ -16,7 +16,7 @@ const PAGES = [
 ];
 
 /**
- * The chrome around a docs page: reading progress, the search palette, the
+ * The chrome around a docs page: the search palette, the
  * sidebar (from 760px), the "On this page" column (from 1000px) and, on
  * phones, a top bar with search and a page picker.
  * `current` is the open module's slug, or "commands".
@@ -35,7 +35,7 @@ export function DocsShell({
   const currentHref = current === "commands" ? "/commands" : `/docs/${current}`;
   return (
     <PaletteProvider items={buildSearchIndex()}>
-      <ReadingProgress />
+      <NavHeight />
       <HashFocus />
       <div className="sticky top-[var(--docs-nav-h,64px)] z-30 flex gap-2 border-b-2 border-line bg-bg px-4 py-3 min-[760px]:hidden">
         <SearchButton variant="compact" />
@@ -45,7 +45,9 @@ export function DocsShell({
         <div className="hidden min-[760px]:block">
           <DocsSidebar current={current} />
         </div>
-        <div className="min-w-0">{children}</div>
+        <div id="main" tabIndex={-1} className="min-w-0 focus:outline-none!">
+          {children}
+        </div>
         <div className="hidden min-[1000px]:block">
           <DocsToc items={toc} title={tocTitle} />
         </div>

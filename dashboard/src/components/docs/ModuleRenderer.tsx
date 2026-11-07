@@ -7,7 +7,7 @@ import { CopyButton } from "./CopyButton";
 import { DocSection, DocSectionFrame } from "./DocSection";
 import { DocsPageHeader } from "./DocsPageHeader";
 import type { TocItem } from "./DocsToc";
-import { RichText } from "./RichText";
+import { richText } from "./rich-text";
 
 function moduleCommands(doc: ModuleDoc): Command[] {
   return doc.commandIds.map(getCommand).filter((c): c is Command => Boolean(c));
@@ -27,7 +27,7 @@ function BeginnerBlock({ intro }: { intro: ModuleDoc["forBeginners"] }) {
     <aside aria-label="New here?" className="mt-10 grid gap-4 rounded-2xl border-[3px] border-ink bg-panel p-6 sm:p-8">
       <p className="font-mono text-xs font-bold uppercase tracking-[.14em] text-gold">New here?</p>
       <p className="max-w-[70ch] leading-[1.7] text-ink">
-        <RichText text={intro.what} />
+        {richText(intro.what)}
       </p>
       <div className="flex flex-wrap gap-2">
         {intro.firstCommands.map((c) => (
@@ -37,7 +37,7 @@ function BeginnerBlock({ intro }: { intro: ModuleDoc["forBeginners"] }) {
         ))}
       </div>
       <p className="max-w-[70ch] text-sm leading-relaxed text-muted">
-        <b className="text-ink">Tip:</b> <RichText text={intro.tip} />
+        <b className="text-ink">Tip:</b> {richText(intro.tip)}
       </p>
     </aside>
   );
@@ -74,7 +74,7 @@ export function ModuleRenderer({ doc }: { doc: ModuleDoc }) {
               <li key={`${i}-${t}`} className="flex gap-3 leading-[1.7] text-ink-2">
                 <span aria-hidden className="mt-[.6em] size-2 shrink-0 bg-gold" />
                 <span>
-                  <RichText text={t} />
+                  {richText(t)}
                 </span>
               </li>
             ))}

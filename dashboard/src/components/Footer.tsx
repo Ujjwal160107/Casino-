@@ -39,7 +39,7 @@ const COLUMNS: {
   },
 ];
 
-const linkClass = "inline-flex min-h-11 items-center text-sm text-muted transition-colors hover:text-gold sm:min-h-8";
+const linkClass = "inline-flex min-h-11 items-center text-sm text-muted transition-colors hover:text-gold";
 
 export function Footer() {
   return (
@@ -58,7 +58,7 @@ export function Footer() {
         {COLUMNS.map((col) => (
           <div key={col.title}>
             <h3 className="mb-3 font-mono text-xs font-bold uppercase tracking-[.14em] text-ink">{col.title}</h3>
-            <ul className="space-y-1">
+            <ul>
               {col.links.map((l) => (
                 <li key={l.label}>
                   {l.external ? (

@@ -114,28 +114,31 @@ export function CommandPalette({
         onKeyDown={onDialogKey}
         className="w-full max-w-[640px] overflow-hidden rounded-2xl border-[3px] border-ink bg-panel shadow-[8px_8px_0_var(--color-ink)] transition-[opacity,translate] duration-200 ease-[var(--ease-out-expo)] starting:-translate-y-2 starting:opacity-0"
       >
-        <div className="flex items-center gap-3 border-b-2 border-line pl-4 pr-2">
-          <Search size={18} aria-hidden className="shrink-0 text-muted" />
-          <input
-            ref={inputRef}
-            type="text"
-            role="combobox"
-            aria-expanded="true"
-            aria-controls={`${uid}-list`}
-            aria-autocomplete="list"
-            aria-activedescendant={activeId}
-            aria-label="Search docs and commands"
-            autoComplete="off"
-            spellCheck={false}
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSelected(0);
-            }}
-            onKeyDown={onInputKey}
-            placeholder="Search commands and docs… try heist, vote, payday"
-            className="min-h-14 min-w-0 flex-1 bg-transparent text-base text-ink placeholder:text-muted focus:outline-none"
-          />
+        <div className="flex items-center gap-2 border-b-2 border-line p-2">
+          {/* the field's focus shows as a ring on this wrapper, not the input's own outline */}
+          <div className="flex min-w-0 flex-1 items-center gap-3 rounded-full px-3 focus-within:ring-2 focus-within:ring-gold">
+            <Search size={18} aria-hidden className="shrink-0 text-muted" />
+            <input
+              ref={inputRef}
+              type="text"
+              role="combobox"
+              aria-expanded="true"
+              aria-controls={`${uid}-list`}
+              aria-autocomplete="list"
+              aria-activedescendant={activeId}
+              aria-label="Search docs and commands"
+              autoComplete="off"
+              spellCheck={false}
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSelected(0);
+              }}
+              onKeyDown={onInputKey}
+              placeholder="Search commands and docs… try heist, vote, payday"
+              className="min-h-12 min-w-0 flex-1 bg-transparent text-base text-ink outline-none! placeholder:text-muted"
+            />
+          </div>
           <button
             type="button"
             onClick={onClose}

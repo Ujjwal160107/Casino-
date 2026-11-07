@@ -159,7 +159,7 @@ const line = (i: number) => {
   const r = RACKETS[i];
   return {
     racketId: ID(100 + i), cityId: city.id, key: r.key, name: r.name, class: r.class, income: LEAGUE_RACKET_INCOME.SILVER[r.class],
-    ownerFamilyId: owners[i] ? ID(200 + i) : null, ownerLabel: owners[i], strikes: 0,
+    ownerFamilyId: owners[i] ? ID(200 + i) : null, ownerLabel: owners[i] ?? "the Street", strikes: 0, // the bot labels unowned rackets "the Street"
     war: i === 2 ? { id: ID(90), status: "BIDDING", topBid: 6_200_000, topBidderLabel: LABEL, bidClosesAt: at(300), startsAt: at(600) } : null,
     nextWarAt: at(600 + i * 60), bidding: { phase: i === 2 ? "OPEN" : "SOON", nextOpensAt: at(120) },
   };

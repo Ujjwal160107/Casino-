@@ -38,7 +38,7 @@ export function ModulesRailColumns({ modules }: { modules: RailModule[] }) {
   }
 
   return (
-    <ul className="flex flex-col gap-3 min-[901px]:h-[560px] min-[901px]:flex-row">
+    <ul className="@container flex flex-col gap-3 min-[901px]:h-[560px] min-[901px]:flex-row">
       {modules.map((m, i) => {
         const open = i === active;
         const bodyId = `${id}-body-${m.slug}`;
@@ -85,7 +85,9 @@ export function ModulesRailColumns({ modules }: { modules: RailModule[] }) {
               id={bodyId}
               className={cn(
                 open ? "grid" : "hidden",
-                "min-[901px]:absolute min-[901px]:inset-0 min-[901px]:grid min-[901px]:grid-rows-[minmax(0,1fr)_auto]",
+                // Laid out at the open column's width even while collapsed, so the art keeps a real size
+                // and the copy never reflows as the column grows: (rail − 7 gaps − 8 borders) × 5.5 / 12.5.
+                "min-[901px]:absolute min-[901px]:inset-y-0 min-[901px]:left-0 min-[901px]:grid min-[901px]:w-[calc((100cqw-132px)*0.44)] min-[901px]:grid-rows-[minmax(0,1fr)_auto]",
                 open ? "min-[901px]:visible min-[901px]:opacity-100" : "min-[901px]:invisible min-[901px]:opacity-0",
               )}
               style={{ transition: open ? "opacity .45s .2s, visibility 0s" : "opacity .3s, visibility 0s .3s" }}
@@ -109,8 +111,8 @@ export function ModulesRailColumns({ modules }: { modules: RailModule[] }) {
                 <div className="flex flex-wrap gap-2">
                   {m.cmds.map((c) => <CommandPill key={c} cmd={c} tone="inverted" />)}
                 </div>
-                <Link href={`/docs/${m.slug}`} className="justify-self-start border-b-[3px] border-gold pb-0.5 font-body text-sm font-extrabold uppercase tracking-[.06em]">
-                  Read the guide →
+                <Link href={`/docs/${m.slug}`} className="inline-flex min-h-11 items-center justify-self-start font-body text-sm font-extrabold uppercase tracking-[.06em]">
+                  <span className="border-b-[3px] border-gold pb-0.5">Read the guide →</span>
                 </Link>
               </div>
             </div>

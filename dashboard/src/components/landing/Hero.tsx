@@ -120,7 +120,7 @@ function HeroDemo() {
       <div
         ref={donRef}
         aria-hidden
-        className="pointer-events-none absolute z-[3] max-[599px]:hidden min-[600px]:-right-3.5 min-[600px]:-top-[116px] min-[600px]:w-40 min-[1100px]:-bottom-[30px] min-[1100px]:-left-[140px] min-[1100px]:right-auto min-[1100px]:top-auto min-[1100px]:w-[250px]"
+        className="pointer-events-none absolute z-[3] max-[599px]:hidden min-[600px]:-right-3.5 min-[600px]:-top-[116px] min-[600px]:w-40 min-[1100px]:bottom-[240px] min-[1100px]:-left-[100px] min-[1100px]:right-auto min-[1100px]:top-auto min-[1100px]:w-[150px] min-[1280px]:-left-[140px] min-[1280px]:w-[190px]"
       >
         <Image
           src="/cf/cf_fortuna_don.png"
@@ -136,7 +136,7 @@ function HeroDemo() {
         ref={tiltRef}
         className="relative z-[2] rounded-2xl border-[3px] border-ink shadow-[12px_12px_0_var(--color-ink)] transition-transform duration-500 ease-[var(--ease-out-expo)] [--rx:0deg] [--ry:0deg] [transform:perspective(1400px)_rotateX(var(--rx))_rotateY(var(--ry))_rotate(-2deg)]"
       >
-        <DemoChat />
+        <DemoChat headerClassName={SEAL_CLEARANCE} />
       </div>
 
       <Seal />
@@ -144,19 +144,26 @@ function HeroDemo() {
   );
 }
 
-/** Gold seal with the "New · Crime Families" ring. Sits top-right; top-left on tablets so the Don has the right. */
+/**
+ * Gold seal with the "New · Crime Families" ring, half outside the chat's
+ * top-right corner (top-left on tablets, where the Don takes the right).
+ * SEAL_CLEARANCE keeps the chat header's content out from under it.
+ */
+const SEAL_CLEARANCE = "min-[700px]:pl-[132px] min-[1100px]:pl-4 min-[1100px]:pr-[108px]";
+
 function Seal() {
   return (
     <div
       aria-hidden
-      className="absolute -top-[42px] z-[4] grid h-[132px] w-[132px] place-items-center rounded-full bg-gold text-bg shadow-[5px_5px_0_var(--color-ink)] max-[699px]:hidden min-[700px]:-left-3 min-[1100px]:-right-9 min-[1100px]:left-auto"
+      className="absolute -top-16 z-[4] grid h-[132px] w-[132px] place-items-center rounded-full bg-gold text-bg shadow-[5px_5px_0_var(--color-ink)] max-[699px]:hidden min-[700px]:-left-3 min-[1100px]:-right-9 min-[1100px]:-top-[72px] min-[1100px]:left-auto"
     >
       <svg viewBox="0 0 132 132" className="hero-seal-text absolute inset-0 h-full w-full">
         <defs>
           <path id="hero-seal-path" d="M66,66 m-50,0 a50,50 0 1,1 100,0 a50,50 0 1,1 -100,0" />
         </defs>
-        <text className="fill-current font-mono text-[11.5px] font-bold uppercase tracking-[.22em]">
-          <textPath href="#hero-seal-path">New · Crime Families · New · Crime Families ·</textPath>
+        {/* Two repeats spread over the full circumference (2π·50 ≈ 314) so the ring closes without colliding. */}
+        <text className="fill-current font-mono text-[10px] font-bold uppercase">
+          <textPath href="#hero-seal-path" textLength={312} lengthAdjust="spacing">New · Crime Families · New · Crime Families ·</textPath>
         </text>
       </svg>
       <span className="font-display text-[34px] font-black uppercase leading-none">New</span>

@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- small pixel-art turf icons at fixed sizes; next/image adds nothing here. */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { BotMessage, type ScreenKey } from "@/components/bot/BotMessage";
 import { Container, Reveal, Section, SectionHead, useReducedMotionPref } from "./kit";
 import { cn } from "@/lib/utils";
@@ -91,6 +91,20 @@ function useStagedScreen(active: number, reduced: boolean) {
   return [shown, shown !== active] as const;
 }
 
+/** The dark Discord frame every story screen sits in. */
+function StageFrame({ screen }: { screen: ScreenKey }) {
+  return (
+    <div className="rounded-2xl border-[3px] border-bg bg-[#1b1d23] p-4 shadow-[12px_12px_0_var(--color-gold)]">
+      <BotMessage screen={screen} />
+    </div>
+  );
+}
+
+/**
+ * One step. From 1000px the inactive ones are muted and the sticky stage
+ * shows the screen; below that every step reads at full ink with its own
+ * screen inline, because a stage after four steps would only ever show the last.
+ */
 function StoryStep({ step, index, on, stepRef }: { step: Step; index: number; on: boolean; stepRef: (el: HTMLLIElement | null) => void }) {
   return (
     <li
@@ -98,44 +112,65 @@ function StoryStep({ step, index, on, stepRef }: { step: Step; index: number; on
       data-step={index}
       aria-current={on ? "step" : undefined}
       className={cn(
-        "grid content-center gap-3 border-l-4 py-6 pl-7 transition-colors duration-300 min-[1000px]:min-h-[38vh]",
-        on ? "border-gold" : "border-bg/25",
+        "grid content-center gap-3 border-l-4 border-bg/25 py-6 pl-7 transition-colors duration-300 min-[1000px]:min-h-[38vh]",
+        on && "min-[1000px]:border-gold",
       )}
+      style={{ "--step-muted": MUTED_INK } as CSSProperties}
     >
-      <span className={cn("font-mono text-[13px] font-bold uppercase tracking-[.14em] text-bg transition-opacity duration-300", on ? "opacity-100" : "opacity-70")}>{step.tag}</span>
-      <h3 className="font-display text-[clamp(40px,4.4vw,68px)] font-black uppercase leading-[.85] transition-colors duration-300" style={{ color: on ? "var(--color-bg)" : MUTED_INK }}>
+      <span className={cn("font-mono text-[13px] font-bold uppercase tracking-[.14em] text-bg transition-opacity duration-300", !on && "min-[1000px]:opacity-70")}>{step.tag}</span>
+      <h3 className={cn("font-display text-[clamp(40px,4.4vw,68px)] font-black uppercase leading-[.85] text-bg transition-colors duration-300", !on && "min-[1000px]:text-[color:var(--step-muted)]")}>
         {step.title}
       </h3>
       <p className="max-w-[46ch] text-lg text-bg/80">{step.body}</p>
+      <div className="mt-4 mr-3 min-[1000px]:hidden">
+        <StageFrame screen={step.screen} />
+      </div>
     </li>
   );
 }
 
-function StoryStage({ shown, swapping, reduced }: { shown: number; swapping: boolean; reduced: boolean }) {
+/** The sticky stage (from 1000px): swaps to the active step's screen with a short fade. */
+function StoryStage({ shown, swapping, reduced, stageRef }: { shown: number; swapping: boolean; reduced: boolean; stageRef: RefObject<HTMLDivElement | null> }) {
   const step = STEPS[shown];
   return (
-    <div className="min-w-0 min-[1000px]:sticky min-[1000px]:top-[110px]">
-      <div className="rounded-2xl border-[3px] border-bg bg-[#1b1d23] p-4 shadow-[12px_12px_0_var(--color-gold)]">
-        <div
-          style={{
-            opacity: swapping ? 0 : 1,
-            transform: swapping ? "translateY(8px)" : "none",
-            transition: reduced ? undefined : `opacity ${SWAP_MS}ms ease, transform ${SWAP_MS}ms ease`,
-          }}
-        >
-          <BotMessage screen={step.screen} />
-        </div>
+    <div ref={stageRef} className="hidden min-w-0 min-[1000px]:sticky min-[1000px]:top-[110px] min-[1000px]:block">
+      <div
+        style={{
+          opacity: swapping ? 0 : 1,
+          transform: swapping ? "translateY(8px)" : "none",
+          transition: reduced ? undefined : `opacity ${SWAP_MS}ms ease, transform ${SWAP_MS}ms ease`,
+        }}
+      >
+        <StageFrame screen={step.screen} />
       </div>
       <p className="sr-only" aria-live="polite">{step.caption}</p>
     </div>
   );
 }
 
+/**
+ * Publishes the stage's height as --stage-h on the story grid, so the steps
+ * column can pad its bottom enough that the stuck stage stays fully in view
+ * while the last step is active. Writes a CSS variable, so no re-render.
+ */
+function useStageHeightVar() {
+  const gridRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const grid = gridRef.current, stage = stageRef.current;
+    if (!grid || !stage || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => grid.style.setProperty("--stage-h", `${stage.offsetHeight}px`));
+    ro.observe(stage);
+    return () => ro.disconnect();
+  }, []);
+  return [gridRef, stageRef] as const;
+}
+
 function FamilyFacts() {
   return (
     <div className="mt-24 grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-6">
       {FACTS.map((f, i) => (
-        <Reveal key={f.big} delay={i * 80} className="grid gap-2 border-t-[3px] border-bg pt-4">
+        <Reveal key={f.big} delay={i * 80} className="grid content-start gap-2 border-t-[3px] border-bg pt-4">
           <b className="font-display text-[74px] font-black uppercase leading-[.85]">{f.big}</b>
           <span className="text-bg/80">{f.label}</span>
         </Reveal>
@@ -168,6 +203,7 @@ export function CrimeFamilies() {
   const reduced = useReducedMotionPref();
   const [stepRefs, active] = useActiveStep(STEPS.length);
   const [shown, swapping] = useStagedScreen(active, reduced);
+  const [gridRef, stageRef] = useStageHeightVar();
 
   return (
     <Section id="crime-families" ruled={false} className="border-y-[3px] border-ink bg-ink text-bg">
@@ -187,13 +223,14 @@ export function CrimeFamilies() {
           sub="New. Every crewmate holds intel someone else needs. Scroll through one job."
         />
 
-        <div className="grid gap-10 min-[1000px]:grid-cols-[minmax(0,1fr)_minmax(0,560px)] min-[1000px]:items-start">
-          <ol className="m-0 list-none p-0">
+        <div ref={gridRef} className="grid gap-10 min-[1000px]:grid-cols-[minmax(0,1fr)_minmax(0,560px)] min-[1000px]:items-start">
+          {/* When the last step's bottom reaches the 45% line, the grid must still reach 110px + the stage height + room for its 12px shadow. */}
+          <ol className="m-0 list-none p-0 min-[1000px]:pb-[max(0px,calc(134px+var(--stage-h,0px)-45vh))]">
             {STEPS.map((s, i) => (
               <StoryStep key={s.tag} step={s} index={i} on={i === active} stepRef={(el) => { stepRefs.current[i] = el; }} />
             ))}
           </ol>
-          <StoryStage shown={shown} swapping={swapping} reduced={reduced} />
+          <StoryStage shown={shown} swapping={swapping} reduced={reduced} stageRef={stageRef} />
         </div>
 
         <FamilyFacts />

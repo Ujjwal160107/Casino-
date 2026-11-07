@@ -75,6 +75,12 @@ export function LandingNavbar(props: LandingNavbarProps) {
 
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-50 border-b-[3px] border-ink bg-bg">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-[calc(env(safe-area-inset-top,0px)+16px)] focus:z-[70] focus:inline-flex focus:min-h-11 focus:items-center focus:rounded-full focus:bg-gold focus:px-5 focus:font-bold focus:uppercase focus:tracking-[.05em] focus:text-bg focus:shadow-[4px_4px_0_var(--color-ink)]"
+      >
+        Skip to content
+      </a>
       <nav aria-label="Main" className="mx-auto flex min-h-[72px] w-full max-w-[86rem] items-center gap-3 px-4 sm:gap-6 sm:px-6 lg:px-9">
         <Link href="/" className="flex min-h-11 items-center gap-2.5 text-ink">
           <Image src="/fortuna_icon.png" alt="" width={38} height={38} className="h-[38px] w-[38px] rounded-full border-2 border-ink" />

@@ -37,7 +37,7 @@ export function CommandsExplorer({ commands }: { commands: Command[] }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter by name, alias or description"
-            className="min-h-11 min-w-0 flex-1 bg-transparent text-ink placeholder:text-muted focus:outline-none"
+            className="min-h-11 min-w-0 flex-1 bg-transparent text-ink outline-none! placeholder:text-muted"
           />
         </label>
         <div role="group" aria-label="Module" className="flex flex-wrap gap-2">

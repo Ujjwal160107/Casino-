@@ -126,7 +126,7 @@ export function CommandPill({ cmd, tone = "default" }: { cmd: string; tone?: "de
     gold: "border-bg text-bg hover:bg-bg hover:text-gold",
   }[tone];
   return (
-    <button type="button" onClick={() => copyCommand(cmd)} className={cn("inline-flex min-h-9 items-center rounded-full border-2 px-3 font-mono text-[13px] font-bold transition-colors", styles)} aria-label={`Copy ${cmd}`}>
+    <button type="button" onClick={() => copyCommand(cmd)} className={cn("inline-flex min-h-11 items-center rounded-full border-2 px-4 font-mono text-[13px] font-bold transition-colors", styles)} aria-label={`Copy ${cmd}`}>
       {cmd}
     </button>
   );

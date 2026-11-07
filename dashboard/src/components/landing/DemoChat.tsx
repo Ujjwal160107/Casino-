@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type FocusEvent } from "react";
+import { Pause, Play } from "lucide-react";
 import { BotMessage, UserMessage, type ScreenKey } from "@/components/bot/BotMessage";
+import { cn } from "@/lib/utils";
+import { useReducedMotionPref } from "./kit";
 
 /**
  * A playable Discord channel that runs real Crime Families flows with the
  * bot's exported cards. It auto-plays (pressing the glowing button itself)
- * until the visitor touches it; under reduced motion it never auto-plays or
- * types, and shows the first flow's opening state at once.
+ * until the visitor touches, focuses or pauses it; under reduced motion it
+ * never auto-plays or types, and shows the first flow's opening state at once.
  */
 
 type Step = {
@@ -69,7 +72,18 @@ type Entry =
   | { id: number; kind: "typing" };
 type NewEntry = Entry extends infer E ? (E extends Entry ? Omit<E, "id"> : never) : never;
 
-type Engine = { run: number; auto: boolean; reduced: boolean; timers: Set<number>; press: (() => void) | null; nextId: number };
+type Engine = {
+  run: number;
+  auto: boolean;
+  reduced: boolean;
+  timers: Set<number>;
+  /** Presses the armed live button (null when none is armed). */
+  press: (() => void) | null;
+  nextId: number;
+  flow: FlowName;
+  /** The current flow has played to its end. */
+  done: boolean;
+};
 
 /** Cancels whatever flow is running: bumps the run id, clears its timers and disarms its button. */
 function halt(eng: Engine) {
@@ -77,6 +91,21 @@ function halt(eng: Engine) {
   eng.timers.forEach((t) => clearTimeout(t));
   eng.timers.clear();
   eng.press = null;
+}
+
+const nextFlow = (name: FlowName) => ORDER[(ORDER.indexOf(name) + 1) % ORDER.length];
+const LIVE_BUTTON = '[aria-label$="(try it)"]';
+
+/** Which sides of the chip strip have chips scrolled out of view. */
+type Edges = { l: boolean; r: boolean };
+function chipEdges(el: HTMLElement, prev: Edges): Edges {
+  const l = el.scrollLeft > 2;
+  const r = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+  return l === prev.l && r === prev.r ? prev : { l, r };
+}
+function edgeMask({ l, r }: Edges) {
+  if (!l && !r) return undefined;
+  return `linear-gradient(to right, ${l ? "transparent, #000 40px" : "#000"}, ${r ? "#000 calc(100% - 40px), transparent" : "#000"})`;
 }
 
 const CHAT_CSS = `
@@ -88,15 +117,29 @@ const CHAT_CSS = `
 @media (prefers-reduced-motion: reduce) { .demo-in, .demo-dot { animation: none; } }
 `;
 
-export function DemoChat() {
+export function DemoChat({ headerClassName }: { headerClassName?: string }) {
   const [active, setActive] = useState<FlowName | null>(null);
+  const [playing, setPlaying] = useState(true);
+  const [edges, setEdges] = useState<Edges>({ l: false, r: false });
+  const reducedPref = useReducedMotionPref();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [typed, setTyped] = useState("");
   const [hint, setHint] = useState(FIRST_HINT);
   const logRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const chipsRef = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   // Engine state: the current run (bumped to cancel a flow), auto-play, pending timers, the armed button.
-  const engine = useRef<Engine>({ run: 0, auto: true, reduced: false, timers: new Set(), press: null, nextId: 0 });
+  const engine = useRef<Engine>({ run: 0, auto: true, reduced: false, timers: new Set(), press: null, nextId: 0, flow: ORDER[0], done: false });
+
+  function setAuto(on: boolean) {
+    engine.current.auto = on;
+    setPlaying(on);
+  }
+  /** Auto-presses `fire` after a beat, unless auto-play was paused meanwhile. */
+  function autoPress(fire: () => void) {
+    after(1900, () => { if (engine.current.auto) fire(); });
+  }
 
   function after(ms: number, fn: () => void) {
     const t = window.setTimeout(() => { engine.current.timers.delete(t); fn(); }, engine.current.reduced ? 0 : ms);
@@ -117,6 +160,8 @@ export function DemoChat() {
     const id = engine.current.run;
     const live = () => id === engine.current.run;
     const f: Flow = FLOWS[name];
+    engine.current.flow = name;
+    engine.current.done = false;
     setActive(name);
     setEntries([]);
     setTyped("");
@@ -158,7 +203,7 @@ export function DemoChat() {
             res();
           };
           engine.current.press = fire;
-          if (engine.current.auto) after(1900, fire);
+          if (engine.current.auto) autoPress(fire);
         });
         await sleep(150);
         if (!live()) return;
@@ -168,13 +213,25 @@ export function DemoChat() {
       }
     }
 
+    engine.current.done = true;
     if (engine.current.auto) {
       await sleep(3000);
-      if (live() && engine.current.auto) play(ORDER[(ORDER.indexOf(name) + 1) % ORDER.length]);
+      if (live() && engine.current.auto) play(nextFlow(name));
     }
   }
 
-  const start = useEffectEvent(() => { void play(ORDER[0]); });
+  /** Turns auto-play back on from wherever the demo stopped. */
+  function resume() {
+    setAuto(true);
+    const eng = engine.current;
+    if (eng.done) void play(nextFlow(eng.flow));
+    else if (eng.press) autoPress(eng.press);
+  }
+
+  const start = useEffectEvent(() => {
+    setPlaying(engine.current.auto);
+    void play(ORDER[0]);
+  });
   useEffect(() => {
     const eng = engine.current;
     eng.reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -196,23 +253,62 @@ export function DemoChat() {
     return () => ro.disconnect();
   }, []);
 
-  const choose = (name: FlowName) => { engine.current.auto = false; void play(name); };
-  const pressLive = () => { engine.current.auto = false; engine.current.press?.(); };
+  // A keyboard (or pointer) user who pressed a live button stays in the log; follow them to the next one.
+  useEffect(() => {
+    const log = logRef.current;
+    if (!log || document.activeElement !== log) return;
+    log.querySelector<HTMLElement>(LIVE_BUTTON)?.focus({ preventScroll: true });
+  }, [entries]);
+
+  // Fade the chip strip's edge on whichever side has chips out of view.
+  useEffect(() => {
+    const el = chipsRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setEdges((prev) => chipEdges(el, prev)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const choose = (name: FlowName) => { setAuto(false); void play(name); };
+  const pressLive = () => {
+    setAuto(false);
+    const fire = engine.current.press;
+    if (!fire) return;
+    // The pressed card is about to re-render without this button: park focus on the log first.
+    logRef.current?.focus({ preventScroll: true });
+    fire();
+  };
+  // Any focus inside the demo (other than the pause toggle itself) hands control to the visitor.
+  const onFocusIn = (e: FocusEvent<HTMLDivElement>) => { if ((e.target as Node) !== toggleRef.current) setAuto(false); };
+  const mask = edgeMask(edges);
 
   return (
-    <div role="region" aria-label="Try Fortuna: a demo chat" className="flex h-[600px] max-h-[76vh] min-w-0 flex-col overflow-hidden rounded-[13px] bg-[#1b1d23] font-body">
+    <div role="region" aria-label="Try Fortuna: a demo chat" onFocus={onFocusIn} className="flex h-[600px] max-h-[76vh] min-w-0 flex-col overflow-hidden rounded-[13px] bg-[#1b1d23] font-body">
       <style href="fortuna-demo-chat" precedence="default">{CHAT_CSS}</style>
 
-      <div className="flex items-center gap-2.5 border-b border-[#2a2d35] px-4 py-3 text-sm font-semibold text-[#f2f3f5]">
+      <div className={cn("flex items-center gap-2.5 border-b border-[#2a2d35] px-4 py-1 text-sm font-semibold text-[#f2f3f5]", headerClassName)}>
         <span aria-hidden className="font-mono text-lg font-bold text-[#8a8f99]">#</span>
         family-hq
         <span className="ml-auto inline-flex items-center gap-1.5 font-mono text-[11px] font-bold tracking-[.12em] text-gold">
           <span aria-hidden className="h-[7px] w-[7px] rounded-full bg-gold" />
           LIVE DEMO
         </span>
+        {!reducedPref && (
+          <button
+            ref={toggleRef}
+            type="button"
+            aria-pressed={!playing}
+            aria-label="Pause demo"
+            title={playing ? "Pause demo" : "Play demo"}
+            onClick={() => (playing ? setAuto(false) : resume())}
+            className="grid h-11 w-11 flex-none place-items-center rounded-full border-[1.5px] border-[#3c3f47] text-[#f2f3f5] transition-colors hover:border-gold hover:text-gold"
+          >
+            {playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
+          </button>
+        )}
       </div>
 
-      <div ref={logRef} onPointerDown={() => { engine.current.auto = false; }} className="flex-1 overflow-y-auto overscroll-contain p-4">
+      <div ref={logRef} tabIndex={-1} onPointerDown={() => setAuto(false)} className="flex-1 overflow-y-auto overscroll-contain p-4 focus-visible:outline-offset-[-3px]">
         <div ref={contentRef} className="flex flex-col gap-4">
           {entries.map((e) => (
             <div key={e.id} className="demo-in">
@@ -236,7 +332,14 @@ export function DemoChat() {
       </div>
 
       <div className="grid gap-2.5 border-t border-[#2a2d35] bg-[#1b1d23] p-3">
-        <div role="group" aria-label="Commands to try" className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          ref={chipsRef}
+          role="group"
+          aria-label="Commands to try"
+          onScroll={(e) => { const el = e.currentTarget; setEdges((prev) => chipEdges(el, prev)); }}
+          style={{ maskImage: mask, WebkitMaskImage: mask }}
+          className="flex gap-2 overflow-x-auto [scrollbar-width:none] sm:flex-wrap [&::-webkit-scrollbar]:hidden"
+        >
           {ORDER.map((name) => {
             const on = active === name;
             return (

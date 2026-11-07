@@ -34,6 +34,8 @@
 
 html {
   scroll-behavior: smooth;
+  /* Keeps anchored and keyboard-focused content clear of the sticky nav. */
+  scroll-padding-top: 96px;
 }
 
 body {

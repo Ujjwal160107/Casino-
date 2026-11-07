@@ -3,8 +3,12 @@ import type { ReactNode } from "react";
 /** Matches a command written inline in copy: "!work", "!turf", "/turf". */
 const COMMAND = /(^|[\s(])([!/][a-z][a-z-]*)/g;
 
-/** Doc copy with every inline command set as gold mono code. */
-export function RichText({ text }: { text: string }) {
+/**
+ * Doc copy with every inline command set as gold mono code. A plain function,
+ * not a component: it runs for every paragraph and table cell, and a component
+ * boundary per cell bloats the RSC payload (the Crime Families page has 38 tables).
+ */
+export function richText(text: string): ReactNode[] {
   const parts: ReactNode[] = [];
   let last = 0;
   for (const m of text.matchAll(COMMAND)) {

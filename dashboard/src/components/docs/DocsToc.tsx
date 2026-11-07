@@ -9,8 +9,8 @@ export interface TocItem {
 }
 
 /**
- * "On this page" with scroll-spy: the first section inside the reading band
- * (just under the nav) is marked current, and the list keeps it in view.
+ * "On this page" with scroll-spy: the last section whose top has scrolled up
+ * to the line just under the nav is marked current, and the list keeps it in view.
  */
 export function DocsToc({ items, title = "On this page" }: { items: TocItem[]; title?: string }) {
   const navRef = useRef<HTMLElement>(null);
@@ -19,23 +19,33 @@ export function DocsToc({ items, title = "On this page" }: { items: TocItem[]; t
 
   useEffect(() => {
     const ids = idKey.split(" ");
-    const visible = new Set<string>();
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) visible.add(e.target.id);
-          else visible.delete(e.target.id);
-        }
-        const first = ids.find((id) => visible.has(id));
-        if (first) setCurrent(first);
-      },
-      { rootMargin: "-110px 0px -70% 0px" },
-    );
-    for (const id of ids) {
-      const el = document.getElementById(id);
-      if (el) io.observe(el);
-    }
-    return () => io.disconnect();
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      // A section a link jumps to lands at nav height + 88px (its scroll margin);
+      // the current section is the last one whose top has reached that line.
+      const navH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--docs-nav-h")) || 64;
+      const line = navH + 96;
+      let next: string | null = null;
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        if (el.getBoundingClientRect().top > line) break;
+        next = id;
+      }
+      setCurrent(next);
+    };
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    schedule();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
   }, [idKey]);
 
   useEffect(() => {
@@ -64,7 +74,7 @@ export function DocsToc({ items, title = "On this page" }: { items: TocItem[]; t
             href={`#${item.id}`}
             aria-current={on ? "location" : undefined}
             className={cn(
-              "border-l-2 py-1.5 pl-3 leading-snug transition-colors",
+              "flex min-h-8 items-center border-l-2 py-1 pl-3 leading-snug transition-colors",
               on ? "border-gold text-gold" : "border-line text-muted hover:text-ink",
             )}
           >

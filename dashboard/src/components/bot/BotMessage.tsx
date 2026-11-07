@@ -41,6 +41,11 @@ function art(name: string): string {
   const base = name.replace(/\.(png|webp)$/, "");
   return `/cf/${base}.${WEBP.has(base) ? "webp" : "png"}`;
 }
+/** Thumbnail URLs are attachments (our art) or the bot's CDN emoji, served locally as /cf/e<id>.png. */
+function thumbSrc(url: string): string {
+  const cdn = url.match(/cdn\.discordapp\.com\/emojis\/(\d+)/);
+  return cdn ? `/cf/e${cdn[1]}.png` : art(url.replace("attachment://", ""));
+}
 function emojiSrc(e: Emoji): string | null {
   if (e.name?.startsWith("cf_")) return art(e.name);
   return e.id ? `/cf/e${e.id}.png` : null;
@@ -119,7 +124,7 @@ function Button({ b, live }: { b: Node; live: Live }) {
   const isLive = live?.label === b.label;
   const cls = `relative inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-[7px] px-3 text-[13.5px] font-semibold text-white ${BUTTON[b.style ?? 2] ?? BUTTON[2]} ${b.disabled ? "opacity-50" : ""}`;
   const inner = <>{em && <img src={em} alt="" className="h-[18px] w-[18px] [image-rendering:pixelated]" />}{b.label && <span>{b.label}</span>}<LiveRing on={isLive} /></>;
-  if (isLive) return <button type="button" onClick={live!.onPress} className={`${cls} transition hover:brightness-110 active:scale-95`} aria-label={`${b.label} (try it)`}>{inner}</button>;
+  if (isLive) return <button type="button" onClick={live!.onPress} className={`${cls} transition before:absolute before:-inset-x-1 before:-inset-y-1.5 before:content-[''] hover:brightness-110 active:scale-95`} aria-label={`${b.label} (try it)`}>{inner}</button>;
   return <span className={cls}>{inner}</span>;
 }
 
@@ -139,7 +144,7 @@ function Part({ c, live }: { c: Node; live: Live }): ReactNode {
       return (
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-[7px]">{c.components?.map((x, i) => <Part key={i} c={x} live={live} />)}</div>
-          {acc.type === 11 ? <img src={art(acc.media!.url.replace("attachment://", ""))} alt="" className="h-[72px] w-[72px] rounded-lg bg-[#1b1d22] object-contain [image-rendering:pixelated]" /> : <Button b={acc} live={live} />}
+          {acc.type === 11 ? <img src={thumbSrc(acc.media!.url)} alt="" className="h-[72px] w-[72px] rounded-lg bg-[#1b1d22] object-contain [image-rendering:pixelated]" /> : <Button b={acc} live={live} />}
         </div>
       );
     }

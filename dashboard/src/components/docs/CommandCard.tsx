@@ -1,7 +1,7 @@
 import type { Command } from "@/content/types";
 import { cmdAnchor } from "./anchors";
 import { CopyButton } from "./CopyButton";
-import { RichText } from "./RichText";
+import { richText } from "./rich-text";
 
 const Label = ({ children }: { children: string }) => (
   <dt className="font-mono text-[11px] font-bold uppercase tracking-[.12em] text-muted">{children}</dt>
@@ -16,7 +16,7 @@ export function CommandCard({ command: c }: { command: Command }) {
     <article
       id={cmdAnchor(c.id)}
       tabIndex={-1}
-      className="grid scroll-mt-[calc(var(--docs-nav-h,64px)+96px)] gap-3 rounded-2xl border-2 border-line-2 bg-panel p-6 transition-colors focus:border-gold focus:outline-none"
+      className="grid scroll-mt-[calc(var(--docs-nav-h,64px)+96px)] gap-3 rounded-2xl border-2 border-line-2 bg-panel p-6 transition-colors focus:border-gold"
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <h3 className="font-mono text-base font-bold text-gold">{c.name}</h3>
@@ -27,7 +27,7 @@ export function CommandCard({ command: c }: { command: Command }) {
       </div>
 
       <p className="max-w-[70ch] text-[15px] leading-relaxed text-ink-2">
-        <RichText text={c.short} />
+        {richText(c.short)}
       </p>
 
       <dl className="grid grid-cols-1 gap-x-5 gap-y-1.5 text-sm sm:grid-cols-[auto_minmax(0,1fr)]">

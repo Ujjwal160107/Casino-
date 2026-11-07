@@ -19,7 +19,7 @@ export default async function Home() {
   const session = await getServerSession(authOptions);
 
   return (
-    <main className="min-h-screen bg-bg">
+    <main id="main" className="min-h-screen scroll-mt-24 bg-bg">
       <LandingNavbar user={session?.user} />
       <Hero />
       <Marquees />

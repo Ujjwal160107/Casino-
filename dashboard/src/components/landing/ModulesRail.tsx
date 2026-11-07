@@ -41,7 +41,7 @@ export function ModulesRail() {
   return (
     <Section id="modules">
       <Container>
-        <SectionHead num="01" title={<>The <em>modules.</em></>} sub="Ten systems on one wallet. Hover or tap a column to open it." />
+        <SectionHead num="01" title={<>The <em>modules.</em></>} sub="The biggest systems, all on one wallet. Open one to see what it does." />
         <ModulesRailColumns modules={railModules()} />
         <p className="mt-8 text-muted">
           Plus Crime &amp; Heat, Items &amp; Shop and Chickens.{" "}

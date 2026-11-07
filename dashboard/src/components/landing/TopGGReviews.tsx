@@ -10,11 +10,21 @@ interface Review {
     date: string;
 }
 
-// Strip leading top.gg noise like "• 2 days ago" from scraped review text.
+// Scraped top.gg text carries debris: a leading "• 2 days ago", a trailing
+// vote count ("…servers. 3"), an owner reply ("3 Fortuna • Replying to …")
+// and "… Read more 3" on truncated reviews. Strip it; end a truncated review
+// with one clean ellipsis.
 function cleanContent(text: string) {
-    return text
+    let t = text
         .replace(/^[•\s]*(?:\d+|an?)\s+(?:days?|hours?|minutes?|seconds?)\s+ago\s*/i, "")
+        .replace(/\s*\d*\s*Fortuna\s*•\s*Replying to[\s\S]*$/i, "")
         .trim();
+    const truncated = /\bRead more(?:\s+\d+)*$/i.test(t);
+    t = t
+        .replace(/\s*\bRead more(?:\s+\d+)*$/i, "")
+        .replace(/(?:\s+\d+)+$/, "")
+        .trim();
+    return truncated ? `${t.replace(/[\s.…,;:]+$/, "")}…` : t;
 }
 
 /** A numberless head in the SectionHead style (kit's head always carries a number). */
@@ -52,9 +62,10 @@ export async function TopGGReviews() {
         <Section id="reviews">
             <Container>
                 <ReviewsHead />
-                <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-6 p-0">
+                {/* Balanced columns: cards keep their own height instead of stretching to the row's tallest. */}
+                <ul className="m-0 list-none columns-1 gap-6 p-0 md:columns-2 lg:columns-3">
                     {shown.map((r, i) => (
-                        <Reveal key={r.id} as="li" delay={(i % 3) * 80} className="grid content-start gap-4 rounded-[18px] border-[3px] border-ink p-8">
+                        <Reveal key={r.id} as="li" delay={(i % 3) * 80} className="mb-6 grid break-inside-avoid gap-4 rounded-[18px] border-[3px] border-ink p-8">
                             <div className="flex gap-1 text-xl text-gold" role="img" aria-label={`${r.score} out of 5`}>
                                 {[...Array(5)].map((_, n) => (
                                     <span key={n} aria-hidden className={n < r.score ? "" : "opacity-25"}>
