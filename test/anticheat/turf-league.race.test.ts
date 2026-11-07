@@ -313,14 +313,25 @@ describe("league-changing level-ups (6.6)", () => {
   });
 
   it("the league-move DM reaches every member once, naming the league and the released rackets (H5)", async () => {
-    const { f } = await ready();
-    const c = fakeClient();
-    await announceLevelUp(c.client as any, f.id, 3, 4, ["Released to the Street: Pawn Row Fencing."], T0);
-    await announceLevelUp(c.client as any, f.id, 2, 3, [], T0);                  // same league: no DM
-    expect(c.dm.size).toBe(2);
-    expect([...c.dm.values()].every((n) => n === 1)).toBe(true);
-    const body = JSON.stringify([...c.dmLast.values()][0]);
-    expect(body).toContain("**Silver** league");
-    expect(body).toContain("Released to the Street: Pawn Row Fencing.");
+    await withCfConfig(ON, async () => {
+      const { f } = await ready();
+      const c = fakeClient();
+      await announceLevelUp(c.client as any, f.id, 3, 4, ["Released to the Street: Pawn Row Fencing."], T0);
+      await announceLevelUp(c.client as any, f.id, 2, 3, [], T0);                  // same league: no DM
+      expect(c.dm.size).toBe(2);
+      expect([...c.dm.values()].every((n) => n === 1)).toBe(true);
+      const body = JSON.stringify([...c.dmLast.values()][0]);
+      expect(body).toContain("**Silver** league");
+      expect(body).toContain("Released to the Street: Pawn Row Fencing.");
+    });
+  });
+
+  it("sends no league-move DM while turf is off (Review Focus 4)", async () => {
+    await withCfConfig({ enabled: true, turfEnabled: false }, async () => {
+      const { f } = await ready();
+      const c = fakeClient();
+      await announceLevelUp(c.client as any, f.id, 3, 4, ["Released to the Street: Pawn Row Fencing."], T0);
+      expect(c.dm.size).toBe(0);
+    });
   });
 });

@@ -183,10 +183,13 @@ export async function announceRacketCollect(
   });
 }
 
-/** The league-move DM to every member after a league-changing level-up (amendment 6.6, H5); nothing within a league. */
+/**
+ * The league-move DM to every member after a league-changing level-up (amendment 6.6, H5);
+ * nothing within a league, and nothing while turf is off (no census places the family).
+ */
 export async function announceLevelUp(client: Client, familyId: string, from: number, to: number, notes: string[], now: Date): Promise<void> {
   return safely("announceLevelUp", async () => {
-    if (leagueOf(from).key === leagueOf(to).key) return;
+    if (!CRIME_FAMILY_CONFIG.turfEnabled || leagueOf(from).key === leagueOf(to).key) return;
     const members = (await listMembers(familyId)).map((m) => m.userId);
     await notifyMany(client, "turf", members, () => turfLeagueMoveNotice({ leagueName: leagueOf(to).name, lines: notes, nextCensusAt: nextCensusAt(now) }));
   });

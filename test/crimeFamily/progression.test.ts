@@ -53,7 +53,9 @@ describe("league-changing level-up preview (6.6)", () => {
     return { f, boss, low };
   }
 
-  it("warns an L3 family that the move releases its rackets and waits for the census; a top bid adds the H17 blocker", async () => {
+  const ON = { enabled: true, turfEnabled: true };
+
+  it("warns an L3 family that the move releases its rackets and waits for the census; a top bid adds the H17 blocker", () => withCfConfig(ON, async () => {
     const { f, low } = await bronze();
     const p = await levelUpPreview(f, T0);
     expect(p.next?.level).toBe(4);
@@ -63,14 +65,28 @@ describe("league-changing level-up preview (6.6)", () => {
     expect(p.notes[1]).toMatch(/^Your family gets a Silver city at the next census \(<t:\d+:R>\)\.$/);
     await seedWar({ racketKey: "docks_numbers", status: "BIDDING", cityId: low.id, topBid: 700_000, topBidderFamilyId: f.id });
     expect((await levelUpPreview(f, T0)).blockers.at(-1)).toBe(FINISH);
-  });
+  }));
 
-  it("shows no notes inside a league and runs no hook at the max level", async () => {
+  it("with turf off promises no census city: only a still-owned racket's release is named", () => withCfConfig({ enabled: true, turfEnabled: false }, async () => {
+    const { f, low } = await bronze();
+    expect((await levelUpPreview(f, T0)).notes).toEqual(["Moving up to the Silver league releases Pawn Row Fencing to the Street."]);
+    await testPrisma.racket.updateMany({ where: { cityId: low.id }, data: { ownerFamilyId: "" } });
+    expect((await levelUpPreview(f, T0)).notes).toEqual([]);
+  }));
+
+  it("with turf off a league-changing level-up with nothing to release writes no league_move row", () => withCfConfig({ enabled: true, turfEnabled: false }, async () => {
+    const boss = await seedEligibleUser();
+    const f = await seedFamily({ bossId: boss, level: 3, xp: 6_000, earnings: 10_000_000 });
+    expect(await levelUp(f.id, boss, 3, T0)).toMatchObject({ level: 4, notes: [] });
+    expect(await testPrisma.familyLedger.count({ where: { familyId: f.id, type: "league_move" } })).toBe(0);
+  }));
+
+  it("shows no notes inside a league and runs no hook at the max level", () => withCfConfig(ON, async () => {
     const l1 = await seedFamily({ bossId: await seedEligibleUser(), xp: 1_000 });
     expect((await levelUpPreview(l1, T0)).notes).toEqual([]);
     const l10 = await seedFamily({ bossId: await seedEligibleUser(), level: 10, xp: 99_999 });
     expect(await levelUpPreview(l10, T0)).toEqual({ next: null, blockers: ["Max level."], notes: [] });
-  });
+  }));
 
   it("a stale S8 (L3 confirm on a family already at L4) answers Level changed. without running the Bronze → Silver hook", async () => {
     const { f, boss, low } = await bronze();

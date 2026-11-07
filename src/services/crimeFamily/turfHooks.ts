@@ -94,9 +94,10 @@ export const TURF_FAMILY_HOOK: FamilyHook = {
     if (!changesLeague(from, to)) return [];
     const league = leagueOf(to).name;
     const names = (await ownedRackets(prisma, familyId)).map((r) => r.name);
+    // Rackets can still be owned after turf was switched off; the census places families only while it is on.
     return [
       ...(names.length ? [`Moving up to the ${league} league releases ${names.join(", ")} to the Street.`] : []),
-      `Your family gets a ${league} city at the next census (<t:${unix(nextCensusAt(now))}:R>).`,
+      ...(CRIME_FAMILY_CONFIG.turfEnabled ? [`Your family gets a ${league} city at the next census (<t:${unix(nextCensusAt(now))}:R>).`] : []),
     ];
   },
 
@@ -111,6 +112,7 @@ export const TURF_FAMILY_HOOK: FamilyHook = {
       });
     }
     const family = await tx.family.update({ where: { id: familyId }, data: { cityId: "" } });
+    if (!CRIME_FAMILY_CONFIG.turfEnabled && owned.length === 0) return [];   // no turf, no unexplained league_move row
     await writeLedger(tx, {
       familyId, actorId: "system", type: "league_move", amount: 0, treasuryAfter: family.treasury, earningsAfter: family.earnings,
       meta: { from: leagueOf(from).key, to: leagueOf(to).key, released: owned.map((r) => r.key) },
