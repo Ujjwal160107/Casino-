@@ -56,8 +56,8 @@ export interface VaultView {
   /** Whether the viewer may run Payday and Level up (Boss or Underboss). */
   canOfficer: boolean;
   payday: PaydayPreview;
-  /** The next level and why it cannot be bought yet (empty when it can). */
-  levelUp: { next: FamilyLevelDef | null; blockers: string[] };
+  /** The next level, why it cannot be bought yet (empty when it can) and the hooks' S8 lines (a league move). */
+  levelUp: { next: FamilyLevelDef | null; blockers: string[]; notes: string[] };
 }
 
 /** S7, and the S6 Payday button and rules hint. */

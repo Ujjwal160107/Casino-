@@ -245,7 +245,7 @@ const LEDGER_LABELS: Readonly<Record<LedgerType, string>> = {
   payday_clamp_return: "Payday clamp return",
   caper_cut: "Crew heist cut", racket_income: "Racket income", racket_neglect: "Racket neglect", dues: "Dues", dues_missed: "Dues missed",
   level_fee: "Level up", rename_fee: "Rename", bid_escrow: "Bid escrow", bid_refund: "Bid refund", war_bid_burn: "War bid burned",
-  disband_burn: "Disband burn", xp: "XP",
+  disband_burn: "Disband burn", xp: "XP", league_move: "League move",
 };
 
 function ledgerAmount(l: LedgerLine): string {
@@ -346,6 +346,7 @@ export function buildLevelUpConfirm(ownerId: string, v: VaultView): CfPayload {
   const body = next
     ? `**Fee:** ${fmtFortunes(next.fee)}, burned: ${fmtFortunes(fromEarnings)} from earnings, ${fmtFortunes(next.fee - fromEarnings)} from the treasury.\n` +
       `**Level ${next.level}:** up to ${next.memberCap} members${next.tierUnlocked ? `, tier ${next.tierUnlocked} crew heists` : ""}.` +
+      (v.levelUp.notes.length ? `\n${v.levelUp.notes.join("\n")}` : "") +
       (v.levelUp.blockers.length ? `\n${v.levelUp.blockers.join("\n")}` : "")
     : "Your family is at the max level.";
   const container = new ContainerBuilder()

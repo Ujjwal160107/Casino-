@@ -26,6 +26,7 @@ import { levelUp } from "../services/crimeFamily/progression";
 import { FamilyError } from "../services/crimeFamily/tx";
 import { depositToVault, getVaultView, resolveDepositAmount } from "../services/crimeFamily/vaultService";
 import { announceChairChange, announceDisband, announcePayday, announceRoleChange, resolveInviteCard } from "../ui/crimeFamily/announce";
+import { announceLevelUp } from "../ui/crimeFamily/turfAnnounce";
 import {
   buildConfirm, buildCreateConfirm, buildDashboard, buildDisbandConfirm, buildLedgerPage, buildLeaderboard,
   buildLevelUpConfirm, buildManagePanel, buildMyInvites, buildNoFamilyCard, buildPaydayPreview, buildVaultPanel,
@@ -224,7 +225,8 @@ const paydayRoute: CfRoute = async (i, [, earnings, count, uid]) => {
 const levelRoute: CfRoute = async (i, [, level, uid]) => {
   const { family } = await requireMembership(uid);
   const result = await levelUp(family.id, uid, Number(level));
-  return show(i, await vaultScreen(uid, `Your family is now level ${result.level}.`));
+  return showThenAnnounce(i, vaultScreen(uid, `Your family is now level ${result.level}.`),
+    () => announceLevelUp(i.client, family.id, Number(level), result.level, result.notes, new Date()));
 };
 
 /** `crew:create:ok:<TAG>:<name>:<owner>` (S3 Confirm). */

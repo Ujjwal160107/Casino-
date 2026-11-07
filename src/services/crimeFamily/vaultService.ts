@@ -10,7 +10,7 @@ import { debitWalletInTx } from "../walletService";
 import { assertNotJailed, requireMembership } from "./familyQueries";
 import { readLedgerPage, writeLedger, type LedgerType } from "./ledger";
 import { previewPayday } from "./paydayService";
-import { levelUpBlockers, nextLevelDef } from "./progression";
+import { levelUpPreview } from "./progression";
 import { can } from "./permissions";
 import { FamilyError, invalidateUsers, runFamilyTx, VaultBusy, VaultShort } from "./tx";
 import type { VaultView } from "./views";
@@ -222,6 +222,6 @@ export async function getVaultView(familyId: string, viewerId: string, now: Date
     ledger: ledger.rows,
     canOfficer: officer,
     payday,
-    levelUp: { next: nextLevelDef(family.level), blockers: levelUpBlockers(family) },
+    levelUp: await levelUpPreview(family, now),
   };
 }

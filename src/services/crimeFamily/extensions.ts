@@ -1,7 +1,7 @@
 // Registries that plans 2 (Capers) and 3 (Turf) extend. Add an entry here;
 // never add a branch to the family services. A hook module must not import
 // membershipService or disbandService (they import this file: a cycle).
-import { Prisma } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { CAPER_ACTIVITY_RULE, CAPER_FAMILY_HOOK } from "./caperHooks";
 import { TURF_FAMILY_HOOK, WAR_HITS_RULE } from "./turfHooks";
 import { VOTE_FAMILY_HOOK } from "./voteHooks";
@@ -37,6 +37,12 @@ export interface FamilyHook {
   handoverBlock?(tx: Prisma.TransactionClient, familyId: string): Promise<string | null>;
   /** Inside moveChair after the new Boss is seated (every chair path: handover, claim, succession, vote). */
   onChairMove?(tx: Prisma.TransactionClient, familyId: string, now: Date): Promise<void>;
+  /** Runs inside the level-up transaction before the level CAS; a string → FamilyError. */
+  levelUpBlock?(db: Prisma.TransactionClient | PrismaClient, ctx: { familyId: string; from: number; to: number }): Promise<string | null>;
+  /** S8 lines for the level about to be bought. */
+  levelUpNotes?(familyId: string, ctx: { from: number; to: number; now: Date }): Promise<string[]>;
+  /** Runs after the fee; returns lines for the members' DM. */
+  onLevelUp?(tx: Prisma.TransactionClient, ctx: { familyId: string; from: number; to: number; now: Date }): Promise<string[] | void>;
 }
 
 export const FAMILY_HOOKS: FamilyHook[] = [CAPER_FAMILY_HOOK, TURF_FAMILY_HOOK, VOTE_FAMILY_HOOK];

@@ -541,6 +541,16 @@ export function turfReleasedNotice(v: { racketName: string }): ContainerBuilder 
   return familyNotice("war", "Racket released", `**${v.racketName}** went back to the Street after too many neglect strikes.`);
 }
 
+/** A league-changing level-up (amendment 6.6, H5): the new league, the released rackets and the census that places it. */
+export function turfLeagueMoveNotice(v: { leagueName: string; lines: string[]; nextCensusAt: Date }): ContainerBuilder {
+  const body = [
+    `Your family moved up to the **${v.leagueName}** league.`,
+    ...v.lines,
+    `It gets a ${v.leagueName} city at the next census ${relTime(v.nextCensusAt)}.`,
+  ].join("\n");
+  return familyNotice("war", "League move", body);
+}
+
 /** A census move (amendment 6.9): a rebalance, or a re-placement after the family's city closed. */
 export function turfCityMovedNotice(v: { cityLabel: string }): ContainerBuilder {
   return familyNotice("war", "New city", `The league opened or closed a city; your family now plays in **${v.cityLabel}**.`);

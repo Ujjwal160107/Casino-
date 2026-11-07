@@ -6,6 +6,7 @@ import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { fmtFortunes } from "../../utils/format";
 import { levelDef, type FamilyLevelDef, type FamilyRole } from "../../data/crimeFamilyCatalog";
+import { FAMILY_HOOKS } from "./extensions";
 import { writeLedger } from "./ledger";
 import { can } from "./permissions";
 import { FamilyError, runFamilyTx } from "./tx";
@@ -47,13 +48,38 @@ async function assertLevelUpActor(db: Prisma.TransactionClient, familyId: string
   }
 }
 
+export type LevelUpResult = { family: Family; level: number; fee: number; fromTreasury: number; fromEarnings: number; notes: string[] };
+
+/**
+ * S6/S8: the next level, every blocker (the pure ones, then the hooks') and
+ * the hooks' S8 lines. At the max level no hook runs (there is no `to`).
+ */
+export async function levelUpPreview(
+  family: Family, now: Date,
+): Promise<{ next: FamilyLevelDef | null; blockers: string[]; notes: string[] }> {
+  const next = nextLevelDef(family.level);
+  if (!next) return { next: null, blockers: levelUpBlockers(family), notes: [] };
+  const ctx = { familyId: family.id, from: family.level, to: next.level };
+  const blockers = levelUpBlockers(family);
+  const notes: string[] = [];
+  for (const hook of FAMILY_HOOKS) {
+    const block = await hook.levelUpBlock?.(prisma, ctx);
+    if (block) blockers.push(block);
+    notes.push(...((await hook.levelUpNotes?.(family.id, { from: ctx.from, to: ctx.to, now })) ?? []));
+  }
+  return { next, blockers, notes };
+}
+
 /**
  * Spec 10.1: CAS on the expected level, the XP threshold and no arrears,
  * then burn the fee earnings-first. `expectedLevel` is the level S8 showed.
+ * The FAMILY_HOOKS level-up blocks run before the CAS only while the family
+ * is still at `expectedLevel` (a stale S8 falls through to "Level changed.");
+ * their onLevelUp lines come back as `notes`.
  */
 export async function levelUp(
   familyId: string, actorId: string, expectedLevel: number, now: Date = new Date(),
-): Promise<{ family: Family; level: number; fee: number; fromTreasury: number; fromEarnings: number }> {
+): Promise<LevelUpResult> {
   await assertLevelUpActor(prisma, familyId, actorId, now);
   const current = await prisma.family.findUnique({ where: { id: familyId } });
   if (!current) throw new FamilyError("That family no longer exists.");
@@ -63,6 +89,13 @@ export async function levelUp(
   return runFamilyTx(async (tx) => {
     await assertLevelUpActor(tx, familyId, actorId, now);
     const next = nextLevelDef(expectedLevel);
+    const fresh = await tx.family.findUnique({ where: { id: familyId }, select: { level: true } });
+    if (fresh?.level === expectedLevel && next) {
+      for (const hook of FAMILY_HOOKS) {
+        const block = await hook.levelUpBlock?.(tx, { familyId, from: expectedLevel, to: next.level });
+        if (block) throw new FamilyError(block);
+      }
+    }
     const { count } = next
       ? await tx.family.updateMany({
         where: { id: familyId, level: expectedLevel, xp: { gte: next.xpToReach }, duesArrears: 0 },
@@ -76,7 +109,9 @@ export async function levelUp(
       throw new FamilyError(levelUpBlockers(fresh)[0] ?? LEVEL_CHANGED);
     }
     const spent = await spendFromVault(tx, familyId, next.fee, "level_fee", actorId, { to: next.level });
+    const notes: string[] = [];
+    for (const hook of FAMILY_HOOKS) notes.push(...((await hook.onLevelUp?.(tx, { familyId, from: expectedLevel, to: next.level, now })) ?? []));
     const family = await tx.family.findUniqueOrThrow({ where: { id: familyId } });
-    return { family, level: next.level, fee: next.fee, ...spent };
+    return { family, level: next.level, fee: next.fee, ...spent, notes };
   });
 }

@@ -171,3 +171,11 @@ it("S1 carries Find a family within 14 components; S2 with claim, vote and recru
   expect(countComponents(s1.payload)).toBeLessThanOrEqual(14);
   expect(countComponents(byLabel("S2 dashboard (claim, vote and recruit, 30 members)").payload)).toBeLessThanOrEqual(20);
 });
+
+it("S8 names the released rackets and the next census for a league move within 6 components (6.6)", () => {
+  const s8 = crimeFamilyWorstCases().find((c) => c.label === "S8 level-up confirm (league move, 3 released)")!;
+  const t = JSON.stringify(s8.payload.components.map((c) => c.toJSON()));
+  expect(t).toContain("releases");
+  expect(t).toContain("next census");
+  expect(countComponents(s8.payload)).toBeLessThanOrEqual(6);
+});

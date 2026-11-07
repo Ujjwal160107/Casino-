@@ -98,7 +98,22 @@ function vaultView(locked: boolean): VaultView {
     familyId: FAMILY_ID, tag: "WXYZ", treasury: BIG, earnings: BIG, level: 9, duesPerDay: 360_000, duesArrears: 999, arrearsOwed: BIG,
     lastPaydayAt: new Date(), nextPaydayAt: SOON(), ledger: ledgerLines(10), canOfficer: true,
     payday: paydayPreview(locked),
-    levelUp: { next: FAMILY_LEVELS[9], blockers: ["Needs 60,000 XP (have 46,000).", "Clear dues arrears first."] },
+    levelUp: { next: FAMILY_LEVELS[9], blockers: ["Needs 60,000 XP (have 46,000).", "Clear dues arrears first."], notes: [] },
+  };
+}
+
+/** S8 for a league move releasing three rackets (amendment 6.6). */
+function leagueMoveVaultView(): VaultView {
+  const v = vaultView(false);
+  return {
+    ...v,
+    levelUp: {
+      ...v.levelUp,
+      notes: [
+        "Moving up to the Gold league releases Construction Union Kickbacks, Racetrack Bookmaking, Casino Row Protection to the Street.",
+        `Your family gets a Gold city at the next census (<t:${Math.floor(SOON().getTime() / 1000)}:R>).`,
+      ],
+    },
   };
 }
 
@@ -184,6 +199,7 @@ export function crimeFamilyWorstCases(): { label: string; max: number; payload: 
     { label: "S6 vault (payday open)", max: 12, payload: buildVaultPanel(OWNER, vaultView(false)) },
     { label: "S7 payday preview (30 paid, 30 unpaid)", max: 6, payload: buildPaydayPreview(OWNER, paydayPreview(false), "Members changed.") },
     { label: "S8 level-up confirm", max: 6, payload: buildLevelUpConfirm(OWNER, vaultView(false)) },
+    { label: "S8 level-up confirm (league move, 3 released)", max: 6, payload: buildLevelUpConfirm(OWNER, leagueMoveVaultView()) },
     { label: "S9 log (15 lines)", max: 7, payload: buildLedgerPage(OWNER, { rows: ledgerLines(15), page: 98, pages: 999 }) },
     { label: "S10 leaderboard (3 sorts)", max: 13, payload: buildLeaderboard(OWNER, leaderboardView(), { art: true }) },
     { label: "S22 disband", max: 6, payload: buildDisbandConfirm(OWNER, "WXYZ", { finalPayday: paydayPreview(false), burnTreasury: BIG, burnEarnings: BIG }) },

@@ -6,6 +6,9 @@ import { placeBid } from "../../src/services/crimeFamily/bidService";
 import { getRacketDetailView } from "../../src/services/crimeFamily/turfQueries";
 import { nextWarStart } from "../../src/services/crimeFamily/warMath";
 import { racketDef } from "../../src/data/crimeFamilyCatalog";
+import { levelUp } from "../../src/services/crimeFamily/progression";
+import { announceLevelUp } from "../../src/ui/crimeFamily/turfAnnounce";
+import { fakeClient } from "../crimeFamily/fakeClient";
 import {
   testPrisma, seedEligibleUser, seedFamily, seedTurfCity, seedRacket, seedWar, seedWarHits, racketByKey, resetFamilies, ensureUniqueIndexes, daysAgo, withCfConfig,
 } from "../helpers";
@@ -233,5 +236,91 @@ describe("the census runs the turf steps once a day (6.4 steps 1–5)", () => {
       expect(notices.filter((n) => n.type === "turf")).toHaveLength(2);
       expect(notices.every((n) => n.userIds.length === 3)).toBe(true);
     });
+  });
+});
+
+describe("league-changing level-ups (6.6)", () => {
+  /** A Bronze L3 family ready for L4: 6,000 XP, 10,000,000 earnings, placed in Low Town #1 and active. */
+  async function ready(o: { level?: number; xp?: number } = {}) {
+    const boss = await seedEligibleUser(); const s = await seedEligibleUser();
+    const f = await seedFamily({ bossId: boss, level: o.level ?? 3, xp: o.xp ?? 6_000, earnings: 10_000_000, members: [{ userId: s, role: "SOLDIER", joinedAt: daysAgo(10) }],
+      data: { cityId: (await city(leagueOfLevel(o.level ?? 3), 1)).id, activeMembers: 3 } });
+    return { f, boss, s };
+  }
+  const leagueOfLevel = (l: number) => (l <= 3 ? "BRONZE" : l <= 6 ? "SILVER" : "GOLD");
+
+  it("L3 → L4 with a held racket: Street, league_move row, unplaced, then placed in Midtown by the census (edge 6)", async () => {
+    await withCfConfig(ON, async () => {
+      const { f, boss } = await ready();
+      const low = await city("BRONZE", 1);
+      await seedRacket("pawn_row", { cityId: low.id, ownerFamilyId: f.id, neglectStrikes: 2 });
+      const r = await levelUp(f.id, boss, 3, T0);
+      expect(r).toMatchObject({ level: 4, notes: ["Released to the Street: Pawn Row Fencing."] });
+      expect(await racketByKey("pawn_row", low.id)).toMatchObject({ ownerFamilyId: "", neglectStrikes: 0, lastPayoutAt: T0 });
+      expect(await testPrisma.family.findUniqueOrThrow({ where: { id: f.id } })).toMatchObject({ level: 4, cityId: "" });
+      expect(await testPrisma.familyLedger.findFirst({ where: { familyId: f.id, type: "league_move" } }))
+        .toMatchObject({ amount: 0, meta: { from: "BRONZE", to: "SILVER", released: ["pawn_row"] } });
+      await placeUnplaced("SILVER", new Date(+T0 + DAY));
+      expect((await testPrisma.family.findUniqueOrThrow({ where: { id: f.id } })).cityId).toBe((await city("SILVER", 1)).id);
+    });
+  });
+
+  it.each([
+    ["defending in an ARMED war (edge 7)", async (fid: string) => { await seedRacket("pawn_row", { cityId: (await city("BRONZE", 1)).id, ownerFamilyId: fid }); await seedWar({ racketKey: "pawn_row", status: "ARMED", cityId: (await city("BRONZE", 1)).id, defenderFamilyId: fid, attackerFamilyId: "65f0000000000000000000a9", topBid: 2_100_000 }); }],
+    ["holding a top bid (Review Focus 3)", async (fid: string) => { await seedWar({ racketKey: "docks_numbers", status: "BIDDING", cityId: (await city("BRONZE", 1)).id, topBid: 700_000, topBidderFamilyId: fid }); }],
+  ] as const)("is refused while %s: no fee, no level, no release", async (_n, arrange) => {
+    await withCfConfig(ON, async () => {
+      const { f, boss } = await ready();
+      await arrange(f.id);
+      await expect(levelUp(f.id, boss, 3, T0)).rejects.toThrow("Finish your turf first: a family can't move up to the Silver league while it holds a top bid or fights in a turf war.");
+      expect(await testPrisma.family.findUniqueOrThrow({ where: { id: f.id } })).toMatchObject({ level: 3, earnings: 10_000_000 });
+      expect(await testPrisma.familyLedger.count({ where: { familyId: f.id, type: { in: ["level_fee", "league_move"] } } })).toBe(0);
+    });
+  });
+
+  it("a level-up inside a league keeps the city and the rackets", async () => {
+    await withCfConfig(ON, async () => {
+      const { f, boss } = await ready({ level: 2, xp: 3_000 });
+      await seedRacket("pawn_row", { cityId: (await city("BRONZE", 1)).id, ownerFamilyId: f.id });
+      expect((await levelUp(f.id, boss, 2, T0)).notes).toEqual([]);
+      expect((await testPrisma.family.findUniqueOrThrow({ where: { id: f.id } })).cityId).toBe((await city("BRONZE", 1)).id);
+      expect((await racketByKey("pawn_row", (await city("BRONZE", 1)).id)).ownerFamilyId).toBe(f.id);
+    });
+  });
+
+  it("a level-up racing a placement never leaves a Silver family in a Bronze city (H14)", async () => {
+    await withCfConfig(ON, async () => {
+      const { f, boss } = await ready();
+      await testPrisma.family.update({ where: { id: f.id }, data: { cityId: "" } });
+      await Promise.allSettled([placeUnplaced("BRONZE", T0), levelUp(f.id, boss, 3, T0)]);
+      const after = await testPrisma.family.findUniqueOrThrow({ where: { id: f.id } });
+      if (after.level === 4) expect(after.cityId).toBe("");
+      else expect(after.cityId).toBe((await city("BRONZE", 1)).id);
+    });
+  });
+
+  it("a Silver L6 family that times its level-up to Gold's 41st slot lands in a shared city, not an empty one (edge 11)", async () => {
+    await withCfConfig(ON, async () => {
+      await gold(40, (await city("GOLD", 1)).id);
+      const { f, boss } = await ready({ level: 6, xp: 24_000 });
+      await testPrisma.family.update({ where: { id: f.id }, data: { earnings: 50_000_000 } });
+      await levelUp(f.id, boss, 6, T0);
+      await syncLeagueCities("GOLD", new Date(+T0 + DAY)); await placeUnplaced("GOLD", new Date(+T0 + DAY)); await rebalanceLeague("GOLD", new Date(+T0 + DAY));
+      const mine = (await testPrisma.family.findUniqueOrThrow({ where: { id: f.id } })).cityId;
+      expect(await testPrisma.family.count({ where: { cityId: mine } })).toBeGreaterThanOrEqual(19);
+      expect(await sizesOf("GOLD")).toEqual([22, 19]);
+    });
+  });
+
+  it("the league-move DM reaches every member once, naming the league and the released rackets (H5)", async () => {
+    const { f } = await ready();
+    const c = fakeClient();
+    await announceLevelUp(c.client as any, f.id, 3, 4, ["Released to the Street: Pawn Row Fencing."], T0);
+    await announceLevelUp(c.client as any, f.id, 2, 3, [], T0);                  // same league: no DM
+    expect(c.dm.size).toBe(2);
+    expect([...c.dm.values()].every((n) => n === 1)).toBe(true);
+    const body = JSON.stringify([...c.dmLast.values()][0]);
+    expect(body).toContain("**Silver** league");
+    expect(body).toContain("Released to the Street: Pawn Row Fencing.");
   });
 });

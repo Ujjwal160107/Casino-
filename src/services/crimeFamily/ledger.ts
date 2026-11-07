@@ -6,7 +6,7 @@ import prisma from "../../utils/prisma";
 export type LedgerType =
   | "create_fee" | "deposit" | "deposit_tax" | "payday" | "payday_tax" | "payday_clamp_return" | "caper_cut" | "racket_income"
   | "racket_neglect" | "dues" | "dues_missed" | "level_fee" | "rename_fee" | "bid_escrow" | "bid_refund" | "war_bid_burn"
-  | "disband_burn" | "xp";
+  | "disband_burn" | "xp" | "league_move";
 
 export type LedgerRow = {
   familyId: string;

@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { levelUp, awardFamilyXp } from "../../src/services/crimeFamily/progression";
+import { levelUp, levelUpPreview, awardFamilyXp } from "../../src/services/crimeFamily/progression";
 import { getLeaderboard } from "../../src/services/crimeFamily/leaderboard";
 import { runFamilyTx } from "../../src/services/crimeFamily/tx";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, withCfConfig } from "../helpers";
+import {
+  testPrisma, seedEligibleUser, seedFamily, seedTurfCity, seedRacket, seedWar, resetFamilies, ensureUniqueIndexes, withCfConfig,
+} from "../helpers";
 
-beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember"]));
+beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "TurfCity", "Racket", "War"]));
 beforeEach(resetFamilies);
 const fam = (id: string) => testPrisma.family.findUnique({ where: { id } });
 
@@ -36,6 +38,48 @@ describe("levelUp (10.1)", () => {
     expect(rs.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     for (const r of rs) if (r.status === "rejected") expect(r.reason.message).toMatch(/^(Level changed\.|Vault busy, try again\.)$/);
     expect(await fam(f.id)).toMatchObject({ level: 2, earnings: 8_000_000 });
+  });
+});
+
+describe("league-changing level-up preview (6.6)", () => {
+  const T0 = new Date("2026-11-10T00:10:00Z");
+  const FINISH = "Finish your turf first: a family can't move up to the Silver league while it holds a top bid or fights in a turf war.";
+  /** An L3 family ready for L4 holding Pawn Row Fencing in Low Town #1. */
+  async function bronze() {
+    const boss = await seedEligibleUser();
+    const low = await seedTurfCity({ league: "BRONZE", number: 1 });
+    const f = await seedFamily({ bossId: boss, level: 3, xp: 6_000, earnings: 10_000_000, data: { cityId: low.id } });
+    await seedRacket("pawn_row", { cityId: low.id, ownerFamilyId: f.id });
+    return { f, boss, low };
+  }
+
+  it("warns an L3 family that the move releases its rackets and waits for the census; a top bid adds the H17 blocker", async () => {
+    const { f, low } = await bronze();
+    const p = await levelUpPreview(f, T0);
+    expect(p.next?.level).toBe(4);
+    expect(p.blockers).toEqual([]);
+    expect(p.notes).toHaveLength(2);
+    expect(p.notes[0]).toBe("Moving up to the Silver league releases Pawn Row Fencing to the Street.");
+    expect(p.notes[1]).toMatch(/^Your family gets a Silver city at the next census \(<t:\d+:R>\)\.$/);
+    await seedWar({ racketKey: "docks_numbers", status: "BIDDING", cityId: low.id, topBid: 700_000, topBidderFamilyId: f.id });
+    expect((await levelUpPreview(f, T0)).blockers.at(-1)).toBe(FINISH);
+  });
+
+  it("shows no notes inside a league and runs no hook at the max level", async () => {
+    const l1 = await seedFamily({ bossId: await seedEligibleUser(), xp: 1_000 });
+    expect((await levelUpPreview(l1, T0)).notes).toEqual([]);
+    const l10 = await seedFamily({ bossId: await seedEligibleUser(), level: 10, xp: 99_999 });
+    expect(await levelUpPreview(l10, T0)).toEqual({ next: null, blockers: ["Max level."], notes: [] });
+  });
+
+  it("a stale S8 (L3 confirm on a family already at L4) answers Level changed. without running the Bronze → Silver hook", async () => {
+    const { f, boss, low } = await bronze();
+    await testPrisma.family.update({ where: { id: f.id }, data: { level: 4, xp: 12_000 } });
+    await seedWar({ racketKey: "docks_numbers", status: "BIDDING", cityId: low.id, topBid: 700_000, topBidderFamilyId: f.id });
+    const before = await testPrisma.familyLedger.count({ where: { familyId: f.id } });
+    await expect(levelUp(f.id, boss, 3, T0)).rejects.toThrow("Level changed.");
+    expect(await fam(f.id)).toMatchObject({ level: 4, earnings: 10_000_000, cityId: low.id });
+    expect(await testPrisma.familyLedger.count({ where: { familyId: f.id } })).toBe(before);
   });
 });
 

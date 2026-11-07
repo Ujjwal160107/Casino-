@@ -6,18 +6,20 @@ import type { Prisma, War } from "@prisma/client";
 import type { Client } from "discord.js";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
-import { racketDef } from "../../data/crimeFamilyCatalog";
+import { leagueOf, racketDef } from "../../data/crimeFamilyCatalog";
 import { setNx } from "../../services/crimeFamily/activity";
 import type { BidResult } from "../../services/crimeFamily/bidService";
 import { checkMemberEligibility } from "../../services/crimeFamily/eligibility";
 import { listMembers } from "../../services/crimeFamily/familyQueries";
+import { nextCensusAt } from "../../services/crimeFamily/leagueRules";
 import type { RacketCollect } from "../../services/crimeFamily/racketService";
 import { getWarBoardView } from "../../services/crimeFamily/turfQueries";
 import type { WarBoardRef, WarBoardView, WarResultView } from "../../services/crimeFamily/views";
 import type { WarSide } from "../../services/crimeFamily/warMath";
 import type { WarSettlement } from "../../services/crimeFamily/warService";
 import {
-  notifyMany, turfBidPlacedNotice, turfNeglectNotice, turfOutbidNotice, turfReleasedNotice, turfWarResultNotice, turfWarSoonNotice,
+  notifyMany, turfBidPlacedNotice, turfLeagueMoveNotice, turfNeglectNotice, turfOutbidNotice, turfReleasedNotice, turfWarResultNotice,
+  turfWarSoonNotice,
 } from "../../services/dmNoticeService";
 import { safely } from "./caperFlow";
 import { buildNotice } from "./kit";
@@ -178,5 +180,14 @@ export async function announceRacketCollect(
     } else if (out.status === "released") {
       await notifyMany(client, "turf", members.all, () => turfReleasedNotice({ racketName: out.racketName }));
     }
+  });
+}
+
+/** The league-move DM to every member after a league-changing level-up (amendment 6.6, H5); nothing within a league. */
+export async function announceLevelUp(client: Client, familyId: string, from: number, to: number, notes: string[], now: Date): Promise<void> {
+  return safely("announceLevelUp", async () => {
+    if (leagueOf(from).key === leagueOf(to).key) return;
+    const members = (await listMembers(familyId)).map((m) => m.userId);
+    await notifyMany(client, "turf", members, () => turfLeagueMoveNotice({ leagueName: leagueOf(to).name, lines: notes, nextCensusAt: nextCensusAt(now) }));
   });
 }
