@@ -114,16 +114,16 @@ describe("turf gives the tester no shortcut (D34)", () => {
   it("a hit debits 25,000 and the 600 s cooldown applies", async () => {
     const { w } = await testerAtWar();
     const now = new Date();
-    await armHit({ warId: w.id, userId: BOT_DEVELOPER_ID, guildId: "g1", block: "docks", now });
+    await armHit({ warId: w.id, userId: BOT_DEVELOPER_ID, block: "docks", now });
     expect(await balance(BOT_DEVELOPER_ID)).toBe(975_000);
-    await expect(armHit({ warId: w.id, userId: BOT_DEVELOPER_ID, guildId: "g1", block: "main", now: new Date(+now + 599_000) })).rejects.toThrow(/^Next hit <t:\d+:R>\.$/);
+    await expect(armHit({ warId: w.id, userId: BOT_DEVELOPER_ID, block: "main", now: new Date(+now + 599_000) })).rejects.toThrow(/^Next hit <t:\d+:R>\.$/);
     expect(await balance(BOT_DEVELOPER_ID)).toBe(975_000);
   });
 
   it("a seventh hit is refused with nothing debited", async () => {
     const { f, w } = await testerAtWar();
     await seedContribution({ warId: w.id, familyId: f.id, userId: BOT_DEVELOPER_ID, side: "ATK", hits: 6 });
-    await expect(armHit({ warId: w.id, userId: BOT_DEVELOPER_ID, guildId: "g1", block: "docks" })).rejects.toThrow("You've used all 6 hits in this war.");
+    await expect(armHit({ warId: w.id, userId: BOT_DEVELOPER_ID, block: "docks" })).rejects.toThrow("You've used all 6 hits in this war.");
     expect(await balance(BOT_DEVELOPER_ID)).toBe(1_000_000);
   });
 

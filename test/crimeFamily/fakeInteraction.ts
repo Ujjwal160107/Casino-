@@ -6,8 +6,8 @@ import { fakeRest } from "./fakeClient";
 // crime family router and routes touch. Each ack updates deferred / replied /
 // ephemeral the way discord.js does, and logs into `order`.
 
-/** `client` replaces the fake's own client (caper routes pass `fakeCaperClient(...).client`). */
-export type FakeOpts = { userId: string; guildId?: string; ephemeralSource?: boolean; channelId?: string; client?: unknown };
+/** `client` replaces the fake's own client (caper routes pass `fakeCaperClient(...).client`); `guildId: null` is a DM press. */
+export type FakeOpts = { userId: string; guildId?: string | null; ephemeralSource?: boolean; channelId?: string; client?: unknown };
 type Kind = "button" | "select" | "modal";
 
 const isEphemeral = (options: unknown) =>
@@ -26,7 +26,7 @@ function fakeInteraction(customId: string, kind: Kind, opts: FakeOpts) {
   const i: any = {
     customId,
     user: { id: opts.userId, username: "FamilyTest", bot: false },
-    guildId: opts.guildId ?? "g1",
+    guildId: opts.guildId === undefined ? "g1" : opts.guildId, // null is a DM press
     channelId: opts.channelId ?? "c1",
     deferred: false,
     replied: false,

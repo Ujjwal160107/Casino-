@@ -54,7 +54,7 @@ async function liveWarIn(tx: Prisma.TransactionClient, warId: string, now: Date)
 }
 
 /** Refuses a press on a war that is not live, from a family not in it, or from a member who may not fight; only then the contribution row (T14). */
-async function warActor(warId: string, userId: string, guildId: string | null, now: Date): Promise<{ war: War; side: WarSide; contribution: WarContribution }> {
+async function warActor(warId: string, userId: string, now: Date): Promise<{ war: War; side: WarSide; contribution: WarContribution }> {
   const war = await prisma.war.findUnique({ where: { id: warId } });
   if (war?.status === "ARMED") throw new FamilyError(NOT_STARTED);
   if (!war || war.status !== "ACTIVE" || war.endsAt <= now) throw new FamilyError(OVER);
@@ -66,16 +66,16 @@ async function warActor(warId: string, userId: string, guildId: string | null, n
       : familyId === war.defenderFamilyId ? "DEF" : null;
   if (!membership || !side) throw new FamilyError(NOT_YOUR_WAR);
 
-  const check = await checkMemberEligibility(userId, "war", { now, guildId, expectedGuildId: membership.family.homeGuildId });
+  const check = await checkMemberEligibility(userId, "war", { now });
   if (!check.ok) throw eligibilityError(check.failures);
   const contribution = await ensureContribution(warId, membership.family.id, userId, side);
   return { war, side, contribution };
 }
 
 /** Free, once per member per slot: the current weak point of one random block, valid until the slot ends. */
-export async function scoutWar(input: { warId: string; userId: string; guildId: string | null; now?: Date }): Promise<ScoutReport> {
+export async function scoutWar(input: { warId: string; userId: string; now?: Date }): Promise<ScoutReport> {
   const now = input.now ?? new Date();
-  const { contribution } = await warActor(input.warId, input.userId, input.guildId, now);
+  const { contribution } = await warActor(input.warId, input.userId, now);
   return runFamilyTx(async (tx) => {
     const war = await liveWarIn(tx, input.warId, now);
     const slot = slotOf(war.startsAt, now);
@@ -91,10 +91,10 @@ export async function scoutWar(input: { warId: string; userId: string; guildId: 
 }
 
 /** Arms one hit: the cap and cooldown CAS, the 25,000 guarded debit, and a call due at min(now + 20 s, endsAt). */
-export async function armHit(input: { warId: string; userId: string; guildId: string | null; block: WarBlockKey; now?: Date }): Promise<ArmedHit> {
+export async function armHit(input: { warId: string; userId: string; block: WarBlockKey; now?: Date }): Promise<ArmedHit> {
   const now = input.now ?? new Date();
   const { userId, block } = input;
-  const { side, contribution } = await warActor(input.warId, userId, input.guildId, now);
+  const { side, contribution } = await warActor(input.warId, userId, now);
   const c = CRIME_FAMILY_CONFIG;
   const armed = await runFamilyTx(async (tx) => {
     const war = await liveWarIn(tx, input.warId, now);

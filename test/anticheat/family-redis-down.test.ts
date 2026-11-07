@@ -111,7 +111,7 @@ describe("capers with Redis down", () => {
     const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
     const mid = await postCaperCard(fc.client, c.id, CH);
     for (const r of ["LOOKOUT", "SAFECRACKER", "DRIVER"] as const) {
-      const j = await joinCaper({ caperId: c.id, uid: f.ids[r], role: r, guildId: G });
+      const j = await joinCaper({ caperId: c.id, uid: f.ids[r], role: r });
       await onSeatsChanged(fc.client, c.id, j.full);                     // un-debounced render, then the auto-start
     }
     const run = await testPrisma.caper.findUniqueOrThrow({ where: { id: c.id } });
@@ -161,8 +161,8 @@ describe("turf with Redis down (spec 18 shape 4, edge 8)", () => {
     const { a, d } = await turfSides();
     await seedRacket("docks_numbers", { ownerFamilyId: d.f.id });
     const w = await seedWar({ racketKey: "docks_numbers", status: "ACTIVE", topBid: 2_100_000, topBidderFamilyId: a.f.id, defenderFamilyId: d.f.id });
-    await scoutWar({ warId: w.id, userId: a.s, guildId: "g1" });
-    const h = await armHit({ warId: w.id, userId: a.s, guildId: "g1", block: "docks" });
+    await scoutWar({ warId: w.id, userId: a.s });
+    const h = await armHit({ warId: w.id, userId: a.s, block: "docks" });
     const slot = (await testPrisma.warHit.findUnique({ where: { id: h.hitId } }))!.slot;
     expect(await answerHit({ hitId: h.hitId, userId: a.s, choice: weakPoint(w.seed, "docks", slot) })).toEqual({ correct: true, points: 10, block: "docks" });
     expect(await balance(a.s)).toBe(175_000);

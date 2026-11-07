@@ -271,7 +271,6 @@ export interface GateDef {
   notInFamily: boolean;
   activeMember: boolean;
   hop: "join" | "found" | null;
-  guild: "lobby" | "home" | null;
   prepItem: boolean;
 }
 
@@ -283,18 +282,18 @@ function caperGate(tier: CaperTierDef): GateDef {
   return {
     discordAgeDays: 90, fortunaAgeDays: tier.seatGate.fortunaAgeDays, shifts: tier.seatGate.shifts, netWorth: tier.seatGate.netWorth,
     tenureSeconds: MEMBER_TENURE_SECONDS, heatBelow: tier.heatCeiling, notJailed: true, notInFamily: false, activeMember: false,
-    hop: null, guild: "lobby", prepItem: true,
+    hop: null, prepItem: true,
   };
 }
 
 export const ELIGIBILITY_GATES: Readonly<Record<GateKey, GateDef>> = {
   found: {
     discordAgeDays: 180, fortunaAgeDays: 30, shifts: 60, netWorth: 15_000_000, tenureSeconds: null, heatBelow: 70,
-    notJailed: true, notInFamily: true, activeMember: false, hop: "found", guild: null, prepItem: false,
+    notJailed: true, notInFamily: true, activeMember: false, hop: "found", prepItem: false,
   },
   family_join: {
     discordAgeDays: 90, fortunaAgeDays: 14, shifts: 20, netWorth: 1_000_000, tenureSeconds: null, heatBelow: null,
-    notJailed: true, notInFamily: false, activeMember: false, hop: "join", guild: null, prepItem: false,
+    notJailed: true, notInFamily: false, activeMember: false, hop: "join", prepItem: false,
   },
   caper_t1: caperGate(caperTier(1)),
   caper_t2: caperGate(caperTier(2)),
@@ -302,14 +301,14 @@ export const ELIGIBILITY_GATES: Readonly<Record<GateKey, GateDef>> = {
   caper_t4: caperGate(caperTier(4)),
   war: {
     discordAgeDays: 90, fortunaAgeDays: 14, shifts: 20, netWorth: null, tenureSeconds: MEMBER_TENURE_SECONDS, heatBelow: 100,
-    notJailed: true, notInFamily: false, activeMember: false, hop: null, guild: "home", prepItem: false,
+    notJailed: true, notInFamily: false, activeMember: false, hop: null, prepItem: false,
   },
   racket: {
     discordAgeDays: 90, fortunaAgeDays: null, shifts: 20, netWorth: null, tenureSeconds: MEMBER_TENURE_SECONDS, heatBelow: null,
-    notJailed: false, notInFamily: false, activeMember: true, hop: null, guild: null, prepItem: false,
+    notJailed: false, notInFamily: false, activeMember: true, hop: null, prepItem: false,
   },
   payday: {
     discordAgeDays: 90, fortunaAgeDays: 14, shifts: 20, netWorth: null, tenureSeconds: PAYDAY_TENURE_SECONDS, heatBelow: null,
-    notJailed: false, notInFamily: false, activeMember: true, hop: null, guild: null, prepItem: false,
+    notJailed: false, notInFamily: false, activeMember: true, hop: null, prepItem: false,
   },
 };

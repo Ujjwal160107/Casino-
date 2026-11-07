@@ -3,11 +3,12 @@
 // module can be loaded first without reading another table half-initialised.
 import { FamilyError } from "../services/crimeFamily/tx";
 import { buildNotice, type CfPayload } from "../ui/crimeFamily/kit";
-import { CRIME_FAMILY_CONFIG } from "../utils/economyConfig";
+import { CRIME_FAMILY_CONFIG, isCrimeFamilyOpen } from "../utils/economyConfig";
 import { safeEditReply } from "../utils/interactionHelpers";
 import type { CfInteraction, CfRoute, CfRouteEntry } from "./crimeFamilyRouter";
 
-const NOT_OPEN = "Crime Families are not open yet.";
+export const NOT_OPEN = "Crime Families are not open yet.";
+export const NOT_OPEN_HERE = "Crime Families are not open in this server yet.";
 
 export const show = async (i: CfInteraction, payload: CfPayload) => { await safeEditReply(i, payload); };
 
@@ -29,4 +30,14 @@ export const update = (run: CfRoute): CfRouteEntry => ({ scope: "owner", ack: "u
 /** Presses that work from DMs check only the kill switch, never the guild (F1). */
 export function assertEnabled(): void {
   if (!CRIME_FAMILY_CONFIG.enabled) throw new FamilyError(NOT_OPEN);
+}
+
+/** A press that works in any allowed server or a DM (A20): a DM refusal names no server. */
+export function assertCfOpen(guildId: string | null): void {
+  if (!isCrimeFamilyOpen(guildId)) throw new FamilyError(guildId ? NOT_OPEN_HERE : NOT_OPEN);
+}
+
+/** A press that needs a server (create records the home guild, plan posts the lobby there): a DM is refused. */
+export function assertServerOpen(i: CfInteraction): void {
+  if (!i.guildId || !isCrimeFamilyOpen(i.guildId)) throw new FamilyError(NOT_OPEN_HERE);
 }

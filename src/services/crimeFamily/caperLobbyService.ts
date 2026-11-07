@@ -62,14 +62,11 @@ export async function familyCaperBlock(family: Family, now: Date): Promise<strin
  * The seat gates shared by plan and join: membership in the caper's family,
  * the tier's eligibility row, one live seat per account and the rolling seat cap.
  */
-async function seatGates(
-  uid: string, target: { familyId: string; tier: CaperTierDef; guildId: string }, role: CaperRoleKey, guildId: string | null, now: Date,
-): Promise<void> {
+async function seatGates(uid: string, target: { familyId: string; tier: CaperTierDef }, role: CaperRoleKey, now: Date): Promise<void> {
   const { family } = await requireMembership(uid);
   if (family.id !== target.familyId) throw new FamilyError("This crew heist belongs to another family.");
-  const gate = await checkMemberEligibility(uid, `caper_t${target.tier.tier}`, { role, guildId, expectedGuildId: target.guildId, now });
+  const gate = await checkMemberEligibility(uid, `caper_t${target.tier.tier}`, { role, now });
   if (!gate.ok) {
-    if (gate.failures.some((f) => f.gate === "guild")) throw new FamilyError("This crew heist is in another server; join that server to play.");
     const base = eligibilityError(gate.failures).message;
     if (!gate.failures.some((f) => f.gate === "prep_item")) throw new FamilyError(base);
     const def = caperRole(role);
@@ -99,7 +96,7 @@ export async function planCaper(input: { uid: string; tier: number; guildId: str
   }
   const blocked = await familyCaperBlock(family, now);
   if (blocked) throw new FamilyError(blocked);
-  await seatGates(uid, { familyId: family.id, tier, guildId: input.guildId }, "MASTERMIND", input.guildId, now);
+  await seatGates(uid, { familyId: family.id, tier }, "MASTERMIND", now);
 
   let caper: Caper;
   try {
@@ -133,7 +130,7 @@ export async function planCaper(input: { uid: string; tier: number; guildId: str
 
 /** Spec 8.4 steps 2-3 (CFD-1): take an open seat and pay its stake; `full` once every seat up to the tier maximum is filled. */
 export async function joinCaper(input: {
-  caperId: string; uid: string; role: CaperRoleKey; guildId: string | null; now?: Date;
+  caperId: string; uid: string; role: CaperRoleKey; now?: Date;
 }): Promise<{ caper: Caper; seat: CaperCrew; full: boolean }> {
   const now = input.now ?? new Date();
   const { caperId, uid, role } = input;
@@ -142,7 +139,7 @@ export async function joinCaper(input: {
   const tier = caperTier(snapshot.tier);
   if (role === "MASTERMIND") throw new FamilyError("The Mastermind seat belongs to the planner.");
   if (!tierRoles(tier).includes(role)) throw new FamilyError("That role is not part of this crew heist.");
-  await seatGates(uid, { familyId: snapshot.familyId, tier, guildId: snapshot.guildId }, role, input.guildId, now);
+  await seatGates(uid, { familyId: snapshot.familyId, tier }, role, now);
 
   let joined: { caper: Caper; seat: CaperCrew; full: boolean };
   try {

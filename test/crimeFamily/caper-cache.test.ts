@@ -22,7 +22,7 @@ describe("caper wallet writes drop the user cache", () => {
     await cache([ids.MASTERMIND, ids.LOOKOUT, ids.DRIVER]);
     const c = await planCaper({ uid: ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
     expect(await cached([ids.MASTERMIND, ids.LOOKOUT])).toEqual([false, true]);
-    await joinCaper({ caperId: c.id, uid: ids.LOOKOUT, role: "LOOKOUT", guildId: G });
+    await joinCaper({ caperId: c.id, uid: ids.LOOKOUT, role: "LOOKOUT" });
     expect(await cached([ids.LOOKOUT, ids.DRIVER])).toEqual([false, true]);
   });
 

@@ -62,12 +62,12 @@ describe("checkMemberEligibility (12.1)", () => {
     expect(await gates(u, "family_join", { familyId: "65f000000000000000000002" })).toEqual([]);
   });
 
-  it("checks a caper seat's heat, prep item, tenure and guild", async () => {
+  it("checks a caper seat's heat, prep item and tenure", async () => {
     const boss = await seedEligibleUser();
     const u = await seedEligibleUser({ wallet: 9_000_000, heat: 60, prepKeys: ["camouflage_kit"] });
     await seedFamily({ bossId: boss, members: [{ userId: u, role: "SOLDIER", joinedAt: daysAgo(4) }] });
-    expect(await gates(u, "caper_t2", { role: "LOOKOUT", guildId: "g1", expectedGuildId: "g1" })).toEqual(["heat"]);
-    expect(await gates(u, "caper_t1", { role: "MUSCLE", guildId: "g2", expectedGuildId: "g1" })).toEqual(["guild", "prep_item"]);
+    expect(await gates(u, "caper_t2", { role: "LOOKOUT" })).toEqual(["heat"]);
+    expect(await gates(u, "caper_t1", { role: "MUSCLE" })).toEqual(["prep_item"]);
   });
 
   it("payday needs 7 days of tenure and an active-member rule", async () => {

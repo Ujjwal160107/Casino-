@@ -60,10 +60,9 @@ async function bid(ctx: CrewCtx) {
   }
 }
 
-/** S25 war, only in the family's home guild, where its boards and buttons live. */
+/** S25 war, from any server: its Scout and Hit buttons work wherever it is posted (A4). */
 async function war(ctx: CrewCtx) {
-  const { family } = await requireMembership(ctx.uid);
-  if (family.homeGuildId !== ctx.guildId) throw new FamilyError("War actions happen in your family's home server.");
+  await requireMembership(ctx.uid);
   return show(ctx, await warCardScreen(ctx.uid, new Date()));
 }
 

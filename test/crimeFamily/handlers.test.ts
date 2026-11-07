@@ -131,6 +131,15 @@ describe("crime family interactions", () => {
     expect(said(acc)).toContain("Crime Families are not open yet.");
     expect(await testPrisma.familyMember.findUnique({ where: { userId: invitee } })).toBeNull();
   });
+  it("create from a DM is refused under enabled (it needs a server; A20)", async () => {
+    const founder = await seedEligibleUser({ wallet: 15_000_000 });
+    await withCfConfig({ enabled: true }, async () => {
+      const dm = fakeButton(CREW_IDS.createOk("VLA", "Velvet Ante", founder), { userId: founder, guildId: null, ephemeralSource: true });
+      await handleCrimeFamilyInteraction(dm as any);
+      expect(said(dm)).toContain("Crime Families are not open in this server yet.");
+    });
+    expect(await testPrisma.family.count()).toBe(0);
+  });
 
   it("the S5 pager and a select on page 2 keep the page", async () => {
     const boss = await seedEligibleUser();

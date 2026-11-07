@@ -52,13 +52,17 @@ describe("turf routes (13.2)", () => {
     expect((await testPrisma.war.findUnique({ where: { id: w.id } }))!.atkDocks).toBe(10);
   });
 
-  it("a press from another guild is refused with no debit and no row (Review Focus 4)", async () => {
-    const { w, s } = await liveWar();
-    const i = fakeButton(TURF_IDS.hit(w.id, "docks"), { userId: s, guildId: "elsewhere" });
-    await handleCrimeFamilyInteraction(i as any);
-    expect(said(i)).toMatch(/Not eligible/);
-    expect(await testPrisma.warContribution.count()).toBe(0);
-    expect((await testPrisma.wallet.findUnique({ where: { userId: s } }))!.balance).toBe(100_000);
+  it("Hit from another guild and Scout from a DM work like any press (A4)", async () => {
+    await withCfConfig(ON, async () => {
+      const { w, s } = await liveWar();
+      const hit = fakeButton(TURF_IDS.hit(w.id, "docks"), { userId: s, guildId: "elsewhere" });
+      await handleCrimeFamilyInteraction(hit as any);
+      expect(JSON.stringify(hit.editReply.mock.calls)).toMatch(/turf:hx:[0-9a-f]{24}:\d/);
+      const scout = fakeButton(TURF_IDS.scout(w.id), { userId: s, guildId: null });
+      await handleCrimeFamilyInteraction(scout as any);
+      expect(said(scout)).toContain("weak point is");
+      expect(await testPrisma.warContribution.count({ where: { warId: w.id, userId: s } })).toBe(1);
+    });
   });
 
   it("an unknown block argument and an unknown turf action are inactive buttons", async () => {

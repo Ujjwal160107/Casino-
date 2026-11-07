@@ -32,21 +32,17 @@ import {
 } from "../ui/crimeFamily/familyScreens";
 import { CREW_IDS, decodeName, type CrewConfirmKind, type CrewModalKind } from "../ui/crimeFamily/ids";
 import type { CfPayload } from "../ui/crimeFamily/kit";
-import { CRIME_FAMILY_CONFIG, isCrimeFamilyOpen } from "../utils/economyConfig";
+import { CRIME_FAMILY_CONFIG } from "../utils/economyConfig";
 import { fmtFortunes } from "../utils/format";
 import type { CfInteraction, CfRoute, CfRouteEntry, CfRouteTable } from "./crimeFamilyRouter";
-import { assertEnabled, auto, notice, owner, show, showThenAnnounce, update } from "./crewRouteKit";
+import { assertEnabled, assertServerOpen, auto, notice, owner, show, showThenAnnounce, update } from "./crewRouteKit";
 
-export const NOT_OPEN_HERE = "Crime Families are not open in this server yet.";
+export { NOT_OPEN_HERE } from "./crewRouteKit";
 const ONLY_OFFICERS = "Only the Boss or Underboss can run payday.";
 const ONLY_BOSS_DISBAND = "Only the Boss can disband the family.";
 export const BAD_AMOUNT = "Enter a positive amount like 250k or 5m";
 
 const days = (seconds: number) => Math.round(seconds / 86_400);
-
-function assertCreateOpen(i: CfInteraction): void {
-  if (!isCrimeFamilyOpen(i.guildId)) throw new FamilyError(NOT_OPEN_HERE);
-}
 
 // ── Modals (opened with no I/O before showModal) ─────────────────────────────
 
@@ -233,7 +229,7 @@ const levelRoute: CfRoute = async (i, [, level, uid]) => {
 
 /** `crew:create:ok:<TAG>:<name>:<owner>` (S3 Confirm). */
 const createOkRoute: CfRoute = async (i, [, tag, encodedName, uid]) => {
-  assertCreateOpen(i);
+  assertServerOpen(i);
   await createFamily({
     uid, username: i.user.username, name: decodeName(encodedName), tag, guildId: i.guildId!, channelId: i.channelId!,
   });
@@ -277,7 +273,7 @@ const modalRoute: CfRoute = async (i, [kind, uid]) => {
   const field = (id: string) => i.fields.getTextInputValue(id);
   switch (kind as CrewModalKind) {
     case "create": {
-      assertCreateOpen(i);
+      assertServerOpen(i);
       const name = checkFamilyName(field("name"));
       if (!name.ok) throw new FamilyError(name.reason);
       const tag = checkFamilyTag(field("tag"));

@@ -204,7 +204,7 @@ const right = (seed: string, block: "docks" | "main" | "alleys", startsAt: Date,
 describe("war actions (9.4, edges 45–51)", () => {
   it("scouting is free, once per member per slot, and reveals the current weak point", async () => {
     const { w, a } = await liveWar();
-    const rs = await Promise.allSettled([scoutWar({ warId: w.id, userId: a.ids[1], guildId: "g1" }), scoutWar({ warId: w.id, userId: a.ids[1], guildId: "g1" })]);
+    const rs = await Promise.allSettled([scoutWar({ warId: w.id, userId: a.ids[1] }), scoutWar({ warId: w.id, userId: a.ids[1] })]);
     const ok = rs.filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled");
     expect(ok).toHaveLength(1);
     expect((rs.find((r) => r.status === "rejected") as any).reason.message).toMatch(/^Already scouted this slot, next at <t:\d+:R>\.$/);
@@ -218,7 +218,7 @@ describe("war actions (9.4, edges 45–51)", () => {
   it("a hit costs 25,000, arms a 20 s call and sets the 600 s cooldown; racing presses debit once", async () => {
     const { w, a } = await liveWar();
     const now = new Date();
-    const rs = await Promise.allSettled([armHit({ warId: w.id, userId: a.ids[0], guildId: "g1", block: "main", now }), armHit({ warId: w.id, userId: a.ids[0], guildId: "g1", block: "docks", now })]);
+    const rs = await Promise.allSettled([armHit({ warId: w.id, userId: a.ids[0], block: "main", now }), armHit({ warId: w.id, userId: a.ids[0], block: "docks", now })]);
     expect(rs.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect((rs.find((r) => r.status === "rejected") as any).reason.message).toMatch(/^Next hit <t:\d+:R>\.$|Vault busy/);
     expect(await wallet(a.ids[0])).toBe(175_000);
@@ -230,17 +230,17 @@ describe("war actions (9.4, edges 45–51)", () => {
   it("enforces 6 hits per war and refuses a short wallet with nothing written (edge 46)", async () => {
     const { w, a } = await liveWar();
     await seedContribution({ warId: w.id, familyId: a.f.id, userId: a.ids[1], side: "ATK", hits: 6 });
-    await expect(armHit({ warId: w.id, userId: a.ids[1], guildId: "g1", block: "docks" })).rejects.toThrow("You've used all 6 hits in this war.");
+    await expect(armHit({ warId: w.id, userId: a.ids[1], block: "docks" })).rejects.toThrow("You've used all 6 hits in this war.");
     await testPrisma.wallet.update({ where: { userId: a.ids[2] }, data: { balance: 24_999 } });
-    await expect(armHit({ warId: w.id, userId: a.ids[2], guildId: "g1", block: "docks" })).rejects.toThrow("Insufficient funds.");
+    await expect(armHit({ warId: w.id, userId: a.ids[2], block: "docks" })).rejects.toThrow("Insufficient funds.");
     expect(await testPrisma.warHit.count({ where: { warId: w.id } })).toBe(0);
     expect(await testPrisma.warContribution.findFirst({ where: { warId: w.id, userId: a.ids[2] } })).toMatchObject({ hits: 0 });
   });
 
   it("a correct answer scores +10 attacking or +12 defending; a miss scores 0 and reveals nothing (T10)", async () => {
     const { w, a, d } = await liveWar();
-    const atk = await armHit({ warId: w.id, userId: a.ids[0], guildId: "g1", block: "docks" });
-    const def = await armHit({ warId: w.id, userId: d.ids[0], guildId: "g1", block: "docks" });
+    const atk = await armHit({ warId: w.id, userId: a.ids[0], block: "docks" });
+    const def = await armHit({ warId: w.id, userId: d.ids[0], block: "docks" });
     const ok = right(w.seed, "docks", w.startsAt);
     expect(await answerHit({ hitId: atk.hitId, userId: a.ids[0], choice: ok })).toEqual({ correct: true, points: 10, block: "docks" });
     expect(await answerHit({ hitId: def.hitId, userId: d.ids[0], choice: (ok + 1) % 4 })).toEqual({ correct: false, points: 0, block: "docks" });
@@ -254,7 +254,7 @@ describe("war actions (9.4, edges 45–51)", () => {
   it("an answer is judged against the arm-time slot (edge 50)", async () => {
     const { w, a } = await liveWar({ started: 24.9 });                    // slot 4 ends in ~6 s
     const armedAt = new Date();
-    const h = await armHit({ warId: w.id, userId: a.ids[0], guildId: "g1", block: "alleys", now: armedAt });
+    const h = await armHit({ warId: w.id, userId: a.ids[0], block: "alleys", now: armedAt });
     const later = new Date(+armedAt + 10_000);                            // slot 5
     expect(slotOf(w.startsAt, later)).toBe(5);
     expect((await answerHit({ hitId: h.hitId, userId: a.ids[0], choice: weakPoint(w.seed, "alleys", 4), now: later })).correct).toBe(true);
@@ -263,7 +263,7 @@ describe("war actions (9.4, edges 45–51)", () => {
   it("an answer after the deadline is too late, and the sweeper times it out (edge 47)", async () => {
     const { w, a } = await liveWar();
     const now = new Date();
-    const h = await armHit({ warId: w.id, userId: a.ids[0], guildId: "g1", block: "main", now });
+    const h = await armHit({ warId: w.id, userId: a.ids[0], block: "main", now });
     await expect(answerHit({ hitId: h.hitId, userId: a.ids[0], choice: 0, now: new Date(+now + 21_000) })).rejects.toThrow("Too late.");
     expect(await sweepWarHits(new Date(+now + 21_000))).toBe(1);
     expect((await testPrisma.warHit.findUnique({ where: { id: h.hitId } }))!.state).toBe("TIMEOUT");
@@ -272,37 +272,36 @@ describe("war actions (9.4, edges 45–51)", () => {
   it("stale buttons: scout and hit after the war ended are refused with nothing written (Review Focus 3)", async () => {
     const { w, a } = await liveWar();
     await testPrisma.war.update({ where: { id: w.id }, data: { status: "RESOLVED" } });
-    await expect(scoutWar({ warId: w.id, userId: a.ids[0], guildId: "g1" })).rejects.toThrow("This war is over.");
-    await expect(armHit({ warId: w.id, userId: a.ids[0], guildId: "g1", block: "docks" })).rejects.toThrow("This war is over.");
+    await expect(scoutWar({ warId: w.id, userId: a.ids[0] })).rejects.toThrow("This war is over.");
+    await expect(armHit({ warId: w.id, userId: a.ids[0], block: "docks" })).rejects.toThrow("This war is over.");
     expect([await wallet(a.ids[0]), await testPrisma.warContribution.count()]).toEqual([200_000, 0]);
   });
 
   it("an answer that lands after settlement began scores nothing (T17)", async () => {
     const { w, a } = await liveWar();
-    const h = await armHit({ warId: w.id, userId: a.ids[0], guildId: "g1", block: "docks" });
+    const h = await armHit({ warId: w.id, userId: a.ids[0], block: "docks" });
     await testPrisma.war.update({ where: { id: w.id }, data: { status: "SETTLING" } });
     await expect(answerHit({ hitId: h.hitId, userId: a.ids[0], choice: right(w.seed, "docks", w.startsAt) })).rejects.toThrow("Too late: the war is over.");
     expect((await war(w.id))!.atkDocks).toBe(0);
     expect((await testPrisma.warHit.findUnique({ where: { id: h.hitId } }))!.state).toBe("ARMED");
   });
 
-  it("wrong family, wrong guild, Associates and hot members are refused before any write (edge 45, 51; Review Focus 4)", async () => {
+  it("wrong family, Associates and hot members are refused before any write (edge 45, 51; Review Focus 4)", async () => {
     const { w, a } = await liveWar();
     const outsider = await family(1);
-    await expect(armHit({ warId: w.id, userId: outsider.ids[0], guildId: "g1", block: "docks" })).rejects.toThrow("Not your war.");
-    await expect(armHit({ warId: w.id, userId: a.ids[1], guildId: "g-other", block: "docks" })).rejects.toThrow(/Not eligible/);
+    await expect(armHit({ warId: w.id, userId: outsider.ids[0], block: "docks" })).rejects.toThrow("Not your war.");
     const fresh = await seedEligibleUser({ wallet: 200_000 });
     await testPrisma.familyMember.create({ data: { familyId: a.f.id, userId: fresh, role: "SOLDIER", roleSlot: fresh, seat: 9, joinedAt: new Date() } });
-    await expect(scoutWar({ warId: w.id, userId: fresh, guildId: "g1" })).rejects.toThrow(/Not eligible/);
+    await expect(scoutWar({ warId: w.id, userId: fresh })).rejects.toThrow(/Not eligible/);
     await testPrisma.user.update({ where: { discordId: a.ids[2] }, data: { crimeHeat: 100 } });
-    await expect(armHit({ warId: w.id, userId: a.ids[2], guildId: "g1", block: "docks" })).rejects.toThrow(/heat/);
+    await expect(armHit({ warId: w.id, userId: a.ids[2], block: "docks" })).rejects.toThrow(/heat/);
     expect(await testPrisma.warContribution.count({ where: { warId: w.id } })).toBe(0);
     expect(await wallet(a.ids[1])).toBe(200_000);
   });
 
   it("a member's first scout and first hit racing create one contribution row", async () => {
     const { w, a } = await liveWar();
-    const rs = await Promise.allSettled([scoutWar({ warId: w.id, userId: a.ids[0], guildId: "g1" }), armHit({ warId: w.id, userId: a.ids[0], guildId: "g1", block: "main" })]);
+    const rs = await Promise.allSettled([scoutWar({ warId: w.id, userId: a.ids[0] }), armHit({ warId: w.id, userId: a.ids[0], block: "main" })]);
     expect(rs.every((r) => r.status === "fulfilled")).toBe(true);
     expect(await testPrisma.warContribution.count({ where: { warId: w.id, userId: a.ids[0] } })).toBe(1);
   });

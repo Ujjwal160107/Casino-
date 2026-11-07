@@ -90,7 +90,7 @@ async function join(ctx: CrewCtx) {
   if (!role) throw new FamilyError(`Unknown role. Roles: ${JOINABLE}.`);
   const live = await familyLiveCaper(ctx);
   if (live.status !== "LOBBY") throw new FamilyError(NO_LOBBY);
-  const { caper, full } = await joinCaper({ caperId: live.id, uid: ctx.uid, role, guildId: ctx.guildId });
+  const { caper, full } = await joinCaper({ caperId: live.id, uid: ctx.uid, role });
   const jumpUrl = caper.messageId ? jumpLink(caper.guildId, caper.channelId, caper.messageId) : null;
   // The seat is committed: a failed reply (deleted message, no Send Messages)
   // must not skip the auto-start or the roster redraw.

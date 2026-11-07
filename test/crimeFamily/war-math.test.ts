@@ -95,4 +95,9 @@ describe("war math (9.1, 9.4, 15)", () => {
       expect(isTurfOpen("g2")).toBe(false);
     });
   });
+
+  it("A20: isTurfOpen(null) needs enabled and turfEnabled", async () => {
+    await withCfConfig({ enabled: true }, async () => expect(isTurfOpen(null)).toBe(false));
+    await withCfConfig({ enabled: true, turfEnabled: true, allowGuildIds: ["g1"] }, async () => expect(isTurfOpen(null)).toBe(true));
+  });
 });

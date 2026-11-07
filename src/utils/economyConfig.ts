@@ -293,13 +293,19 @@ export const CRIME_FAMILY_CONFIG = {
   managePageSize: 15,
 } as const;
 
-/** Whether !crew, creation and invites are open in this guild (sweepers and payouts ignore it). */
+/**
+ * Whether !crew, creation and invites are open in this guild (sweepers and payouts ignore it).
+ * A DM press (no guild) is open whenever `enabled` (A20); `allowGuildIds` limits servers only.
+ */
 export function isCrimeFamilyOpen(guildId: string | null | undefined): boolean {
   const { enabled, allowGuildIds } = CRIME_FAMILY_CONFIG;
-  return enabled && !!guildId && (allowGuildIds === null || allowGuildIds.includes(guildId));
+  return enabled && (!guildId || allowGuildIds === null || allowGuildIds.includes(guildId));
 }
 
-/** Whether !turf, the map, racket detail and new bids are open in this guild (running wars ignore it, T1). */
+/**
+ * Whether !turf, the map, racket detail and new bids are open in this guild (running wars ignore it, T1).
+ * A DM press (no guild) is open whenever `enabled` and `turfEnabled` (A20); `allowGuildIds` limits servers only.
+ */
 export function isTurfOpen(guildId: string | null | undefined): boolean {
   return isCrimeFamilyOpen(guildId) && CRIME_FAMILY_CONFIG.turfEnabled;
 }

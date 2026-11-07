@@ -3,6 +3,7 @@ import prisma from "../../src/utils/prisma";
 import { handleCrimeFamilyInteraction } from "../../src/handlers/crimeFamilyRouter";
 import { planCaper, joinCaper } from "../../src/services/crimeFamily/caperLobbyService";
 import { CPR_IDS } from "../../src/ui/crimeFamily/ids";
+import { caperTier } from "../../src/data/crimeFamilyCatalog";
 import { fakeButton, fakeSelect, said } from "./fakeInteraction";
 import { testPrisma, resetFamilies, ensureUniqueIndexes, withCfConfig, flushTestKeys } from "../helpers";
 import { caperCrew, seedRunning, fakeCaperClient, G, CH } from "./caperFixtures";
@@ -67,13 +68,37 @@ describe("cpr: planner routes", () => {
 });
 
 describe("cpr: lobby and GO routes", () => {
-  it("join from another guild", () => open(async () => {
+  it("join from another guild and from a DM seats the member (A4, A20)", () => open(async () => {
     const f = await caperCrew({ tier: 1, roles: [...T1] });
     const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
-    const i = await press(fakeSelect(CPR_IDS.join(c.id), ["LOOKOUT"], { userId: f.ids.LOOKOUT, guildId: "g2", client: fakeCaperClient().client }));
-    expect(i.order[0]).toBe("deferUpdate");
-    expect(said(i)).toContain("This crew heist is in another server; join that server to play.");
-    expect(await testPrisma.caperCrew.count({ where: { caperId: c.id } })).toBe(1);
+    const fc = fakeCaperClient();
+    const far = await press(fakeSelect(CPR_IDS.join(c.id), ["LOOKOUT"], { userId: f.ids.LOOKOUT, guildId: "g2", client: fc.client }));
+    expect(said(far)).not.toContain("another server");
+    const dm = await press(fakeSelect(CPR_IDS.join(c.id), ["SAFECRACKER"], { userId: f.ids.SAFECRACKER, guildId: null, client: fc.client }));
+    expect(said(dm)).not.toContain("not open");
+    expect((await testPrisma.caperCrew.findMany({ where: { caperId: c.id } })).map((r) => r.role).sort()).toEqual(["LOOKOUT", "MASTERMIND", "SAFECRACKER"]);
+  }));
+
+  it("a DM join while switched off says 'not open yet' and seats nobody (Review Focus 5)", async () => {
+    const f = await caperCrew({ tier: 1, roles: [...T1] });
+    const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
+    const before = (await testPrisma.wallet.findUnique({ where: { userId: f.ids.LOOKOUT } }))!.balance;
+    const off = await press(fakeSelect(CPR_IDS.join(c.id), ["LOOKOUT"], { userId: f.ids.LOOKOUT, guildId: null, client: fakeCaperClient().client }));
+    expect(said(off)).toContain("Crime Families are not open yet.");
+    expect(said(off)).not.toContain("in this server");
+    await withCfConfig({ enabled: true, allowGuildIds: ["g9"] }, async () => {
+      const on = await press(fakeSelect(CPR_IDS.join(c.id), ["LOOKOUT"], { userId: f.ids.LOOKOUT, guildId: null, client: fakeCaperClient().client }));
+      expect(said(on)).not.toContain("not open");
+    });
+    expect(await testPrisma.caperCrew.count({ where: { caperId: c.id, userId: f.ids.LOOKOUT } })).toBe(1);
+    expect((await testPrisma.wallet.findUnique({ where: { userId: f.ids.LOOKOUT } }))!.balance).toBe(before - caperTier(1).stake); // one stake (50,000), once
+  });
+
+  it("plan from a DM is refused (the lobby needs a server channel)", () => open(async () => {
+    const { bossId } = await caperCrew({ tier: 1, roles: [...R3] });
+    const i = await press(fakeSelect(CPR_IDS.plan(bossId), ["1"], { userId: bossId, guildId: null, client: fakeCaperClient().client }));
+    expect(said(i)).toContain("Crime Families are not open in this server yet.");
+    expect(await testPrisma.caper.count()).toBe(0);
   }));
 
   it("brief from the public card defers ephemerally; Refresh from the brief defers as an update", async () => {
@@ -119,7 +144,7 @@ describe("cpr: lobby and GO routes", () => {
   it("a committed last join whose auto-start fails is not refused (the press or the sweeper starts it)", () => open(async () => {
     const f = await caperCrew({ tier: 1, roles: [...T1] });
     const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
-    for (const r of ["LOOKOUT", "SAFECRACKER"] as const) await joinCaper({ caperId: c.id, uid: f.ids[r], role: r, guildId: G });
+    for (const r of ["LOOKOUT", "SAFECRACKER"] as const) await joinCaper({ caperId: c.id, uid: f.ids[r], role: r });
     const tx = failTransactionsAfter(1, () => new Error("Write conflict"));
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     let i: any;

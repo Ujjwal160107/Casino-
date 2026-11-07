@@ -40,7 +40,7 @@ describe("caper card and flow (13.2, 8.4)", () => {
     expect((await caperRow(c.id)).messageId).toBe(mid);
 
     for (const r of JOINERS) {
-      const j = await joinCaper({ caperId: c.id, uid: ids[r], role: r, guildId: G });
+      const j = await joinCaper({ caperId: c.id, uid: ids[r], role: r });
       await onSeatsChanged(fc.client, c.id, j.full);
     }
     const run = await caperRow(c.id);
@@ -64,7 +64,7 @@ describe("caper card and flow (13.2, 8.4)", () => {
 
   it("Start racing the last join's auto-start posts one GO message (Review Focus 5)", async () => {
     const { ids, fc, c } = await postedLobby();
-    for (const r of JOINERS) await joinCaper({ caperId: c.id, uid: ids[r], role: r, guildId: G });
+    for (const r of JOINERS) await joinCaper({ caperId: c.id, uid: ids[r], role: r });
     await Promise.allSettled([onSeatsChanged(fc.client, c.id, true), runStart(fc.client, c.id, { kind: "press", uid: ids.MASTERMIND })]);
     expect(fc.sent.filter(isGoCall)).toHaveLength(1);
     for (const id of Object.values(ids)) expect(fc.dms.get(id)).toBe(1);
@@ -80,7 +80,7 @@ describe("caper card and flow (13.2, 8.4)", () => {
     expect(await renderCaperCard(fc.client, c.id)).toBe("skipped");
     expect(rest.post.mock.calls.length + rest.patch.mock.calls.length).toBe(calls);
     let full = false;
-    for (const r of JOINERS) full = (await joinCaper({ caperId: c.id, uid: ids[r], role: r, guildId: G })).full;
+    for (const r of JOINERS) full = (await joinCaper({ caperId: c.id, uid: ids[r], role: r })).full;
     expect(full).toBe(true);
     expect((await runStart(fc.client, c.id, { kind: "auto" })).status).toBe("started");
     for (const id of Object.values(ids)) expect(fc.dms.get(id)).toBe(1);
@@ -102,10 +102,10 @@ describe("caper card and flow (13.2, 8.4)", () => {
   it("the trailing debounce renders the last of two joins inside 2 s", async () => {
     const { ids, fc, c, mid } = await postedLobby();
     const edit = fc.rest.patch;
-    await joinCaper({ caperId: c.id, uid: ids.LOOKOUT, role: "LOOKOUT", guildId: G });
+    await joinCaper({ caperId: c.id, uid: ids.LOOKOUT, role: "LOOKOUT" });
     await requestCaperRender(fc.client, c.id);                      // "set": renders now
     await new Promise((r) => setTimeout(r, 100));
-    await joinCaper({ caperId: c.id, uid: ids.SAFECRACKER, role: "SAFECRACKER", guildId: G });
+    await joinCaper({ caperId: c.id, uid: ids.SAFECRACKER, role: "SAFECRACKER" });
     await requestCaperRender(fc.client, c.id);                      // "held": schedules one trailing render
     expect(edit).toHaveBeenCalledTimes(1);
     await vi.waitFor(() => expect(edit).toHaveBeenCalledTimes(2), { timeout: 4_000, interval: 50 });
@@ -161,7 +161,7 @@ describe("caper card and flow (13.2, 8.4)", () => {
     await testPrisma.caperCrew.create({ data: { caperId: "65f000000000000000000001", familyId: f.family.id, userId: f.ids.LOOKOUT, role: "LOOKOUT", liveSlot: "65f000000000000000000001", stake: 50_000, started: true, startedAt: earlier } });
     const fc = fakeCaperClient({ members: Object.values(f.ids) });
     const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH, now });
-    for (const r of JOINERS) await joinCaper({ caperId: c.id, uid: f.ids[r], role: r, guildId: G, now });
+    for (const r of JOINERS) await joinCaper({ caperId: c.id, uid: f.ids[r], role: r, now });
     expect((await runStart(fc.client, c.id, { kind: "auto" }, now)).status).toBe("started");
     expect(await testPrisma.cooldownReminder.findMany({ where: { discordId: f.ids.LOOKOUT, type: "caper" } })).toMatchObject([{ dueAt: new Date(+earlier + 86_400_000) }]);
     expect(await testPrisma.cooldownReminder.count({ where: { discordId: f.ids.SAFECRACKER, type: "caper" } })).toBe(0);

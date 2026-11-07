@@ -4,7 +4,7 @@
 import { SnowflakeUtil } from "discord.js";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
-import { caperRole, ELIGIBILITY_GATES, type CaperRoleKey, type GateDef, type GateKey } from "../../data/crimeFamilyCatalog";
+import { caperRole, ELIGIBILITY_GATES, type CaperRoleKey, type GateKey } from "../../data/crimeFamilyCatalog";
 import { computeNetWorth } from "../netWorthService";
 import { isBanActive } from "../banService";
 import { checkJailStatus } from "../jailService";
@@ -14,7 +14,7 @@ import { FamilyError } from "./tx";
 
 export type EligibilityCheck = { gate: string; need: string; have: string; ok: boolean };
 export type EligibilityResult = { ok: boolean; checks: EligibilityCheck[]; failures: EligibilityCheck[] };
-export interface EligibilityOpts { now?: Date; guildId?: string | null; expectedGuildId?: string; familyId?: string; role?: CaperRoleKey }
+export interface EligibilityOpts { now?: Date; familyId?: string; role?: CaperRoleKey }
 
 type ExitReason = "LEFT" | "KICKED" | "DISBANDED";
 
@@ -53,15 +53,11 @@ export function eligibilityError(failures: EligibilityCheck[]): FamilyError {
   return new FamilyError(`Not eligible: ${failures.map((f) => `${f.need} (you have ${f.have})`).join("; ")}`);
 }
 
-function guildPhrase(gate: GateDef): string {
-  return gate.guild === "home" ? "acting in the family's home server" : "acting in the lobby's server";
-}
-
 /**
  * Evaluates every row of the gate, in a fixed order: banned, jailed,
  * discord_age, fortuna_age, shifts, net_worth, not_member | tenure, heat,
- * in_family, hop_cooldown, refound_cooldown, rejoin_cooldown, guild,
- * prep_item, active.
+ * in_family, hop_cooldown, refound_cooldown, rejoin_cooldown, prep_item,
+ * active.
  */
 export async function checkMemberEligibility(uid: string, gateKey: GateKey, opts: EligibilityOpts = {}): Promise<EligibilityResult> {
   const gate = ELIGIBILITY_GATES[gateKey];
@@ -140,11 +136,6 @@ export async function checkMemberEligibility(uid: string, gateKey: GateKey, opts
       add("rejoin_cooldown", !left, `≥ ${num(windowMs / DAY_MS)} days since you left this family`,
         left ? `a cooldown that ends ${unix(new Date(left.leftAt.getTime() + windowMs))}` : "none");
     }
-  }
-
-  if (gate.guild && opts.expectedGuildId !== undefined) {
-    const same = opts.guildId === opts.expectedGuildId;
-    add("guild", same, guildPhrase(gate), same ? "this server" : "another server");
   }
 
   if (gate.prepItem && opts.role) {

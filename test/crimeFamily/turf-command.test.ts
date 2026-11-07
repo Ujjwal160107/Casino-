@@ -80,13 +80,13 @@ describe("!turf (13.1)", () => {
     });
   });
 
-  it("war posts the S25 card in the home guild and refuses elsewhere", async () => {
+  it("war posts the S25 card from any server", async () => {
     await withCfConfig(ON, async () => {
       const boss = await seedEligibleUser();
       const f = await seedFamily({ bossId: boss, homeGuildId: "g1" });
       await seedRacket("pawn_row");
       const w = await seedWar({ racketKey: "pawn_row", status: "ACTIVE", topBid: 2_100_000, topBidderFamilyId: f.id, defenderFamilyId: "" });
-      expect(await run("!turf war", boss, "g2")).toContain("War actions happen in your family's home server.");
+      expect(await run("!turf war", boss, "g2")).toContain(TURF_IDS.scout(w.id));
       expect(await run("!turf war", boss, "g1")).toContain(TURF_IDS.scout(w.id));
     });
   });

@@ -7,28 +7,23 @@ import type { CaperRoleKey } from "../data/crimeFamilyCatalog";
 import { joinCaper } from "../services/crimeFamily/caperLobbyService";
 import { lockChoice, openBrief } from "../services/crimeFamily/caperPlayService";
 import { buildPlannerView } from "../services/crimeFamily/caperQueries";
-import { FamilyError } from "../services/crimeFamily/tx";
 import { onSeatsChanged, openLobby, resolveAndAnnounce, runCancel, runLeave, runStart, safely } from "../ui/crimeFamily/caperFlow";
 import { buildBrief, buildCaperPlanner } from "../ui/crimeFamily/caperScreens";
 import { buildNotice, type CfPayload } from "../ui/crimeFamily/kit";
 import { jumpLink } from "../ui/crimeFamily/post";
-import { isCrimeFamilyOpen } from "../utils/economyConfig";
 import { rejectPress, safeEditReply } from "../utils/interactionHelpers";
 import type { CfInteraction, CfRoute, CfRouteEntry, CfRouteTable } from "./crimeFamilyRouter";
-import { NOT_OPEN_HERE } from "./crewInteractionHandler";
+import { assertCfOpen, assertServerOpen } from "./crewRouteKit";
 
 const show = async (i: CfInteraction, payload: CfPayload) => { await safeEditReply(i, payload); };
 const values = (i: CfInteraction): string[] => (i.isStringSelectMenu() ? i.values : []);
 const owner = (run: CfRoute): CfRouteEntry => ({ scope: "owner", ack: "ephemeral", run });
 const shared = (ack: CfRouteEntry["ack"], run: CfRoute): CfRouteEntry => ({ scope: "shared", ack, run });
 
-/** Planning and joining are gated by the guild switch (C3); everything else runs so a live caper finishes. */
-function assertOpen(i: CfInteraction): void {
-  if (!isCrimeFamilyOpen(i.guildId)) throw new FamilyError(NOT_OPEN_HERE);
-}
-
+// Planning and joining are gated by the kill switch (C3); everything else runs so a live caper finishes.
+// Plan needs a server (the lobby posts there); a join works from any server or a DM (A4, A20).
 const planRoute: CfRoute = async (i) => {
-  assertOpen(i);
+  assertServerOpen(i);
   const { caper, channelId, posted } = await openLobby(i.client, {
     uid: i.user.id, tier: Number(values(i)[0]), guildId: i.guildId ?? "", channelId: i.channelId ?? "",
   });
@@ -38,8 +33,8 @@ const planRoute: CfRoute = async (i) => {
 };
 
 const joinRoute: CfRoute = async (i, [caperId]) => {
-  assertOpen(i);
-  const { full } = await joinCaper({ caperId, uid: i.user.id, role: values(i)[0] as CaperRoleKey, guildId: i.guildId });
+  assertCfOpen(i.guildId);
+  const { full } = await joinCaper({ caperId, uid: i.user.id, role: values(i)[0] as CaperRoleKey });
   await onSeatsChanged(i.client, caperId, full);
 };
 

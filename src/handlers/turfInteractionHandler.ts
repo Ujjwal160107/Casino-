@@ -1,7 +1,8 @@
 // TURF_ROUTES: every `turf:` press (spec 13.2). The router has already checked
 // the owner and acknowledged; each route calls one turf service and renders
 // one screen. The map, racket detail and bids are gated by isTurfOpen; Scout,
-// Hit and the hit answer are not, so a war already running finishes (T1).
+// Hit and the hit answer are not, so a war already running finishes (T1), and
+// work from any server or a DM (A4).
 // Every war press is authorised against DB rows by the service, never the message.
 import { WAR_BLOCKS, racketDef } from "../data/crimeFamilyCatalog";
 import { BAD_AMOUNT, parseBidAmount, placeBid } from "../services/crimeFamily/bidService";
@@ -86,7 +87,7 @@ const bidSubmitRoute: CfRoute = async (i, [, racketKey]) => {
 
 const hitRoute: CfRoute = async (i, [warId, block]) => {
   if (!blockOf(block)) throw new FamilyError(INACTIVE);
-  const armed = await armHit({ warId, userId: i.user.id, guildId: i.guildId, block: block as WarBlockKey });
+  const armed = await armHit({ warId, userId: i.user.id, block: block as WarBlockKey });
   await show(i, buildHitCall(armed, blockName(armed.block)));
 };
 
@@ -105,7 +106,7 @@ export const TURF_ROUTES: CfRouteTable = {
   bid: bidModalRoute,
   "modal:bid": gated("ephemeral", bidSubmitRoute),
   scout: shared("ephemeral", async (i, [warId]) => {
-    const report = await scoutWar({ warId, userId: i.user.id, guildId: i.guildId });
+    const report = await scoutWar({ warId, userId: i.user.id });
     await show(i, buildScoutReport(report, blockName(report.block)));
   }),
   hit: shared("ephemeral", hitRoute),

@@ -12,7 +12,7 @@ import { caperCrew, seedLobby, txCount, G, CH } from "../crimeFamily/caperFixtur
 const wallet = async (id: string) => (await testPrisma.wallet.findUnique({ where: { userId: id } }))!.balance;
 const crew = (caperId: string) => testPrisma.caperCrew.findMany({ where: { caperId } });
 const plan = (uid: string, tier = 1, now?: Date) => planCaper({ uid, tier, guildId: G, channelId: CH, now });
-const join = (caperId: string, uid: string, role: any, now?: Date, guildId = G) => joinCaper({ caperId, uid, role, guildId, now });
+const join = (caperId: string, uid: string, role: any, now?: Date) => joinCaper({ caperId, uid, role, now });
 const BUSY_OR = (m: string) => new RegExp(`^(${m.replace(/[.()]/g, "\\$&")}|Vault busy, try again\\.)$`);
 const T1 = ["MASTERMIND", "LOOKOUT", "SAFECRACKER", "DRIVER"] as const;
 
@@ -69,13 +69,12 @@ describe("join (8.4 steps 2-3)", () => {
     expect(r.caper.seatsVersion).toBe(3);
   });
 
-  it("refuses the Mastermind seat, a role outside the tier, another guild and a missing prep item, with no debit", async () => {
+  it("refuses the Mastermind seat, a role outside the tier and a missing prep item, with no debit", async () => {
     const { ids } = await caperCrew({ tier: 1, roles: [...T1] });
     const c = await plan(ids.MASTERMIND);
     const before = await wallet(ids.LOOKOUT);
     await expect(join(c.id, ids.LOOKOUT, "MASTERMIND")).rejects.toThrow("The Mastermind seat belongs to the planner.");
     await expect(join(c.id, ids.LOOKOUT, "HACKER")).rejects.toThrow("That role is not part of this crew heist.");
-    await expect(join(c.id, ids.LOOKOUT, "LOOKOUT", undefined, "g2")).rejects.toThrow("This crew heist is in another server; join that server to play.");
     await expect(join(c.id, ids.LOOKOUT, "DRIVER")).rejects.toThrow("Driver needs one of: Iron Spurs, Guard Vest, Arctic Wolf Spirit Charm.");
     expect(await wallet(ids.LOOKOUT)).toBe(before);
     expect(await crew(c.id)).toHaveLength(1);
