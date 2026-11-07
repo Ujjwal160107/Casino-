@@ -318,15 +318,15 @@ export const CATEGORIES: CategoryData[] = [
         example: "{p}crew deposit 5m"
       },
       {
-        name: "heist", aliases: ["crewheist", "caper", "capers"], description: "Plan or join a crew heist: a 10-minute lobby and a 120-second GO where the crew trades intel.",
+        name: "heist", aliases: ["crewheist", "caper", "capers"], description: "Plan or join a crew heist from any server: a 10-minute lobby and a 120-second GO where the crew shares intel.",
         usage: "{p}heist [subcommand]",
         subcommands: [
           "plan <1-4> — plan a tier (Capo and above)",
-          "join <role> — take a seat (Lookout, Safecracker, Driver, Muscle, Hacker)",
+          "join <role> — take a seat, from any server (Lookout, Safecracker, Driver, Muscle, Hacker)",
           "leave — leave the lobby (stake refunded)",
           "start — start once the required roles are filled",
           "cancel — cancel the lobby (planner or Boss)",
-          "brief — open your brief during GO"
+          "brief — open your brief during GO (Share sends the intel you hold to the seat that needs it)"
         ],
         example: "{p}heist join lookout"
       },
@@ -336,7 +336,7 @@ export const CATEGORIES: CategoryData[] = [
         subcommands: [
           "racket <key|1-10> — a racket's owner, income and bidding window",
           "bid <key> <amount> — Boss/Underboss: bid from earnings",
-          "war — your family's live war card"
+          "war — your war card with Scout and Hit, from any server"
         ],
         example: "{p}turf bid docks_numbers 2.1m"
       }

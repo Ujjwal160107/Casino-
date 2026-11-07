@@ -136,6 +136,7 @@ export default async function ChangelogPage() {
                     <FeatureItem>Hits cost 25,000, 6 per member per war</FeatureItem>
                     <FeatureItem>+10 attacking, +12 defending per correct hit</FeatureItem>
                     <FeatureItem>Scores go dark for the last 10 minutes</FeatureItem>
+                    <FeatureItem>Turf war actions (Scout and Hit) work from any server and from the war-soon DM.</FeatureItem>
                   </ul>
                 </div>
               </div>
@@ -236,6 +237,7 @@ export default async function ChangelogPage() {
                     <FeatureItem>2 seats per player per rolling 24 hours</FeatureItem>
                     <FeatureItem>4 to 10 crew heists a family a day, by size</FeatureItem>
                     <FeatureItem>An AFK seat leaks its intel instead of sinking the job</FeatureItem>
+                    <FeatureItem>Crew heists work from any server and from the bot&apos;s DMs; the Share button passes intel to crewmates anywhere.</FeatureItem>
                   </ul>
                 </div>
 

@@ -57,4 +57,22 @@ describe("help and tutorial (19.3)", () => {
     expect(l.howItWorks).toContain("10 to 30 players");
     expect(l.howToUse.join(" ")).toContain("`{p}crew board`");
   });
+
+  it("the heist and turf entries say they work from any server and the brief carries Share", async () => {
+    vi.resetModules();
+    const help = await import("../../src/commands/general/help");
+    const cmds = help.CATEGORIES.find((c) => c.id === "crimefamilies")!.commands;
+    const heist = cmds.find((c) => c.name === "heist")!;
+    expect(heist.description).toContain("from any server");
+    expect((heist.subcommands ?? []).find((s) => s.startsWith("brief"))).toContain("Share");
+    const turf = cmds.find((c) => c.name === "turf")!;
+    expect((turf.subcommands ?? []).find((s) => s.startsWith("war"))).toContain("from any server");
+  });
+
+  it("the tutorial lesson says crew heists and turf wars work from any server and points to Share", async () => {
+    const { LESSONS } = await import("../../src/commands/general/tutorial");
+    const l = LESSONS.find((x) => x.id === "crimefamilies")!;
+    expect(l.howToUse.join(" ")).toContain("`{p}heist brief` — open your brief and Share the intel you hold");
+    expect(l.howItWorks).toContain("work from any server");
+  });
 });

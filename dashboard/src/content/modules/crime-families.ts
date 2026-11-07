@@ -27,7 +27,7 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "What a family is",
       body: [
-        "Families are global. Your family, its vault and its dashboard follow you to every server the bot is in, and you can only be in one family at a time.",
+        "Families are global. Your family, its vault and its dashboard follow you to every server the bot is in, and you can only be in one family at a time. Crew heists and turf wars work from any server the bot shares with you, and from the bot's DMs.",
         "!crew opens your family dashboard: crest, level, XP, members, vault balances and the buttons your rank allows. With no family it shows the Create card instead. Every family also has a home channel, set where it was founded and moved with !crew home, where payday cards and chair notices are posted.",
         "Viewing works in jail. Anything that moves money or members (deposit, invite, accept) checks jail when you press it.",
       ],
@@ -402,8 +402,8 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Crew Heists: the family job",
       body: [
-        "A crew heist is a job the family runs together in one server. A Capo or higher plans it with !heist, and a lobby card posts in the channel. For 10 minutes members pick a role from the \"Join as…\" select or type !heist join <role>; every seat pays its stake when it sits down. Once the required roles are filled the planner presses Start, or the crew heist starts by itself the moment every seat up to the tier's maximum is taken.",
-        "Then comes the GO: 120 seconds in which each member opens their own brief and answers one question. Nobody holds their own answer. Each brief shows the answer to a crewmate's question, so the crew has to talk it through in the channel. The number of wrong or missing answers decides whether the job is Clean, Messy or a Bust.",
+        "A crew heist is a job the family runs together. A Capo or higher plans it with !heist, and a lobby card posts in the channel. For 10 minutes members pick a role from the \"Join as…\" select or type !heist join <role> in any server; every seat pays its stake when it sits down. Once the required roles are filled the planner presses Start, or the crew heist starts by itself the moment every seat up to the tier's maximum is taken.",
+        "Then comes the GO: 120 seconds in which each member opens their own brief and answers one question. Nobody holds their own answer. Each brief shows the answer to a crewmate's question, and the crew passes it on with the Share button or in chat. The number of wrong or missing answers decides whether the job is Clean, Messy or a Bust.",
         "Crew heists are the family's main income. Every crew heist puts 10% of its pool into the vault's earnings and gives the family XP, and 2 started seats in 7 days is what makes a member active for Payday.",
       ],
       table: {
@@ -454,8 +454,8 @@ const crimeFamilies: ModuleDoc = {
       heading: "The intel ring and the leak",
       body: [
         "At Start the bot lines the filled seats up in the seat order above (a missing Driver is simply skipped) and deals every seat 4 options from its role's 6 labels, one of them correct. Each seat's correct answer is shown only to the next seat in the ring, and the last seat's to the Mastermind. So every member holds intel for someone else and needs intel from someone else. A blind guess is right 1 time in 4.",
-        "Your brief says \"Tell @previous: <answer>\" for the intel you hold (the seat before you in the ring), and \"<question>? @next has your intel\" for your own call. Example: a Payroll Van with 5 seats runs Mastermind, Lookout, Safecracker, Driver, Muscle. The Muscle holds the Driver's escape route (\"Tell @Driver: Canal Street\") and gets the door answer from the Mastermind.",
-        "The leak covers a member who goes AFK. A seat is dark if its member had not opened the brief before the last 30 seconds of the GO. From that point, the seat that needed the dark member's intel sees it in their own brief (\"Your contact went dark. The intel leaked: Canal Street\"). The dark seat itself can't answer and counts as a miss. A member who opened the brief and then walked away is not dark: their partner gets no leak and has to guess or be told.",
+        "Your brief says \"Your intel for @previous: <answer>\" for the intel you hold (the seat before you in the ring), and \"<question>? @next has your intel\" for your own call. Example: a Payroll Van with 5 seats runs Mastermind, Lookout, Safecracker, Driver, Muscle. The Muscle holds the Driver's escape route (\"Your intel for @Driver: Canal Street\") and gets the door answer from the Mastermind.",
+        "The leak covers a member who goes AFK. A seat is dark if its member had not opened the brief before the last 30 seconds of the GO. From that point, the seat that needed the dark member's intel sees it in their own brief (\"Your contact went dark. The intel leaked: Canal Street\"). The dark seat itself can't answer and counts as a miss. A member who opened the brief and then walked away is not dark: their partner gets no leak and has to guess or be told (a Share they sent before walking away still counts).",
         "Going dark on purpose to read every leak doesn't work: each dark seat is a miss, so a crew that tries it Busts. One genuine AFK costs exactly one miss, so the best that crew can do is Messy.",
       ],
       table: {
@@ -472,13 +472,36 @@ const crimeFamilies: ModuleDoc = {
       },
     },
     {
+      heading: "Sharing intel",
+      body: [
+        "The Share button sits at the top of your brief, next to the intel you hold. Press it and the bot passes that answer to the seat it answers, wherever that member is playing from. It moves no money, XP or heat and changes no outcome rule: it only saves the crew from needing a shared chat.",
+        "The answer appears only in the brief of the seat it answers, as \"Intel from @next: <answer>\", the next time that member opens the brief or presses Refresh. It never shows on the crew heist card, in a channel or in a DM. That member also gets an \"Intel arrived\" DM with an Open brief button; the DM never contains the answer, it is skipped once they have locked their call or gone dark, and it is turned off with the \"Crew heist lobby\" toggle in !settings. After you share, the button reads Shared.",
+        "On the result card a seat that locked after its intel was shared is marked \"(relayed)\", next to the existing \"(leaked)\" and \"(went dark)\" marks. A seat can't be both relayed and leaked: a holder that shared had opened its brief, so it never goes dark.",
+        "How it plays out: a crew of six in six different servers with no shared chat can still play a perfect run, joining from the lobby DM, opening briefs from the GO DM and passing every answer with Share. A share at the last second is the recipient's miss if they never refresh before the GO ends; a seat with its DMs off gets no DM, but Refresh still shows the shared answer. A dark seat that presses Share after the leak is told \"You went dark: this seat counts as a miss.\", and its intel has already leaked. Picking a role from a lobby DM after someone else took it says \"Role just taken.\" and charges nothing. A member who joins from a DM is seated even when the lobby is in a server they are not in, and the DM turns into their seated card. Turf war hits armed from a DM score like any other hit.",
+      ],
+      table: {
+        title: "Share rules",
+        columns: ["Rule", "Value"],
+        rows: [
+          ["Where", "The Share button on your brief"],
+          ["Who", "Only the seat holding the intel, after opening its brief and while not dark"],
+          ["When", "During the 120-second GO, until it ends"],
+          ["How often", "Once per seat per crew heist; a second press says \"Already shared.\""],
+          ["Who sees the answer", "Only the seat it answers, in its own brief (\"Intel from @next: <answer>\"), on its next open or Refresh"],
+          ["DM to that seat", "\"Intel arrived\" with Open brief, never the answer; skipped once it has locked or gone dark; off with the \"Crew heist lobby\" toggle"],
+          ["Result card", "\"(relayed)\" on a seat that locked after its intel was shared"],
+          ["Refused with", "\"Open your brief first.\" (brief not opened), \"You went dark: this seat counts as a miss.\", \"Too late.\" (GO over), \"You are not in this crew heist.\" (no seat, or pinched at Start)"],
+        ],
+      },
+    },
+    {
       heading: "A crew heist, step by step",
       body: [
         "Plan. A Capo, Underboss or Boss runs !heist and picks a tier, or types !heist plan <1-4>. The family's level must unlock the tier, the family can't be under investigation (its investigation threshold of members at heat 100 or above: 3, or a quarter of the members rounded up when that is more), the family cooldown must be over, the family must have started fewer crew heists in the last 24 hours than its cap (4, or the member count ÷ 3 rounded up when that is more; see Family size), and the planner must pass every seat gate for the Mastermind seat. The planner's stake is taken at once. If the bot can't post in the channel, the lobby goes to the family's home channel when it is in the same server; otherwise the plan is refused with the missing permission.",
-        "Lobby: 10 minutes. The card lists every open role. Members who aren't seated, are in this server, pass the tier's gates and have a free seat get a \"Crew heist lobby open\" DM with a link (at most 3 lobby calls a day, and none for 2 hours after a lobby is cancelled). Joining works from the card or with !heist join <role> anywhere in the lobby's server; another channel gets a small \"joined\" card with a link back. Role names ignore case and spaces, so \"safe cracker\" works.",
+        "Lobby: 10 minutes. The card lists every open role. Members in any server who aren't seated, pass the tier's gates, own a prep item for an open role and have a free seat get a \"Crew heist lobby open\" DM with a Join as… select and a link to the lobby (at most 3 lobby calls a day, and none for 2 hours after a lobby is cancelled). Joining works from the card, from the DM, or with !heist join <role> in any server. Away from the card you get a personal card that says where you sat, with an Open brief button and a link back; a DM you joined from turns into that card. !heist in another server shows the lobby card with its own Join as… select. Role names ignore case and spaces, so \"safe cracker\" works.",
         "Leave before Start with the Leave button or !heist leave, and your stake comes straight back. If the Mastermind leaves, the whole crew heist is cancelled and every stake is refunded.",
         "Start. The planner presses Start (or types !heist start) once the required roles are filled; the crew heist also starts on its own when the last seat up to the maximum fills, or when the lobby closes with the required roles filled. Start re-checks every seat: jail, ban, heat, net worth (your paid stake counts towards it), prep items and your seat count. A seat that fails is removed and refunded and the card says it \"got pinched\". If that leaves a required role empty, the lobby stays open until its 10 minutes are up. From Start the stakes are spent, and the family cooldown begins.",
-        "GO: 120 seconds. A new message mentions every crew member with an Open brief button, and each member gets a \"Crew heist GO\" DM. Open your brief (the button or !heist brief), press Refresh to see the time left and any leaked intel, and lock one of the 4 options. One answer per member, and it can't be changed. The card shows how many have locked in, never who is right.",
+        "GO: 120 seconds. A new message mentions every crew member with an Open brief button, and each member gets a \"Crew heist GO\" DM with its own Open brief button, so the brief opens from any server or the DM. Open your brief (the button or !heist brief), press Refresh to see the time left and any leaked intel, and lock one of the 4 options. One answer per member, and it can't be changed. The card shows how many have locked in, never who is right.",
         "Result. The crew heist resolves the moment the last answer locks, or when the GO ends. The result card lists every seat's cut, fine and jail time. There is no result DM.",
         "If the lobby closes without its required roles, or the planner or the Boss cancels it (!heist cancel), every stake is refunded and the family waits 30 minutes before the next crew heist. If the bot restarts during a GO before every seat has answered, the run is void: every stake is refunded and nothing else happens (no heat, fine, jail, XP or vault cut), and the void run doesn't count towards anyone's seat limit or the family's daily cap.",
       ],
@@ -486,7 +509,7 @@ const crimeFamilies: ModuleDoc = {
         title: "Seat gates, checked in this order",
         columns: ["#", "Gate"],
         rows: [
-          ["1", "In this family for 72 hours or more (no Associates), and acting in the lobby's server"],
+          ["1", "In this family for 72 hours or more (no Associates)"],
           ["2", "Not jailed, not banned"],
           ["3", "Heat below the tier's ceiling"],
           ["4", "Lifetime shifts, Fortuna profile age and Discord account age for the tier"],
@@ -564,6 +587,7 @@ const crimeFamilies: ModuleDoc = {
           ["Cancelled or expired lobby", "30 minutes"],
           ["Lobby / GO / leak point", "10 minutes / 120 seconds / the last 30 seconds of the GO"],
           ["Lobby call DMs", "3 per player per 24 hours; none for 2 hours after a cancel"],
+          ["Intel DMs", "1 per seat per crew heist (only when a crewmate shares)"],
           ["Solo crime cooldown", "Not touched. Heat is the budget the two share."],
         ],
       },
@@ -592,7 +616,7 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "Expected value: a strong crew",
       body: [
-        "The same assumptions with answers right 95% of the time, which is what a crew that calls its intel clearly in the channel gets.",
+        "The same assumptions with answers right 95% of the time, which is what a crew that shares every intel line (Share or chat) gets.",
       ],
       table: {
         title: "Per-step pass rate 95%",
@@ -626,7 +650,8 @@ const crimeFamilies: ModuleDoc = {
       heading: "Getting better at crew heists",
       body: [
         "Open your brief early, well before the last 30 seconds. A brief opened late makes your seat dark: you can't answer, it counts as a miss, and your partner reads your intel as a leak instead of hearing it from you.",
-        "Say your intel to the right person. Your brief names who needs it (the seat before you in the ring), and the answer you need is with someone else. Call it in the channel with their name, read your own answer back, and only then lock. A wrong lock can't be undone.",
+        "Press Share the moment your brief opens: it reaches exactly the seat that needs it, wherever they are. Then wait for your own intel (Refresh) before you lock; a blind lock is right 1 time in 4. A wrong lock can't be undone.",
+        "A seat that never shares costs its partner a 75% miss chance: in a crew of strangers, Share is the whole game.",
         "Keep your heat below the tier's ceiling before the lobby opens. Heat is checked when you join and again at Start, so a solo crime in the lobby's 10 minutes can push you over and get you pinched. The highest heat in the crew also raises the patrol chance for everyone.",
         "Bring the best item for your role. The crew edge is the average of every seat's best item, and at Tier 4 the best gear lowers the patrol chance by about 1.3 to 1.4 points on every run compared with the weakest (for example 21.7% instead of 23.0% for a 6-seat crew at heat 0). The top items are Corporate Blessing (Mastermind), Camouflage Kit (Lookout), Cheat Sheet (Safecracker), Arctic Wolf Spirit Charm (Driver), and Sniper Rifle or Eclipse Mask (Muscle, Hacker).",
         "An AFK seat costs the crew one miss, not the job: its partner gets the leak, and the seat itself is paid nothing. In a 3- or 4-seat crew one more miss on top of it is a Bust, so a seat you aren't sure will turn up is a real risk.",
@@ -713,10 +738,10 @@ const crimeFamilies: ModuleDoc = {
     {
       heading: "The Turf War",
       body: [
-        "The war runs for 60 minutes from its start time. The attacker is the top bidder; the defender is the family that owns the racket, or the Street. Fifteen minutes before it starts, every member of both families who can fight gets a \"Turf wars\" DM with a link to their home channel. When it starts, a war board posts in each family's home channel and refreshes about once a minute.",
-        "Who can fight: members of the two families, acting in their family's home server, who have been in the family 72 hours or more (no Associates), have 20 or more lifetime shifts, a Fortuna profile 14 days and a Discord account 90 days or older, aren't jailed or banned, and have heat below 100. !turf war shows your own war card with the buttons, in the home server only.",
+        "The war runs for 60 minutes from its start time. The attacker is the top bidder; the defender is the family that owns the racket, or the Street. Fifteen minutes before it starts, every member of both families who can fight gets a \"Turf wars\" DM with a link to their home channel and the Scout and three Hit buttons, so the DM works as their war card. When it starts, a war board posts in each family's home channel and refreshes about once a minute.",
+        "Who can fight: members of the two families, from any server or the bot's DMs, who have been in the family 72 hours or more (no Associates), have 20 or more lifetime shifts, a Fortuna profile 14 days and a Discord account 90 days or older, aren't jailed or banned, and have heat below 100. !turf war shows your war card with the buttons from any server.",
         "The turf is three blocks: Docks, Main Street and Back Alleys. Each block has four approaches, and one of them is its weak point. The weak point changes every 5 minutes (12 slots in a war) and is secret: no button, emoji or board ever gives it away.",
-        "Scout is free once per member per 5-minute slot. It shows you the current weak point of one random block, valid until that slot ends, and only you see it. Call it in the home channel so the crew can use it.",
+        "Scout is free once per member per 5-minute slot. It shows you the current weak point of one random block, valid until that slot ends, and only you see it. Call it where your crew talks so they can use it.",
         "Hit costs 25,000 from your wallet, burned. Press Hit on a block and you get 20 seconds to pick one of its four approaches (or until the war ends, if sooner). The call is judged against the weak point of the slot you pressed Hit in, so a hit armed just before a slot turns still counts. The right approach scores +10 to that block for the attacker or +12 for the defender (home advantage). A wrong pick or a timeout scores 0, and the 25,000 is gone either way. Each member gets at most 6 hits a war, 600 seconds apart.",
         "The defender starts every block at the racket's baseline: 30 Corner, 50 District, 80 Crown. The Street never hits; it only has the baseline. In the last 10 minutes the board goes dark: block scores show as ??, and only each side's hit count is shown.",
         "Each block goes to the higher score, and a tie goes to the defender. Win 2 of the 3 blocks to win the war. If the attacker wins, the racket is theirs; if not, nothing changes hands. No money moves between families either way.",
@@ -786,7 +811,8 @@ const crimeFamilies: ModuleDoc = {
       heading: "Getting better at turf wars",
       body: [
         "Have everyone scout every slot. Scout is free but shows only one random block per member per slot, and two scouts can land on the same block, so a rota can't assign blocks. With three scouts the crew sees all three weak points about 22% of the time, with four about 44%, and with six about 74%; most slots you know at least two of the three. Scout at the start of each 5-minute slot and post what you got.",
-        "Call weak points in the home channel the moment you see them, with the block and the time it runs out (\"Docks: Pier 4 till :25\"). A hit called from a scout scores 10; a guess scores 2.5 on average and still costs 25,000.",
+        "Call weak points where your crew talks (the home channel, or any shared chat) the moment you see them, with the block and the time it runs out (\"Docks: Pier 4 till :25\"). A hit called from a scout scores 10; a guess scores 2.5 on average and still costs 25,000.",
+        "Scout and Hit work from the war-soon DM, so members outside the home server can fight; there is no bot relay for scout calls.",
         "Save hits for the blackout. Your 6 hits are 600 seconds apart, so a member who hits at the start can still land the sixth at the 50-minute mark, right as the scores go dark. The other side can't see where you're pushing, and a defender who thought a block was safe can't react.",
         "Bid late, but before the close. Bidding shuts 1 hour before the war and a raise must beat the top bid by 10%, so an early bid only sets the price for everyone else. Have the Boss or Underboss ready in the last few hours, with the earnings in the vault (bids can't touch the treasury).",
         "A cycle pays nothing if, when it falls due, fewer than 3 members are racket-eligible (72 h in the family, 20 shifts, and 2 started crew heist seats or 3 correct war hits in the last 7 days), and three such cycles lose the racket without a fight.",
