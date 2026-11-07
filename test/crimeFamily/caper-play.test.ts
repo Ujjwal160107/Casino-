@@ -1,6 +1,6 @@
 // test/crimeFamily/caper-play.test.ts
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { openBrief, lockChoice } from "../../src/services/crimeFamily/caperPlayService";
+import { openBrief, lockChoice, shareIntel } from "../../src/services/crimeFamily/caperPlayService";
 import { testPrisma, resetFamilies, ensureUniqueIndexes } from "../helpers";
 import { buildCaperCardView } from "../../src/services/crimeFamily/caperQueries";
 import { seedRunning, seedLobby } from "./caperFixtures";
@@ -67,5 +67,41 @@ describe("the relayed mark (amendment 5.3, G8)", () => {
     const rows = await testPrisma.caperCrew.findMany({ where: { caperId: caper.id } });
     expect(Object.fromEntries(rows.map((r) => [r.role, r.relayed]))).toEqual({ MASTERMIND: true, LOOKOUT: false, SAFECRACKER: false });
     expect((await buildCaperCardView(caper.id, now))!.seats.find((s) => s.role === "MASTERMIND")!.relayed).toBe(true);
+  });
+});
+
+describe("share (amendment 5.3)", () => {
+  it("records one share and returns the nudge for the seat it answers", async () => {
+    const { caper, ids } = await seedRunning({ tier: 1, roles: [...R], picks: { MASTERMIND: "none" } });
+    const now = new Date();
+    const { brief, nudge } = await shareIntel(caper.id, ids.LOOKOUT, now);           // the Lookout holds the Mastermind's answer
+    expect(brief).toMatchObject({ shared: true, canShare: false });
+    expect(nudge).toEqual({ userId: ids.MASTERMIND, tierName: "Pawnshop Back Room", goEndsAt: caper.goEndsAt });
+    expect(await testPrisma.caperCrew.findFirst({ where: { caperId: caper.id, userId: ids.LOOKOUT } })).toMatchObject({ sharedIntel: true, sharedAt: now });
+    expect((await openBrief(caper.id, ids.MASTERMIND, now)).relayed).not.toBeNull();
+  });
+
+  it("refuses from the wrong state and writes nothing (Review Focus 3)", async () => {
+    const { caper, ids } = await seedRunning({ tier: 1, roles: [...R], dark: ["SAFECRACKER"] });
+    const now = new Date();
+    const leakAt = new Date(+caper.goEndsAt - 30_000);
+    await expect(shareIntel(caper.id, ids.SAFECRACKER, now)).rejects.toThrow("Open your brief first.");
+    await expect(shareIntel(caper.id, ids.SAFECRACKER, leakAt)).rejects.toThrow("You went dark: this seat counts as a miss.");
+    await expect(shareIntel(caper.id, "not-in-crew", now)).rejects.toThrow("You are not in this crew heist.");
+    await expect(shareIntel(caper.id, ids.LOOKOUT, caper.goEndsAt)).rejects.toThrow("Too late.");
+    await shareIntel(caper.id, ids.LOOKOUT, now);
+    await expect(shareIntel(caper.id, ids.LOOKOUT, now)).rejects.toThrow("Already shared.");
+    expect(await testPrisma.caperCrew.count({ where: { caperId: caper.id, sharedIntel: true } })).toBe(1);
+    await testPrisma.caper.update({ where: { id: caper.id }, data: { status: "SETTLING" } });
+    await expect(shareIntel(caper.id, ids.MASTERMIND, now)).rejects.toThrow("Too late.");
+  });
+
+  it("skips the nudge when the recipient already locked or went dark (G7), but still records the share", async () => {
+    const locked = await seedRunning({ tier: 1, roles: [...R] });                     // every seat locked
+    expect((await shareIntel(locked.caper.id, locked.ids.LOOKOUT, new Date())).nudge).toBeNull();
+    const dark = await seedRunning({ tier: 1, roles: [...R], picks: { MASTERMIND: "none" }, dark: ["MASTERMIND"] });
+    const leakAt = new Date(+dark.caper.goEndsAt - 30_000);
+    expect((await shareIntel(dark.caper.id, dark.ids.LOOKOUT, leakAt)).nudge).toBeNull();
+    expect(await testPrisma.caperCrew.count({ where: { sharedIntel: true, caperId: { in: [locked.caper.id, dark.caper.id] } } })).toBe(2);
   });
 });

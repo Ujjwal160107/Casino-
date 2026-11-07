@@ -1,9 +1,10 @@
 // The GO (spec 8.4 step 6): open a seat's brief and lock one choice. A lock
 // writes only its own crew row; the settle draw writes every crew row, so a
-// lock racing the draw conflicts and retries into "Too late." (CFD-2).
+// lock racing the draw conflicts and retries into "Too late." (CFD-2). A
+// share writes only its own crew row, like a lock (A18).
 import type { Caper, CaperCrew } from "@prisma/client";
 import prisma from "../../utils/prisma";
-import type { CaperRoleKey } from "../../data/crimeFamilyCatalog";
+import { caperTier, type CaperRoleKey } from "../../data/crimeFamilyCatalog";
 import { getCaper, listCrew } from "./caperQueries";
 import { briefFor, isDark, leakAtOf, parseAnswers, ringNeighbours, type CaperAnswers } from "./intelRing";
 import { FamilyError, runFamilyTx } from "./tx";
@@ -11,6 +12,7 @@ import type { BriefView } from "./views";
 
 const TOO_LATE = "Too late.";
 const NOT_IN_CAPER = "You are not in this crew heist.";
+const WENT_DARK = "You went dark: this seat counts as a miss.";
 const OPTIONS = 4;
 
 /** The stored answers of a live GO; a corrupt row (edge 63) is played no further, resolve voids it. */
@@ -52,7 +54,7 @@ export async function lockChoice(caperId: string, uid: string, index: number, no
     if (!row) throw new FamilyError(NOT_IN_CAPER);
     const leakAt = leakAtOf(caper.goEndsAt);
     const leaking = now >= leakAt;
-    if (leaking && isDark(row, leakAt)) throw new FamilyError("You went dark: this seat counts as a miss.");
+    if (leaking && isDark(row, leakAt)) throw new FamilyError(WENT_DARK);
     const { next } = ringNeighbours(answers.order, row.role as CaperRoleKey);
     const holder = rows.find((r) => r.role === next);
     const { count } = await tx.caperCrew.updateMany({
@@ -64,4 +66,35 @@ export async function lockChoice(caperId: string, uid: string, index: number, no
   });
   const allLocked = (await prisma.caperCrew.count({ where: { caperId, choice: -1 } })) === 0;
   return { brief: briefOf(caper, answers, await listCrew(caperId), uid, now), allLocked };
+}
+
+/** The intel-arrived DM for the seat a share answers; the route sends it. */
+export type IntelNudge = { userId: string; tierName: string; goEndsAt: Date };
+
+/**
+ * Shares the intel the presser's seat holds with the seat it answers, once per
+ * seat during GO (A18). No nudge when that seat already locked or went dark (G7).
+ */
+export async function shareIntel(caperId: string, uid: string, now: Date = new Date()): Promise<{ brief: BriefView; nudge: IntelNudge | null }> {
+  const { caper, answers, nudge } = await runFamilyTx(async (tx) => {
+    const caper = await tx.caper.findFirst({ where: { id: caperId, status: "RUNNING", goEndsAt: { gt: now } } });
+    if (!caper) throw new FamilyError(TOO_LATE);
+    const answers = answersOf(caper);
+    const rows = await tx.caperCrew.findMany({ where: { caperId } });
+    const row = rows.find((r) => r.userId === uid);
+    if (!row) throw new FamilyError(NOT_IN_CAPER);
+    const leakAt = leakAtOf(caper.goEndsAt);
+    const leaking = now >= leakAt;
+    if (leaking && isDark(row, leakAt)) throw new FamilyError(WENT_DARK);
+    if (!row.briefOpened) throw new FamilyError("Open your brief first.");
+    const { count } = await tx.caperCrew.updateMany({ where: { caperId, userId: uid, sharedIntel: false }, data: { sharedIntel: true, sharedAt: now } });
+    if (count !== 1) throw new FamilyError("Already shared.");
+    const { prev } = ringNeighbours(answers.order, row.role as CaperRoleKey);
+    const recipient = rows.find((r) => r.role === prev);
+    const nudge: IntelNudge | null = recipient && recipient.choice === -1 && !(leaking && isDark(recipient, leakAt))
+      ? { userId: recipient.userId, tierName: caperTier(caper.tier).name, goEndsAt: caper.goEndsAt }
+      : null;
+    return { caper, answers, nudge };
+  });
+  return { brief: briefOf(caper, answers, await listCrew(caperId), uid, now), nudge };
 }
