@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element -- tiny pixel-art emoji and card art at fixed sizes; next/image adds nothing here. */
 import { Fragment, type ReactNode } from "react";
 import demo from "@/content/demo-screens.json";
 
@@ -60,8 +61,11 @@ function inline(text: string, key = "i"): ReactNode[] {
   let last = 0;
   let m: RegExpExecArray | null;
   let i = 0;
-  TOKEN.lastIndex = 0;
-  while ((m = TOKEN.exec(text))) {
+  // A fresh regex per call: inline() recurses into bold/italics, and a shared
+  // global regex would have its lastIndex reset by the inner call, re-matching
+  // the same token forever.
+  const re = new RegExp(TOKEN.source, "g");
+  while ((m = re.exec(text))) {
     if (m.index > last) out.push(text.slice(last, m.index));
     const k = `${key}-${i++}`;
     if (m[1]) out.push(<code key={k} className="rounded border border-[#30333b] bg-[#1a1c21] px-1 font-mono text-[12px]">{m[1].slice(1, -1)}</code>);
@@ -74,7 +78,7 @@ function inline(text: string, key = "i"): ReactNode[] {
     else if (m[7]) out.push(<span key={k} className="text-[#00a8fc]">{m[7]}</span>);
     else if (m[9]) out.push(<b key={k} className="font-bold text-[#f2f3f5]">{inline(m[9], k)}</b>);
     else if (m[10]) out.push(<i key={k}>{inline(m[10], k)}</i>);
-    last = TOKEN.lastIndex;
+    last = re.lastIndex;
   }
   if (last < text.length) out.push(text.slice(last));
   return out;

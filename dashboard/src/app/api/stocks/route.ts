@@ -6,6 +6,11 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 const POINTS = 48; // 24 hours at one point per 30-minute tick
+const READ_TIMEOUT_MS = 8000; // fail fast instead of hanging on server selection
+
+function withTimeout<T>(p: Promise<T>): Promise<T> {
+  return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error("market read timed out")), READ_TIMEOUT_MS))]);
+}
 
 export type StockSeries = {
   symbol: string;
@@ -19,12 +24,12 @@ export type StockSeries = {
 
 export async function GET() {
   try {
-    const stocks = await prisma.stock.findMany({
+    const stocks = await withTimeout(prisma.stock.findMany({
       where: { status: { not: "DELISTED" } },
       select: { symbol: true, name: true, currentPrice: true, previousPrice: true, status: true, lastUpdate: true },
       orderBy: { symbol: "asc" },
-    });
-    const series: StockSeries[] = await Promise.all(
+    }));
+    const series: StockSeries[] = await withTimeout(Promise.all(
       stocks.map(async (s) => {
         const pts = await prisma.stockPricePoint.findMany({
           where: { symbol: s.symbol },
@@ -42,7 +47,7 @@ export async function GET() {
           points: pts.reverse().map((p) => ({ at: p.at.toISOString(), price: p.price })),
         };
       }),
-    );
+    ));
     return NextResponse.json({ stocks: series }, { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } });
   } catch (err) {
     console.error("[api/stocks] market read failed:", err);
