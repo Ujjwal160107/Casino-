@@ -4,8 +4,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { Footer } from "@/components/Footer";
-import { DocsSidebar } from "@/components/docs/DocsSidebar";
-import { ModuleRenderer } from "@/components/docs/ModuleRenderer";
+import { DocsShell } from "@/components/docs/DocsShell";
+import { ModuleRenderer, moduleToc } from "@/components/docs/ModuleRenderer";
 import { MODULE_DOCS, getModuleDoc } from "@/content/modules";
 
 export function generateStaticParams() {
@@ -37,12 +37,9 @@ export default async function ModulePage({
   return (
     <main className="min-h-screen bg-bg">
       <LandingNavbar user={session?.user} />
-      <div className="mx-auto flex max-w-6xl gap-12 px-6 pb-24 pt-12">
-        <aside className="sticky top-24 hidden w-56 shrink-0 self-start lg:block">
-          <DocsSidebar modules={MODULE_DOCS} />
-        </aside>
+      <DocsShell current={doc.slug} toc={moduleToc(doc)}>
         <ModuleRenderer doc={doc} />
-      </div>
+      </DocsShell>
       <Footer />
     </main>
   );
