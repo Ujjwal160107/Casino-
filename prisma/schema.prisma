@@ -904,6 +904,9 @@ model CaperCrew {
   briefOpenedAt DateTime @default(now())      // rewritten at first open; read only with briefOpened:true (8.3 darkness)
   choice      Int      @default(-1)           // sentinel, CAS target
   leaked      Boolean  @default(false)        // display only: this seat locked after seeing leaked intel
+  sharedIntel Boolean  @default(false)        // CAS sentinel: this seat shared the intel it holds (A18)
+  sharedAt    DateTime @default(now())        // rewritten at the share; read only with sharedIntel:true
+  relayed     Boolean  @default(false)        // display only: this seat locked after its holder shared
   refunded    Boolean  @default(false)        // CAS on cancel/VOID refunds (rows are kept)
   passed      Boolean  @default(false)
   cut         Float    @default(0)

@@ -99,7 +99,7 @@ describe("S25 personal cards and the any-server hints (amendment 5.2, 5.4)", () 
     const lobby = buildCaperCard({
       caperId: "65f0000000000000000000aa", familyLabel: "[F1] Family", tier: 1, status: "LOBBY", outcome: "", plannerId: "1", guildId: "g1",
       channelId: "c1", messageId: "m1", lobbyClosesAt: soon, goEndsAt: soon, leakAt: soon,
-      seats: [{ role: "MASTERMIND", optional: false, userId: "1", locked: false, passed: false, leaked: false, dark: false, holderId: null, cut: 0, fine: 0, jailed: false }],
+      seats: [{ role: "MASTERMIND", optional: false, userId: "1", locked: false, passed: false, leaked: false, relayed: false, dark: false, holderId: null, cut: 0, fine: 0, jailed: false }],
       openRoles: ["LOOKOUT"], lockedCount: 0, crewCount: 1, roll: 0, patrolChance: 0, pool: 0, note: null,
     }, { art: false });
     expect(visibleText(lobby)).toContain("in any server");

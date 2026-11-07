@@ -32,7 +32,7 @@ const OUTSIDER = "98765432109876543399";
 function seats(filled: number, ended: boolean): CaperSeatView[] {
   return T4_ROLES.map((role, i) => ({
     role, optional: role === "HACKER", userId: i < filled ? CREW[i] : null, locked: ended || i % 2 === 0,
-    passed: i % 2 === 0, leaked: ended, dark: ended && i % 2 === 1, holderId: ended ? CREW[(i + 1) % CREW.length] : null,
+    passed: i % 2 === 0, leaked: ended, relayed: ended && i % 2 === 0, dark: ended && i % 2 === 1, holderId: ended ? CREW[(i + 1) % CREW.length] : null,
     cut: ended ? 0 : BIG, fine: ended ? BIG : 0, jailed: ended,
   }));
 }
@@ -61,7 +61,8 @@ function briefView(o: Partial<BriefView> = {}): BriefView {
   return {
     caperId: CAPER_ID, ownerId: CREW[3], role: "DRIVER", tell: { userId: CREW[2], label: "Old Rail Road" },
     call: { question: caperRole("DRIVER").call, options, fromUserId: CREW[4] },
-    leaked: options[1], dark: false, lockedIndex: null, goEndsAt: SOON(), leakAt: SOON(), ...o,
+    leaked: options[1], dark: false, lockedIndex: null, goEndsAt: SOON(), leakAt: SOON(),
+    relayed: null, canShare: true, shared: false, ...o,
   };
 }
 

@@ -94,7 +94,7 @@ export async function seedLobby(o: {
  */
 export async function seedRunning(o: {
   tier?: Tier; roles: CaperRoleKey[]; picks?: Partial<Record<CaperRoleKey, "right" | "wrong" | "none">>; dark?: CaperRoleKey[];
-  startedAt?: Date; goEndsAt?: Date; edge?: number; heatSnapshot?: number; status?: "RUNNING" | "SETTLING"; wallet?: number;
+  shared?: CaperRoleKey[]; startedAt?: Date; goEndsAt?: Date; edge?: number; heatSnapshot?: number; status?: "RUNNING" | "SETTLING"; wallet?: number;
 }): Promise<{ caper: Caper; family: Family; bossId: string; ids: Ids; answers: CaperAnswers }> {
   const tier = caperTier(o.tier ?? 1);
   const startedAt = o.startedAt ?? new Date(Date.now() - 60_000);
@@ -108,6 +108,7 @@ export async function seedRunning(o: {
     },
   });
   const dark = new Set(o.dark ?? []);
+  const shared = new Set(o.shared ?? []);
   for (const role of o.roles) {
     const correct = answers.seats[role]!.correct;
     const pick = o.picks?.[role] ?? "right";
@@ -116,6 +117,7 @@ export async function seedRunning(o: {
       data: {
         caperId: caper.id, familyId: family.id, userId: ids[role], role, stake: tier.stake, started: true, startedAt,
         briefOpened: !dark.has(role), briefOpenedAt: new Date(startedAt.getTime() + 1_000), choice,
+        ...(shared.has(role) ? { sharedIntel: true, sharedAt: new Date(startedAt.getTime() + 2_000) } : {}),
       },
     });
   }

@@ -124,6 +124,12 @@ export interface BriefView {
   lockedIndex: number | null;
   goEndsAt: Date;
   leakAt: Date;
+  /** From the holder's share: this seat's own correct label (A18). */
+  relayed: string | null;
+  /** This seat may press Share: brief opened, not dark, not shared yet, before goEndsAt. */
+  canShare: boolean;
+  /** This seat already shared the intel it holds. */
+  shared: boolean;
 }
 
 /** One seat of a caper card, in tierRoles order; an open seat has userId null. */
@@ -134,6 +140,8 @@ export interface CaperSeatView {
   locked: boolean;
   passed: boolean;
   leaked: boolean;
+  /** Display only, written at lock: this seat locked after its holder shared. */
+  relayed: boolean;
   /** Shown only once the caper has left RUNNING. */
   dark: boolean;
   /** The seat's ring successor: the holder of this seat's intel. */

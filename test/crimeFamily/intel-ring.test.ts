@@ -9,7 +9,7 @@ const ids = Object.fromEntries(T2.map((r, i) => [r, `u${i}`])) as Record<CaperRo
 const goEndsAt = new Date("2026-11-04T19:08:00Z");
 const leakAt = leakAtOf(goEndsAt);
 const opened = new Date("2026-11-04T19:06:30Z");
-const seats = (dark: CaperRoleKey[] = []) => T2.map((role) => ({ role, userId: ids[role], briefOpened: !dark.includes(role), briefOpenedAt: opened, choice: -1 }));
+const seats = (dark: CaperRoleKey[] = []) => T2.map((role) => ({ role, userId: ids[role], briefOpened: !dark.includes(role), briefOpenedAt: opened, choice: -1, sharedIntel: false }));
 const correctLabel = (a: ReturnType<typeof buildAnswers>, r: CaperRoleKey) => a.seats[r]!.options[a.seats[r]!.correct];
 
 describe("intel ring (8.3)", () => {

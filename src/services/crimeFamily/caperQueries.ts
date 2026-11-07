@@ -84,6 +84,7 @@ export async function buildCaperCardView(caperId: string, _now: Date, note: stri
     return {
       role, optional: role === tier.optional, userId: row?.userId ?? null,
       locked: !!row && row.choice !== -1, passed: row?.passed ?? false, leaked: row?.leaked ?? false,
+      relayed: row?.relayed ?? false,
       dark: !!row && ended && row.started && isDark(row, leakAt), holderId: holderOf(role),
       cut: row?.cut ?? 0, fine: row?.fine ?? 0, jailed: row?.jailed ?? false,
     };

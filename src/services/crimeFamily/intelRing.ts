@@ -1,6 +1,7 @@
 // Pure intel ring rules (spec 8.3): the ring order over filled seats, the
 // server-randomised answers, darkness, the leak and one seat's brief. Seat i's
-// correct answer is shown only to seat (i + 1) mod n.
+// correct answer is shown only to seat (i + 1) mod n. A seat's holder may
+// share; the share shows only to the seat it answers (A18).
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { CAPER_ROLES, caperRole, type CaperRoleKey } from "../../data/crimeFamilyCatalog";
 import type { Rng } from "./random";
@@ -69,9 +70,9 @@ export function isDark(seat: { briefOpened: boolean; briefOpenedAt: Date }, leak
   return !seat.briefOpened || seat.briefOpenedAt.getTime() >= leakAt.getTime();
 }
 
-type BriefSeat = { role: CaperRoleKey; userId: string; briefOpened: boolean; briefOpenedAt: Date; choice: number };
+type BriefSeat = { role: CaperRoleKey; userId: string; briefOpened: boolean; briefOpenedAt: Date; choice: number; sharedIntel: boolean };
 
-/** One seat's brief: the intel it tells its prev, its own call (answered by next), the leak and darkness. */
+/** One seat's brief: the intel it tells its prev, its own call (answered by next), the leak, darkness and the relay. */
 export function briefFor(i: { caperId: string; answers: CaperAnswers; role: CaperRoleKey; seats: readonly BriefSeat[]; goEndsAt: Date; now: Date }): BriefView {
   const seatOf = (role: CaperRoleKey): BriefSeat => {
     const seat = i.seats.find((s) => s.role === role);
@@ -87,6 +88,7 @@ export function briefFor(i: { caperId: string; answers: CaperAnswers; role: Cape
 
   const { prev, next } = ringNeighbours(i.answers.order, i.role);
   const viewer = seatOf(i.role);
+  const holder = seatOf(next);
   const leakAt = leakAtOf(i.goEndsAt);
   const leaking = i.now.getTime() >= leakAt.getTime();
 
@@ -95,11 +97,15 @@ export function briefFor(i: { caperId: string; answers: CaperAnswers; role: Cape
     ownerId: viewer.userId,
     role: i.role,
     tell: { userId: seatOf(prev).userId, label: correctLabel(prev) },
-    call: { question: caperRole(i.role).call, options: [...answerOf(i.role).options], fromUserId: seatOf(next).userId },
-    leaked: leaking && isDark(seatOf(next), leakAt) ? correctLabel(i.role) : null,
+    call: { question: caperRole(i.role).call, options: [...answerOf(i.role).options], fromUserId: holder.userId },
+    leaked: leaking && isDark(holder, leakAt) ? correctLabel(i.role) : null,
     dark: leaking && isDark(viewer, leakAt),
     lockedIndex: viewer.choice === -1 ? null : viewer.choice,
     goEndsAt: i.goEndsAt,
     leakAt,
+    relayed: holder.sharedIntel ? correctLabel(i.role) : null,
+    // A seat opened before leakAt is never dark, so this is "not dark at the press" (amendment 5.3).
+    canShare: viewer.briefOpened && !isDark(viewer, leakAt) && !viewer.sharedIntel && i.now.getTime() < i.goEndsAt.getTime(),
+    shared: viewer.sharedIntel,
   };
 }

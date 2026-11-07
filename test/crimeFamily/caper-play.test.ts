@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { openBrief, lockChoice } from "../../src/services/crimeFamily/caperPlayService";
 import { testPrisma, resetFamilies, ensureUniqueIndexes } from "../helpers";
+import { buildCaperCardView } from "../../src/services/crimeFamily/caperQueries";
 import { seedRunning, seedLobby } from "./caperFixtures";
 
 const R = ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] as const;
@@ -54,5 +55,17 @@ describe("brief and lock (8.4 step 6)", () => {
     await expect(lockChoice(caper.id, ids.LOOKOUT, 0, leakAt)).rejects.toThrow("You went dark: this seat counts as a miss.");
     await lockChoice(caper.id, ids.MASTERMIND, 0, leakAt);                           // Mastermind's holder (next) is the Lookout
     expect(await row(caper.id, ids.MASTERMIND)).toMatchObject({ choice: 0, leaked: true });
+  });
+});
+
+describe("the relayed mark (amendment 5.3, G8)", () => {
+  it("a lock after the holder shared is marked relayed; the card view carries it; a lock without a share is not (G8)", async () => {
+    const { caper, ids } = await seedRunning({ tier: 1, roles: [...R], picks: { MASTERMIND: "none", LOOKOUT: "none" }, shared: ["LOOKOUT"] });
+    const now = new Date();
+    await lockChoice(caper.id, ids.MASTERMIND, 0, now);                      // the Mastermind's holder is the Lookout
+    await lockChoice(caper.id, ids.LOOKOUT, 0, now);                         // the Lookout's holder (Safecracker) did not share
+    const rows = await testPrisma.caperCrew.findMany({ where: { caperId: caper.id } });
+    expect(Object.fromEntries(rows.map((r) => [r.role, r.relayed]))).toEqual({ MASTERMIND: true, LOOKOUT: false, SAFECRACKER: false });
+    expect((await buildCaperCardView(caper.id, now))!.seats.find((s) => s.role === "MASTERMIND")!.relayed).toBe(true);
   });
 });

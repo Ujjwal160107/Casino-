@@ -25,7 +25,7 @@ function briefOf(caper: Caper, answers: CaperAnswers, rows: readonly CaperCrew[]
   if (!viewer) throw new FamilyError(NOT_IN_CAPER);
   return briefFor({
     caperId: caper.id, answers, role: viewer.role as CaperRoleKey, goEndsAt: caper.goEndsAt, now,
-    seats: rows.map((r) => ({ role: r.role as CaperRoleKey, userId: r.userId, briefOpened: r.briefOpened, briefOpenedAt: r.briefOpenedAt, choice: r.choice })),
+    seats: rows.map((r) => ({ role: r.role as CaperRoleKey, userId: r.userId, briefOpened: r.briefOpened, briefOpenedAt: r.briefOpenedAt, choice: r.choice, sharedIntel: r.sharedIntel })),
   });
 }
 
@@ -57,7 +57,7 @@ export async function lockChoice(caperId: string, uid: string, index: number, no
     const holder = rows.find((r) => r.role === next);
     const { count } = await tx.caperCrew.updateMany({
       where: { caperId, userId: uid, choice: -1 },
-      data: { choice: index, leaked: leaking && holder !== undefined && isDark(holder, leakAt) },
+      data: { choice: index, leaked: leaking && holder !== undefined && isDark(holder, leakAt), relayed: holder?.sharedIntel === true },
     });
     if (count === 0) throw new FamilyError("Locked in already.");
     return { caper, answers };
