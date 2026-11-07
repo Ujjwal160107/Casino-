@@ -69,7 +69,7 @@ function cityRow(ownerId: string, v: TurfMapView): ActionRowBuilder<ButtonBuilde
   );
 }
 
-/** S16: always into a message that does not hold the map, so the banner is sent and old attachments cleared. */
+/** S16: always replaces the message's attachments (freshAttachments), so the banner is sent again whether or not that message already held the map. */
 export function buildTurfMap(ownerId: string, v: TurfMapView): CfPayload {
   const banner = bannerGallery("turf_map");
   const numbered = v.rackets.map((line, i) => ({ line, n: i + 1 }));
