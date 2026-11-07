@@ -66,6 +66,7 @@ describe("!caper", () => {
     const m = await run(fc, ids.LOOKOUT, ["join", "lookout"], "c2");
     expect(m.said()).toContain(`https://discord.com/channels/${G}/${CH}/${mid}`);
     expect(m.said()).toContain(`cpr:brief:${c.id}`);
+    expect(m.said()).toContain(`<@${ids.LOOKOUT}> seated as **Lookout**`);
   }));
 
   it("a filling !caper join auto-starts even when its reply throws (Review Focus 5)", () => open(async () => {

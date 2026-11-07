@@ -6,8 +6,11 @@ import { fakeRest } from "./fakeClient";
 // crime family router and routes touch. Each ack updates deferred / replied /
 // ephemeral the way discord.js does, and logs into `order`.
 
-/** `client` replaces the fake's own client (caper routes pass `fakeCaperClient(...).client`); `guildId: null` is a DM press. */
-export type FakeOpts = { userId: string; guildId?: string | null; ephemeralSource?: boolean; channelId?: string; client?: unknown };
+/**
+ * `client` replaces the fake's own client (caper routes pass `fakeCaperClient(...).client`); `guildId: null` is a DM press;
+ * `messageId` is the pressed message's id (pass the stored card id for a press on the shared card).
+ */
+export type FakeOpts = { userId: string; guildId?: string | null; messageId?: string; ephemeralSource?: boolean; channelId?: string; client?: unknown };
 type Kind = "button" | "select" | "modal";
 
 const isEphemeral = (options: unknown) =>
@@ -34,7 +37,7 @@ function fakeInteraction(customId: string, kind: Kind, opts: FakeOpts) {
     order,
     client: opts.client ?? client,
     channel,
-    message: { id: "m-source", flags: { has: (flag: number) => !!opts.ephemeralSource && flag === MessageFlags.Ephemeral } },
+    message: { id: opts.messageId ?? "m-source", flags: { has: (flag: number) => !!opts.ephemeralSource && flag === MessageFlags.Ephemeral } },
     isButton: () => kind === "button",
     isStringSelectMenu: () => kind === "select",
     isModalSubmit: () => kind === "modal",

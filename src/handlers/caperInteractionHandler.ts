@@ -6,9 +6,9 @@
 import type { CaperRoleKey } from "../data/crimeFamilyCatalog";
 import { joinCaper } from "../services/crimeFamily/caperLobbyService";
 import { lockChoice, openBrief } from "../services/crimeFamily/caperPlayService";
-import { buildPlannerView } from "../services/crimeFamily/caperQueries";
+import { buildCaperCardView, buildPlannerView } from "../services/crimeFamily/caperQueries";
 import { onSeatsChanged, openLobby, resolveAndAnnounce, runCancel, runLeave, runStart, safely } from "../ui/crimeFamily/caperFlow";
-import { buildBrief, buildCaperPlanner } from "../ui/crimeFamily/caperScreens";
+import { buildBrief, buildCaperPlanner, buildPersonalCaperCard } from "../ui/crimeFamily/caperScreens";
 import { buildNotice, type CfPayload } from "../ui/crimeFamily/kit";
 import { jumpLink } from "../ui/crimeFamily/post";
 import { rejectPress, safeEditReply } from "../utils/interactionHelpers";
@@ -32,10 +32,17 @@ const planRoute: CfRoute = async (i) => {
     : "Lobby opened, but the card could not be posted. Use `!heist` to post it."));
 };
 
+// A join on the shared card leaves the edit to the card writer; any other pressed
+// message (a DM, an S25 lobby card) becomes the presser's S25 card (G3), read after
+// onSeatsChanged so a filling join shows GO. A refused join edits nothing.
 const joinRoute: CfRoute = async (i, [caperId]) => {
   assertCfOpen(i.guildId);
-  const { full } = await joinCaper({ caperId, uid: i.user.id, role: values(i)[0] as CaperRoleKey });
-  await onSeatsChanged(i.client, caperId, full);
+  const joined = await joinCaper({ caperId, uid: i.user.id, role: values(i)[0] as CaperRoleKey });
+  await onSeatsChanged(i.client, caperId, joined.full);
+  const onCard = i.isMessageComponent() && i.message.id === joined.caper.messageId;
+  if (onCard) return;
+  const card = await buildCaperCardView(caperId, new Date());
+  if (card) await show(i, buildPersonalCaperCard(card, i.user.id));
 };
 
 const startRoute: CfRoute = async (i, [caperId]) => {

@@ -1,7 +1,9 @@
 // `!heist` (aliases `!crewheist`, `!caper`, `!capers`, slash `/heist action value`):
 // the crew heist command, internally "caper" (spec 8, 13.1; amendment 9). One
 // table maps each subaction to a handler; the shared card is drawn by the card
-// writer, never built here. Only planning, joining and the no-live-caper view
+// writer, never built here. Every subaction works from any server (amendment
+// 5.2): identity comes from the DB rows, and away from the lobby's server the
+// reply is the member's personal card. Only planning, joining and the no-live-caper view
 // are gated by the guild switch (C3), so a live caper finishes under the kill
 // switch. Jail is enforced by the seat gates, so a jailed member can still open
 // their brief.
@@ -10,12 +12,12 @@ import { CAPER_ROLES, caperRole, type CaperRoleKey } from "../../data/crimeFamil
 import { NOT_OPEN_HERE } from "../../handlers/crewInteractionHandler";
 import { touchActivity } from "../../services/crimeFamily/activity";
 import { joinCaper } from "../../services/crimeFamily/caperLobbyService";
-import { buildPlannerView, getCaper, getLiveCaper, latestResolvedCaper, liveSeatOf } from "../../services/crimeFamily/caperQueries";
+import { buildCaperCardView, buildPlannerView, getCaper, getLiveCaper, latestResolvedCaper, liveSeatOf } from "../../services/crimeFamily/caperQueries";
 import { getMembership, requireMembership } from "../../services/crimeFamily/familyQueries";
 import { FamilyError } from "../../services/crimeFamily/tx";
 import { postCaperCard } from "../../ui/crimeFamily/caperCard";
 import { onSeatsChanged, openLobby, runCancel, runLeave, runStart } from "../../ui/crimeFamily/caperFlow";
-import { buildCaperPlanner, buildCaperSeatCard } from "../../ui/crimeFamily/caperScreens";
+import { buildCaperPlanner, buildPersonalCaperCard } from "../../ui/crimeFamily/caperScreens";
 import { CPR_IDS } from "../../ui/crimeFamily/ids";
 import { buildNotice, buildOpener, type CfPayload } from "../../ui/crimeFamily/kit";
 import { jumpLink } from "../../ui/crimeFamily/post";
@@ -56,17 +58,18 @@ async function repost(ctx: CrewCtx, caperId: string): Promise<void> {
   if (posted === null) throw new FamilyError("I couldn't post the crew heist card in this channel.");
 }
 
-/** C7: the live caper's card moves here; else a recent dead result is reposted; else S11. */
+/** C7: the live caper's card moves here (in its own server; elsewhere the member's S25 card); else a recent dead result is reposted; else S11. */
 async function view(ctx: CrewCtx) {
   const membership = await getMembership(ctx.uid);
   if (!membership) throw new FamilyError(`You are not in a crime family. Start with \`${ctx.prefix}crew\`.`);
   const live = await getLiveCaper(membership.family.id);
   if (live && live.guildId === ctx.guildId) return repost(ctx, live.id);
-  if (live) {
-    const link = live.messageId ? `: ${jumpLink(live.guildId, live.channelId, live.messageId)}` : ".";
-    return notice(ctx, `Your family's crew heist is running in another server${link}`);
-  }
   const now = new Date();
+  if (live) {
+    const card = await buildCaperCardView(live.id, now);
+    if (!card) throw new FamilyError(NO_LOBBY);
+    return show(ctx, buildPersonalCaperCard(card, ctx.uid));
+  }
   const last = await latestResolvedCaper(membership.family.id);
   const deadSince = now.getTime() - CRIME_FAMILY_CONFIG.caperDeadResultRepostSeconds * 1000;
   if (last && last.messageId === "" && last.updatedAt.getTime() >= deadSince) return repost(ctx, last.id);
@@ -91,14 +94,12 @@ async function join(ctx: CrewCtx) {
   const live = await familyLiveCaper(ctx);
   if (live.status !== "LOBBY") throw new FamilyError(NO_LOBBY);
   const { caper, full } = await joinCaper({ caperId: live.id, uid: ctx.uid, role });
-  const jumpUrl = caper.messageId ? jumpLink(caper.guildId, caper.channelId, caper.messageId) : null;
-  // The seat is committed: a failed reply (deleted message, no Send Messages)
-  // must not skip the auto-start or the roster redraw.
-  try {
-    await show(ctx, buildCaperSeatCard({ caperId: caper.id, text: `Seated as ${caperRole(role).name}.`, jumpUrl }));
-  } finally {
-    await onSeatsChanged(ctx.message.client, caper.id, full);
-  }
+  // The auto-start and the roster redraw run before the reply (onSeatsChanged
+  // never throws), so a filling join replies the GO-live card.
+  await onSeatsChanged(ctx.message.client, caper.id, full);
+  const card = await buildCaperCardView(caper.id, new Date());
+  if (!card) return notice(ctx, `Seated as ${caperRole(role).name}.`);
+  return show(ctx, buildPersonalCaperCard(card, ctx.uid));
 }
 
 async function leave(ctx: CrewCtx) {

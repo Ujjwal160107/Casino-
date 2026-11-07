@@ -1,9 +1,10 @@
-// The caper screens (spec 13.3 S11–S15, the S25 caper card, the S28 GO call
-// and "Lobby moved", and C14's cancelled card): pure builders from plain view
-// objects to CfPayloads. No I/O. `art: true` means the target message does
+// The caper screens (spec 13.3 S11–S15, the S25 caper card and its lobby
+// variant (amendment 5.4), the S28 GO call and "Lobby moved", and C14's
+// cancelled card): pure builders from plain view objects to CfPayloads. No I/O. `art: true` means the target message does
 // not hold the banner yet: the file is sent and old attachments are cleared.
 import {
   ActionRowBuilder,
+  type ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
   SeparatorBuilder,
@@ -97,6 +98,27 @@ export function buildCaperPlanner(v: CaperPlannerView, opts: { art: boolean; eph
   return cfPayload(container, { files: opts.art && file ? [file] : undefined, freshAttachments: opts.art, ephemeral: opts.ephemeral });
 }
 
+// ── Rows shared by the cards and the DMs ────────────────────────────────────
+
+/** The "Join as…" select of S12, the S25 lobby card and the lobby DM: one option per open role. */
+export function joinSelectRow(caperId: string, roles: readonly CaperRoleKey[]): ActionRowBuilder<StringSelectMenuBuilder> {
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(CPR_IDS.join(caperId))
+    .setPlaceholder("Join as…")
+    .addOptions(roles.map((role) => {
+      const option = new StringSelectMenuOptionBuilder().setLabel(caperRole(role).name).setValue(role);
+      const emoji = cfEmoji(caperRole(role).emojiKey);
+      if (emoji) option.setEmoji(emoji);
+      return option;
+    }));
+  return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+}
+
+/** The Open brief row of S13, S25 and the GO DM. */
+export function briefRow(caperId: string): ActionRowBuilder<ButtonBuilder> {
+  return buttonRow(cfButton(CPR_IDS.brief(caperId), "Open brief", ButtonStyle.Primary));
+}
+
 // ── S12, S13, S15, cancelled ────────────────────────────────────────────────
 
 const seated = (v: CaperCardView) => v.seats.filter((s): s is CaperSeatView & { userId: string } => s.userId !== null);
@@ -108,7 +130,7 @@ function buildLobby(v: CaperCardView, tier: CaperTierDef, art: boolean): CfPaylo
     `${roleLabel(s.role)} · ${s.userId ? mention(s.userId) : "open"}${s.optional ? " (optional)" : ""}`);
   const hint = v.note ?? (v.openRoles.length === 0
     ? "All seats filled, waiting for Start"
-    : `-# Pick a role from **Join as…** or use \`!heist join <role>\`. Start needs ${tier.required.map((r) => caperRole(r).name).join(", ")}; ` +
+    : `-# Pick a role from **Join as…** or use \`!heist join <role>\` in any server. Start needs ${tier.required.map((r) => caperRole(r).name).join(", ")}; ` +
       "the crew heist starts by itself once every seat is filled.");
 
   const container = new ContainerBuilder();
@@ -127,18 +149,7 @@ function buildLobby(v: CaperCardView, tier: CaperTierDef, art: boolean): CfPaylo
       ),
       text(hint),
     );
-  if (v.openRoles.length > 0) {
-    const select = new StringSelectMenuBuilder()
-      .setCustomId(CPR_IDS.join(v.caperId))
-      .setPlaceholder("Join as…")
-      .addOptions(v.openRoles.map((role) => {
-        const option = new StringSelectMenuOptionBuilder().setLabel(caperRole(role).name).setValue(role);
-        const emoji = cfEmoji(caperRole(role).emojiKey);
-        if (emoji) option.setEmoji(emoji);
-        return option;
-      }));
-    container.addActionRowComponents(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select));
-  }
+  if (v.openRoles.length > 0) container.addActionRowComponents(joinSelectRow(v.caperId, v.openRoles));
   container.addActionRowComponents(buttonRow(
     cfButton(CPR_IDS.leave(v.caperId), "Leave"),
     cfButton(CPR_IDS.start(v.caperId), "Start", ButtonStyle.Success),
@@ -162,7 +173,7 @@ function buildGo(v: CaperCardView, tier: CaperTierDef, art: boolean): CfPayload 
       text(`**Locked in ${v.lockedCount}/${v.crewCount}**\n${roster.join("\n")}`),
       text(hint),
     )
-    .addActionRowComponents(buttonRow(cfButton(CPR_IDS.brief(v.caperId), "Open brief", ButtonStyle.Primary)));
+    .addActionRowComponents(briefRow(v.caperId));
   return cfPayload(container, { files: art && banner ? [banner.file] : undefined, freshAttachments: art });
 }
 
@@ -255,8 +266,36 @@ export function buildBrief(v: BriefView): CfPayload {
 export function buildCaperSeatCard(v: { caperId: string; text: string; jumpUrl: string | null }): CfPayload {
   const container = new ContainerBuilder()
     .addTextDisplayComponents(text(v.jumpUrl ? `${v.text}\n[Go to the crew heist](${v.jumpUrl})` : v.text))
-    .addActionRowComponents(buttonRow(cfButton(CPR_IDS.brief(v.caperId), "Open brief", ButtonStyle.Primary)));
+    .addActionRowComponents(briefRow(v.caperId));
   return cfPayload(container);
+}
+
+/**
+ * Every heist surface away from the shared card (amendment 5.2, G2), for one
+ * viewer: the S25 lobby card (unseated, LOBBY), the S25 seated card (seated,
+ * LOBBY or GO), or a notice with the jump link (unseated, GO or later).
+ */
+export function buildPersonalCaperCard(v: CaperCardView, viewerId: string): CfPayload {
+  const seat = v.seats.find((s) => s.userId === viewerId);
+  const jump = v.messageId ? jumpLink(v.guildId, v.channelId, v.messageId) : null;
+  const tier = caperTier(v.tier);
+  if (v.status === "LOBBY" && !seat) {
+    const head = `${v.familyLabel} crew heist lobby: ${tier.name} · closes ${rel(v.lobbyClosesAt)}` +
+      (jump ? `\n[Go to the lobby](${jump})` : "") + (v.openRoles.length === 0 ? "\nEvery open seat is taken." : "");
+    const container = new ContainerBuilder().addTextDisplayComponents(text(head));
+    if (v.openRoles.length > 0) container.addActionRowComponents(joinSelectRow(v.caperId, v.openRoles));
+    return cfPayload(container);
+  }
+  if (seat && v.status === "LOBBY") {
+    return buildCaperSeatCard({
+      caperId: v.caperId, jumpUrl: jump,
+      text: `${mention(viewerId)} seated as **${caperRole(seat.role).name}**. GO starts when every seat is filled or the planner presses Start.`,
+    });
+  }
+  if (seat && (v.status === "RUNNING" || v.status === "SETTLING")) {
+    return buildCaperSeatCard({ caperId: v.caperId, jumpUrl: jump, text: `${mention(viewerId)} GO is live: open your brief. GO ends ${rel(v.goEndsAt)}.` });
+  }
+  return buildNotice(`Your family's ${tier.name} crew heist is under way${jump ? `: ${jump}` : "."}`);
 }
 
 /** S28 GO call: the only caper payload that pings, and only the crew. */

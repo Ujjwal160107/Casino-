@@ -5,7 +5,7 @@ import { MAX_SAFE_BALANCE } from "../../utils/economyConfig";
 import { caperRole, type CaperRoleKey } from "../../data/crimeFamilyCatalog";
 import type { BriefView, CaperCardView, CaperPlannerView, CaperSeatView } from "../../services/crimeFamily/views";
 import {
-  buildBrief, buildCaperCard, buildCaperPlanner, buildCaperSeatCard, buildGoCall, buildLobbyMoved,
+  buildBrief, buildCaperCard, buildCaperPlanner, buildCaperSeatCard, buildGoCall, buildLobbyMoved, buildPersonalCaperCard,
 } from "../../ui/crimeFamily/caperScreens";
 import { CPR_IDS } from "../../ui/crimeFamily/ids";
 import { buildOpener, type CfPayload } from "../../ui/crimeFamily/kit";
@@ -24,6 +24,8 @@ const SOON = () => new Date(Date.now() + 3_600_000);
 /** The T4 seats in ring order; the owner is the Mastermind. */
 const T4_ROLES: CaperRoleKey[] = ["MASTERMIND", "LOOKOUT", "SAFECRACKER", "DRIVER", "MUSCLE", "HACKER"];
 const CREW = T4_ROLES.map((_, i) => (i === 0 ? OWNER : `9876543210987654${String(3300 + i)}`));
+/** A 20-digit member holding no seat. */
+const OUTSIDER = "98765432109876543399";
 
 function seats(filled: number, ended: boolean): CaperSeatView[] {
   return T4_ROLES.map((role, i) => ({
@@ -75,6 +77,10 @@ export function caperWorstCases(): { label: string; max: number; payload: CfPayl
     { label: "S14 brief (dark)", max: 6, payload: buildBrief(briefView({ dark: true, leaked: null })) },
     { label: "S15 result (T4 BUST, 6 seats)", max: 8, payload: buildCaperCard(cardView({ status: "RESOLVED", outcome: "BUST", roll: 0.1234, seats: seats(6, true) }), { art: true }) },
     { label: "S25 crew heist card", max: 4, payload: buildCaperSeatCard({ caperId: CAPER_ID, text: "Seated as Safecracker.", jumpUrl: jump }) },
+    { label: "S25 lobby (5 open roles)", max: 4, payload: buildPersonalCaperCard(cardView({ status: "LOBBY", seats: seats(1, false) }), CREW[3]) },
+    { label: "S25 lobby (no open role)", max: 4, payload: buildPersonalCaperCard(cardView({ status: "LOBBY", seats: seats(6, false) }), OUTSIDER) },
+    { label: "S25 seated (GO)", max: 4, payload: buildPersonalCaperCard(cardView({ status: "RUNNING", seats: seats(6, false) }), CREW[2]) },
+    { label: "S25 under way (unseated)", max: 2, payload: buildPersonalCaperCard(cardView({ status: "RUNNING", seats: seats(6, false) }), OUTSIDER) },
     { label: "S27 brief opener", max: 4, payload: buildOpener("Your crew heist brief is ready.", { customId: CPR_IDS.openBrief(CAPER_ID, OWNER), label: "Open brief" }) },
     { label: "S28 GO call (6 crew)", max: 4, payload: buildGoCall({ caperId: CAPER_ID, crewIds: CREW, goEndsAt: SOON(), pinched: ["98765432109876543401", "98765432109876543402"] }) },
     { label: "S28 lobby moved", max: 2, payload: buildLobbyMoved(jump) },

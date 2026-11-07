@@ -76,3 +76,34 @@ it("S11 names the size-scaled heist cap", () => {
   const s11 = caperWorstCases().find((c) => c.label === "S11 planner (Capo)")!;
   expect(visibleText(s11.payload)).toContain("/10 in 24 h");
 });
+
+describe("S25 personal cards and the any-server hints (amendment 5.2, 5.4)", () => {
+  const selects = (p: any) => { const t: any[] = []; json(p).forEach((x: any) => walk(x, (n) => n.type === ComponentType.StringSelect && t.push(n))); return t; };
+
+  it("S25 lobby (5 open roles) has one Join as… select with every role but the Mastermind", () => {
+    const s = selects(pick("S25 lobby (5 open roles)"));
+    expect(s).toHaveLength(1);
+    expect(s[0].custom_id).toBe(CPR_IDS.join("65f0000000000000000000aa"));
+    expect(s[0].options.map((o: any) => o.value)).toEqual(["LOOKOUT", "SAFECRACKER", "DRIVER", "MUSCLE", "HACKER"]);
+  });
+
+  it("S25 lobby (no open role) has no select and says so", () => {
+    const p = pick("S25 lobby (no open role)");
+    expect(selects(p)).toHaveLength(0);
+    expect(visibleText(p)).toContain("Every open seat is taken.");
+  });
+
+  it("the S12 lobby hint and the S1 hint say crew heists work from any server", () => {
+    // The S12 fixture carries a 200-character note in place of the hint: draw the lobby with no note.
+    const soon = new Date(Date.now() + 600_000);
+    const lobby = buildCaperCard({
+      caperId: "65f0000000000000000000aa", familyLabel: "[F1] Family", tier: 1, status: "LOBBY", outcome: "", plannerId: "1", guildId: "g1",
+      channelId: "c1", messageId: "m1", lobbyClosesAt: soon, goEndsAt: soon, leakAt: soon,
+      seats: [{ role: "MASTERMIND", optional: false, userId: "1", locked: false, passed: false, leaked: false, dark: false, holderId: null, cut: 0, fine: 0, jailed: false }],
+      openRoles: ["LOOKOUT"], lockedCount: 0, crewCount: 1, roll: 0, patrolChance: 0, pool: 0, note: null,
+    }, { art: false });
+    expect(visibleText(lobby)).toContain("in any server");
+    const s1 = crimeFamilyWorstCases().find((c) => c.label === "S1 no-family card")!;
+    expect(visibleText(s1.payload)).toContain("Crew heists and turf wars work from any server.");
+  });
+});

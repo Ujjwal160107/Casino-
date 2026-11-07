@@ -49,7 +49,7 @@ export function buildNoFamilyCard(ownerId: string, join: EligibilityResult, foun
     .addTextDisplayComponents(
       text(`**Join a family**\n${checklist(join)}`),
       text(`**Found one** (costs ${fmtFortunes(CRIME_FAMILY_CONFIG.createFee)})\n${checklist(found)}`),
-      text("-# Browse families with `!crew board` or ask a Capo for an invite; crew heist lobbies and results post in this server."),
+      text("-# Browse families with `!crew board` or ask a Capo for an invite. Crew heists and turf wars work from any server."),
     )
     .addActionRowComponents(buttonRow(
       cfButton(CREW_IDS.board("lvl", false, 0, ownerId), "Find a family", ButtonStyle.Primary),
