@@ -2,12 +2,13 @@
 // the owner and acknowledged; each route re-reads the caper and membership
 // from the DB through one service, then hands the shared card to the flow
 // module. A press on a shared card never sends a locally built card: the card
-// writer edits the stored message.
+// writer edits the stored message. Brief, Refresh and Share answer with the
+// presser's private S14.
 import type { CaperRoleKey } from "../data/crimeFamilyCatalog";
 import { joinCaper } from "../services/crimeFamily/caperLobbyService";
-import { lockChoice, openBrief } from "../services/crimeFamily/caperPlayService";
+import { lockChoice, openBrief, shareIntel } from "../services/crimeFamily/caperPlayService";
 import { buildCaperCardView, buildPlannerView } from "../services/crimeFamily/caperQueries";
-import { onSeatsChanged, openLobby, resolveAndAnnounce, runCancel, runLeave, runStart, safely } from "../ui/crimeFamily/caperFlow";
+import { onSeatsChanged, openLobby, resolveAndAnnounce, runCancel, runLeave, runStart, safely, sendIntelNudge } from "../ui/crimeFamily/caperFlow";
 import { buildBrief, buildCaperPlanner, buildPersonalCaperCard } from "../ui/crimeFamily/caperScreens";
 import { buildNotice, type CfPayload } from "../ui/crimeFamily/kit";
 import { jumpLink } from "../ui/crimeFamily/post";
@@ -60,6 +61,13 @@ const actRoute: CfRoute = async (i, [caperId, index]) => {
   if (allLocked) await safely("caper last-lock resolve", () => resolveAndAnnounce(i.client, caperId, new Date()));
 };
 
+// Share is not gated by the kill switch: a live crew heist finishes (A18).
+const shareRoute: CfRoute = async (i, [caperId]) => {
+  const { brief, nudge } = await shareIntel(caperId, i.user.id);
+  await show(i, buildBrief(brief));
+  if (nudge) await sendIntelNudge(i.client, caperId, i.user.id, nudge);
+};
+
 export const CAPER_ROUTES: CfRouteTable = {
   "v:plan": owner(async (i) => show(i, buildCaperPlanner(await buildPlannerView(i.user.id, new Date()), { art: true, ephemeral: true }))),
   plan: owner(planRoute),
@@ -69,5 +77,6 @@ export const CAPER_ROUTES: CfRouteTable = {
   cancel: shared("update", (i, [caperId]) => runCancel(i.client, caperId, i.user.id)),
   brief: shared("auto", async (i, [caperId]) => show(i, buildBrief(await openBrief(caperId, i.user.id)))),
   act: shared("update", actRoute),
+  share: shared("auto", shareRoute),
   "open:brief": owner(async (i, [, caperId]) => show(i, buildBrief(await openBrief(caperId, i.user.id)))),
 };

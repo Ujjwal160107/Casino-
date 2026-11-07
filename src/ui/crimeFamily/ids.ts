@@ -93,6 +93,8 @@ export const CPR_IDS = {
   /** Open brief on S13, S25 and S28, and S14's Refresh. */
   brief: (caperId: string) => cfId("cpr", "brief", caperId),
   act: (caperId: string, index: number) => cfId("cpr", "act", caperId, index),
+  /** S14's Share: the seat's held intel to the seat it answers (A18). */
+  share: (caperId: string) => cfId("cpr", "share", caperId),
   /** S27 opener for `!caper brief`: cpr:open:brief:<caperId>:<owner>, 60 characters at most. */
   openBrief: (caperId: string, owner: string) => cfId("cpr", "open", "brief", caperId, owner),
 } as const;

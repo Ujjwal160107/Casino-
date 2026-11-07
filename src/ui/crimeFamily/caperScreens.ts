@@ -7,6 +7,7 @@ import {
   type ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
+  SectionBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
   StringSelectMenuBuilder,
@@ -78,7 +79,7 @@ export function buildCaperPlanner(v: CaperPlannerView, opts: { art: boolean; eph
         "**How a crew heist works**\n" +
         `1. A Capo or above plans a tier and pays the stake; the lobby stays open ${minutes(CRIME_FAMILY_CONFIG.lobbySeconds)} minutes.\n` +
         "2. Members join by role, each holding one of the role's prep items, and pay the same stake.\n" +
-        `3. GO lasts ${CRIME_FAMILY_CONFIG.goSeconds} s: open your brief, tell your contact their intel and lock your own call.\n` +
+        `3. GO lasts ${CRIME_FAMILY_CONFIG.goSeconds} s: open your brief, press Share to pass on the intel you hold, and lock your own call.\n` +
         `4. A seat that has not opened its brief ${CRIME_FAMILY_CONFIG.leakAtSecondsLeft} s before the end goes dark and counts as a miss.`,
       ),
       text(CAPER_TIERS.map((t) => tierLine(t, unlocked.has(t.tier))).join("\n")),
@@ -163,7 +164,7 @@ function buildGo(v: CaperCardView, tier: CaperTierDef, art: boolean): CfPayload 
   const roster = seated(v).map((s) => `${roleLabel(s.role)} · ${mention(s.userId)} · ${s.locked ? "locked in" : "deciding"}`);
   const hint = v.note ?? (v.status === "SETTLING"
     ? "-# Every call is in. Settling the take…"
-    : "-# Open your brief: tell your contact their intel and lock your own call. A seat that has not opened its brief by the leak goes dark and misses.");
+    : "-# Open your brief: press Share to pass on the intel you hold, then lock your own call. A seat that has not opened its brief by the leak goes dark and misses.");
   const container = new ContainerBuilder();
   if (banner) container.addMediaGalleryComponents(banner.gallery);
   container
@@ -180,7 +181,7 @@ function buildGo(v: CaperCardView, tier: CaperTierDef, art: boolean): CfPayload 
 function stepLine(s: CaperSeatView & { userId: string }): string {
   const mark = s.passed ? Mascot.Emotes.Accept : Mascot.Emotes.Decline;
   const intel = s.holderId ? ` · intel ${mention(s.holderId)} → call ${mention(s.userId)}` : ` · ${mention(s.userId)}`;
-  return `${mark} ${roleLabel(s.role)}${intel}${s.leaked ? " (leaked)" : ""}${s.dark ? " (went dark)" : ""}`;
+  return `${mark} ${roleLabel(s.role)}${intel}${s.relayed ? " (relayed)" : ""}${s.leaked ? " (leaked)" : ""}${s.dark ? " (went dark)" : ""}`;
 }
 
 function payoutLine(s: CaperSeatView & { userId: string }, tier: CaperTierDef): string {
@@ -231,16 +232,31 @@ export function buildCaperCard(v: CaperCardView, opts: { art: boolean }): CfPayl
 
 // ── S14 ──────────────────────────────────────────────────────────────────────
 
-/** One seat's private brief. Option labels are plain text with no emoji, so nothing can hint at the answer (8.3). */
+/** S14's header accessory: Share while it can go, a disabled Shared once it went (A18, G5). */
+function shareButton(v: BriefView): ButtonBuilder {
+  return v.shared
+    ? cfButton(CPR_IDS.share(v.caperId), "Shared", ButtonStyle.Success, { disabled: true })
+    : cfButton(CPR_IDS.share(v.caperId), "Share", ButtonStyle.Primary, { disabled: !v.canShare });
+}
+
+/**
+ * One seat's private brief. Option labels are plain text with no emoji, so
+ * nothing can hint at the answer (8.3). The header carries Share unless the
+ * seat went dark; a holder's share shows as "Intel from" (A18).
+ */
 export function buildBrief(v: BriefView): CfPayload {
   const call: string[] = [];
   if (v.dark) {
     call.push("You went dark: this seat counts as a miss.");
   } else {
     call.push(`**${v.call.question}?** ${mention(v.call.fromUserId)} has your intel.`);
+    if (v.relayed !== null) call.push(`Intel from ${mention(v.call.fromUserId)}: **${v.relayed}**`);
     if (v.leaked !== null) call.push(`Your contact went dark. The intel leaked: **${v.leaked}**`);
     if (v.lockedIndex !== null) call.push(`Locked in: **${v.call.options[v.lockedIndex]}**`);
-    else if (v.leaked === null) call.push(`-# If your contact goes dark, the intel leaks ${rel(v.leakAt)}; press Refresh then.`);
+    else if (v.leaked === null && v.relayed === null) {
+      const leakLine = `If your contact goes dark, the intel leaks ${rel(v.leakAt)}; press Refresh then.`;
+      call.push(v.canShare ? `-# Press Share to send ${mention(v.tell.userId)} their intel. ${leakLine}` : `-# ${leakLine}`);
+    }
   }
   call.push(`-# GO ends ${rel(v.goEndsAt)}.`);
 
@@ -252,8 +268,11 @@ export function buildBrief(v: BriefView): CfPayload {
         v.lockedIndex === i ? ButtonStyle.Success : ButtonStyle.Secondary, { disabled: v.lockedIndex !== null })),
       refresh,
     );
-  const container = new ContainerBuilder()
-    .addTextDisplayComponents(text(`### ${roleLabel(v.role)} brief\nTell ${mention(v.tell.userId)}: **${v.tell.label}**`))
+  const header = text(`### ${roleLabel(v.role)} brief\nYour intel for ${mention(v.tell.userId)}: **${v.tell.label}**`);
+  const container = new ContainerBuilder();
+  if (v.dark) container.addTextDisplayComponents(header);
+  else container.addSectionComponents(new SectionBuilder().addTextDisplayComponents(header).setButtonAccessory(shareButton(v)));
+  container
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(text(call.join("\n")))
     .addActionRowComponents(row);

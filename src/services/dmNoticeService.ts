@@ -488,6 +488,12 @@ export function caperGoNotice(v: { tierName: string; goEndsAt: Date; jumpUrl: st
   return familyNotice("caper", "Crew Heist GO", body).addActionRowComponents(row);
 }
 
+/** A holder shared this seat's intel (A18), with the Open brief row the sender builds (G9). Never carries the label. */
+export function caperIntelNotice(v: { sharerId: string; tierName: string; goEndsAt: Date }, row: ActionRowBuilder<ButtonBuilder>): ContainerBuilder {
+  const body = `<@${v.sharerId}> shared your intel for the **${v.tierName}** crew heist. Open your brief.\nGO ends ${relTime(v.goEndsAt)}.`;
+  return familyNotice("caper", "Intel arrived", body).addActionRowComponents(row);
+}
+
 // Turf (`turf`): bids, war warnings and results, and racket neglect.
 
 export function turfBidPlacedNotice(v: { racketName: string; bidderLabel: string; amount: number; startsAt: Date }): ContainerBuilder {

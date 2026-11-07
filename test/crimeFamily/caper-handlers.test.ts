@@ -106,7 +106,7 @@ describe("cpr: lobby and GO routes", () => {
     const pub = await press(fakeButton(CPR_IDS.brief(caper.id), { userId: ids.LOOKOUT, guildId: G }));
     expect(pub.deferReply).toHaveBeenCalledTimes(1);
     expect(pub.ephemeral).toBe(true);
-    expect(said(pub)).toContain("Tell <@");
+    expect(said(pub)).toContain("Your intel for <@");
     const refresh = await press(fakeButton(CPR_IDS.brief(caper.id), { userId: ids.LOOKOUT, guildId: G, ephemeralSource: true }));
     expect(refresh.deferUpdate).toHaveBeenCalledTimes(1);
     expect(refresh.deferReply).not.toHaveBeenCalled();
@@ -137,7 +137,7 @@ describe("cpr: lobby and GO routes", () => {
       i = await press(fakeButton(CPR_IDS.act(caper.id, answers.seats.SAFECRACKER!.correct), { userId: ids.SAFECRACKER, guildId: G, ephemeralSource: true, client: fakeCaperClient().client }));
     } finally { tx.mockRestore(); errors.mockRestore(); }
     expect((await seat(caper.id, ids.SAFECRACKER)).choice).toBe(answers.seats.SAFECRACKER!.correct);
-    expect(said(i)).toContain("Tell <@");
+    expect(said(i)).toContain("Your intel for <@");
     expect(said(i)).not.toContain("Something went wrong.");
   });
 
@@ -160,7 +160,7 @@ describe("cpr: lobby and GO routes", () => {
     const { caper, ids } = await seedRunning({ tier: 1, roles: [...R3], picks: { LOOKOUT: "none" } });
     await testPrisma.user.update({ where: { discordId: ids.LOOKOUT }, data: { isJailed: true, jailReleaseTime: new Date(Date.now() + 3_600_000) } });
     const b = await press(fakeButton(CPR_IDS.brief(caper.id), { userId: ids.LOOKOUT, guildId: G }));
-    expect(said(b)).toContain("Tell <@");
+    expect(said(b)).toContain("Your intel for <@");
     await press(fakeButton(CPR_IDS.act(caper.id, 1), { userId: ids.LOOKOUT, guildId: G, ephemeralSource: true, client: fakeCaperClient().client }));
     expect((await seat(caper.id, ids.LOOKOUT)).choice).toBe(1);
   });

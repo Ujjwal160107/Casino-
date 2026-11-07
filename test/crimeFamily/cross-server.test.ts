@@ -2,6 +2,10 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { handleCaper } from "../../src/commands/economy/caper";
 import { handleCrimeFamilyInteraction } from "../../src/handlers/crimeFamilyRouter";
 import { joinCaper, planCaper } from "../../src/services/crimeFamily/caperLobbyService";
+import { openBrief } from "../../src/services/crimeFamily/caperPlayService";
+import { parseAnswers } from "../../src/services/crimeFamily/intelRing";
+import type { CaperRoleKey } from "../../src/data/crimeFamilyCatalog";
+import { CRIME_FAMILY_CONFIG } from "../../src/utils/economyConfig";
 import { leaveFamily } from "../../src/services/crimeFamily/membershipService";
 import { postCaperCard } from "../../src/ui/crimeFamily/caperCard";
 import { announceLobby, onSeatsChanged, runCancel, runStart } from "../../src/ui/crimeFamily/caperFlow";
@@ -9,7 +13,7 @@ import { CPR_IDS, TURF_IDS } from "../../src/ui/crimeFamily/ids";
 import { announceWarSoon } from "../../src/ui/crimeFamily/turfAnnounce";
 import prisma from "../../src/utils/prisma";
 import { testPrisma, resetFamilies, ensureUniqueIndexes, flushTestKeys, withCfConfig, seedEligibleUser, seedFamily, seedWar, seedRacket, daysAgo } from "../helpers";
-import { caperCrew, fakeCaperClient, G, CH } from "./caperFixtures";
+import { caperCrew, fakeCaperClient, seedRunning, G, CH } from "./caperFixtures";
 import { fakeButton, fakeSelect, said } from "./fakeInteraction";
 import { visibleText } from "./visibleText";
 
@@ -198,5 +202,48 @@ describe("war actions from a DM (amendment 5.2, 5.5)", () => {
     expect(said(await scout(live.s, live.w.id))).toContain("Not your war.");
     expect(await testPrisma.warContribution.count({ where: { userId: { in: [armed.s, live.s] } } })).toBe(0);
     expect((await testPrisma.wallet.findUnique({ where: { userId: armed.s } }))!.balance).toBe(100_000);
+  }));
+});
+
+describe("the intel relay through Discord (amendment 5.3, 5.8)", () => {
+  it("a crew in three places with no shared chat locks every call right through Share (edge 1)", () => open(async () => {
+    const R3 = ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] as const;
+    const f = await caperCrew({ tier: 1, roles: [...R3] });
+    const fc = fakeCaperClient();
+    const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
+    await postCaperCard(fc.client, c.id, CH);
+    await press(fakeSelect(CPR_IDS.join(c.id), ["LOOKOUT"], { userId: f.ids.LOOKOUT, guildId: "g2", messageId: "s25", client: fc.client }));
+    await press(fakeSelect(CPR_IDS.join(c.id), ["SAFECRACKER"], { userId: f.ids.SAFECRACKER, guildId: null, messageId: "dm", client: fc.client }));
+    await runStart(fc.client, c.id, { kind: "press", uid: f.ids.MASTERMIND });
+    const where = { [f.ids.MASTERMIND]: G, [f.ids.LOOKOUT]: "g2", [f.ids.SAFECRACKER]: null } as Record<string, string | null>;
+    for (const uid of Object.values(f.ids)) await press(fakeButton(CPR_IDS.brief(c.id), { userId: uid, guildId: where[uid], client: fc.client }));
+    // the second join's trailing S13 render (debounce.ts) must land before the snapshot, as caper-flow.test.ts:114 waits for it
+    await new Promise((r) => setTimeout(r, CRIME_FAMILY_CONFIG.caperRenderDebounceSeconds * 1000 + 100));
+    const dmsBefore = new Map(fc.dms), sends = fc.sent.length, edits = fc.edits.length;
+    for (const uid of Object.values(f.ids)) await press(fakeButton(CPR_IDS.share(c.id), { userId: uid, guildId: where[uid], ephemeralSource: true, client: fc.client }));
+    for (const uid of Object.values(f.ids)) expect(fc.dms.get(uid)).toBe((dmsBefore.get(uid) ?? 0) + 1);   // one intel DM each
+    expect([fc.sent.length, fc.edits.length]).toEqual([sends, edits]);                 // the relay posts and edits nothing in any channel
+    for (const uid of Object.values(f.ids)) {
+      const b = await openBrief(c.id, uid);
+      expect(b.relayed).not.toBeNull();
+      await press(fakeButton(CPR_IDS.act(c.id, b.call.options.indexOf(b.relayed!)), { userId: uid, guildId: where[uid], ephemeralSource: true, client: fc.client }));
+    }
+    const answers = parseAnswers((await testPrisma.caper.findUniqueOrThrow({ where: { id: c.id } })).answers)!;
+    const rows = await testPrisma.caperCrew.findMany({ where: { caperId: c.id } });
+    expect(rows.every((r) => r.relayed && r.choice === answers.seats[r.role as CaperRoleKey]!.correct)).toBe(true);
+  }), 10_000);
+
+  it("Share from the wrong state is refused with no row change and no DM (Review Focus 3)", () => open(async () => {
+    const { caper, ids } = await seedRunning({ tier: 1, roles: ["MASTERMIND", "LOOKOUT", "SAFECRACKER"], picks: { MASTERMIND: "none" }, dark: ["SAFECRACKER"] });
+    const fc = fakeCaperClient();
+    const share = (uid: string) => press(fakeButton(CPR_IDS.share(caper.id), { userId: uid, guildId: null, ephemeralSource: true, client: fc.client }));
+    expect(said(await share("outsider"))).toContain("You are not in this crew heist.");
+    expect(said(await share(ids.SAFECRACKER))).toContain("Open your brief first.");
+    await share(ids.LOOKOUT);
+    expect(said(await share(ids.LOOKOUT))).toContain("Already shared.");
+    await testPrisma.caper.update({ where: { id: caper.id }, data: { status: "RESOLVED" } });
+    expect(said(await share(ids.MASTERMIND))).toContain("Too late.");
+    expect(await testPrisma.caperCrew.count({ where: { caperId: caper.id, sharedIntel: true } })).toBe(1);
+    expect([...fc.dms.values()].reduce((a, b) => a + b, 0)).toBe(1);                  // only the Lookout's one share nudged
   }));
 });

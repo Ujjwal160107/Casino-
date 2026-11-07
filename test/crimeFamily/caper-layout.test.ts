@@ -5,6 +5,9 @@ import { setEmojiRecord } from "../../src/utils/emojiRegistry";
 import { CF_ASSETS } from "../../src/utils/crimeFamilyAssets";
 import { CPR_IDS } from "../../src/ui/crimeFamily/ids";
 import { visibleText } from "./visibleText";
+import { countComponents } from "./layoutHelpers";
+import type { CfPayload } from "../../src/ui/crimeFamily/kit";
+import { caperRole } from "../../src/data/crimeFamilyCatalog";
 
 const art = vi.hoisted(() => ({ present: true }));
 vi.mock("../../src/utils/assetPaths", async (orig) => {
@@ -105,5 +108,30 @@ describe("S25 personal cards and the any-server hints (amendment 5.2, 5.4)", () 
     expect(visibleText(lobby)).toContain("in any server");
     const s1 = crimeFamilyWorstCases().find((c) => c.label === "S1 no-family card")!;
     expect(visibleText(s1.payload)).toContain("Crew heists and turf wars work from any server.");
+  });
+});
+
+describe("S14 Share and the (relayed) mark (amendment 5.3, 5.4)", () => {
+  const CAPER_ID = "65f0000000000000000000aa";
+  const byLabel = pick;
+
+  it("S14 open: the header Section's accessory is Share (cpr:share); shared is a disabled Shared; dark has no Share", () => {
+    const open = byLabel("S14 brief (open)"), shared = byLabel("S14 brief (shared, relayed, locked)"), dark = byLabel("S14 brief (dark)");
+    expect(countComponents(open)).toBe(12);
+    expect(countComponents(shared)).toBe(12);
+    expect(countComponents(dark)).toBe(6);
+    const accessory = (p: CfPayload) => (p.components[0] as any).toJSON().components[0].accessory;
+    expect(accessory(open)).toMatchObject({ custom_id: CPR_IDS.share(CAPER_ID), label: "Share", disabled: false });
+    expect(accessory(shared)).toMatchObject({ label: "Shared", disabled: true });
+    expect(JSON.stringify(dark)).not.toContain(CPR_IDS.share(CAPER_ID));
+    expect(visibleText(shared)).toMatch(/Intel from <@\d+>: \*\*.+\*\*/);
+    expect(visibleText(open)).toContain("Your intel for <@");
+  });
+
+  it("S15 marks a seat that locked on relayed intel '(relayed)'; the intel DM never carries a label", () => {
+    expect(visibleText(byLabel("S15 result (T4 BUST, 6 seats)"))).toContain("(relayed)");
+    expect(countComponents(byLabel("DM intel arrived"))).toBe(8);
+    expect(visibleText(byLabel("DM intel arrived"))).toContain("shared your intel for the");
+    for (const l of caperRole("DRIVER").labels) expect(visibleText(byLabel("DM intel arrived"))).not.toContain(l);
   });
 });

@@ -26,6 +26,8 @@ describe("customIds", () => {
     CREW_IDS.familyCard(O, U), CREW_IDS.applyOpen(O, U), CREW_IDS.applyModal(O, U), CREW_IDS.recruit("toggle", U),
     CREW_IDS.recruitEdit({ netWorth: 10_000_000_000, shifts: 5_000, ageDays: 730, heists: 1_000 }, U), CREW_IDS.recruitModal(U),
     CREW_IDS.appAnswer("decline", O, U), CREW_IDS.inboxPage(999, U),
+    // The intel relay (A18): cpr:share:<caperId>, 34 characters.
+    CPR_IDS.share(O),
   ];
 
   it.each(all)("%s fits in 100 characters and round-trips", (id) => {

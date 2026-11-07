@@ -2,8 +2,12 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { shareIntel } from "../../src/services/crimeFamily/caperPlayService";
 import { resolveCaper } from "../../src/services/crimeFamily/caperSettleService";
+import { handleCrimeFamilyInteraction } from "../../src/handlers/crimeFamilyRouter";
+import { setNoticeTypeEnabled } from "../../src/services/dmPrefsService";
+import { CPR_IDS } from "../../src/ui/crimeFamily/ids";
 import { testPrisma, resetFamilies, ensureUniqueIndexes } from "../helpers";
-import { seedRunning, scriptedRng, txCount } from "../crimeFamily/caperFixtures";
+import { fakeCaperClient, seedRunning, scriptedRng, txCount } from "../crimeFamily/caperFixtures";
+import { fakeButton } from "../crimeFamily/fakeInteraction";
 
 const R3 = ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] as const;
 const row = (caperId: string, userId: string) => testPrisma.caperCrew.findFirstOrThrow({ where: { caperId, userId } });
@@ -36,5 +40,20 @@ describe("the share CAS (A18)", () => {
     const { caper, ids } = await seedRunning({ tier: 1, roles: [...R3], picks: { MASTERMIND: "none" } });
     await expect(shareIntel(caper.id, ids.LOOKOUT, caper.goEndsAt)).rejects.toThrow("Too late.");
     expect((await row(caper.id, ids.LOOKOUT)).sharedIntel).toBe(false);
+  });
+});
+
+describe("the nudge DM (A18)", () => {
+  it("two concurrent Share presses send one nudge; with the caper_lobby toggle off the share records and no DM goes", async () => {
+    const a = await seedRunning({ tier: 1, roles: [...R3], picks: { MASTERMIND: "none" } });
+    const fc = fakeCaperClient();
+    const press = (uid: string, caperId: string) => handleCrimeFamilyInteraction(fakeButton(CPR_IDS.share(caperId), { userId: uid, guildId: null, ephemeralSource: true, client: fc.client }) as any);
+    await Promise.all([press(a.ids.LOOKOUT, a.caper.id), press(a.ids.LOOKOUT, a.caper.id)]);
+    expect(fc.dms.get(a.ids.MASTERMIND)).toBe(1);
+    const b = await seedRunning({ tier: 1, roles: [...R3], picks: { MASTERMIND: "none" } });
+    await setNoticeTypeEnabled(b.ids.MASTERMIND, "caper_lobby", false);
+    await press(b.ids.LOOKOUT, b.caper.id);
+    expect(fc.dms.get(b.ids.MASTERMIND) ?? 0).toBe(0);
+    expect((await row(b.caper.id, b.ids.LOOKOUT)).sharedIntel).toBe(true);
   });
 });

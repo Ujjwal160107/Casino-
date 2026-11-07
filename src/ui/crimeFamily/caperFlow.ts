@@ -12,9 +12,10 @@ import { logToChannel } from "../../utils/discordLogger";
 import { redisService } from "../../services/redisService";
 import { enqueueReminder } from "../../services/cooldownReminderService";
 import { getOwnedPrepKeys } from "../../services/crimeService";
-import { caperGoNotice, caperLobbyNotice, notifyMany } from "../../services/dmNoticeService";
+import { caperGoNotice, caperIntelNotice, caperLobbyNotice, notifyMany, sendOptOutDm } from "../../services/dmNoticeService";
 import { buildCaperCardView, cancelledLobbySince, getCaper, listCrew, startedSeatsSince } from "../../services/crimeFamily/caperQueries";
 import { cancelCaper, leaveCaper, planCaper, startCaper, type StartBy, type StartResult } from "../../services/crimeFamily/caperLobbyService";
+import type { IntelNudge } from "../../services/crimeFamily/caperPlayService";
 import { resolveCaper, type ResolveResult } from "../../services/crimeFamily/caperSettleService";
 import { checkMemberEligibility } from "../../services/crimeFamily/eligibility";
 import { listMembers, requireMembership } from "../../services/crimeFamily/familyQueries";
@@ -132,6 +133,12 @@ async function announceStart(client: Client, caperId: string, pinched: string[],
 
   const delay = Math.max(0, caper.goEndsAt.getTime() - now.getTime()) + CRIME_FAMILY_CONFIG.caperSettleDelayMs;
   setTimeout(() => void safely("caper settle timer", () => resolveAndAnnounce(client, caperId, new Date())), delay).unref();
+}
+
+/** After a share committed: the intel-arrived DM to the seat it answers, with Open brief (A18). Never throws. */
+export async function sendIntelNudge(client: Client, caperId: string, sharerId: string, nudge: IntelNudge): Promise<void> {
+  await sendOptOutDm(client, nudge.userId, "caper_lobby",
+    caperIntelNotice({ sharerId, tierName: nudge.tierName, goEndsAt: nudge.goEndsAt }, briefRow(caperId)));
 }
 
 /** Start by a press, the last join or the sweeper; the card shows why a Start did not happen. */

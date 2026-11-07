@@ -3,7 +3,7 @@
 // src/scripts/checkV2Payloads.ts. Built from literal views: no DB.
 import { MAX_SAFE_BALANCE } from "../../utils/economyConfig";
 import { caperRole, caperTier, type CaperRoleKey } from "../../data/crimeFamilyCatalog";
-import { caperGoNotice, caperLobbyNotice } from "../../services/dmNoticeService";
+import { caperGoNotice, caperIntelNotice, caperLobbyNotice } from "../../services/dmNoticeService";
 import type { BriefView, CaperCardView, CaperPlannerView, CaperSeatView } from "../../services/crimeFamily/views";
 import {
   briefRow, buildBrief, buildCaperCard, buildCaperPlanner, buildCaperSeatCard, buildGoCall, buildLobbyMoved, buildPersonalCaperCard,
@@ -75,8 +75,10 @@ export function caperWorstCases(): { label: string; max: number; payload: CfPayl
     { label: "S12 lobby (T4, full)", max: 12, payload: buildCaperCard(cardView({ status: "LOBBY", seats: seats(6, false) }), { art: true }) },
     { label: "S12 cancelled", max: 3, payload: buildCaperCard(cardView({ status: "CANCELLED", outcome: "VOID", seats: seats(6, false) }), { art: true }) },
     { label: "S13 GO (T4, 6 seats)", max: 8, payload: buildCaperCard(cardView({ status: "RUNNING", seats: seats(6, false) }), { art: false }) },
-    { label: "S14 brief (open)", max: 10, payload: buildBrief(briefView()) },
-    { label: "S14 brief (locked)", max: 10, payload: buildBrief(briefView({ lockedIndex: 3 })) },
+    { label: "S14 brief (open)", max: 12, payload: buildBrief(briefView()) },
+    { label: "S14 brief (locked)", max: 12, payload: buildBrief(briefView({ lockedIndex: 3 })) },
+    { label: "S14 brief (shared, relayed, locked)", max: 12, payload: buildBrief(briefView({
+      shared: true, canShare: false, relayed: caperRole("DRIVER").labels[2], leaked: null, lockedIndex: 2 })) },
     { label: "S14 brief (dark)", max: 6, payload: buildBrief(briefView({ dark: true, leaked: null })) },
     { label: "S15 result (T4 BUST, 6 seats)", max: 8, payload: buildCaperCard(cardView({ status: "RESOLVED", outcome: "BUST", roll: 0.1234, seats: seats(6, true) }), { art: true }) },
     { label: "S25 crew heist card", max: 4, payload: buildCaperSeatCard({ caperId: CAPER_ID, text: "Seated as Safecracker.", jumpUrl: jump }) },
@@ -91,5 +93,6 @@ export function caperWorstCases(): { label: string; max: number; payload: CfPayl
       { familyLabel: FAMILY_LABEL, tierName: caperTier(4).name, stake: caperTier(4).stake, closesAt: SOON(), jumpUrl: jump },
       joinSelectRow(CAPER_ID, T4_ROLES.slice(1)))) },
     { label: "DM crew heist GO", max: 8, payload: cfPayload(caperGoNotice({ tierName: caperTier(4).name, goEndsAt: SOON(), jumpUrl: jump }, briefRow(CAPER_ID))) },
+    { label: "DM intel arrived", max: 8, payload: cfPayload(caperIntelNotice({ sharerId: CREW[4], tierName: caperTier(4).name, goEndsAt: SOON() }, briefRow(CAPER_ID))) },
   ];
 }
