@@ -75,6 +75,11 @@ describe("caper DM notices (13.4)", () => {
     expect(countComponents(war)).toBe(11);
     expect(visibleText(war)).toContain("Scout and hit from the buttons below");
   });
+  it("the action row sits under the body and the settings footnote stays last", () => {
+    const go = caperGoNotice({ tierName: "Payroll Van", goEndsAt: new Date(1_800_000_000_000), jumpUrl: null }, briefRow(CAPER)).toJSON() as any;
+    const types = go.components.map((c: any) => c.type);
+    expect(types).toEqual([9, 1, 14, 10]); // section, action row, separator, footnote text
+  });
 });
 
 describe("recruit DM notices (amendment 8.10)", () => {

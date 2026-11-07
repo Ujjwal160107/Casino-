@@ -1,6 +1,6 @@
 import { Client, ContainerBuilder, type ActionRowBuilder, type ButtonBuilder, type StringSelectMenuBuilder } from "discord.js";
 import { Mascot } from "../config/branding";
-import { noticeContainer, v2Reply } from "../utils/componentsV2";
+import { noticeContainer, v2Reply, type StatusOptions } from "../utils/componentsV2";
 import { fmtAmount, fmtCurrency, fmtFortunes } from "../utils/format";
 import { CRIME_FAMILY_CONFIG } from "../utils/economyConfig";
 import { FAMILY_ROLES, type FamilyRole } from "../data/crimeFamilyCatalog";
@@ -332,9 +332,12 @@ export async function notifyMany(
 
 const FAMILY_HINT = `-# ${SETTINGS_HINT}.`;
 
-/** Titles stay text-only; the thumbnail is the notice's cf_ icon. */
-function familyNotice(iconKey: string, title: string, body: string): ContainerBuilder {
-  return noticeContainer(cfNoticeEmote(iconKey), title, body, FAMILY_HINT);
+/**
+ * Titles stay text-only; the thumbnail is the notice's cf_ icon. An action row
+ * sits right under the body, so the opt-out footnote stays last.
+ */
+function familyNotice(iconKey: string, title: string, body: string, row?: StatusOptions["row"]): ContainerBuilder {
+  return noticeContainer(cfNoticeEmote(iconKey), title, body, FAMILY_HINT, row);
 }
 
 export function familyInviteNotice(v: {
@@ -479,19 +482,19 @@ export function caperLobbyNotice(
     `**Stake:** ${fmtFortunes(v.stake)}\n` +
     `The lobby closes ${relTime(v.closesAt)}. Pick a role below to join from here.` +
     jumpLine(v.jumpUrl, "Go to the lobby");
-  return familyNotice("caper", "Crew Heist lobby open", body).addActionRowComponents(row);
+  return familyNotice("caper", "Crew Heist lobby open", body, row);
 }
 
 /** The GO call, with the Open brief row the announcer builds (G9). */
 export function caperGoNotice(v: { tierName: string; goEndsAt: Date; jumpUrl: string | null }, row: ActionRowBuilder<ButtonBuilder>): ContainerBuilder {
   const body = `The **${v.tierName}** crew heist is live.\nGO ends ${relTime(v.goEndsAt)}. Open your brief below.` + jumpLine(v.jumpUrl, "Go to the crew heist");
-  return familyNotice("caper", "Crew Heist GO", body).addActionRowComponents(row);
+  return familyNotice("caper", "Crew Heist GO", body, row);
 }
 
 /** A holder shared this seat's intel (A18), with the Open brief row the sender builds (G9). Never carries the label. */
 export function caperIntelNotice(v: { sharerId: string; tierName: string; goEndsAt: Date }, row: ActionRowBuilder<ButtonBuilder>): ContainerBuilder {
   const body = `<@${v.sharerId}> shared your intel for the **${v.tierName}** crew heist. Open your brief.\nGO ends ${relTime(v.goEndsAt)}.`;
-  return familyNotice("caper", "Intel arrived", body).addActionRowComponents(row);
+  return familyNotice("caper", "Intel arrived", body, row);
 }
 
 // Turf (`turf`): bids, war warnings and results, and racket neglect.
@@ -519,7 +522,7 @@ export function turfWarSoonNotice(
     `Your family is ${v.side === "ATK" ? "attacking" : "defending"} **${v.racketName}**. The war starts ${relTime(v.startsAt)}.\n` +
     "The war board posts in your family's home channel. Scout and hit from the buttons below once it starts, from any server." +
     jumpLine(v.channelUrl || null, "Go to the home channel");
-  return familyNotice("war", "Turf war soon", body).addActionRowComponents(row);
+  return familyNotice("war", "Turf war soon", body, row);
 }
 
 export function turfWarResultNotice(v: { racketName: string; side: WarSide; won: boolean; summary: string }): ContainerBuilder {

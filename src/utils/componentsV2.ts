@@ -1,6 +1,8 @@
 import {
+    type ActionRowBuilder,
     AttachmentBuilder,
     ContainerBuilder,
+    type MessageActionRowComponentBuilder,
     MessageFlags,
     SectionBuilder,
     SeparatorBuilder,
@@ -23,6 +25,8 @@ export interface StatusOptions {
     hint?: string;
     /** Override the mascot image (attachment:// or CDN url). */
     thumbnailUrl?: string;
+    /** Buttons or a select under the body, above the hint. */
+    row?: ActionRowBuilder<MessageActionRowComponentBuilder>;
 }
 
 /**
@@ -43,6 +47,8 @@ export function statusContainer(kind: StatusKind, title: string, desc?: string, 
     } else {
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
     }
+
+    if (opts?.row) container.addActionRowComponents(opts.row);
 
     if (opts?.hint) {
         container.addSeparatorComponents(
@@ -70,8 +76,10 @@ export function errorContainer(title: string, desc?: string, opts?: StatusOption
  * given emote's CDN image instead of a mascot reaction. Titles stay text-only;
  * the thumbnail carries the emoji.
  */
-export function noticeContainer(emote: string, title: string, body: string, hint?: string): ContainerBuilder {
-    return statusContainer("info", title, body, { hint, thumbnailUrl: getEmoteUrl(emote) ?? undefined });
+export function noticeContainer(
+    emote: string, title: string, body: string, hint?: string, row?: StatusOptions["row"],
+): ContainerBuilder {
+    return statusContainer("info", title, body, { hint, row, thumbnailUrl: getEmoteUrl(emote) ?? undefined });
 }
 
 /** Bare container from markdown blocks (one TextDisplay per block). */
