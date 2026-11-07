@@ -35,14 +35,17 @@ const planRoute: CfRoute = async (i) => {
 // A join on the shared card leaves the edit to the card writer; any other pressed
 // message (a DM, an S25 lobby card) becomes the presser's S25 card (G3), read after
 // onSeatsChanged so a filling join shows GO. A refused join edits nothing.
+// The seat has committed: a failed card read is logged, never sent as a refusal.
 const joinRoute: CfRoute = async (i, [caperId]) => {
   assertCfOpen(i.guildId);
   const joined = await joinCaper({ caperId, uid: i.user.id, role: values(i)[0] as CaperRoleKey });
   await onSeatsChanged(i.client, caperId, joined.full);
   const onCard = i.isMessageComponent() && i.message.id === joined.caper.messageId;
   if (onCard) return;
-  const card = await buildCaperCardView(caperId, new Date());
-  if (card) await show(i, buildPersonalCaperCard(card, i.user.id));
+  await safely("caper off-card join card", async () => {
+    const card = await buildCaperCardView(caperId, new Date());
+    if (card) await show(i, buildPersonalCaperCard(card, i.user.id));
+  });
 };
 
 const startRoute: CfRoute = async (i, [caperId]) => {

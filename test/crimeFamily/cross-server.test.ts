@@ -7,6 +7,7 @@ import { postCaperCard } from "../../src/ui/crimeFamily/caperCard";
 import { announceLobby, onSeatsChanged, runCancel, runStart } from "../../src/ui/crimeFamily/caperFlow";
 import { CPR_IDS, TURF_IDS } from "../../src/ui/crimeFamily/ids";
 import { announceWarSoon } from "../../src/ui/crimeFamily/turfAnnounce";
+import prisma from "../../src/utils/prisma";
 import { testPrisma, resetFamilies, ensureUniqueIndexes, flushTestKeys, withCfConfig, seedEligibleUser, seedFamily, seedWar, seedRacket, daysAgo } from "../helpers";
 import { caperCrew, fakeCaperClient, G, CH } from "./caperFixtures";
 import { fakeButton, fakeSelect, said } from "./fakeInteraction";
@@ -83,6 +84,30 @@ describe("personal cards (amendment 5.2, 5.4)", () => {
     expect(text).toContain("GO is live: open your brief.");
     expect(text).not.toContain("GO starts when");
     expect((await testPrisma.caper.findUniqueOrThrow({ where: { id: c.id } })).status).toBe("RUNNING");
+  }));
+
+  it("a committed join whose card read fails keeps the seat and shows no error, by press or by !heist join", () => open(async () => {
+    const { ids, fc, c } = await lobbyWithCard();
+    const findUnique = prisma.caper.findUnique;
+    const real = findUnique.bind(prisma.caper);
+    const seated = () => testPrisma.caperCrew.count({ where: { caperId: c.id, userId: { in: [ids.LOOKOUT, ids.SAFECRACKER] } } });
+    let base = 0;
+    // Every caper read after this join's seat commits fails (a Mongo blip right after the transaction).
+    const spy = vi.spyOn(prisma.caper, "findUnique").mockImplementation((async (args: any) =>
+      (await seated()) > base ? Promise.reject(new Error("Mongo blip")) : real(args)) as any);
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const i = await press(fakeSelect(CPR_IDS.join(c.id), ["LOOKOUT"], { userId: ids.LOOKOUT, guildId: "g2", messageId: "s25-lobby", client: fc.client }));
+      expect(said(i)).not.toContain("Something went wrong.");
+      base = 1;
+      const cmd = await heist(fc, ids.SAFECRACKER, ["join", "safecracker"]);
+      expect(cmd.text).toContain("Seated as Safecracker.");
+      expect(cmd.text).not.toContain("Something went wrong.");
+    } finally {
+      spy.mockRestore(); error.mockRestore();
+      Object.assign(prisma.caper, { findUnique });   // mockRestore writes undefined back on Prisma's model proxy
+    }
+    expect(await seated()).toBe(2);
   }));
 
   it("an S25 lobby card pressed by another family's member is refused and not edited (Review Focus 2)", () => open(async () => {

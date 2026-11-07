@@ -95,9 +95,13 @@ async function join(ctx: CrewCtx) {
   if (live.status !== "LOBBY") throw new FamilyError(NO_LOBBY);
   const { caper, full } = await joinCaper({ caperId: live.id, uid: ctx.uid, role });
   // The auto-start and the roster redraw run before the reply (onSeatsChanged
-  // never throws), so a filling join replies the GO-live card.
+  // never throws), so a filling join replies the GO-live card. The seat has
+  // committed: a failed card read falls back to the plain notice.
   await onSeatsChanged(ctx.message.client, caper.id, full);
-  const card = await buildCaperCardView(caper.id, new Date());
+  const card = await buildCaperCardView(caper.id, new Date()).catch((err) => {
+    console.error("[crimeFamily] caper join card failed:", err);
+    return null;
+  });
   if (!card) return notice(ctx, `Seated as ${caperRole(role).name}.`);
   return show(ctx, buildPersonalCaperCard(card, ctx.uid));
 }
