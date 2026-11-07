@@ -5,6 +5,17 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Tag } from "@/components/ui/Tag";
 import { FadeUp } from "@/components/ui/FadeUp";
 
+/** The newest system, shown as a wide card above the grid. */
+const FEATURED = {
+  title: "Crime Families",
+  img: "/art/cf-war-banner.png",
+  alt: "Fortuna's don leading a turf war in a neon-lit street",
+  href: "/docs/crime-families",
+  blurb:
+    "Found or join a family of 10 to 30 players. Pull crew heists that only work if everyone shares their intel, vote out a bad Boss, and fight turf wars for league cities. Play from any server.",
+  cmds: ["!crew", "!heist", "!turf"],
+};
+
 const MODULES = [
   {
     title: "Economy & Money",
@@ -85,9 +96,38 @@ export function ModuleShowcase() {
     <section className="mx-auto max-w-[90rem] px-6 py-16">
       <SectionHeader
         eyebrow="What's in the box"
-        title="Nine systems. One economy."
+        title="Ten systems. One economy."
         sub="Everything below runs on the same wallet — and follows you to every server."
       />
+      <FadeUp>
+        <Link href={FEATURED.href} className="mb-4 block">
+          <Panel className="grid overflow-hidden transition-colors hover:border-gold/40 lg:grid-cols-[3fr_2fr]">
+            <div className="relative aspect-[960/336] w-full bg-panel lg:aspect-auto lg:min-h-[17rem]">
+              <Image
+                src={FEATURED.img}
+                alt={FEATURED.alt}
+                fill
+                sizes="(min-width: 1024px) 60vw, 100vw"
+                className="object-cover [image-rendering:pixelated]"
+              />
+            </div>
+            <div className="flex flex-col justify-center p-6 lg:p-8">
+              <Tag color="gold" className="w-fit">NEW</Tag>
+              <h3 className="mt-3 font-display text-2xl font-bold text-ink">
+                {FEATURED.title}
+              </h3>
+              <p className="mt-2 leading-relaxed text-muted">{FEATURED.blurb}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {FEATURED.cmds.map((c) => (
+                  <Tag key={c} color="gold" className="font-mono">
+                    {c}
+                  </Tag>
+                ))}
+              </div>
+            </div>
+          </Panel>
+        </Link>
+      </FadeUp>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {MODULES.map((m, i) => (
           <FadeUp key={m.title} delay={(i % 3) * 0.06}>
