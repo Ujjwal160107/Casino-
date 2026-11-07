@@ -246,4 +246,18 @@ describe("the intel relay through Discord (amendment 5.3, 5.8)", () => {
     expect(await testPrisma.caperCrew.count({ where: { caperId: caper.id, sharedIntel: true } })).toBe(1);
     expect([...fc.dms.values()].reduce((a, b) => a + b, 0)).toBe(1);                  // only the Lookout's one share nudged
   }));
+
+  it("a committed Share whose brief reply fails still nudges once and shows no error", () => open(async () => {
+    const { caper, ids } = await seedRunning({ tier: 1, roles: ["MASTERMIND", "LOOKOUT", "SAFECRACKER"], picks: { MASTERMIND: "none" } });
+    const fc = fakeCaperClient();
+    const i = fakeButton(CPR_IDS.share(caper.id), { userId: ids.LOOKOUT, guildId: "g2", ephemeralSource: true, client: fc.client });
+    i.editReply.mockRejectedValueOnce(Object.assign(new Error("Internal Server Error"), { status: 500 }));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await press(i);
+    } finally { error.mockRestore(); }
+    expect(said(i)).not.toContain("Something went wrong.");
+    expect(await testPrisma.caperCrew.count({ where: { caperId: caper.id, sharedIntel: true } })).toBe(1);
+    expect([...fc.dms.values()].reduce((a, b) => a + b, 0)).toBe(1);
+  }));
 });

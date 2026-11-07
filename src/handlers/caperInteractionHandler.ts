@@ -62,9 +62,11 @@ const actRoute: CfRoute = async (i, [caperId, index]) => {
 };
 
 // Share is not gated by the kill switch: a live crew heist finishes (A18).
+// The share has committed and a second press reads "Already shared.": a failed
+// brief reply is logged, never sent as a refusal, and never skips the nudge.
 const shareRoute: CfRoute = async (i, [caperId]) => {
   const { brief, nudge } = await shareIntel(caperId, i.user.id);
-  await show(i, buildBrief(brief));
+  await safely("caper share brief", () => show(i, buildBrief(brief)));
   if (nudge) await sendIntelNudge(i.client, caperId, i.user.id, nudge);
 };
 
