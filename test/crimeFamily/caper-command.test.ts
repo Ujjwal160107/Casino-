@@ -21,7 +21,7 @@ async function run(fc: ReturnType<typeof fakeCaperClient>, uid: string, args: st
 }
 async function lobby() {
   const f = await caperCrew({ tier: 1, roles: [...T1] });
-  const fc = fakeCaperClient({ members: Object.values(f.ids) });
+  const fc = fakeCaperClient();
   const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
   return { ...f, fc, c };
 }

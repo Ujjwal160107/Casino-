@@ -107,7 +107,7 @@ describe("capers with Redis down", () => {
 
   it("plan → joins → auto-start → locks → settle pays exactly the stored outcome, and every state renders", async () => {
     const f = await caperCrew({ tier: 1, roles: [...T1] });
-    const fc = fakeCaperClient({ members: Object.values(f.ids) });
+    const fc = fakeCaperClient();
     const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
     const mid = await postCaperCard(fc.client, c.id, CH);
     for (const r of ["LOOKOUT", "SAFECRACKER", "DRIVER"] as const) {
@@ -135,7 +135,7 @@ describe("capers with Redis down", () => {
 
   it("announceLobby still DMs a qualified member (the lobby-DM cap fails open)", async () => {
     const f = await caperCrew({ tier: 1, roles: [...T1] });
-    const fc = fakeCaperClient({ members: Object.values(f.ids) });
+    const fc = fakeCaperClient();
     const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
     expect(await announceLobby(fc.client, c.id)).toEqual(expect.arrayContaining([f.ids.LOOKOUT, f.ids.SAFECRACKER, f.ids.DRIVER]));
     expect(fc.dms.get(f.ids.LOOKOUT)).toBe(1);

@@ -4,6 +4,7 @@
 // gallery the message already holds (an edit, no files), "none" no gallery.
 import {
   ActionRowBuilder,
+  type ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
   ModalBuilder,
@@ -141,8 +142,8 @@ export function buildBidModal(racketKey: string, ownerId: string): ModalBuilder 
 
 // ── S18, S25 ─────────────────────────────────────────────────────────────────
 
-/** Scout plus one Hit button per block: shared by S18 and the S25 war card. */
-function warActionRow(warId: string) {
+/** Scout plus one Hit button per block: shared by S18, the S25 war card and the war-soon DM. */
+export function warActionRow(warId: string): ActionRowBuilder<ButtonBuilder> {
   return buttonRow(
     cfButton(TURF_IDS.scout(warId), "Scout", ButtonStyle.Secondary, { emojiKey: "role_lookout" }),
     ...WAR_BLOCKS.map((b) => cfButton(TURF_IDS.hit(warId, b.key), `Hit ${b.name}`, ButtonStyle.Danger, { emojiKey: b.emojiKey })),
@@ -213,7 +214,7 @@ export function buildHitResult(content: string): CfPayload {
 export function buildScoutReport(r: ScoutReport, blockName: string): CfPayload {
   const container = new ContainerBuilder().addTextDisplayComponents(
     text(`${cfLabel(blockDef(r.block).emojiKey, blockName)}: weak point is **${r.approach}** until ${rel(r.slotEndsAt)}`),
-    text("-# Share it with your crew in the home channel."),
+    text("-# Share it with your crew: it holds until the slot ends."),
   );
   return cfPayload(container, { ephemeral: true });
 }

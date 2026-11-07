@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { DM_NOTICE_TYPES, isCooldownReminderType } from "../../src/services/dmPrefsService";
-import { caperGoNotice, caperLobbyNotice, familyArrearsNotice, familyInviteNotice, notifyMany } from "../../src/services/dmNoticeService";
+import { caperGoNotice, caperLobbyNotice, familyArrearsNotice, familyInviteNotice, notifyMany, turfWarSoonNotice } from "../../src/services/dmNoticeService";
+import { briefRow, joinSelectRow } from "../../src/ui/crimeFamily/caperScreens";
+import { warActionRow } from "../../src/ui/crimeFamily/turfScreens";
+import { cfPayload } from "../../src/ui/crimeFamily/kit";
+import { countComponents } from "../crimeFamily/layoutHelpers";
+import { visibleText } from "../crimeFamily/visibleText";
 import { containerText, containerThumb, fakeDmClient } from "./helpers";
 import { seedUser, seedEligibleUser, seedFamily, seedApplication, resetFamilies, daysAgo } from "../helpers";
 import { sendApplicationDigests } from "../../src/ui/crimeFamily/recruitAnnounce";
@@ -40,6 +45,8 @@ describe("family DM notices (13.4)", () => {
   });
 });
 
+const CAPER = "65f0000000000000000000aa";
+
 describe("caper DM notices (13.4)", () => {
   it("caper is a cooldown reminder for !heist; caper_lobby is an account notice with no command", () => {
     expect(DM_NOTICE_TYPES.caper).toEqual({ label: "Crew heist", command: "!heist", group: "cooldown" });
@@ -48,13 +55,25 @@ describe("caper DM notices (13.4)", () => {
     expect(isCooldownReminderType("caper_lobby")).toBe(false);
   });
   it("the lobby call names the tier, stake and close time and links the card", () => {
-    const t = containerText(caperLobbyNotice({ familyLabel: "[VLA] Velvet Ante", tierName: "Payroll Van", stake: 100_000, closesAt: new Date(1_800_000_000_000), jumpUrl: "https://discord.com/channels/1/2/3" }));
+    const t = containerText(caperLobbyNotice({ familyLabel: "[VLA] Velvet Ante", tierName: "Payroll Van", stake: 100_000, closesAt: new Date(1_800_000_000_000), jumpUrl: "https://discord.com/channels/1/2/3" }, joinSelectRow(CAPER, ["LOOKOUT"])));
     for (const s of ["Payroll Van", "100,000", "<t:1800000000:R>", "https://discord.com/channels/1/2/3"]) expect(t).toContain(s);
   });
   it("the GO call uses the cf_caper emoji as its thumbnail when loaded, the Gun emote otherwise", () => {
-    expect(containerThumb(caperGoNotice({ tierName: "x", goEndsAt: new Date(), jumpUrl: null }))).toContain("1456729243399753752");
+    expect(containerThumb(caperGoNotice({ tierName: "x", goEndsAt: new Date(), jumpUrl: null }, briefRow(CAPER)))).toContain("1456729243399753752");
     setEmojiRecord("cf_caper", { id: "1234567890123456780", name: "cf_caper" });
-    expect(containerThumb(caperGoNotice({ tierName: "x", goEndsAt: new Date(), jumpUrl: null }))).toContain("1234567890123456780");
+    expect(containerThumb(caperGoNotice({ tierName: "x", goEndsAt: new Date(), jumpUrl: null }, briefRow(CAPER)))).toContain("1234567890123456780");
+  });
+  it("the lobby, GO and war-soon DMs carry their rows: 8, 8 and 11 components (amendment 5.5)", () => {
+    const at = new Date(1_800_000_000_000);
+    const lobby = cfPayload(caperLobbyNotice({ familyLabel: "[VLA] Velvet Ante", tierName: "Payroll Van", stake: 100_000, closesAt: at, jumpUrl: null }, joinSelectRow(CAPER, ["LOOKOUT"])));
+    expect(countComponents(lobby)).toBe(8);
+    expect(JSON.stringify(lobby)).toContain(`cpr:join:${CAPER}`);
+    const go = cfPayload(caperGoNotice({ tierName: "Payroll Van", goEndsAt: at, jumpUrl: null }, briefRow(CAPER)));
+    expect(countComponents(go)).toBe(8);
+    expect(JSON.stringify(go)).toContain(`cpr:brief:${CAPER}`);
+    const war = cfPayload(turfWarSoonNotice({ racketName: "Docks Numbers", side: "DEF", startsAt: at, channelUrl: "" }, warActionRow("65f0000000000000000000bb")));
+    expect(countComponents(war)).toBe(11);
+    expect(visibleText(war)).toContain("Scout and hit from the buttons below");
   });
 });
 

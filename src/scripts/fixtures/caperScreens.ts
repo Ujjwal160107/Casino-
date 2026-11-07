@@ -2,13 +2,15 @@
 // appended to crimeFamilyWorstCases() and read by both layout tests and
 // src/scripts/checkV2Payloads.ts. Built from literal views: no DB.
 import { MAX_SAFE_BALANCE } from "../../utils/economyConfig";
-import { caperRole, type CaperRoleKey } from "../../data/crimeFamilyCatalog";
+import { caperRole, caperTier, type CaperRoleKey } from "../../data/crimeFamilyCatalog";
+import { caperGoNotice, caperLobbyNotice } from "../../services/dmNoticeService";
 import type { BriefView, CaperCardView, CaperPlannerView, CaperSeatView } from "../../services/crimeFamily/views";
 import {
-  buildBrief, buildCaperCard, buildCaperPlanner, buildCaperSeatCard, buildGoCall, buildLobbyMoved, buildPersonalCaperCard,
+  briefRow, buildBrief, buildCaperCard, buildCaperPlanner, buildCaperSeatCard, buildGoCall, buildLobbyMoved, buildPersonalCaperCard,
+  joinSelectRow,
 } from "../../ui/crimeFamily/caperScreens";
 import { CPR_IDS } from "../../ui/crimeFamily/ids";
-import { buildOpener, type CfPayload } from "../../ui/crimeFamily/kit";
+import { buildOpener, cfPayload, type CfPayload } from "../../ui/crimeFamily/kit";
 import { jumpLink } from "../../ui/crimeFamily/post";
 
 const OWNER = "12345678901234567890";
@@ -84,5 +86,9 @@ export function caperWorstCases(): { label: string; max: number; payload: CfPayl
     { label: "S27 brief opener", max: 4, payload: buildOpener("Your crew heist brief is ready.", { customId: CPR_IDS.openBrief(CAPER_ID, OWNER), label: "Open brief" }) },
     { label: "S28 GO call (6 crew)", max: 4, payload: buildGoCall({ caperId: CAPER_ID, crewIds: CREW, goEndsAt: SOON(), pinched: ["98765432109876543401", "98765432109876543402"] }) },
     { label: "S28 lobby moved", max: 2, payload: buildLobbyMoved(jump) },
+    { label: "DM crew heist lobby (T4, 5 roles)", max: 8, payload: cfPayload(caperLobbyNotice(
+      { familyLabel: FAMILY_LABEL, tierName: caperTier(4).name, stake: caperTier(4).stake, closesAt: SOON(), jumpUrl: jump },
+      joinSelectRow(CAPER_ID, T4_ROLES.slice(1)))) },
+    { label: "DM crew heist GO", max: 8, payload: cfPayload(caperGoNotice({ tierName: caperTier(4).name, goEndsAt: SOON(), jumpUrl: jump }, briefRow(CAPER_ID))) },
   ];
 }

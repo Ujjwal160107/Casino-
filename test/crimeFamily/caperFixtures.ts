@@ -124,7 +124,11 @@ export async function seedRunning(o: {
 
 export type BotPerm = "ViewChannel" | "SendMessages" | "ReadMessageHistory" | "AttachFiles";
 
-export function fakeCaperClient(o: { members?: string[]; missingPerms?: Record<string, BotPerm[]> } = {}) {
+/**
+ * No family code reads guild membership (amendment 5.2): the guild cache holds only
+ * `{ id: G, name }` for the trade log. `lastDm` is each user's last DM payload.
+ */
+export function fakeCaperClient(o: { missingPerms?: Record<string, BotPerm[]> } = {}) {
   const dm = fakeDmClient();
   const sent: { channelId: string; payload: any }[] = [];
   const edits: { channelId: string; messageId: string; payload: any }[] = [];
@@ -148,15 +152,13 @@ export function fakeCaperClient(o: { members?: string[]; missingPerms?: Record<s
       edits.push({ channelId, messageId, payload }); return { id: messageId };
     },
   });
-  const members = new Set(o.members ?? []);
-  const guild = { id: G, name: "Guild", members: { fetch: vi.fn(async (uid: string) => (members.has(uid) ? { id: uid } : Promise.reject(new Error("Unknown Member")))) } };
   const client = {
     user: { id: "bot" },
     options: {},
     rest,
     channels: { fetch: vi.fn(async (id: string) => channel(id)) },
     users: (dm.client as any).users,
-    guilds: { cache: new Map([[G, guild]]) },
+    guilds: { cache: new Map([[G, { id: G, name: "Guild" }]]) },
   } as unknown as Client;
-  return { client, channel, rest, sent, edits, editFailures, sendFailures, dms: dm.sent };
+  return { client, channel, rest, sent, edits, editFailures, sendFailures, dms: dm.sent, lastDm: dm.last };
 }

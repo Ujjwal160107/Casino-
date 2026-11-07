@@ -25,7 +25,7 @@ beforeEach(async () => { await resetFamilies(); await flushTestKeys("cf:*"); });
 
 async function postedLobby(now = new Date()) {
   const f = await caperCrew({ tier: 1, roles: [...T1] });
-  const fc = fakeCaperClient({ members: Object.values(f.ids) });
+  const fc = fakeCaperClient();
   const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH, now });
   const mid = await postCaperCard(fc.client, c.id, CH);
   return { ...f, fc, c, mid: mid! };
@@ -115,16 +115,16 @@ describe("caper card and flow (13.2, 8.4)", () => {
     expect(edit).toHaveBeenCalledTimes(2);
   }, 10_000);
 
-  it("lobby DMs: only eligible, unseated members in the lobby's guild; at most 3 per member per rolling 24 h; none within 2 h of a cancelled lobby", async () => {
+  it("lobby DMs: only eligible, unseated members, in any server; at most 3 per member per rolling 24 h; none within 2 h of a cancelled lobby", async () => {
     const now = new Date();
     const f = await caperCrew({ tier: 1, roles: [...T1] });
     const assoc = await seedEligibleUser({ wallet: 3_000_000, prepKeys: ["hunting_permit"] });
     // Associate is derived from tenure (plan 1 P20), never a stored role: a Soldier who joined now is one.
     await testPrisma.familyMember.create({ data: { familyId: f.family.id, userId: assoc, role: "SOLDIER", roleSlot: assoc, seat: 9, joinedAt: now } });
     await testPrisma.inventory.deleteMany({ where: { userId: f.ids.DRIVER } });                       // no prep item for any open role
-    const fc = fakeCaperClient({ members: [f.ids.MASTERMIND, f.ids.LOOKOUT, f.ids.DRIVER, assoc] });   // the Safecracker is not in the guild
+    const fc = fakeCaperClient();
     const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH, now });
-    expect(await announceLobby(fc.client, c.id, now)).toEqual([f.ids.LOOKOUT]);
+    expect((await announceLobby(fc.client, c.id, now)).sort()).toEqual([f.ids.LOOKOUT, f.ids.SAFECRACKER].sort());
     for (let k = 0; k < 3; k++) await announceLobby(fc.client, c.id, now);
     expect(fc.dms.get(f.ids.LOOKOUT)).toBe(3);
     const old = await testPrisma.caper.create({ data: { familyId: f.family.id, tier: 1, status: "CANCELLED", outcome: "CANCELLED", liveSlot: "old-cancel", plannerId: f.ids.MASTERMIND, guildId: G, channelId: CH, lobbyClosesAt: now } });
@@ -136,12 +136,12 @@ describe("caper card and flow (13.2, 8.4)", () => {
   it("the lobby-DM counter is created with its 24 h TTL in one MULTI, and a Redis error still grants the DM (14.3)", async () => {
     const now = new Date();
     const f = await caperCrew({ tier: 1, roles: [...T1] });
-    const fc = fakeCaperClient({ members: [f.ids.MASTERMIND, f.ids.LOOKOUT] });
+    const fc = fakeCaperClient();
     const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH, now });
     const redis = redisService.getInstance();
     const expire = vi.spyOn(redis, "expire").mockRejectedValue(new Error("EXPIRE lost"));   // a lone EXPIRE would leave the key forever
     try {
-      expect(await announceLobby(fc.client, c.id, now)).toEqual([f.ids.LOOKOUT]);
+      expect((await announceLobby(fc.client, c.id, now)).sort()).toEqual([f.ids.LOOKOUT, f.ids.SAFECRACKER, f.ids.DRIVER].sort());
     } finally { expire.mockRestore(); }
     const ttl = await testRedis().ttl(`cf:lobbydm:${f.ids.LOOKOUT}`);
     expect(ttl).toBeGreaterThan(86_300);
@@ -150,7 +150,7 @@ describe("caper card and flow (13.2, 8.4)", () => {
     const multi = vi.spyOn(redis, "multi").mockImplementation(() => { throw new Error("Redis down"); });
     try {
       await flushTestKeys("cf:lobbydm:*");
-      expect(await announceLobby(fc.client, c.id, now)).toEqual([f.ids.LOOKOUT]);
+      expect((await announceLobby(fc.client, c.id, now)).sort()).toEqual([f.ids.LOOKOUT, f.ids.SAFECRACKER, f.ids.DRIVER].sort());
     } finally { multi.mockRestore(); }
   });
 
@@ -159,7 +159,7 @@ describe("caper card and flow (13.2, 8.4)", () => {
     const f = await caperCrew({ tier: 1, roles: [...T1] });
     const earlier = new Date(+now - 3 * 3_600_000);
     await testPrisma.caperCrew.create({ data: { caperId: "65f000000000000000000001", familyId: f.family.id, userId: f.ids.LOOKOUT, role: "LOOKOUT", liveSlot: "65f000000000000000000001", stake: 50_000, started: true, startedAt: earlier } });
-    const fc = fakeCaperClient({ members: Object.values(f.ids) });
+    const fc = fakeCaperClient();
     const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH, now });
     for (const r of JOINERS) await joinCaper({ caperId: c.id, uid: f.ids[r], role: r, now });
     expect((await runStart(fc.client, c.id, { kind: "auto" }, now)).status).toBe("started");

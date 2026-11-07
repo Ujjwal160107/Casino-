@@ -104,3 +104,18 @@ describe("turf screens (13.3)", () => {
     expect(opts).toHaveLength(10);
   });
 });
+
+it("the S20 scout report's hint is not bound to the home channel (G11)", async () => {
+  const { visibleText } = await import("./visibleText");
+  const scout = turfWorstCases().find((c) => c.label === "S20 scout report")!;
+  expect(visibleText(scout.payload)).toContain("it holds until the slot ends");
+  expect(visibleText(scout.payload)).not.toContain("in the home channel");
+});
+
+it("the war-soon DM carries Scout and the three Hits within its 12-component max", () => {
+  const WAR = "65f0000000000000000000ab";
+  const dm = turfWorstCases().find((c) => c.label === "DM turf war soon")!;
+  expect(dm.max).toBe(12);
+  const ids: string[] = []; json(dm.payload).forEach((c: any) => walk(c, (n) => n.custom_id && ids.push(n.custom_id)));
+  expect(ids).toEqual([TURF_IDS.scout(WAR), ...["docks", "main", "alleys"].map((b) => TURF_IDS.hit(WAR, b as any))]);
+});

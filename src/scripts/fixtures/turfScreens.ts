@@ -7,9 +7,10 @@ import { MAX_SAFE_BALANCE } from "../../utils/economyConfig";
 import { RACKETS, WAR_BLOCKS } from "../../data/crimeFamilyCatalog";
 import type { RacketDetailView, TurfMapView, TurfRacketLine, WarBoardView } from "../../services/crimeFamily/views";
 import {
-  buildHitCall, buildHitResult, buildRacketDetail, buildScoutReport, buildTurfMap, buildWarBoard, buildWarCard, buildWarResult,
+  buildHitCall, buildHitResult, buildRacketDetail, buildScoutReport, buildTurfMap, buildWarBoard, buildWarCard, buildWarResult, warActionRow,
 } from "../../ui/crimeFamily/turfScreens";
-import type { CfPayload } from "../../ui/crimeFamily/kit";
+import { turfWarSoonNotice } from "../../services/dmNoticeService";
+import { cfPayload, type CfPayload } from "../../ui/crimeFamily/kit";
 import { jumpLink } from "../../ui/crimeFamily/post";
 
 const OWNER = "12345678901234567890";
@@ -73,5 +74,9 @@ export function turfWorstCases(): { label: string; max: number; payload: CfPaylo
       }, "keep"),
     },
     { label: "S25 war card", max: 7, payload: buildWarCard({ warId: WAR_ID, racketName: "Construction Union Kickbacks", endsAt: SOON(), jumpUrl: jumpLink(OWNER, OWNER, OWNER) }) },
+    // 11 components; the amendment's 5.5 counts 12 (G10).
+    { label: "DM turf war soon", max: 12, payload: cfPayload(turfWarSoonNotice(
+      { racketName: "Construction Union Kickbacks", side: "DEF", startsAt: SOON(), channelUrl: jumpLink(OWNER, OWNER, OWNER).replace(/\/\d+$/, "") },
+      warActionRow(WAR_ID))) },
   ];
 }

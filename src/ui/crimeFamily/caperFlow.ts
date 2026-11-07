@@ -19,7 +19,7 @@ import { resolveCaper, type ResolveResult } from "../../services/crimeFamily/cap
 import { checkMemberEligibility } from "../../services/crimeFamily/eligibility";
 import { listMembers, requireMembership } from "../../services/crimeFamily/familyQueries";
 import { pickLobbyChannel, postCaperCard, renderCaperCard, requestCaperRender } from "./caperCard";
-import { buildGoCall } from "./caperScreens";
+import { briefRow, buildGoCall, joinSelectRow } from "./caperScreens";
 import { jumpLink, sendToChannel } from "./post";
 
 const mention = (id: string) => `<@${id}>`;
@@ -64,9 +64,10 @@ async function wouldQualify(uid: string, tier: CaperTierDef, open: readonly Cape
 }
 
 /**
- * The caper_lobby DMs for a new lobby: unseated members in the lobby's guild
- * who would qualify for an open seat and have a lobby-DM slot left; nobody
- * within lobbyDmQuietAfterCancelSeconds of a cancelled lobby. The ids DMed.
+ * The caper_lobby DMs for a new lobby: unseated members of the family, in any
+ * server (A4), who would qualify for an open seat and have a lobby-DM slot
+ * left; nobody within lobbyDmQuietAfterCancelSeconds of a cancelled lobby.
+ * Each DM carries the Join as… select. The ids DMed.
  */
 export async function announceLobby(client: Client, caperId: string, now: Date = new Date()): Promise<string[]> {
   const caper = await getCaper(caperId);
@@ -74,19 +75,12 @@ export async function announceLobby(client: Client, caperId: string, now: Date =
   if (!caper || !view || view.status !== "LOBBY" || view.openRoles.length === 0) return [];
   const quietSince = new Date(now.getTime() - CRIME_FAMILY_CONFIG.lobbyDmQuietAfterCancelSeconds * 1000);
   if (await cancelledLobbySince(caper.familyId, quietSince)) return [];
-  const guild = client.guilds.cache.get(caper.guildId);
-  if (!guild) return [];
 
   const tier = caperTier(view.tier);
   const seated = new Set(view.seats.map((s) => s.userId));
   const ids: string[] = [];
   for (const { userId } of await listMembers(caper.familyId)) {
     if (seated.has(userId)) continue;
-    try {
-      await guild.members.fetch(userId);
-    } catch {
-      continue;
-    }
     if (!(await wouldQualify(userId, tier, view.openRoles, now))) continue;
     if (await takeLobbyDmSlot(userId)) ids.push(userId);
   }
@@ -94,7 +88,7 @@ export async function announceLobby(client: Client, caperId: string, now: Date =
     familyLabel: view.familyLabel, tierName: tier.name, stake: tier.stake, closesAt: view.lobbyClosesAt,
     jumpUrl: view.messageId ? jumpLink(view.guildId, view.channelId, view.messageId) : null,
   };
-  await notifyMany(client, "caper_lobby", ids, () => caperLobbyNotice(notice));
+  await notifyMany(client, "caper_lobby", ids, () => caperLobbyNotice(notice, joinSelectRow(caperId, view.openRoles)));
   return ids;
 }
 
@@ -126,7 +120,7 @@ async function announceStart(client: Client, caperId: string, pinched: string[],
   const jumpTo = goId ?? (caper.messageId || null);
   const jumpUrl = jumpTo ? jumpLink(caper.guildId, caper.channelId, jumpTo) : null;
   const tierName = caperTier(caper.tier).name;
-  await notifyMany(client, "caper_lobby", crewIds, () => caperGoNotice({ tierName, goEndsAt: caper.goEndsAt, jumpUrl }));
+  await notifyMany(client, "caper_lobby", crewIds, () => caperGoNotice({ tierName, goEndsAt: caper.goEndsAt, jumpUrl }, briefRow(caperId)));
 
   for (const uid of crewIds) {
     await safely("caper reminder", async () => {

@@ -14,6 +14,7 @@ import { CATEGORIES, buildModuleView } from "../../src/commands/general/help";
 import { LESSONS } from "../../src/commands/general/tutorial";
 import { buildCrimeBoardPayload } from "../../src/commands/economy/crimeUi";
 import { resolveAndAnnounce } from "../../src/ui/crimeFamily/caperFlow";
+import { briefRow, joinSelectRow } from "../../src/ui/crimeFamily/caperScreens";
 import { seedEligibleUser, withCfConfig, resetFamilies } from "../helpers";
 import { seedRunning, fakeCaperClient } from "./caperFixtures";
 
@@ -40,8 +41,8 @@ describe("Crew Heist rename (amendment 9)", () => {
   it("no DM builder or DM pref label shows 'caper'", () => {
     const at = new Date();
     const built = [
-      dm.caperLobbyNotice({ tierName: "Warehouse Job", stake: 300_000, closesAt: at, familyLabel: "[VLA] Velvet Ante", jumpUrl: "https://discord.com/channels/1/2/3" }),
-      dm.caperGoNotice({ tierName: "Warehouse Job", goEndsAt: at, jumpUrl: "https://discord.com/channels/1/2/3" }),
+      dm.caperLobbyNotice({ tierName: "Warehouse Job", stake: 300_000, closesAt: at, familyLabel: "[VLA] Velvet Ante", jumpUrl: "https://discord.com/channels/1/2/3" }, joinSelectRow("65f0000000000000000000aa", ["LOOKOUT"])),
+      dm.caperGoNotice({ tierName: "Warehouse Job", goEndsAt: at, jumpUrl: "https://discord.com/channels/1/2/3" }, briefRow("65f0000000000000000000aa")),
       dm.turfNeglectNotice({ racketName: "Docks", strikes: 1, max: 3 }),
     ];
     for (const c of built) expect(visibleText(c)).not.toMatch(OLD);
@@ -72,7 +73,7 @@ describe("Crew Heist rename (amendment 9)", () => {
     await withCfConfig({ caperTradeLogMinPool: 1 }, async () => {
       logToChannel.mockClear();
       const run = await seedRunning({ tier: 1, roles: ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] });
-      const fc = fakeCaperClient({ members: Object.values(run.ids) });
+      const fc = fakeCaperClient();
       const result = await resolveAndAnnounce(fc.client, run.caper.id, new Date(+run.caper.goEndsAt! + 1_000));
       expect(result).toMatchObject({ status: "settled", resolvedNow: true });
       expect(logToChannel).toHaveBeenCalledTimes(1);

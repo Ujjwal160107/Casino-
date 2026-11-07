@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { handleCaper } from "../../src/commands/economy/caper";
 import { handleCrimeFamilyInteraction } from "../../src/handlers/crimeFamilyRouter";
-import { planCaper } from "../../src/services/crimeFamily/caperLobbyService";
+import { joinCaper, planCaper } from "../../src/services/crimeFamily/caperLobbyService";
+import { leaveFamily } from "../../src/services/crimeFamily/membershipService";
 import { postCaperCard } from "../../src/ui/crimeFamily/caperCard";
-import { CPR_IDS } from "../../src/ui/crimeFamily/ids";
-import { testPrisma, resetFamilies, ensureUniqueIndexes, flushTestKeys, withCfConfig, seedEligibleUser, seedFamily } from "../helpers";
+import { announceLobby, onSeatsChanged, runCancel, runStart } from "../../src/ui/crimeFamily/caperFlow";
+import { CPR_IDS, TURF_IDS } from "../../src/ui/crimeFamily/ids";
+import { announceWarSoon } from "../../src/ui/crimeFamily/turfAnnounce";
+import { testPrisma, resetFamilies, ensureUniqueIndexes, flushTestKeys, withCfConfig, seedEligibleUser, seedFamily, seedWar, seedRacket, daysAgo } from "../helpers";
 import { caperCrew, fakeCaperClient, G, CH } from "./caperFixtures";
-import { fakeSelect, said } from "./fakeInteraction";
+import { fakeButton, fakeSelect, said } from "./fakeInteraction";
 import { visibleText } from "./visibleText";
 
 const T1 = ["MASTERMIND", "LOOKOUT", "SAFECRACKER", "DRIVER"] as const;
@@ -91,5 +94,84 @@ describe("personal cards (amendment 5.2, 5.4)", () => {
     expect(said(i)).toContain("This crew heist belongs to another family.");
     expect(i.editReply.mock.calls.every((call: any[]) => !visibleText(call[0]).includes("seated as"))).toBe(true);
     expect((await testPrisma.wallet.findUnique({ where: { userId: outsider } }))!.balance).toBe(before);
+  }));
+});
+
+describe("DM personal cards (amendment 5.2, 5.5)", () => {
+  it("lobby DMs reach every qualified unseated member with no shared server, carrying Join as…", () => open(async () => {
+    const { ids, fc, c } = await lobbyWithCard();                             // the fake client knows no guild members at all
+    expect((await announceLobby(fc.client, c.id)).sort()).toEqual([ids.LOOKOUT, ids.SAFECRACKER, ids.DRIVER].sort());
+    expect(JSON.stringify(fc.lastDm.get(ids.DRIVER))).toContain(CPR_IDS.join(c.id));
+    expect(visibleText(fc.lastDm.get(ids.DRIVER))).toContain("Pick a role below to join from here.");
+  }));
+
+  it("a join from the lobby DM seats the member and edits the DM into the S25 seated card (edge 7)", () => open(async () => {
+    const { ids, fc, c } = await lobbyWithCard();
+    const i = await press(fakeSelect(CPR_IDS.join(c.id), ["DRIVER"], { userId: ids.DRIVER, guildId: null, messageId: "dm-1", client: fc.client }));
+    const card = i.editReply.mock.calls.at(-1)[0];
+    expect(visibleText(card)).toContain(`<@${ids.DRIVER}> seated as **Driver**`);
+    expect(JSON.stringify(card)).toContain(CPR_IDS.brief(c.id));
+    expect(await testPrisma.caperCrew.count({ where: { caperId: c.id, userId: ids.DRIVER } })).toBe(1);
+  }));
+
+  it("a stale lobby DM (started, cancelled, member left) is refused, charges nothing and is not edited (Review Focus 1)", () => open(async () => {
+    const started = await lobbyWithCard();
+    for (const r of ["LOOKOUT", "SAFECRACKER"] as const) await joinCaper({ caperId: started.c.id, uid: started.ids[r], role: r });
+    await runStart(started.fc.client, started.c.id, { kind: "press", uid: started.ids.MASTERMIND });
+    const cancelled = await lobbyWithCard();
+    await runCancel(cancelled.fc.client, cancelled.c.id, cancelled.ids.MASTERMIND);
+    const left = await lobbyWithCard();
+    await leaveFamily(left.ids.DRIVER);
+    for (const [k, expected] of [[started, "Lobby closed."], [cancelled, "Lobby closed."], [left, "You are not in a crime family."]] as const) {
+      const before = (await testPrisma.wallet.findUnique({ where: { userId: k.ids.DRIVER } }))!.balance;
+      const i = await press(fakeSelect(CPR_IDS.join(k.c.id), ["DRIVER"], { userId: k.ids.DRIVER, guildId: null, messageId: "dm-old", client: k.fc.client }));
+      expect(said(i)).toContain(expected);
+      expect(i.editReply.mock.calls.every((call: any[]) => !visibleText(call[0]).includes("seated as"))).toBe(true);
+      expect((await testPrisma.wallet.findUnique({ where: { userId: k.ids.DRIVER } }))!.balance).toBe(before);
+      expect(await testPrisma.caperCrew.count({ where: { caperId: k.c.id, userId: k.ids.DRIVER } })).toBe(0);
+    }
+  }));
+
+  it("the GO DM carries Open brief, and pressing it in the DM opens the brief", () => open(async () => {
+    const { ids, fc, c } = await lobbyWithCard();
+    for (const r of ["LOOKOUT", "SAFECRACKER"] as const) await joinCaper({ caperId: c.id, uid: ids[r], role: r });
+    const { full } = await joinCaper({ caperId: c.id, uid: ids.DRIVER, role: "DRIVER" });
+    await onSeatsChanged(fc.client, c.id, full);                                // full lobby: auto-start, GO DMs
+    expect(JSON.stringify(fc.lastDm.get(ids.SAFECRACKER))).toContain(CPR_IDS.brief(c.id));
+    const i = await press(fakeButton(CPR_IDS.brief(c.id), { userId: ids.SAFECRACKER, guildId: null, messageId: "dm-go", client: fc.client }));
+    expect(said(i)).toContain("Safecracker brief");
+  }));
+});
+
+describe("war actions from a DM (amendment 5.2, 5.5)", () => {
+  const ON = { enabled: true, turfEnabled: true };
+  async function warFamily(status: "ARMED" | "ACTIVE", racketKey: string) {
+    const boss = await seedEligibleUser({ wallet: 100_000 }); const s = await seedEligibleUser({ wallet: 100_000 });
+    const fam = await seedFamily({ bossId: boss, homeGuildId: G, homeChannelId: CH, members: [{ userId: s, role: "SOLDIER", joinedAt: daysAgo(10) }] });
+    await seedRacket(racketKey);
+    const w = await seedWar({ racketKey, status, topBid: 2_100_000, topBidderFamilyId: fam.id, defenderFamilyId: "" });
+    return { boss, s, fam, w };
+  }
+
+  it("the war-soon DM carries Scout and the three Hits", () => withCfConfig(ON, async () => {
+    const { s, w } = await warFamily("ARMED", "docks_numbers");
+    const fc = fakeCaperClient();
+    await announceWarSoon(fc.client, w.id, new Date());
+    const dm = JSON.stringify(fc.lastDm.get(s));
+    for (const id of [TURF_IDS.scout(w.id), TURF_IDS.hit(w.id, "docks"), TURF_IDS.hit(w.id, "main"), TURF_IDS.hit(w.id, "alleys")]) expect(dm).toContain(id);
+    expect(visibleText(fc.lastDm.get(s))).toContain("from any server");
+  }));
+
+  it("DM war buttons at the wrong time or from a member who left are refused with no row and no debit (Review Focus 4)", () => withCfConfig(ON, async () => {
+    const armed = await warFamily("ARMED", "docks_numbers");
+    const scout = (uid: string, warId: string) => press(fakeButton(TURF_IDS.scout(warId), { userId: uid, guildId: null }));
+    expect(said(await scout(armed.s, armed.w.id))).toContain("The war has not started yet.");
+    await testPrisma.war.update({ where: { id: armed.w.id }, data: { status: "SETTLING" } });
+    expect(said(await press(fakeButton(TURF_IDS.hit(armed.w.id, "docks"), { userId: armed.s, guildId: null })))).toContain("This war is over.");
+    const live = await warFamily("ACTIVE", "casino_row");
+    await leaveFamily(live.s);
+    expect(said(await scout(live.s, live.w.id))).toContain("Not your war.");
+    expect(await testPrisma.warContribution.count({ where: { userId: { in: [armed.s, live.s] } } })).toBe(0);
+    expect((await testPrisma.wallet.findUnique({ where: { userId: armed.s } }))!.balance).toBe(100_000);
   }));
 });

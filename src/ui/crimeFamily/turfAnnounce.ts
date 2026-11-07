@@ -22,7 +22,7 @@ import {
 import { safely } from "./caperFlow";
 import { buildNotice } from "./kit";
 import { channelLink, editChannelMessage, sendToChannel } from "./post";
-import { buildWarBoard, buildWarResult, warOutcomeLine } from "./turfScreens";
+import { buildWarBoard, buildWarResult, warActionRow, warOutcomeLine } from "./turfScreens";
 
 /** The stored board refs of a war (T8); [] before the first post. */
 export const boardsOf = (war: Pick<War, "boards">): WarBoardRef[] => (Array.isArray(war.boards) ? (war.boards as unknown as WarBoardRef[]) : []);
@@ -143,7 +143,10 @@ export async function announceBid(client: Client, r: BidResult): Promise<void> {
   });
 }
 
-/** The war-soon warning to every member of both families who may fight, linking their home channel (T9). */
+/**
+ * The war-soon warning to every member of both families who may fight, linking their home channel (T9),
+ * with the Scout and Hit buttons, so the DM is the member's war card in any server.
+ */
 export async function announceWarSoon(client: Client, warId: string, now: Date): Promise<void> {
   return safely("announceWarSoon", async () => {
     const war = await prisma.war.findUnique({ where: { id: warId } });
@@ -157,7 +160,7 @@ export async function announceWarSoon(client: Client, warId: string, now: Date):
       const home = homes.get(familyId);
       const channelUrl = home ? channelLink(home.guildId, home.channelId) : "";
       await notifyMany(client, "turf", members.filter((_, i) => checks[i].ok).map((m) => m.userId),
-        () => turfWarSoonNotice({ racketName, side, startsAt: war.startsAt, channelUrl }));
+        () => turfWarSoonNotice({ racketName, side, startsAt: war.startsAt, channelUrl }, warActionRow(war.id)));
     }
   });
 }
