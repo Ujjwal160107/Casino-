@@ -3,6 +3,7 @@
 // and 3 add their builders to CPR_IDS and TURF_IDS.
 import type { BoardSort, Requirements } from "../../services/crimeFamily/recruitService";
 import type { WarBlockKey } from "../../services/crimeFamily/warMath";
+import type { LeagueKey } from "../../data/crimeFamilyCatalog";
 
 export type CfPrefix = "crew" | "cpr" | "turf";
 
@@ -101,7 +102,7 @@ export const CPR_IDS = {
 
 /** Turf ids (spec 13.2): the map, select, opener and bid ids are owner-scoped; the war cards carry the war or hit id. */
 export const TURF_IDS = {
-  /** The S2 Turf button and S17's Back: S16. */
+  /** The S2 Turf button: the viewer's own S16. */
   viewMap: (owner: string) => cfId("turf", "v", "map", owner),
   /** S16's War board button (T20). */
   viewWar: (owner: string) => cfId("turf", "v", "war", owner),
@@ -111,6 +112,12 @@ export const TURF_IDS = {
   /** S17's Bid button: opens the bid modal (54 characters at most). */
   bid: (racketId: string, owner: string) => cfId("turf", "bid", racketId, owner),
   bidModal: (racketId: string, owner: string) => cfId("turf", "modal", "bid", racketId, owner),
+  /** S16's pager and S17's Back: one city's map (turf:city:<cityId>:<owner>, 55 characters at most). */
+  city: (cityId: string, owner: string) => cfId("turf", "city", cityId, owner),
+  /** A disabled ◀ or ▶ at the end of the league's cities, so it never repeats a live button's id (H3). */
+  cityEdge: (edge: "prev" | "next", owner: string) => cfId("turf", "city", edge, owner),
+  /** S16's league buttons: the city is resolved at press time (H3). */
+  league: (league: LeagueKey, owner: string) => cfId("turf", "lg", league, owner),
   scout: (warId: string) => cfId("turf", "scout", warId),
   hit: (warId: string, block: WarBlockKey) => cfId("turf", "hit", warId, block),
   hitAnswer: (hitId: string, index: number) => cfId("turf", "hx", hitId, index),

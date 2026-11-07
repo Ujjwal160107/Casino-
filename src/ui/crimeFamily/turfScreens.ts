@@ -15,7 +15,7 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from "discord.js";
-import { RACKET_CLASSES, WAR_BLOCKS, WAR_RULES, leagueDef } from "../../data/crimeFamilyCatalog";
+import { LEAGUE_RACKET_INCOME, RACKET_CLASSES, TURF_LEAGUES, WAR_BLOCKS, WAR_RULES, leagueDef } from "../../data/crimeFamilyCatalog";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { cfEmoji } from "../../utils/crimeFamilyAssets";
 import { fmtFortunes } from "../../utils/format";
@@ -45,6 +45,30 @@ function mapLine(line: TurfRacketLine, n: number): string {
     `${fmtFortunes(line.income)}/day · war ${warSlot(line.nextWarAt)}${war}`;
 }
 
+/** H19: the city and its league, the league's income per class, and the census line for an unplaced family. */
+function mapHeader(v: TurfMapView): string {
+  const lg = leagueDef(v.city.league);
+  const inc = LEAGUE_RACKET_INCOME[lg.key];
+  const head = `## ${cfLabel("war", "Turf")} · ${v.city.label} (${lg.name})\n` +
+    `-# ${lg.name} league rackets pay ${fmtFortunes(inc.CORNER)} / ${fmtFortunes(inc.DISTRICT)} / ${fmtFortunes(inc.CROWN)} a day ` +
+    "(Corner / District / Crown). Win a racket's weekly war to take it.";
+  return v.status ? `${head}\n-# ${v.status}` : head;
+}
+
+/** ◀ City, City ▶ (a disabled arrow at an end carries its own edge id, H3), then one button per league. */
+function cityRow(ownerId: string, v: TurfMapView): ActionRowBuilder<ButtonBuilder> {
+  const arrow = (edge: "prev" | "next", label: string) => {
+    const cityId = v.nav[edge];
+    return cityId ? cfButton(TURF_IDS.city(cityId, ownerId), label) : cfButton(TURF_IDS.cityEdge(edge, ownerId), label, ButtonStyle.Secondary, { disabled: true });
+  };
+  return buttonRow(
+    arrow("prev", "◀ City"),
+    arrow("next", "City ▶"),
+    ...TURF_LEAGUES.map((lg) => cfButton(TURF_IDS.league(lg.key, ownerId), lg.name,
+      lg.key === v.viewerLeague ? ButtonStyle.Primary : ButtonStyle.Secondary, { emojiKey: lg.crestKey })),
+  );
+}
+
 /** S16: always into a message that does not hold the map, so the banner is sent and old attachments cleared. */
 export function buildTurfMap(ownerId: string, v: TurfMapView): CfPayload {
   const banner = bannerGallery("turf_map");
@@ -56,9 +80,7 @@ export function buildTurfMap(ownerId: string, v: TurfMapView): CfPayload {
   const container = new ContainerBuilder();
   if (banner) container.addMediaGalleryComponents(banner.gallery);
   container
-    .addTextDisplayComponents(text(
-      `## ${cfLabel("war", "Turf")}\n-# Rackets pay family earnings daily. Win a racket's weekly war to take it.`,
-    ))
+    .addTextDisplayComponents(text(mapHeader(v)))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(group("CORNER"), group("DISTRICT"), group("CROWN"))
     .addSeparatorComponents(sep())
@@ -81,7 +103,8 @@ export function buildTurfMap(ownerId: string, v: TurfMapView): CfPayload {
     .addActionRowComponents(buttonRow(
       cfButton(TURF_IDS.viewWar(ownerId), "War board", ButtonStyle.Primary, { emojiKey: "war" }),
       cfButton(CREW_IDS.view("home", ownerId), "Back"),
-    ));
+    ))
+    .addActionRowComponents(cityRow(ownerId, v));
   return cfPayload(container, { files: banner ? [banner.file] : undefined, freshAttachments: true });
 }
 
@@ -123,7 +146,7 @@ export function buildRacketDetail(ownerId: string, v: RacketDetailView, note?: s
     .addTextDisplayComponents(text(details.join("\n")), text(hint))
     .addActionRowComponents(buttonRow(
       cfButton(TURF_IDS.bid(line.racketId, ownerId), "Bid", ButtonStyle.Primary, { disabled: !v.canBid }),
-      cfButton(TURF_IDS.viewMap(ownerId), "Back"),
+      cfButton(TURF_IDS.city(line.cityId, ownerId), "Back"),
     ));
   return cfPayload(container, { files: file ? [file] : undefined, freshAttachments: true });
 }

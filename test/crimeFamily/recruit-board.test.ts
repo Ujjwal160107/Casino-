@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { getBoardView, getFamilyCardView } from "../../src/services/crimeFamily/recruitQueries";
-import { buildFamilyCard, literal } from "../../src/ui/crimeFamily/recruitScreens";
+import { buildBoard, buildFamilyCard, literal } from "../../src/ui/crimeFamily/recruitScreens";
 import { FAMILY_LEVELS } from "../../src/data/crimeFamilyCatalog";
 import { visibleText } from "./visibleText";
 import { testPrisma, seedEligibleUser, seedFamily, resetFamilies } from "../helpers";
@@ -75,6 +75,13 @@ describe("recruitment board (amendment 8.3)", () => {
     expect(text).toContain("\\*\\*bold\\*\\*");
     expect(text).toContain("\\# Big");
     expect(card.allowedMentions).toEqual({ parse: [] });
+  });
+
+  it("the board row and the card header name the league beside the level (plan 4 F17)", async () => {
+    const f = await listed({ level: 5 });
+    const viewer = await seedEligibleUser();
+    expect(visibleText(buildBoard(await getBoardView(viewer, "lvl", false, 0, new Date())))).toContain("L5 · Silver");
+    expect(visibleText(buildFamilyCard(await getFamilyCardView(f.id, viewer, new Date())))).toContain("L5 · Silver");
   });
 
   it("a line-leading > stays literal instead of becoming a blockquote", () => {

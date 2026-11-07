@@ -4,7 +4,7 @@ import type { Racket, TurfCity, War } from "@prisma/client";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { RACKETS, cityLabel, leagueDef, leagueOf, racketDef, type LeagueKey } from "../../data/crimeFamilyCatalog";
-import { bidBlockers, isObjectId, loadBidContext } from "./bidService";
+import { bidBlockers, isObjectId, loadBidContext, noCityLine } from "./bidService";
 import { familyLabel } from "./familyQueries";
 import { pickPlacementCity } from "./leagueRules";
 import { can } from "./permissions";
@@ -135,11 +135,34 @@ async function racketLines(cityId: string, now: Date, racketIds?: string[]): Pro
   });
 }
 
-/** S16: the asked city when it is an OPEN city, else the viewer's (H10: a stale button never errors). */
+/** S16's league button: the viewer's own city when `league` is its family's league, else the league's city #1 (lowest OPEN). */
+export async function leagueCityFor(viewerId: string, league: LeagueKey): Promise<string> {
+  const viewer = await viewerCity(viewerId);
+  if (viewer.family && leagueOf(viewer.family.level).key === league) return viewer.city.id;
+  const [first] = await openCities(league);
+  if (!first) throw new FamilyError(TURF_NOT_READY);
+  return first.id;
+}
+
+/**
+ * S16: the asked city when it is an OPEN city, else the viewer's (H10: a stale
+ * button never errors), with the viewer's league, the census line for an
+ * unplaced family and the pager's neighbours in the shown city's league.
+ */
 export async function getTurfMapView(viewerId: string, cityId: string | null, now: Date): Promise<TurfMapView> {
   const asked = cityId && isObjectId(cityId) ? await prisma.turfCity.findFirst({ where: { id: cityId, status: "OPEN" } }) : null;
-  const city = asked ? cityRef(asked) : (await viewerCity(viewerId)).city;
-  return { city, rackets: await racketLines(city.id, now), nextWar: soonestWar(now) };
+  const viewer = await viewerCity(viewerId);
+  const city = asked ? cityRef(asked) : viewer.city;
+  const league = await openCities(city.league);
+  const at = league.findIndex((c) => c.id === city.id);
+  return {
+    city,
+    viewerLeague: viewer.family ? leagueOf(viewer.family.level).key : null,
+    status: viewer.family && !viewer.placed ? noCityLine(now) : null,
+    nav: { prev: league[at - 1]?.id ?? null, next: league[at + 1]?.id ?? null },
+    rackets: await racketLines(city.id, now),
+    nextWar: soonestWar(now),
+  };
 }
 
 /** S17: the bid figures and the viewer's blockers, from the same context placeBid checks (read-only). */

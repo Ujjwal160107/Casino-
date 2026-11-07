@@ -4,10 +4,10 @@
 // Hit and the hit answer are not, so a war already running finishes (T1), and
 // work from any server or a DM (A4).
 // Every war press is authorised against DB rows by the service, never the message.
-import { WAR_BLOCKS, racketDef } from "../data/crimeFamilyCatalog";
+import { TURF_LEAGUES, WAR_BLOCKS, racketDef } from "../data/crimeFamilyCatalog";
 import { BAD_AMOUNT, parseBidAmount, placeBid } from "../services/crimeFamily/bidService";
 import { getMembership } from "../services/crimeFamily/familyQueries";
-import { getLiveWarFor, getRacketDetailView, getTurfMapView } from "../services/crimeFamily/turfQueries";
+import { getLiveWarFor, getRacketDetailView, getTurfMapView, leagueCityFor } from "../services/crimeFamily/turfQueries";
 import { FamilyError } from "../services/crimeFamily/tx";
 import { answerHit, armHit, scoutWar } from "../services/crimeFamily/warActions";
 import { soonestWar, type WarBlockKey } from "../services/crimeFamily/warMath";
@@ -41,6 +41,15 @@ const gated = (ack: CfRouteEntry["ack"], run: CfRoute): CfRouteEntry => ({
   },
 });
 const shared = (ack: CfRouteEntry["ack"], run: CfRoute): CfRouteEntry => ({ scope: "shared", ack, run });
+
+const mapScreen = async (uid: string, cityId: string | null) => buildTurfMap(uid, await getTurfMapView(uid, cityId, new Date()));
+
+/** S16's league button: an unknown league is a stale or forged id. */
+const leagueRoute: CfRoute = async (i, [key]) => {
+  const league = TURF_LEAGUES.find((l) => l.key === key);
+  if (!league) throw new FamilyError(INACTIVE);
+  await show(i, await mapScreen(i.user.id, await leagueCityFor(i.user.id, league.key)));
+};
 
 const racketScreen = async (uid: string, racketId: string, note?: string) =>
   buildRacketDetail(uid, await getRacketDetailView(racketId, uid, new Date()), note);
@@ -99,7 +108,10 @@ const answerRoute: CfRoute = async (i, [hitId, index]) => {
 };
 
 export const TURF_ROUTES: CfRouteTable = {
-  "v:map": gated("auto", async (i) => show(i, buildTurfMap(i.user.id, await getTurfMapView(i.user.id, null, new Date())))),
+  "v:map": gated("auto", async (i) => show(i, await mapScreen(i.user.id, null))),
+  // A non-ObjectId (a disabled edge arrow) or CLOSED city id shows the viewer's city (H10).
+  city: gated("auto", async (i, [cityId]) => show(i, await mapScreen(i.user.id, cityId))),
+  lg: gated("auto", leagueRoute),
   "v:war": gated("auto", async (i) => show(i, await warCardScreen(i.user.id, new Date()))),
   sel: gated("auto", async (i) => show(i, await racketScreen(i.user.id, i.isStringSelectMenu() ? i.values[0] : ""))),
   "open:racket": gated("ephemeral", async (i, [, racketId]) => show(i, await racketScreen(i.user.id, racketId))),

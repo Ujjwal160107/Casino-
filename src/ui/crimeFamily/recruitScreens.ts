@@ -15,6 +15,7 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from "discord.js";
+import { leagueOf } from "../../data/crimeFamilyCatalog";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { fmtFortunes } from "../../utils/format";
 import { REQUIREMENTS, type BoardSort, type Requirements } from "../../services/crimeFamily/recruitService";
@@ -66,7 +67,7 @@ export function buildBoard(v: BoardView): CfPayload {
   const { ownerId: owner, sort, qualifyOnly: q } = v;
   const header = `## Families recruiting\nSort: ${SORT_LABELS[sort]} · I qualify: ${q ? "on" : "off"} · page ${v.page + 1}/${v.pages}`;
   const lines = v.rows.map((r) =>
-    `${cfLabel(r.crestKey, `**[${r.tag}] ${r.name}**`)} · L${r.level} · ${r.members}/${r.cap} members · ${r.active} active${r.qualifies ? " ✓" : ""}\n` +
+    `${cfLabel(r.crestKey, `**[${r.tag}] ${r.name}**`)} · L${r.level} · ${leagueOf(r.level).name} · ${r.members}/${r.cap} members · ${r.active} active${r.qualifies ? " ✓" : ""}\n` +
     `-# ${reqLine(r.req)}`);
   const container = new ContainerBuilder()
     .addTextDisplayComponents(text(header))
@@ -112,7 +113,7 @@ function cardStatus(v: FamilyCardView): string {
 export function buildFamilyCard(v: FamilyCardView, note?: string): CfPayload {
   const container = new ContainerBuilder();
   const file = addThumbSection(container,
-    withNote(`## ${v.label}\nL${v.level} · ${v.members}/${v.cap} members · ${v.active} active`, note),
+    withNote(`## ${v.label}\nL${v.level} · ${leagueOf(v.level).name} · ${v.members}/${v.cap} members · ${v.active} active`, note),
     v.crestKey);
   const checks = [
     ...v.checks.map((c) => `${checkMark(c)} ${c.label}: ${fmtFortunes(c.need)} (you ${fmtFortunes(c.have)})`),

@@ -18,6 +18,8 @@ const WAR_ID = "65f0000000000000000000ab";
 const HIT_ID = "65f0000000000000000000ac";
 const BIG = MAX_SAFE_BALANCE - 1;
 const CITY = { id: "65f0000000000000000000c1", league: "GOLD", number: 999, label: "Uptown #999" } as const;
+const CITY_PREV = "65f0000000000000000000c0";
+const CITY_NEXT = "65f0000000000000000000c2";
 const SOON = () => new Date(Date.now() + 3_600_000);
 const label = (i: number) => `[WX${String(i).padStart(2, "0")}] Velvet Ante Syndicate Ok`; // 24-character name
 const HITTERS = (base: number) => Array.from({ length: 5 }, (_, i) => ({ userId: `9876543210987654${base + i}`, points: 9_999 - i }));
@@ -34,7 +36,10 @@ function line(i: number): TurfRacketLine {
 }
 
 function mapView(): TurfMapView {
-  return { city: CITY, rackets: RACKETS.map((_, i) => line(i)), nextWar: { racketName: RACKETS[6].name, startsAt: SOON() } };
+  return {
+    city: CITY, viewerLeague: "GOLD", status: null, nav: { prev: CITY_PREV, next: CITY_NEXT },
+    rackets: RACKETS.map((_, i) => line(i)), nextWar: { racketName: RACKETS[6].name, startsAt: SOON() },
+  };
 }
 
 function detailView(): RacketDetailView {
@@ -58,7 +63,18 @@ function boardView(blackout: boolean): WarBoardView {
 export function turfWorstCases(): { label: string; max: number; payload: CfPayload }[] {
   const docks = WAR_BLOCKS[0];
   return [
-    { label: "S16 turf map (10 owned rackets, live bids)", max: 14, payload: buildTurfMap(OWNER, mapView()) },
+    {
+      label: "S16 turf map (placed Gold family, 10 owned rackets, live bids, both pager arrows)", max: 20,
+      payload: buildTurfMap(OWNER, { ...mapView(), viewerLeague: "GOLD", status: null, nav: { prev: CITY_PREV, next: CITY_NEXT } }),
+    },
+    {
+      label: "S16 turf map (unplaced family)", max: 20,
+      payload: buildTurfMap(OWNER, {
+        ...mapView(), viewerLeague: "GOLD",
+        status: "Your family has no city yet: it gets one at the daily census once 3 members are active (next <t:4102444800:R>).",
+        nav: { prev: null, next: null },
+      }),
+    },
     { label: "S17 racket detail (blocked)", max: 11, payload: buildRacketDetail(OWNER, detailView()) },
     { label: "S18 war board", max: 13, payload: buildWarBoard(boardView(false), "send") },
     { label: "S18 war board (blackout)", max: 13, payload: buildWarBoard(boardView(true), "send") },

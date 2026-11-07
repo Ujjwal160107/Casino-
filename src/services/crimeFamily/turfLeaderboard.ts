@@ -6,7 +6,7 @@ import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import type { LeaderboardSort } from "./leaderboard";
 
-/** Every family holding ≥ 1 racket (at most 10 exist), ranked. */
+/** Every family holding ≥ 1 racket in any city, ranked. */
 async function rankedHolders(): Promise<{ familyId: string; value: number }[]> {
   const rows = await prisma.racket.groupBy({ by: ["ownerFamilyId"], where: { ownerFamilyId: { not: "" } }, _count: { _all: true } });
   const families = await prisma.family.findMany({ where: { id: { in: rows.map((r) => r.ownerFamilyId) } }, select: { id: true, createdAt: true } });

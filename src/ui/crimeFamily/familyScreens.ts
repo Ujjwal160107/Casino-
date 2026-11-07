@@ -13,7 +13,7 @@ import {
   type AttachmentBuilder,
 } from "discord.js";
 import { Mascot } from "../../config/branding";
-import { FAMILY_ROLES, type FamilyRole } from "../../data/crimeFamilyCatalog";
+import { FAMILY_ROLES, leagueOf, type FamilyRole } from "../../data/crimeFamilyCatalog";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { cfEmoji } from "../../utils/crimeFamilyAssets";
 import { fmtFortunes } from "../../utils/format";
@@ -385,7 +385,7 @@ const MEDALS = [Mascot.Emotes.MedalGold, Mascot.Emotes.MedalSilver, Mascot.Emote
 function leaderboardLine(row: LeaderboardView["rows"][number], sortLabel: string): string {
   const place = MEDALS[row.rank - 1] ?? `**#${row.rank}**`;
   const crest = cfEmoji(row.crestKey);
-  const parts = [`${place} ${crest ? `${crest} ` : ""}**[${row.tag}]** ${row.name}`, `L${row.level}`, `${row.members} members`];
+  const parts = [`${place} ${crest ? `${crest} ` : ""}**[${row.tag}]** ${row.name}`, `L${row.level} ${leagueOf(row.level).name}`, `${row.members} members`];
   if (row.rackets !== null) parts.push(`${row.rackets} rackets`);
   parts.push(`${fmtFortunes(row.value)} ${sortLabel}`);
   if (row.level === CRIME_FAMILY_CONFIG.maxLevel) parts.push(`${Mascot.Emotes.MedalGold} Made Family`);

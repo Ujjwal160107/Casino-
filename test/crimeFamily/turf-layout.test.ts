@@ -119,3 +119,18 @@ it("the war-soon DM carries Scout and the three Hits within its 12-component max
   const ids: string[] = []; json(dm.payload).forEach((c: any) => walk(c, (n) => n.custom_id && ids.push(n.custom_id)));
   expect(ids).toEqual([TURF_IDS.scout(WAR), ...["docks", "main", "alleys"].map((b) => TURF_IDS.hit(WAR, b as any))]);
 });
+
+it("both S16 cases fit in 20 components and carry no duplicate custom_id (6.8, H3)", async () => {
+  const { countComponents } = await import("./layoutHelpers");
+  const maps = turfWorstCases().filter((c) => c.label.startsWith("S16"));
+  expect(maps.map((c) => c.label)).toEqual([
+    "S16 turf map (placed Gold family, 10 owned rackets, live bids, both pager arrows)",
+    "S16 turf map (unplaced family)",
+  ]);
+  for (const c of maps) {
+    expect(c.max).toBe(20);
+    expect(countComponents(c.payload)).toBeLessThanOrEqual(20);
+    const ids: string[] = []; json(c.payload).forEach((x: any) => walk(x, (n) => n.custom_id && ids.push(n.custom_id)));
+    expect(new Set(ids).size).toBe(ids.length);
+  }
+});

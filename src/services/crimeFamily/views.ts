@@ -1,6 +1,6 @@
 // View types passed from the family services to the UI builders (types only).
 // Each later view type is added by the task that first produces it.
-import type { CaperRoleKey, FamilyLevelDef, FamilyRole } from "../../data/crimeFamilyCatalog";
+import type { CaperRoleKey, FamilyLevelDef, FamilyRole, LeagueKey } from "../../data/crimeFamilyCatalog";
 import type { LedgerLine } from "./ledger";
 import type { BoardSort, Requirements } from "./recruitService";
 import type { WarSettlement, WarStatus } from "./warService";
@@ -221,6 +221,12 @@ export interface TurfRacketLine {
 /** S16: one city's 10 rackets in `RACKETS` order and the soonest war. */
 export interface TurfMapView {
   city: TurfCityRef;
+  /** The viewer's family's league (by level); null for a non-member. */
+  viewerLeague: LeagueKey | null;
+  /** The census line for a member whose family has no city yet; else null. */
+  status: string | null;
+  /** The OPEN cities of the shown city's league just below and above it by number (null at the ends). */
+  nav: { prev: string | null; next: string | null };
   rackets: TurfRacketLine[];
   nextWar: { racketName: string; startsAt: Date };
 }

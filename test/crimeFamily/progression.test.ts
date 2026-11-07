@@ -2,6 +2,8 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { levelUp, levelUpPreview, awardFamilyXp } from "../../src/services/crimeFamily/progression";
 import { getLeaderboard } from "../../src/services/crimeFamily/leaderboard";
 import { runFamilyTx } from "../../src/services/crimeFamily/tx";
+import { buildLeaderboard } from "../../src/ui/crimeFamily/familyScreens";
+import { visibleText } from "./visibleText";
 import {
   testPrisma, seedEligibleUser, seedFamily, seedTurfCity, seedRacket, seedWar, resetFamilies, ensureUniqueIndexes, withCfConfig,
 } from "../helpers";
@@ -116,5 +118,6 @@ describe("XP and leaderboard (10.2, 10.4)", () => {
     expect(v.rows[0]).toMatchObject({ rank: 1, familyId: fams[11].id, value: 12, level: 1, members: 1, rackets: 0 });
     expect(v.viewer).toEqual({ rank: 12, value: 1 });
     expect(v.sorts).toEqual([{ key: "xp", label: "XP" }, { key: "rk", label: "Rackets" }, { key: "war", label: "War wins" }]);
+    expect(visibleText(buildLeaderboard(fams[0].bossId, v, { art: false }))).toContain("L1 Bronze");   // 2.6: the league beside the level
   });
 });
