@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createHmac } from "crypto";
 import * as M from "../../src/services/crimeFamily/warMath";
-import { RACKETS, racketDef } from "../../src/data/crimeFamilyCatalog";
+import { LEAGUE_RACKET_INCOME, RACKETS, racketDef } from "../../src/data/crimeFamilyCatalog";
 import { CRIME_FAMILY_CONFIG, isTurfOpen } from "../../src/utils/economyConfig";
 import { withCfConfig } from "../helpers";
 
@@ -78,7 +78,7 @@ describe("war math (9.1, 9.4, 15)", () => {
   it("baseline, floor, raise and capture XP come from the catalog", () => {
     expect(M.baselineScores("CROWN")).toEqual({ defDocks: 80, defMain: 80, defAlleys: 80 });
     expect(M.baselineScores("CORNER")).toEqual({ defDocks: 30, defMain: 30, defAlleys: 30 });
-    expect(RACKETS.map((r) => M.bidFloor(r))).toEqual([2_100_000, 2_100_000, 4_550_000, 4_550_000, 2_100_000, 2_100_000, 4_550_000, 4_550_000, 9_100_000, 9_100_000]);
+    expect(RACKETS.map((r) => M.bidFloor({ incomePerCycle: LEAGUE_RACKET_INCOME.GOLD[r.class] }))).toEqual([2_100_000, 2_100_000, 4_550_000, 4_550_000, 2_100_000, 2_100_000, 4_550_000, 4_550_000, 9_100_000, 9_100_000]);
     expect(M.minNextBid(0, 9_100_000)).toBe(9_100_000);
     expect(M.minNextBid(9_100_000, 9_100_000)).toBe(10_010_000);
     expect(M.minNextBid(10_010_000, 9_100_000)).toBe(11_011_000);

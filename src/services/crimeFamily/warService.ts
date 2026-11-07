@@ -6,7 +6,7 @@
 import { randomBytes } from "crypto";
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
-import { WAR_RULES, levelDef, racketDef, type RacketDef } from "../../data/crimeFamilyCatalog";
+import { RACKETS, WAR_RULES, levelDef, racketDef, type RacketDef } from "../../data/crimeFamilyCatalog";
 import { addCrimeHeatTx, migrateLegacyHeatForUser } from "../taxService";
 import { writeLedger } from "./ledger";
 import { awardFamilyXp } from "./progression";
@@ -34,24 +34,33 @@ function defOf(racketKey: string): RacketDef {
 }
 
 /**
- * Step 1 of tickWars: a War row per seeded racket for its next start, created
- * only while that window's bidding is open (T13). No transaction is open, so
- * a P2002 from a racing create is caught and ignored.
+ * Step 1 of tickWars (amendment 6.7): per racket key, while its window's
+ * bidding is open, a War row for each racket of an OPEN city whose
+ * openedPeriodKey is not this period yet, then the key stamped (one write per
+ * racket per week; a CLOSED city gets none). No transaction is open, so a
+ * P2002 from a racing create is caught and ignored.
  */
 export async function openWarPeriods(now: Date): Promise<void> {
-  const rackets = await prisma.racket.findMany({ select: { id: true, key: true, warDow: true, warHourUtc: true } });
-  for (const r of rackets) {
-    const startsAt = nextWarStart(r, now);
+  const open = (await prisma.turfCity.findMany({ where: { status: "OPEN" }, select: { id: true } })).map((c) => c.id);
+  for (const def of RACKETS) {
+    const startsAt = nextWarStart(def, now);
     if (bidPhase(startsAt, now).phase !== "OPEN") continue;
     const w = warWindow(startsAt);
-    try {
-      await prisma.war.upsert({
-        where: { racketId_periodKey: { racketId: r.id, periodKey: w.periodKey } },
-        create: { racketId: r.id, racketKey: r.key, ...w },
-        update: {},
-      });
-    } catch (err) {
-      if (!isUniqueViolation(err)) throw err;
+    const rackets = await prisma.racket.findMany({
+      where: { key: def.key, cityId: { in: open }, openedPeriodKey: { not: w.periodKey } },
+      select: { id: true, key: true, cityId: true },
+    });
+    for (const r of rackets) {
+      try {
+        await prisma.war.upsert({
+          where: { racketId_periodKey: { racketId: r.id, periodKey: w.periodKey } },
+          create: { racketId: r.id, racketKey: r.key, cityId: r.cityId, ...w },
+          update: {},
+        });
+      } catch (err) {
+        if (!isUniqueViolation(err)) throw err;
+      }
+      await prisma.racket.updateMany({ where: { id: r.id, openedPeriodKey: { not: w.periodKey } }, data: { openedPeriodKey: w.periodKey } });
     }
   }
 }

@@ -186,28 +186,27 @@ export interface RacketDef {
   key: string;
   name: string;
   class: RacketClass;
-  incomePerCycle: number;
   warDow: number; // 0 = Sunday (getUTCDay)
   warHourUtc: number;
 }
 
-export const RACKET_CLASSES: Readonly<Record<RacketClass, { name: string; baseline: number; minFamilyLevel: number; xpMultiplier: number; emojiKey: string }>> = {
-  CORNER: { name: "Corner", baseline: 30, minFamilyLevel: 1, xpMultiplier: 1, emojiKey: "turf_corner" },
-  DISTRICT: { name: "District", baseline: 50, minFamilyLevel: 4, xpMultiplier: 1.5, emojiKey: "turf_district" },
-  CROWN: { name: "Crown", baseline: 80, minFamilyLevel: 7, xpMultiplier: 2, emojiKey: "turf_crown" },
+export const RACKET_CLASSES: Readonly<Record<RacketClass, { name: string; baseline: number; xpMultiplier: number; emojiKey: string }>> = {
+  CORNER: { name: "Corner", baseline: 30, xpMultiplier: 1, emojiKey: "turf_corner" },
+  DISTRICT: { name: "District", baseline: 50, xpMultiplier: 1.5, emojiKey: "turf_district" },
+  CROWN: { name: "Crown", baseline: 80, xpMultiplier: 2, emojiKey: "turf_crown" },
 };
 
 export const RACKETS: readonly RacketDef[] = [
-  { key: "docks_numbers", name: "Dockside Numbers", class: "CORNER", incomePerCycle: 300_000, warDow: 1, warHourUtc: 18 },
-  { key: "laundromat_front", name: "Laundromat Front", class: "CORNER", incomePerCycle: 300_000, warDow: 2, warHourUtc: 12 },
-  { key: "harbor_customs", name: "Harbor Customs Skim", class: "DISTRICT", incomePerCycle: 650_000, warDow: 2, warHourUtc: 18 },
-  { key: "neon_strip", name: "Neon Strip Clubs", class: "DISTRICT", incomePerCycle: 650_000, warDow: 3, warHourUtc: 1 },
-  { key: "valet_racket", name: "Valet Parking Racket", class: "CORNER", incomePerCycle: 300_000, warDow: 3, warHourUtc: 18 },
-  { key: "pawn_row", name: "Pawn Row Fencing", class: "CORNER", incomePerCycle: 300_000, warDow: 4, warHourUtc: 1 },
-  { key: "union_kickbacks", name: "Construction Union Kickbacks", class: "DISTRICT", incomePerCycle: 650_000, warDow: 4, warHourUtc: 18 },
-  { key: "racetrack_book", name: "Racetrack Bookmaking", class: "DISTRICT", incomePerCycle: 650_000, warDow: 5, warHourUtc: 12 },
-  { key: "casino_row", name: "Casino Row Protection", class: "CROWN", incomePerCycle: 1_300_000, warDow: 6, warHourUtc: 18 },
-  { key: "city_hall", name: "City Hall Contracts", class: "CROWN", incomePerCycle: 1_300_000, warDow: 0, warHourUtc: 12 },
+  { key: "docks_numbers", name: "Dockside Numbers", class: "CORNER", warDow: 1, warHourUtc: 18 },
+  { key: "laundromat_front", name: "Laundromat Front", class: "CORNER", warDow: 2, warHourUtc: 12 },
+  { key: "harbor_customs", name: "Harbor Customs Skim", class: "DISTRICT", warDow: 2, warHourUtc: 18 },
+  { key: "neon_strip", name: "Neon Strip Clubs", class: "DISTRICT", warDow: 3, warHourUtc: 1 },
+  { key: "valet_racket", name: "Valet Parking Racket", class: "CORNER", warDow: 3, warHourUtc: 18 },
+  { key: "pawn_row", name: "Pawn Row Fencing", class: "CORNER", warDow: 4, warHourUtc: 1 },
+  { key: "union_kickbacks", name: "Construction Union Kickbacks", class: "DISTRICT", warDow: 4, warHourUtc: 18 },
+  { key: "racetrack_book", name: "Racetrack Bookmaking", class: "DISTRICT", warDow: 5, warHourUtc: 12 },
+  { key: "casino_row", name: "Casino Row Protection", class: "CROWN", warDow: 6, warHourUtc: 18 },
+  { key: "city_hall", name: "City Hall Contracts", class: "CROWN", warDow: 0, warHourUtc: 12 },
 ];
 
 export function racketDef(key: string): RacketDef | undefined {

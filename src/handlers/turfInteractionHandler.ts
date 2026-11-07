@@ -10,7 +10,7 @@ import { getMembership } from "../services/crimeFamily/familyQueries";
 import { getLiveWarFor, getRacketDetailView, getTurfMapView } from "../services/crimeFamily/turfQueries";
 import { FamilyError } from "../services/crimeFamily/tx";
 import { answerHit, armHit, scoutWar } from "../services/crimeFamily/warActions";
-import type { WarBlockKey } from "../services/crimeFamily/warMath";
+import { soonestWar, type WarBlockKey } from "../services/crimeFamily/warMath";
 import { buildNotice, type CfPayload } from "../ui/crimeFamily/kit";
 import { jumpLink } from "../ui/crimeFamily/post";
 import { announceBid, boardsOf } from "../ui/crimeFamily/turfAnnounce";
@@ -42,8 +42,8 @@ const gated = (ack: CfRouteEntry["ack"], run: CfRoute): CfRouteEntry => ({
 });
 const shared = (ack: CfRouteEntry["ack"], run: CfRoute): CfRouteEntry => ({ scope: "shared", ack, run });
 
-const racketScreen = async (uid: string, racketKey: string, note?: string) =>
-  buildRacketDetail(uid, await getRacketDetailView(racketKey, uid, new Date()), note);
+const racketScreen = async (uid: string, racketId: string, note?: string) =>
+  buildRacketDetail(uid, await getRacketDetailView(racketId, uid, new Date()), note);
 
 /**
  * S25 war (T20): the family's ACTIVE war with a jump link to its own side's
@@ -60,26 +60,26 @@ export async function warCardScreen(uid: string, now: Date): Promise<CfPayload> 
     return buildWarCard({ warId: war.id, racketName, endsAt: war.endsAt, jumpUrl: ref ? jumpLink(ref.guildId, ref.channelId, ref.messageId) : null });
   }
   // An ARMED war is the family's own next fight; the map's soonest slot may be another racket.
-  const next = war ? { racketName, startsAt: war.startsAt } : (await getTurfMapView(now)).nextWar;
+  const next = war ? { racketName, startsAt: war.startsAt } : soonestWar(now);
   return buildNotice(`No turf war is live for your family. Next war: ${next.racketName} <t:${unix(next.startsAt)}:F>.`);
 }
 
 const bidModalRoute: CfRouteEntry = {
   scope: "modalOpener",
   ack: "modal",
-  run: async (i, [racketKey, owner]) => {
+  run: async (i, [racketId, owner]) => {
     if (i.isModalSubmit()) return;
-    await i.showModal(buildBidModal(racketKey, owner));
+    await i.showModal(buildBidModal(racketId, owner));
   },
 };
 
-const bidSubmitRoute: CfRoute = async (i, [, racketKey]) => {
+const bidSubmitRoute: CfRoute = async (i, [, racketId]) => {
   if (!i.isModalSubmit()) return;
   const amount = parseBidAmount(i.fields.getTextInputValue("amount"));
   if (amount === null) throw new FamilyError(BAD_AMOUNT);
-  const result = await placeBid({ racketKey, actorId: i.user.id, amount });
+  const result = await placeBid({ racketId, actorId: i.user.id, amount });
   try {
-    await show(i, await racketScreen(i.user.id, racketKey, `Bid placed: ${fmtFortunes(amount)}.`));
+    await show(i, await racketScreen(i.user.id, racketId, `Bid placed: ${fmtFortunes(amount)}.`));
   } finally {
     void announceBid(i.client, result);
   }
@@ -99,10 +99,10 @@ const answerRoute: CfRoute = async (i, [hitId, index]) => {
 };
 
 export const TURF_ROUTES: CfRouteTable = {
-  "v:map": gated("auto", async (i) => show(i, buildTurfMap(i.user.id, await getTurfMapView(new Date())))),
+  "v:map": gated("auto", async (i) => show(i, buildTurfMap(i.user.id, await getTurfMapView(i.user.id, null, new Date())))),
   "v:war": gated("auto", async (i) => show(i, await warCardScreen(i.user.id, new Date()))),
   sel: gated("auto", async (i) => show(i, await racketScreen(i.user.id, i.isStringSelectMenu() ? i.values[0] : ""))),
-  "open:racket": gated("ephemeral", async (i, [, racketKey]) => show(i, await racketScreen(i.user.id, racketKey))),
+  "open:racket": gated("ephemeral", async (i, [, racketId]) => show(i, await racketScreen(i.user.id, racketId))),
   bid: bidModalRoute,
   "modal:bid": gated("ephemeral", bidSubmitRoute),
   scout: shared("ephemeral", async (i, [warId]) => {

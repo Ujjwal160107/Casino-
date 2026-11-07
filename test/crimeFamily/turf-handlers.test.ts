@@ -7,10 +7,10 @@ import { TURF_IDS } from "../../src/ui/crimeFamily/ids";
 import { weakPoint, slotOf } from "../../src/services/crimeFamily/warMath";
 import { racketDef } from "../../src/data/crimeFamilyCatalog";
 import { fakeButton, fakeModal, said } from "./fakeInteraction";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, withCfConfig } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedTurfCity, withCfConfig, turfCity } from "../helpers";
 
 const ON = { enabled: true, turfEnabled: true };
-beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "Racket", "War", "WarContribution"]));
+beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "TurfCity", "Racket", "War", "WarContribution"]));
 beforeEach(resetFamilies);
 
 async function liveWar() {
@@ -25,7 +25,7 @@ describe("turf routes (13.2)", () => {
   it("the Bid button opens its modal before any Prisma or Redis call", async () => {
     const findUnique = prisma.familyMember.findUnique;
     const db = vi.spyOn(prisma.familyMember, "findUnique"); const redis = vi.spyOn(redisService, "getInstance");
-    const i = fakeButton(TURF_IDS.bid("casino_row", "u1"), { userId: "u1" });
+    const i = fakeButton(TURF_IDS.bid("65f0000000000000000000aa", "u1"), { userId: "u1" });
     i.showModal.mockImplementation(async () => { expect(db).not.toHaveBeenCalled(); expect(redis).not.toHaveBeenCalled(); i.order.push("showModal"); });
     await handleCrimeFamilyInteraction(i as any);
     expect(i.order[0]).toBe("showModal");
@@ -90,12 +90,31 @@ describe("turf routes (13.2)", () => {
   it("the bid modal places the bid and re-renders S17 with a note", async () => {
     await withCfConfig(ON, async () => {
       const boss = await seedEligibleUser();
-      const f = await seedFamily({ bossId: boss, earnings: 3_000_000 });
-      await seedWar({ racketKey: "pawn_row", status: "BIDDING" });
-      const i = fakeModal(TURF_IDS.bidModal("pawn_row", boss), { amount: "2.1m" }, { userId: boss, guildId: "g1" });
+      const f = await seedFamily({ bossId: boss, earnings: 3_000_000, data: { cityId: (await turfCity()).id } });
+      const w = await seedWar({ racketKey: "pawn_row", status: "BIDDING" });
+      const i = fakeModal(TURF_IDS.bidModal(w.racketId, boss), { amount: "2.1m" }, { userId: boss, guildId: "g1" });
       await handleCrimeFamilyInteraction(i as any);
       expect(said(i)).toContain("Bid placed: 2,100,000.");
       expect((await testPrisma.family.findUnique({ where: { id: f.id } }))!.earnings).toBe(900_000);
+    });
+  });
+
+  it("a stale map's racket in another city opens read-only and its bid is refused, nothing debited (Review Focus 1)", async () => {
+    await withCfConfig(ON, async () => {
+      const m1 = await seedTurfCity({ league: "SILVER", number: 1 }); const m2 = await seedTurfCity({ league: "SILVER", number: 2 });
+      const boss = await seedEligibleUser();
+      const f = await seedFamily({ bossId: boss, level: 5, earnings: 9_000_000, data: { cityId: m2.id } });
+      const w = await seedWar({ racketKey: "pawn_row", status: "BIDDING", cityId: m1.id });
+      const away = "This racket is in Midtown #1. Your family plays in Midtown #2.";
+      const open = fakeButton(TURF_IDS.openRacket(w.racketId, boss), { userId: boss, guildId: "g1" });
+      await handleCrimeFamilyInteraction(open as any);
+      expect(said(open)).toContain("**City:** Midtown #1 (Silver league)");
+      expect(said(open)).toContain(away);
+      const bid = fakeModal(TURF_IDS.bidModal(w.racketId, boss), { amount: "1.4m" }, { userId: boss, guildId: "g1" });
+      await handleCrimeFamilyInteraction(bid as any);
+      expect(said(bid)).toContain(away);
+      expect((await testPrisma.family.findUniqueOrThrow({ where: { id: f.id } })).earnings).toBe(9_000_000);
+      expect(await testPrisma.familyLedger.count({ where: { familyId: f.id, type: "bid_escrow" } })).toBe(0);
     });
   });
 });

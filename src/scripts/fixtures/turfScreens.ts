@@ -4,7 +4,7 @@
 // have 24-character names and 4-character tags, every racket is owned and in
 // a live war, and amounts are near MAX_SAFE_BALANCE.
 import { MAX_SAFE_BALANCE } from "../../utils/economyConfig";
-import { RACKETS, WAR_BLOCKS } from "../../data/crimeFamilyCatalog";
+import { LEAGUE_RACKET_INCOME, RACKETS, WAR_BLOCKS } from "../../data/crimeFamilyCatalog";
 import type { RacketDetailView, TurfMapView, TurfRacketLine, WarBoardView } from "../../services/crimeFamily/views";
 import {
   buildHitCall, buildHitResult, buildRacketDetail, buildScoutReport, buildTurfMap, buildWarBoard, buildWarCard, buildWarResult, warActionRow,
@@ -17,6 +17,7 @@ const OWNER = "12345678901234567890";
 const WAR_ID = "65f0000000000000000000ab";
 const HIT_ID = "65f0000000000000000000ac";
 const BIG = MAX_SAFE_BALANCE - 1;
+const CITY = { id: "65f0000000000000000000c1", league: "GOLD", number: 999, label: "Uptown #999" } as const;
 const SOON = () => new Date(Date.now() + 3_600_000);
 const label = (i: number) => `[WX${String(i).padStart(2, "0")}] Velvet Ante Syndicate Ok`; // 24-character name
 const HITTERS = (base: number) => Array.from({ length: 5 }, (_, i) => ({ userId: `9876543210987654${base + i}`, points: 9_999 - i }));
@@ -24,7 +25,8 @@ const HITTERS = (base: number) => Array.from({ length: 5 }, (_, i) => ({ userId:
 function line(i: number): TurfRacketLine {
   const r = RACKETS[i];
   return {
-    key: r.key, name: r.name, class: r.class, income: r.incomePerCycle, ownerFamilyId: `65f00000000000000000000${i}`,
+    racketId: `65f0000000000000000001${String(i).padStart(2, "0")}`, cityId: CITY.id,
+    key: r.key, name: r.name, class: r.class, income: LEAGUE_RACKET_INCOME.GOLD[r.class], ownerFamilyId: `65f00000000000000000000${i}`,
     ownerLabel: label(i), strikes: 2,
     war: { id: WAR_ID, status: "BIDDING", topBid: BIG, topBidderLabel: label(i + 10), bidClosesAt: SOON(), startsAt: SOON() },
     nextWarAt: SOON(), bidding: { phase: "OPEN", nextOpensAt: SOON() },
@@ -32,12 +34,12 @@ function line(i: number): TurfRacketLine {
 }
 
 function mapView(): TurfMapView {
-  return { rackets: RACKETS.map((_, i) => line(i)), nextWar: { racketName: RACKETS[6].name, startsAt: SOON() } };
+  return { city: CITY, rackets: RACKETS.map((_, i) => line(i)), nextWar: { racketName: RACKETS[6].name, startsAt: SOON() } };
 }
 
 function detailView(): RacketDetailView {
   return {
-    line: line(6), floor: 4_550_000, minBid: BIG, minFamilyLevel: 4, viewerIsOfficer: true, canBid: false,
+    line: line(6), floor: 4_550_000, minBid: BIG, city: CITY, viewerIsOfficer: true, canBid: false,
     blockers: ["Racket cap reached (3/3 held or bid).", "Clear dues arrears first."],
   };
 }

@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import prisma from "../../src/utils/prisma";
 import { collectRacket, racketEligibleMembers } from "../../src/services/crimeFamily/racketService";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWarHits } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWarHits, racketByKey } from "../helpers";
 
 const H = 3600_000;
 const fam = (id: string) => testPrisma.family.findUnique({ where: { id } });
-const racket = (key: string) => testPrisma.racket.findUnique({ where: { key } });
-beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "Racket", "War"]));
+const racket = (key: string) => racketByKey(key);
+beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "TurfCity", "Racket", "War"]));
 beforeEach(resetFamilies);
 
 async function owner(o: { level?: number; duesArrears?: number } = {}) {

@@ -15,7 +15,7 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from "discord.js";
-import { RACKET_CLASSES, WAR_BLOCKS, WAR_RULES, racketDef } from "../../data/crimeFamilyCatalog";
+import { RACKET_CLASSES, WAR_BLOCKS, WAR_RULES, leagueDef } from "../../data/crimeFamilyCatalog";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { cfEmoji } from "../../utils/crimeFamilyAssets";
 import { fmtFortunes } from "../../utils/format";
@@ -51,8 +51,7 @@ export function buildTurfMap(ownerId: string, v: TurfMapView): CfPayload {
   const numbered = v.rackets.map((line, i) => ({ line, n: i + 1 }));
   const group = (cls: TurfRacketLine["class"]) => {
     const c = RACKET_CLASSES[cls];
-    const level = c.minFamilyLevel > 1 ? `family L${c.minFamilyLevel}+` : "any level";
-    return text([`**${c.name}** (${level})`, ...numbered.filter((x) => x.line.class === cls).map((x) => mapLine(x.line, x.n))].join("\n"));
+    return text([`**${c.name}**`, ...numbered.filter((x) => x.line.class === cls).map((x) => mapLine(x.line, x.n))].join("\n"));
   };
   const container = new ContainerBuilder();
   if (banner) container.addMediaGalleryComponents(banner.gallery);
@@ -72,7 +71,7 @@ export function buildTurfMap(ownerId: string, v: TurfMapView): CfPayload {
       const option = new StringSelectMenuOptionBuilder()
         .setLabel(line.name)
         .setDescription(`${c.name} · ${fmtFortunes(line.income)}/day`)
-        .setValue(line.key);
+        .setValue(line.racketId);
       const emoji = cfEmoji(c.emojiKey);
       if (emoji) option.setEmoji(emoji);
       return option;
@@ -114,7 +113,7 @@ export function buildRacketDetail(ownerId: string, v: RacketDetailView, note?: s
     biddingLine(line),
     `**Floor:** ${fmtFortunes(v.floor)} · **next bid:** at least ${fmtFortunes(v.minBid)}`,
     `**War:** weekly, ${warSlot(line.nextWarAt)} · next ${full(line.nextWarAt)}`,
-    `**Class level:** family L${v.minFamilyLevel}+`,
+    `**City:** ${v.city.label} (${leagueDef(v.city.league).name} league)`,
   ];
   const hint = note ?? (v.blockers[0]
     ? `-# ${v.blockers[0]}`
@@ -123,17 +122,17 @@ export function buildRacketDetail(ownerId: string, v: RacketDetailView, note?: s
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(text(details.join("\n")), text(hint))
     .addActionRowComponents(buttonRow(
-      cfButton(TURF_IDS.bid(line.key, ownerId), "Bid", ButtonStyle.Primary, { disabled: !v.canBid }),
+      cfButton(TURF_IDS.bid(line.racketId, ownerId), "Bid", ButtonStyle.Primary, { disabled: !v.canBid }),
       cfButton(TURF_IDS.viewMap(ownerId), "Back"),
     ));
   return cfPayload(container, { files: file ? [file] : undefined, freshAttachments: true });
 }
 
-export function buildBidModal(racketKey: string, ownerId: string): ModalBuilder {
-  const name = racketDef(racketKey)?.name ?? "racket";
+/** H9: the opener does no I/O before showModal, so the title names no racket. */
+export function buildBidModal(racketId: string, ownerId: string): ModalBuilder {
   return new ModalBuilder()
-    .setCustomId(TURF_IDS.bidModal(racketKey, ownerId))
-    .setTitle(`Bid on ${name}`.slice(0, 45))
+    .setCustomId(TURF_IDS.bidModal(racketId, ownerId))
+    .setTitle("Place a bid")
     .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder().setCustomId("amount").setLabel("Bid (earnings only)").setStyle(TextInputStyle.Short)
         .setRequired(true).setMaxLength(20).setPlaceholder("e.g. 2.1m"),

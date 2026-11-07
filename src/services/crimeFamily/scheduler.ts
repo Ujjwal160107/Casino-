@@ -23,7 +23,7 @@ import { autoHandover, clearClaimNotice, markClaimNotice, setClaimMessage } from
 import { familyLabel } from "./familyQueries";
 import { expireInvites } from "./membershipService";
 import { executePayday, resumeUnpaidShares } from "./paydayService";
-import { seedRackets } from "./racketService";
+import { seedTurf } from "./turfCities";
 import { tickRackets, tickWars } from "./turfJobs";
 import { FamilyError } from "./tx";
 import { chargeDues } from "./vaultService";
@@ -188,5 +188,5 @@ export function registerCrimeFamilyJobs(client: Client): void {
 export function startCrimeFamilyJobs(client: Client): void {
   if (!isJobShard(client)) return;
   registerCrimeFamilyJobs(client);
-  seedRackets().catch((err) => console.error("[crimeFamily] seedRackets error", err));
+  seedTurf().catch((err) => console.error("[crimeFamily] seedTurf error", err));
 }

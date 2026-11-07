@@ -10,7 +10,7 @@ import { recordProcessBoot, bootedSince } from "../../src/services/processBootSe
 import { fakeClient } from "./fakeClient";
 import { resetFamilies } from "../helpers";
 
-vi.mock("../../src/services/crimeFamily/racketService", async (orig) => ({ ...(await orig<object>()), seedRackets: vi.fn(async () => undefined) }));
+vi.mock("../../src/services/crimeFamily/turfCities", async (orig) => ({ ...(await orig<object>()), seedTurf: vi.fn(async () => undefined) }));
 beforeEach(resetFamilies);
 
 describe("one job shard (A29)", () => {
@@ -28,7 +28,7 @@ describe("one job shard (A29)", () => {
   it("initScheduler registers family jobs only through startCrimeFamilyJobs", () => {
     const src = readFileSync("src/scheduler.ts", "utf8");
     expect(src).toContain("startCrimeFamilyJobs(client)");
-    expect(src).not.toMatch(/registerCrimeFamilyJobs\(|seedRackets\(/);
+    expect(src).not.toMatch(/registerCrimeFamilyJobs\(|seedTurf\(/);
   });
 });
 

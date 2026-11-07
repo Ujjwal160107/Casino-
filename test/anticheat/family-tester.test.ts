@@ -7,7 +7,7 @@ import { depositToVault } from "../../src/services/crimeFamily/vaultService";
 import { executePayday } from "../../src/services/crimeFamily/paydayService";
 import { ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
 import { planCaper, cancelCaper } from "../../src/services/crimeFamily/caperLobbyService";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, resetUser, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedContribution } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, resetUser, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedContribution, turfCity } from "../helpers";
 import { caperCrew, G, CH } from "../crimeFamily/caperFixtures";
 import { armHit } from "../../src/services/crimeFamily/warActions";
 import { placeBid } from "../../src/services/crimeFamily/bidService";
@@ -108,7 +108,7 @@ describe("turf gives the tester no shortcut (D34)", () => {
     const w = await seedWar({ racketKey: "docks_numbers", status: "ACTIVE", topBid: 2_100_000, topBidderFamilyId: f.id, defenderFamilyId: "" });
     return { f, w };
   }
-  beforeAll(() => ensureUniqueIndexes(["Racket", "War", "WarContribution"]));
+  beforeAll(() => ensureUniqueIndexes(["TurfCity", "Racket", "War", "WarContribution"]));
   beforeEach(async () => { await resetFamilies(); await resetUser(BOT_DEVELOPER_ID); });   // resetFamilies keeps users; each test re-seeds the tester
 
   it("a hit debits 25,000 and the 600 s cooldown applies", async () => {
@@ -129,11 +129,11 @@ describe("turf gives the tester no shortcut (D34)", () => {
 
   it("a tester Boss gets no racket cycle early and no bid below the floor", async () => {
     await seedEligibleUser({ id: BOT_DEVELOPER_ID, wallet: 1_000_000 });
-    const f = await seedFamily({ bossId: BOT_DEVELOPER_ID, level: 4, earnings: 9_000_000 });   // L4: racketCap 2, so the held racket leaves room to bid
+    const f = await seedFamily({ bossId: BOT_DEVELOPER_ID, level: 4, earnings: 9_000_000, data: { cityId: (await turfCity()).id } });   // L4: racketCap 2, so the held racket leaves room to bid
     const r = await seedRacket("pawn_row", { ownerFamilyId: f.id, lastPayoutAt: new Date(Date.now() - 3600_000) });
     expect(await collectRacket(r.id, new Date(), 3)).toMatchObject({ status: "skipped", amount: 0 });
-    await seedWar({ racketKey: "valet_racket", status: "BIDDING" });
-    await expect(placeBid({ racketKey: "valet_racket", actorId: BOT_DEVELOPER_ID, amount: 2_099_999 })).rejects.toThrow("Bid at least the floor of 2,100,000.");
+    const w = await seedWar({ racketKey: "valet_racket", status: "BIDDING" });
+    await expect(placeBid({ racketId: w.racketId, actorId: BOT_DEVELOPER_ID, amount: 2_099_999 })).rejects.toThrow("Bid at least the floor of 2,100,000.");
     expect((await testPrisma.family.findUnique({ where: { id: f.id } }))!.earnings).toBe(9_000_000);
   });
 });

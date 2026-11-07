@@ -1,7 +1,7 @@
 import Redis from "ioredis";
-import { PrismaClient, Prisma, User, Family, FamilyInvite, FamilyVote, Racket, War, WarContribution } from "@prisma/client";
+import { PrismaClient, Prisma, User, Family, FamilyInvite, FamilyVote, Racket, TurfCity, War, WarContribution } from "@prisma/client";
 import { CRIME_FAMILY_CONFIG } from "../src/utils/economyConfig";
-import { CAPO_SLOTS, RACKETS, RACKET_CLASSES, type FamilyRole } from "../src/data/crimeFamilyCatalog";
+import { CAPO_SLOTS, LEAGUE_RACKET_INCOME, RACKETS, RACKET_CLASSES, type FamilyRole, type LeagueKey } from "../src/data/crimeFamilyCatalog";
 import { baselineScores, warWindow, type RacketClass, type ScoreField, type WarSide } from "../src/services/crimeFamily/warMath";
 import type { WarBoardRef } from "../src/services/crimeFamily/views";
 
@@ -213,6 +213,7 @@ export async function resetFamilies(): Promise<void> {
   await testPrisma.warContribution.deleteMany({});
   await testPrisma.war.deleteMany({});
   await testPrisma.racket.deleteMany({});
+  await testPrisma.turfCity.deleteMany({});
   await testPrisma.caperCrew.deleteMany({});
   await testPrisma.caper.deleteMany({});
   await testPrisma.familyLedger.deleteMany({});
@@ -269,22 +270,51 @@ export async function seedVote(o: {
 
 // ── Turf (plan 3) ────────────────────────────────────────────────────────────
 
-/** Upserts one racket by key: the definition comes from `RACKETS`; the overrides apply on create and update. */
+/** Upserts one city by [league, number] and sets its status (H2: default Uptown #1). */
+export async function seedTurfCity(o: { league?: LeagueKey; number?: number; status?: "OPEN" | "CLOSED" } = {}): Promise<TurfCity> {
+  const { league = "GOLD", number = 1, status = "OPEN" } = o;
+  return testPrisma.turfCity.upsert({ where: { league_number: { league, number } }, create: { league, number, status }, update: { status } });
+}
+
+/** The default test city, Uptown #1, created on demand. */
+export function turfCity(): Promise<TurfCity> {
+  return seedTurfCity();
+}
+
+/**
+ * Upserts one racket by [cityId, key] (default: Uptown #1): the definition
+ * comes from `RACKETS` at the city's league income; the overrides apply on
+ * create and update.
+ */
 export async function seedRacket(
   key: string,
-  o: Partial<{ ownerFamilyId: string; lastPayoutAt: Date; capturedAt: Date; neglectStrikes: number }> = {},
+  o: Partial<{ cityId: string; ownerFamilyId: string; lastPayoutAt: Date; capturedAt: Date; neglectStrikes: number }> = {},
 ): Promise<Racket> {
   const r = RACKETS.find((d) => d.key === key);
   if (!r) throw new Error(`seedRacket: unknown racket ${key}`);
+  const { cityId: askedCity, ...overrides } = o;
+  const city = askedCity
+    ? await testPrisma.turfCity.findUniqueOrThrow({ where: { id: askedCity } })
+    : await turfCity();
+  const league = city.league as LeagueKey;
   const data = {
-    name: r.name, class: r.class, incomePerCycle: r.incomePerCycle, baseDefense: RACKET_CLASSES[r.class].baseline,
-    warDow: r.warDow, warHourUtc: r.warHourUtc, ...o,
+    name: r.name, class: r.class, league, incomePerCycle: LEAGUE_RACKET_INCOME[league][r.class],
+    baseDefense: RACKET_CLASSES[r.class].baseline, warDow: r.warDow, warHourUtc: r.warHourUtc, ...overrides,
   };
-  return testPrisma.racket.upsert({ where: { key }, create: { key, ...data }, update: data });
+  return testPrisma.racket.upsert({
+    where: { cityId_key: { cityId: city.id, key } }, create: { cityId: city.id, key, ...data }, update: data,
+  });
+}
+
+/** One racket row by key in a city (default: Uptown #1). */
+export async function racketByKey(key: string, cityId?: string): Promise<Racket> {
+  return testPrisma.racket.findUniqueOrThrow({ where: { cityId_key: { cityId: cityId ?? (await turfCity()).id, key } } });
 }
 
 export interface SeedWarOpts {
   racketKey: string;
+  /** The racket's city; default Uptown #1 (H2). */
+  cityId?: string;
   status: "BIDDING" | "ARMED" | "ACTIVE" | "SETTLING" | "RESOLVED" | "CANCELLED";
   startsAt?: Date;
   topBid?: number;
@@ -304,10 +334,12 @@ const WAR_START_OFFSET_MS: Record<SeedWarOpts["status"], number> = {
   BIDDING: 24 * 60 * MIN_MS, ARMED: 10 * MIN_MS, ACTIVE: -10 * MIN_MS, SETTLING: -61 * MIN_MS, RESOLVED: -61 * MIN_MS, CANCELLED: -61 * MIN_MS,
 };
 
-/** A War row whose window comes from `warWindow(startsAt)`; the racket row is seeded when missing. */
+/** A War row whose window comes from `warWindow(startsAt)`; the racket row (in `o.cityId`, default Uptown #1) is seeded when missing. */
 export async function seedWar(o: SeedWarOpts): Promise<War> {
   const now = new Date();
-  const racket = (await testPrisma.racket.findUnique({ where: { key: o.racketKey } })) ?? (await seedRacket(o.racketKey));
+  const cityId = o.cityId ?? (await turfCity()).id;
+  const racket = (await testPrisma.racket.findUnique({ where: { cityId_key: { cityId, key: o.racketKey } } }))
+    ?? (await seedRacket(o.racketKey, { cityId }));
   const startsAt = o.startsAt ?? new Date(now.getTime() + WAR_START_OFFSET_MS[o.status]);
   const live = o.status === "ACTIVE" || o.status === "SETTLING";
   const topBidderFamilyId = o.topBidderFamilyId ?? "";
@@ -315,6 +347,7 @@ export async function seedWar(o: SeedWarOpts): Promise<War> {
     data: {
       racketId: racket.id,
       racketKey: racket.key,
+      cityId: racket.cityId,
       status: o.status,
       ...warWindow(startsAt),
       topBid: o.topBid ?? 0,

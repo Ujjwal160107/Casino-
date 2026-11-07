@@ -4,6 +4,7 @@ import type { CaperRoleKey, FamilyLevelDef, FamilyRole } from "../../data/crimeF
 import type { LedgerLine } from "./ledger";
 import type { BoardSort, Requirements } from "./recruitService";
 import type { WarSettlement, WarStatus } from "./warService";
+import type { TurfCityRef } from "./turfQueries";
 import type { BidPhase, BlockScores, RacketClass } from "./warMath";
 import type { VoidReason, VoteStatus } from "./voteRules";
 
@@ -200,6 +201,8 @@ export type WarBoardRef = {
 
 /** S16, S17: one racket as the map shows it. */
 export interface TurfRacketLine {
+  racketId: string;
+  cityId: string;
   key: string;
   name: string;
   class: RacketClass;
@@ -215,8 +218,9 @@ export interface TurfRacketLine {
   bidding: { phase: BidPhase; nextOpensAt: Date };
 }
 
-/** S16: the 10 rackets in `RACKETS` order and the soonest war. */
+/** S16: one city's 10 rackets in `RACKETS` order and the soonest war. */
 export interface TurfMapView {
+  city: TurfCityRef;
   rackets: TurfRacketLine[];
   nextWar: { racketName: string; startsAt: Date };
 }
@@ -226,7 +230,8 @@ export interface RacketDetailView {
   line: TurfRacketLine;
   floor: number;
   minBid: number;
-  minFamilyLevel: number;
+  /** The racket's city. */
+  city: TurfCityRef;
   viewerIsOfficer: boolean;
   canBid: boolean;
   blockers: string[];

@@ -39,14 +39,13 @@ describe("crime family catalog", () => {
     expect(C.CAPER_TIERS.map((t) => [t.required.length, t.optional])).toEqual([[3, "DRIVER"], [4, "MUSCLE"], [5, "HACKER"], [5, "HACKER"]]);
   });
 
-  it("pins rackets (9.1): 10 rackets, 6,400,000 a day", () => {
-    expect(C.RACKETS.reduce((s, r) => s + r.incomePerCycle, 0)).toBe(6_400_000);
+  it("pins rackets (9.1): 10 rackets", () => {
     expect(C.RACKETS.map((r) => [r.key, r.class, r.warDow, r.warHourUtc])).toEqual([
       ["docks_numbers", "CORNER", 1, 18], ["laundromat_front", "CORNER", 2, 12], ["harbor_customs", "DISTRICT", 2, 18],
       ["neon_strip", "DISTRICT", 3, 1], ["valet_racket", "CORNER", 3, 18], ["pawn_row", "CORNER", 4, 1],
       ["union_kickbacks", "DISTRICT", 4, 18], ["racetrack_book", "DISTRICT", 5, 12], ["casino_row", "CROWN", 6, 18], ["city_hall", "CROWN", 0, 12],
     ]);
-    expect(C.RACKET_CLASSES.CROWN).toMatchObject({ baseline: 80, minFamilyLevel: 7, xpMultiplier: 2 });
+    expect(C.RACKET_CLASSES.CROWN).toMatchObject({ baseline: 80, xpMultiplier: 2 });
   });
 
   it("pins levels (10.1): fees L2..L10 total 172,000,000", () => {

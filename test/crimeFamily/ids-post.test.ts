@@ -17,9 +17,9 @@ describe("customIds", () => {
     CREW_IDS.vault("deposit", U), CREW_IDS.paydayOk(9_000_000_000_000_000, 12, U), CREW_IDS.levelOk(10, U),
     CREW_IDS.log(999, U), CREW_IDS.top("war", U), CREW_IDS.disband("open", U), CREW_IDS.modal("disband", U),
     CREW_IDS.inviteSelect(U), CREW_IDS.invite("decline", O), CREW_IDS.claim(O), CPR_IDS.viewPlan(U), TURF_IDS.viewMap(U),
-    // Turf at max lengths: 16-char racket keys, 20-digit owners, 24-char ObjectIds.
-    TURF_IDS.viewWar(U), TURF_IDS.select(U), TURF_IDS.openRacket("laundromat_front", U), TURF_IDS.bid("laundromat_front", U),
-    TURF_IDS.bidModal("laundromat_front", U), TURF_IDS.scout(O), TURF_IDS.hit(O, "alleys"), TURF_IDS.hitAnswer(O, 3),
+    // Turf at max lengths: 20-digit owners, 24-char racket and war ObjectIds.
+    TURF_IDS.viewWar(U), TURF_IDS.select(U), TURF_IDS.openRacket(O, U), TURF_IDS.bid(O, U),
+    TURF_IDS.bidModal(O, U), TURF_IDS.scout(O), TURF_IDS.hit(O, "alleys"), TURF_IDS.hitAnswer(O, 3),
     // Votes and recruitment at their longest: 20-digit owners, 24-char ObjectIds, page 999.
     CREW_IDS.voteStart(U), CREW_IDS.voteOk(U), CREW_IDS.voteCancel(U), CREW_IDS.ballot("yes", O),
     CREW_IDS.board("act", true, 999, U), CREW_IDS.boardSelect(U), CREW_IDS.myApps(U), CREW_IDS.withdraw(U),
@@ -46,6 +46,10 @@ describe("customIds", () => {
 
   it("the longest new id is recruitEdit at 59 characters (F10)", () =>
     expect(CREW_IDS.recruitEdit({ netWorth: 10_000_000_000, shifts: 5_000, ageDays: 730, heists: 1_000 }, U)).toHaveLength(59));
+
+  it("racket ids replace racket keys: openRacket 62, bid 54, bidModal 60 characters (6.8)", () => {
+    expect([TURF_IDS.openRacket(O, U), TURF_IDS.bid(O, U), TURF_IDS.bidModal(O, U)].map((id) => id.length)).toEqual([62, 54, 60]);
+  });
 
   it("pins the S2 Caper and Turf ids", () => {
     expect(CPR_IDS.viewPlan(U)).toBe(`cpr:v:plan:${U}`);

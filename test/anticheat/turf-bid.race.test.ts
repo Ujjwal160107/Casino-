@@ -1,19 +1,20 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { placeBid, parseBidAmount } from "../../src/services/crimeFamily/bidService";
 import { disbandFamily } from "../../src/services/crimeFamily/disbandService";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedTurfCity, turfCity } from "../helpers";
 
 const fam = (id: string) => testPrisma.family.findUnique({ where: { id } });
 const war = (id: string) => testPrisma.war.findUnique({ where: { id } });
-beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "FamilyInvite", "FamilyExit", "Racket", "War"]));
+beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "FamilyInvite", "FamilyExit", "TurfCity", "Racket", "War"]));
 beforeEach(resetFamilies);
 
 async function bidder(o: { level?: number; earnings?: number; treasury?: number; tag?: string } = {}) {
   const boss = await seedEligibleUser(); const ub = await seedEligibleUser(); const s = await seedEligibleUser();
-  const f = await seedFamily({ bossId: boss, earnings: 0, ...o, members: [{ userId: ub, role: "UNDERBOSS", joinedAt: daysAgo(10) }, { userId: s, role: "SOLDIER", joinedAt: daysAgo(10) }] });
+  const f = await seedFamily({ bossId: boss, earnings: 0, ...o, data: { cityId: (await turfCity()).id }, members: [{ userId: ub, role: "UNDERBOSS", joinedAt: daysAgo(10) }, { userId: s, role: "SOLDIER", joinedAt: daysAgo(10) }] });
   return { f, boss, ub, s };
 }
-const bid = (actorId: string, amount: number, racketKey = "docks_numbers") => placeBid({ racketKey, actorId, amount });
+const bid = async (actorId: string, amount: number, key = "docks_numbers", cityId?: string) =>
+  placeBid({ racketId: (await seedRacket(key, cityId ? { cityId } : {})).id, actorId, amount });
 
 describe("bidding (9.4)", () => {
   it.each([["2.1m", 2_100_000], ["4.1m", 4_100_000], ["8.03m", 8_030_000], ["1.001m", 1_001_000], ["2.05m", 2_050_000], ["1.5000k", 1_500], ["1.0001k", null], ["0m", null], ["10,010,000", 10_010_000], ["all", null], ["max", null], ["-1", null], ["0", null], ["1e7", null], ["abc", null], ["2.5", null]] as const)(
@@ -66,7 +67,7 @@ describe("bidding (9.4)", () => {
     expect((await war(w.id))!.topBid).toBe(0);
   });
 
-  it("checks owner, rank, jail, class level, arrears, investigation, racket cap and the Crown cap", async () => {
+  it("checks owner, rank, jail, arrears, investigation, racket cap and the Crown cap", async () => {
     const o = await bidder({ earnings: 50_000_000, level: 7 });
     await seedRacket("casino_row", { ownerFamilyId: o.f.id });
     for (const k of ["docks_numbers", "harbor_customs", "city_hall", "casino_row"]) await seedWar({ racketKey: k, status: "BIDDING" });
@@ -74,8 +75,7 @@ describe("bidding (9.4)", () => {
     await expect(bid(o.s, 2_100_000)).rejects.toThrow("Only the Boss or Underboss can bid.");
     await expect(bid(o.boss, 9_100_000, "city_hall")).rejects.toThrow("Only one Crown racket at a time, held or bid on.");
     const young = await bidder({ earnings: 50_000_000, level: 3 });
-    await expect(bid(young.boss, 4_550_000, "harbor_customs")).rejects.toThrow("District rackets need family level 4.");
-    await bid(young.boss, 2_100_000);                                  // L3 cap 1: one live top bid
+    await bid(young.boss, 4_550_000, "harbor_customs");                // no class gate (A25); L3 cap 1: one live top bid
     await seedRacket("pawn_row");
     await seedWar({ racketKey: "pawn_row", status: "BIDDING" });
     await expect(bid(young.ub, 2_100_000, "pawn_row")).rejects.toThrow("Racket cap reached (1/1 held or bid).");
@@ -88,6 +88,30 @@ describe("bidding (9.4)", () => {
     const hot = await bidder({ earnings: 50_000_000 });
     for (const id of [hot.boss, hot.ub, hot.s]) await testPrisma.user.update({ where: { discordId: id }, data: { crimeHeat: 100 } });
     await expect(bid(hot.boss, 2_310_000)).rejects.toThrow("Your family is under investigation.");
+  });
+
+  it("a family bids only in its own city; an unplaced family is told when the census runs (6.6)", async () => {
+    const home = await bidder({ earnings: 50_000_000, level: 3 });
+    await seedWar({ racketKey: "harbor_customs", status: "BIDDING" });
+    expect(await bid(home.boss, 4_550_000, "harbor_customs")).toMatchObject({ amount: 4_550_000 });   // no class gate inside a city (A25)
+    const away = await bidder({ earnings: 50_000_000 });
+    const u2 = await seedTurfCity({ league: "GOLD", number: 2 });
+    await testPrisma.family.update({ where: { id: away.f.id }, data: { cityId: u2.id } });
+    await expect(bid(away.boss, 2_100_000)).rejects.toThrow("This racket is in Uptown #1. Your family plays in Uptown #2.");
+    const none = await bidder({ earnings: 50_000_000 });
+    await testPrisma.family.update({ where: { id: none.f.id }, data: { cityId: "" } });
+    await expect(bid(none.boss, 2_100_000)).rejects.toThrow(/^Your family has no city yet: it gets one at the daily census once 3 members are active \(next <t:\d+:R>\)\.$/);
+    expect((await fam(none.f.id))!.earnings).toBe(50_000_000);
+  });
+
+  it("two families in different cities bid on the same key: two rackets, two wars, both bids stand (edge 10)", async () => {
+    const a = await bidder({ earnings: 5_000_000 }); const b = await bidder({ earnings: 5_000_000 });
+    const u2 = await seedTurfCity({ league: "GOLD", number: 2 });
+    await testPrisma.family.update({ where: { id: b.f.id }, data: { cityId: u2.id } });
+    const w1 = await seedWar({ racketKey: "docks_numbers", status: "BIDDING" });
+    const w2 = await seedWar({ racketKey: "docks_numbers", status: "BIDDING", cityId: u2.id });
+    await Promise.all([bid(a.boss, 2_100_000), bid(b.boss, 2_100_000, "docks_numbers", u2.id)]);
+    expect([(await war(w1.id))!.topBidderFamilyId, (await war(w2.id))!.topBidderFamilyId]).toEqual([a.f.id, b.f.id]);
   });
 
   it("the 14-day pair rule blocks shared Bosses or two shared members, both directions (D28)", async () => {

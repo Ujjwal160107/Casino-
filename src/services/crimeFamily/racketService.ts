@@ -1,36 +1,15 @@
-// Rackets (spec 9.1–9.3, 15): seed the fixed list, resolve racket keys, count
-// racket-eligible members and collect one racket's due cycles into earnings
-// (or strike it for neglect and release it to the Street).
+// Rackets (spec 9.1–9.3, 15): resolve racket keys, count racket-eligible
+// members and collect one racket's due cycles into earnings (or strike it for
+// neglect and release it to the Street).
 import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
-import { RACKETS, RACKET_CLASSES, WAR_RULES, racketDef, type RacketDef } from "../../data/crimeFamilyCatalog";
+import { RACKETS, WAR_RULES, racketDef, type RacketDef } from "../../data/crimeFamilyCatalog";
 import { rentCyclesDue } from "../propertyService";
 import { checkMemberEligibility } from "./eligibility";
 import { listMembers } from "./familyQueries";
 import { writeLedger } from "./ledger";
 import { creditEarnings } from "./vaultService";
-import { isUniqueViolation, runFamilyTx } from "./tx";
-
-function upsertRacket(r: RacketDef) {
-  const def = { name: r.name, class: r.class, incomePerCycle: r.incomePerCycle, baseDefense: RACKET_CLASSES[r.class].baseline, warDow: r.warDow, warHourUtc: r.warHourUtc };
-  return prisma.racket.upsert({ where: { key: r.key }, create: { key: r.key, ...def }, update: def });
-}
-
-/**
- * T15: runs at every boot. Upserts the definition of each racket by key and
- * never touches ownership, timers or strikes (edge 61). No transaction is
- * open, so a P2002 from a concurrent first create is caught and retried once.
- */
-export async function seedRackets(): Promise<void> {
-  for (const r of RACKETS) {
-    try {
-      await upsertRacket(r);
-    } catch (err) {
-      if (!isUniqueViolation(err)) throw err;
-      await upsertRacket(r);
-    }
-  }
-}
+import { runFamilyTx } from "./tx";
 
 /** T11: a key, case-insensitive, or the map number 1–10 in `RACKETS` order. */
 export function resolveRacketKey(raw: string | undefined): RacketDef | null {

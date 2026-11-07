@@ -6,7 +6,7 @@ import { inviteMember, acceptInvite } from "../../src/services/crimeFamily/membe
 import { depositToVault } from "../../src/services/crimeFamily/vaultService";
 import { executePayday } from "../../src/services/crimeFamily/paydayService";
 import { ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
-import { testPrisma, testRedis, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, withCfConfig } from "../helpers";
+import { testPrisma, testRedis, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, withCfConfig, racketByKey, turfCity } from "../helpers";
 import { planCaper, joinCaper } from "../../src/services/crimeFamily/caperLobbyService";
 import { openBrief, lockChoice } from "../../src/services/crimeFamily/caperPlayService";
 import { parseAnswers } from "../../src/services/crimeFamily/intelRing";
@@ -148,12 +148,12 @@ describe("turf with Redis down (spec 18 shape 4, edge 8)", () => {
   async function turfSides() {
     const mk = async (ch: string) => {
       const boss = await seedEligibleUser({ wallet: 200_000 }); const ub = await seedEligibleUser({ wallet: 200_000 }); const s = await seedEligibleUser({ wallet: 200_000 });
-      const f = await seedFamily({ bossId: boss, level: 1, earnings: 5_000_000, homeGuildId: "g1", homeChannelId: ch, members: [{ userId: ub, role: "UNDERBOSS", joinedAt: daysAgo(10) }, { userId: s, role: "SOLDIER", joinedAt: daysAgo(10) }] });
+      const f = await seedFamily({ bossId: boss, level: 1, earnings: 5_000_000, homeGuildId: "g1", homeChannelId: ch, data: { cityId: (await turfCity()).id }, members: [{ userId: ub, role: "UNDERBOSS", joinedAt: daysAgo(10) }, { userId: s, role: "SOLDIER", joinedAt: daysAgo(10) }] });
       return { f, boss, ub, s };
     };
     return { a: await mk("ch-a"), d: await mk("ch-d") };
   }
-  beforeAll(() => ensureUniqueIndexes(["Racket", "War", "WarContribution"]));
+  beforeAll(() => ensureUniqueIndexes(["TurfCity", "Racket", "War", "WarContribution"]));
   beforeEach(async () => { await resetFamilies(); vi.spyOn(redisService, "getInstance").mockImplementation(() => { throw new Error("down"); }); });
   afterEach(() => vi.restoreAllMocks());
 
@@ -171,8 +171,8 @@ describe("turf with Redis down (spec 18 shape 4, edge 8)", () => {
 
   it("placeBid moves the escrow out of earnings", async () => {
     const { a } = await turfSides();
-    await seedWar({ racketKey: "pawn_row", status: "BIDDING" });
-    await placeBid({ racketKey: "pawn_row", actorId: a.boss, amount: 2_100_000 });
+    const w = await seedWar({ racketKey: "pawn_row", status: "BIDDING" });
+    await placeBid({ racketId: w.racketId, actorId: a.boss, amount: 2_100_000 });
     expect((await testPrisma.family.findUnique({ where: { id: a.f.id } }))!.earnings).toBe(2_900_000);
     expect(await testPrisma.war.findFirst({ where: { racketKey: "pawn_row" } })).toMatchObject({ topBid: 2_100_000, topBidderFamilyId: a.f.id });
   });
@@ -205,7 +205,7 @@ describe("turf with Redis down (spec 18 shape 4, edge 8)", () => {
     await seedRacket("pawn_row", { ownerFamilyId: a.f.id, lastPayoutAt: new Date(Date.now() - 25 * H) });
     const c = fakeClient();
     await withCfConfig({ enabled: true, turfEnabled: true }, () => tickRackets(c.client, new Date()));
-    expect((await testPrisma.racket.findUnique({ where: { key: "pawn_row" } }))!.neglectStrikes).toBe(1);
+    expect((await racketByKey("pawn_row")).neglectStrikes).toBe(1);
     expect([...c.dm.keys()].sort()).toEqual([a.boss, a.ub, a.s].sort());
   });
 });

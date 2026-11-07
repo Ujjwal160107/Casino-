@@ -4,9 +4,9 @@ import { leaveFamily, kickMember } from "../../src/services/crimeFamily/membersh
 import { disbandFamily, previewDisband } from "../../src/services/crimeFamily/disbandService";
 import { getLeaderboard } from "../../src/services/crimeFamily/leaderboard";
 import { buildDashboardView } from "../../src/services/crimeFamily/familyQueries";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedContribution, seedWarHits, withCfConfig } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedContribution, seedWarHits, withCfConfig, racketByKey } from "../helpers";
 
-beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "FamilyInvite", "Racket", "War", "WarContribution"]));
+beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "FamilyInvite", "TurfCity", "Racket", "War", "WarContribution"]));
 beforeEach(resetFamilies);
 const fam = (id: string) => testPrisma.family.findUnique({ where: { id } });
 
@@ -52,7 +52,7 @@ describe("turf entries in plan 1's registries", () => {
     expect((await previewDisband(f.id)).burnEarnings).toBe(2_100_000);
     await disbandFamily(boss, "TOP");
     expect(await testPrisma.war.findUnique({ where: { id: war.id } })).toMatchObject({ status: "BIDDING", topBid: 0, topBidderFamilyId: "" });
-    expect(await testPrisma.racket.findUnique({ where: { key: "pawn_row" } })).toMatchObject({ ownerFamilyId: "", neglectStrikes: 0 });
+    expect(await racketByKey("pawn_row")).toMatchObject({ ownerFamilyId: "", neglectStrikes: 0 });
     expect(await testPrisma.familyLedger.findFirst({ where: { familyId: f.id, type: "bid_refund" } })).toMatchObject({ amount: 2_100_000 });
     expect((await testPrisma.familyLedger.findFirst({ where: { familyId: f.id, type: "disband_burn" } }))!.amount).toBe(-2_101_000);
   });

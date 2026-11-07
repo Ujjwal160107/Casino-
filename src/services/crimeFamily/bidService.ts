@@ -4,9 +4,10 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { fmtFortunes, parsePositiveAmount } from "../../utils/format";
-import { RACKETS, RACKET_CLASSES, WAR_RULES, levelDef, racketDef, type FamilyRole } from "../../data/crimeFamilyCatalog";
+import { RACKETS, WAR_RULES, cityLabel, levelDef, type FamilyRole } from "../../data/crimeFamilyCatalog";
 import { checkJailStatus } from "../jailService";
 import { familyLabel, getMembership, isUnderInvestigation } from "./familyQueries";
+import { nextCensusAt } from "./leagueRules";
 import { can } from "./permissions";
 import { FamilyError, runFamilyTx, VaultShort } from "./tx";
 import { creditEarnings, spendFromVault } from "./vaultService";
@@ -18,9 +19,11 @@ export interface BidContext {
   now: Date;
   member: { role: FamilyRole; joinedAt: Date } | null;
   jailed: boolean;
-  family: { id: string; level: number; duesArrears: number; homeChannelId: string } | null;
+  family: { id: string; level: number; duesArrears: number; homeChannelId: string; cityId: string } | null;
+  /** The family's city's label when it is placed, else null. */
+  familyCityLabel: string | null;
   underInvestigation: boolean;
-  racket: { ownerFamilyId: string; class: RacketClass };
+  racket: { id: string; key: string; name: string; ownerFamilyId: string; class: RacketClass; cityId: string; cityLabel: string; incomePerCycle: number };
   war: { id: string; status: string; startsAt: Date; bidClosesAt: Date; topBid: number; topBidderFamilyId: string } | null;
   held: number;
   liveBids: number;
@@ -29,7 +32,7 @@ export interface BidContext {
 }
 
 export type BidResult = {
-  warId: string; racketKey: string; racketName: string; amount: number; familyId: string; familyLabel: string;
+  warId: string; racketId: string; racketKey: string; racketName: string; amount: number; familyId: string; familyLabel: string;
   startsAt: Date; bidClosesAt: Date; ownerFamilyId: string; previous: { familyId: string; amount: number } | null;
 };
 
@@ -43,19 +46,32 @@ export const BAD_AMOUNT = "Enter an amount like 2.1m or 2,100,000.";
 const EARNINGS_SHORT = "Not enough earnings for this bid (bids never use the treasury). Check `!crew vault`.";
 const CROWN_KEYS = RACKETS.filter((r) => r.class === "CROWN").map((r) => r.key);
 const AFTER_BIDDING = ["ARMED", "ACTIVE", "SETTLING"];
+const OBJECT_ID = /^[0-9a-f]{24}$/i;
+const unix = (d: Date) => Math.floor(d.getTime() / 1000);
+
+/** A 24-hex id: checked before any findUnique on an id from a customId (Prisma throws on a malformed ObjectId). */
+export function isObjectId(s: string): boolean {
+  return OBJECT_ID.test(s);
+}
+
+/** 6.6: why an unplaced family may not bid yet, and when the census next runs. */
+export function noCityLine(now: Date): string {
+  return `Your family has no city yet: it gets one at the daily census once ${CRIME_FAMILY_CONFIG.racketEligibleMin} members are active (next <t:${unix(nextCensusAt(now))}:R>).`;
+}
 
 /** Every reason this family may not bid now, in the order the player reads them (pure). */
 export function bidBlockers(ctx: BidContext): string[] {
   const { member, family, racket, war } = ctx;
   if (!member || !family) return [NOT_IN_FAMILY];
   const out: string[] = [];
+  // No league check (H18): placement and the level-up keep a family's city in its league.
+  if (family.cityId === "") out.push(noCityLine(ctx.now));
+  else if (family.cityId !== racket.cityId) out.push(`This racket is in ${racket.cityLabel}. Your family plays in ${ctx.familyCityLabel}.`);
   if (!can(member, "bid", ctx.now)) out.push("Only the Boss or Underboss can bid.");
   if (ctx.jailed) out.push("You can't bid while jailed.");
   if (!war) out.push("Bidding is not open for this racket.");
   if (racket.ownerFamilyId === family.id) out.push("You already own this racket.");
   if (war && war.topBidderFamilyId === family.id) out.push("You already hold the top bid.");
-  const cls = RACKET_CLASSES[racket.class];
-  if (family.level < cls.minFamilyLevel) out.push(`${cls.name} rackets need family level ${cls.minFamilyLevel}.`);
   if (family.duesArrears > 0) out.push("Clear dues arrears first.");
   if (ctx.underInvestigation) out.push("Your family is under investigation.");
   if (!family.homeChannelId) out.push("Set a home channel first (`!crew home`).");
@@ -119,24 +135,31 @@ export function parseBidAmount(raw: string | undefined): number | null {
  * inside its transaction (so every retry re-checks); the S17 view calls it on
  * the global client, read-only.
  */
-export async function loadBidContext(db: Db, familyId: string | null, viewerId: string, racketKey: string, now: Date): Promise<BidContext> {
-  const def = racketDef(racketKey);
-  if (!def) throw new FamilyError("Unknown racket.");
+export async function loadBidContext(db: Db, familyId: string | null, viewerId: string, racketId: string, now: Date): Promise<BidContext> {
+  if (!isObjectId(racketId)) throw new FamilyError("Unknown racket.");
   // Sequential reads: queries on one transaction's session never run concurrently.
+  const racket = await db.racket.findUnique({
+    where: { id: racketId },
+    select: { id: true, key: true, name: true, class: true, cityId: true, ownerFamilyId: true, incomePerCycle: true },
+  });
+  if (!racket) throw new FamilyError("Unknown racket.");
+  const city = await db.turfCity.findUniqueOrThrow({ where: { id: racket.cityId }, select: { league: true, number: true } });
   const row = await db.familyMember.findUnique({ where: { userId: viewerId } });
-  const racket = await db.racket.findUnique({ where: { key: racketKey }, select: { ownerFamilyId: true } });
   const war = await db.war.findFirst({
-    where: { racketKey, status: "BIDDING", bidClosesAt: { gt: now } },
+    where: { racketId, status: "BIDDING", bidClosesAt: { gt: now } },
     select: { id: true, status: true, startsAt: true, bidClosesAt: true, topBid: true, topBidderFamilyId: true },
   });
   const base = {
-    now, jailed: false, underInvestigation: false, war, held: 0, liveBids: 0, crownsHeldOrBid: 0, pairBlocked: false,
-    racket: { ownerFamilyId: racket?.ownerFamilyId ?? "", class: def.class },
+    now, jailed: false, underInvestigation: false, war, held: 0, liveBids: 0, crownsHeldOrBid: 0, pairBlocked: false, familyCityLabel: null,
+    racket: { ...racket, class: racket.class as RacketClass, cityLabel: cityLabel(city.league, city.number) },
   };
   const family = familyId && row?.familyId === familyId
-    ? await db.family.findUnique({ where: { id: familyId }, select: { id: true, level: true, duesArrears: true, homeChannelId: true } })
+    ? await db.family.findUnique({ where: { id: familyId }, select: { id: true, level: true, duesArrears: true, homeChannelId: true, cityId: true } })
     : null;
   if (!row || !family) return { ...base, member: null, family: null };
+  const own = family.cityId === "" ? null
+    : family.cityId === racket.cityId ? city
+    : await db.turfCity.findUnique({ where: { id: family.cityId }, select: { league: true, number: true } });
 
   const notThisWar = war ? { id: { not: war.id } } : {};
   const liveWhere = (extra: Prisma.WarWhereInput): Prisma.WarWhereInput => ({
@@ -151,7 +174,7 @@ export async function loadBidContext(db: Db, familyId: string | null, viewerId: 
   const crownsHeld = await db.racket.count({ where: { ownerFamilyId: family.id, class: "CROWN" } });
   const pairBlocked = await pairRuleBlocks(db, family.id, base.racket.ownerFamilyId, now);
   return {
-    ...base, member: { role: row.role as FamilyRole, joinedAt: row.joinedAt }, family,
+    ...base, member: { role: row.role as FamilyRole, joinedAt: row.joinedAt }, family, familyCityLabel: own ? cityLabel(own.league, own.number) : null,
     jailed: jail.isJailed, underInvestigation, held, liveBids, crownsHeldOrBid: crownWars + crownsHeld, pairBlocked,
   };
 }
@@ -161,20 +184,19 @@ export async function loadBidContext(db: Db, familyId: string | null, viewerId: 
  * refunded to earnings, and a CAS on the top bid so two bids in the same
  * second leave exactly one standing (edge 13).
  */
-export async function placeBid(input: { racketKey: string; actorId: string; amount: number; now?: Date }): Promise<BidResult> {
+export async function placeBid(input: { racketId: string; actorId: string; amount: number; now?: Date }): Promise<BidResult> {
   const now = input.now ?? new Date();
-  const { racketKey, actorId, amount } = input;
-  const def = racketDef(racketKey);
-  if (!def) throw new FamilyError("Unknown racket.");
-  const floor = bidFloor(def);
+  const { racketId, actorId, amount } = input;
   const membership = await getMembership(actorId);
 
   return runFamilyTx(async (tx) => {
-    const ctx = await loadBidContext(tx, membership?.family.id ?? null, actorId, racketKey, now);
+    const ctx = await loadBidContext(tx, membership?.family.id ?? null, actorId, racketId, now);
     const blocker = bidBlockers(ctx)[0];
     if (blocker) throw new FamilyError(blocker);
     const family = ctx.family!;
     const war = ctx.war!;
+    const racketKey = ctx.racket.key;
+    const floor = bidFloor(ctx.racket);
 
     if (!Number.isSafeInteger(amount) || amount <= 0) throw new FamilyError(BAD_AMOUNT);
     const min = minNextBid(war.topBid, floor);
@@ -206,7 +228,7 @@ export async function placeBid(input: { racketKey: string; actorId: string; amou
 
     const named = await tx.family.findUniqueOrThrow({ where: { id: family.id }, select: { tag: true, name: true } });
     return {
-      warId: war.id, racketKey, racketName: def.name, amount, familyId: family.id, familyLabel: familyLabel(named),
+      warId: war.id, racketId, racketKey, racketName: ctx.racket.name, amount, familyId: family.id, familyLabel: familyLabel(named),
       startsAt: war.startsAt, bidClosesAt: war.bidClosesAt, ownerFamilyId: ctx.racket.ownerFamilyId, previous,
     };
   });

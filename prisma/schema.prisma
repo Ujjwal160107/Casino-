@@ -769,6 +769,8 @@ model Family {
   claimChannelId String   @default("")
   claimMessageId String   @default("")
   memberCount        Int      @default(1)     // denormalized; written with every member create/delete (A9)
+  cityId             String   @default("")    // "" = unplaced (sentinel); set only by the census
+  cityPlacedAt       DateTime @default(now()) // rewritten at every placement or move; read only with cityId ≠ ""
   activeMembers      Int      @default(0)     // written by the daily census (A22)
   censusAt           DateTime @default(now())
   recruiting         Boolean  @default(false)
@@ -783,6 +785,8 @@ model Family {
   updatedAt      DateTime @updatedAt          // touched by create/plan/accept/invite/leave/kick/promote so payday and disband conflict
   @@index([xp])
   @@index([warWins])
+  @@index([cityId])
+  @@index([level, activeMembers])
   @@index([recruiting, level])
   @@index([recruiting, memberCount])
   @@index([recruiting, activeMembers])
@@ -849,7 +853,7 @@ model FamilyLedger {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
   familyId      String   @db.ObjectId
   actorId       String                        // discordId or "system"
-  type          String   // create_fee|deposit|deposit_tax|payday|payday_tax|caper_cut|racket_income|racket_neglect|dues|dues_missed|level_fee|rename_fee|bid_escrow|bid_refund|war_bid_burn|disband_burn|payday_clamp_return
+  type          String   // create_fee|deposit|deposit_tax|payday|payday_tax|caper_cut|racket_income|racket_neglect|dues|dues_missed|level_fee|rename_fee|bid_escrow|bid_refund|war_bid_burn|disband_burn|payday_clamp_return|league_move
   amount        Float                         // signed, vault perspective
   treasuryAfter Float
   earningsAfter Float
@@ -923,20 +927,26 @@ model CaperCrew {
 }
 
 model Racket {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  key            String   @unique
-  name           String
-  class          String                       // CORNER|DISTRICT|CROWN
-  incomePerCycle Float
-  baseDefense    Int                          // per-block baseline for any defender (9.1)
-  warDow         Int                          // 0 = Sunday (getUTCDay)
-  warHourUtc     Int
-  ownerFamilyId  String   @default("")        // "" = Street (sentinel, never null)
-  capturedAt     DateTime @default(now())
-  lastPayoutAt   DateTime @default(now())
-  neglectStrikes Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  cityId          String   @db.ObjectId
+  league          String                       // BRONZE|SILVER|GOLD, the city's
+  key             String
+  name            String
+  class           String                       // CORNER|DISTRICT|CROWN
+  incomePerCycle  Float
+  baseDefense     Int                          // per-block baseline for any defender (9.1)
+  warDow          Int                          // 0 = Sunday (getUTCDay)
+  warHourUtc      Int
+  ownerFamilyId   String   @default("")        // "" = Street (sentinel, never null)
+  capturedAt      DateTime @default(now())
+  lastPayoutAt    DateTime @default(now())
+  neglectStrikes  Int      @default(0)
+  openedPeriodKey String   @default("")        // periodKey of the last War opened for it (one write per week)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@unique([cityId, key])
+  @@index([cityId])
+  @@index([key, openedPeriodKey])
   @@index([ownerFamilyId])
 }
 
@@ -944,6 +954,7 @@ model War {
   id                String   @id @default(auto()) @map("_id") @db.ObjectId
   racketId          String   @db.ObjectId
   racketKey         String
+  cityId            String   @db.ObjectId     // the racket's, written at upsert
   periodKey         String                    // ISO week of startsAt, e.g. "2026-W44"
   status            String   @default("BIDDING") // BIDDING|ARMED|ACTIVE|SETTLING|RESOLVED|CANCELLED
   bidOpensAt        DateTime
@@ -969,6 +980,7 @@ model War {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   @@unique([racketId, periodKey])
+  @@index([cityId, status])
   @@index([status, bidClosesAt])
   @@index([status, startsAt])
   @@index([status, endsAt])
@@ -1064,6 +1076,21 @@ model FamilyBallot {
   choice   String                              // YES|NO
   castAt   DateTime @default(now())
   @@unique([voteId, userId])
+}
+
+model TurfCity {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  league        String                       // BRONZE|SILVER|GOLD
+  number        Int                          // 1.. per league
+  status        String   @default("OPEN")    // OPEN|CLOSED
+  surplusDays   Int      @default(0)
+  surplusDayKey String   @default("")        // "YYYY-MM-DD": surplusDays counts once per UTC day
+  openedAt      DateTime @default(now())
+  closedAt      DateTime @default(now())     // rewritten at close; read only with status CLOSED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt          // touched by placement and rebalance moves so a closure conflicts (placeBid does not touch it)
+  @@unique([league, number])
+  @@index([league, status])
 }
 
 model CfJobRun {

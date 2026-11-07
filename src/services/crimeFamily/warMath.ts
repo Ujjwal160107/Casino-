@@ -3,7 +3,7 @@
 // Integer arithmetic for money, so every figure matches the spec tables.
 import { createHmac } from "crypto";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
-import { RACKET_CLASSES, WAR_BLOCKS, WAR_RULES, type RacketDef } from "../../data/crimeFamilyCatalog";
+import { RACKETS, RACKET_CLASSES, WAR_BLOCKS, WAR_RULES, type RacketDef } from "../../data/crimeFamilyCatalog";
 
 export type WarBlockKey = (typeof WAR_BLOCKS)[number]["key"];
 export type RacketClass = RacketDef["class"];
@@ -21,6 +21,13 @@ export function nextWarStart(r: Pick<RacketDef, "warDow" | "warHourUtc">, now: D
   const diff = (r.warDow - now.getUTCDay() + 7) % 7;
   const t = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diff, r.warHourUtc);
   return new Date(t <= now.getTime() ? t + WEEK_MS : t);
+}
+
+/** H15: the soonest weekly war of any racket (the schedule is the same in every city). */
+export function soonestWar(now: Date): { racketName: string; startsAt: Date } {
+  return RACKETS
+    .map((r) => ({ racketName: r.name, startsAt: nextWarStart(r, now) }))
+    .reduce((a, b) => (b.startsAt < a.startsAt ? b : a));
 }
 
 /** ISO-8601 week key, e.g. "2026-W45": the ISO year is that of the week's Thursday. */
@@ -112,7 +119,8 @@ export function defenceEarnsXp(s: BlockScores): boolean {
   return WAR_BLOCKS.filter((b) => s[b.key].atk > 0).length >= 2;
 }
 
-export function bidFloor(r: Pick<RacketDef, "incomePerCycle">): number {
+/** The floor reads the Racket row's income, which is its league's (A25). */
+export function bidFloor(r: { incomePerCycle: number }): number {
   return CRIME_FAMILY_CONFIG.bidFloorDays * r.incomePerCycle;
 }
 

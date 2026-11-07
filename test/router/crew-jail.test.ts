@@ -4,8 +4,9 @@ import { fakeMessage, replyText } from "./fakeMessage";
 import { seedEligibleUser, seedFamily, resetFamilies, withCfConfig, testPrisma } from "../helpers";
 import { seedRunning, seedLobby } from "../crimeFamily/caperFixtures";
 import { TURF_IDS } from "../../src/ui/crimeFamily/ids";
+import { seedTurf } from "../../src/services/crimeFamily/turfCities";
 
-beforeEach(resetFamilies);
+beforeEach(async () => { await resetFamilies(); await seedTurf(); });   // !turf needs the cities (no Street fallback)
 
 describe("!crew routing", () => {
   it("a jailed member can view the dashboard but not deposit", async () => {

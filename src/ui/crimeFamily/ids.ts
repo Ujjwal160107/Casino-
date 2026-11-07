@@ -106,11 +106,11 @@ export const TURF_IDS = {
   /** S16's War board button (T20). */
   viewWar: (owner: string) => cfId("turf", "v", "war", owner),
   select: (owner: string) => cfId("turf", "sel", owner),
-  /** S27 opener for `!turf racket <key>`. */
-  openRacket: (racketKey: string, owner: string) => cfId("turf", "open", "racket", racketKey, owner),
-  /** S17's Bid button: opens the bid modal. */
-  bid: (racketKey: string, owner: string) => cfId("turf", "bid", racketKey, owner),
-  bidModal: (racketKey: string, owner: string) => cfId("turf", "modal", "bid", racketKey, owner),
+  /** S27 opener for `!turf racket <key>`: turf:open:racket:<racketId>:<owner>, 62 characters at most. */
+  openRacket: (racketId: string, owner: string) => cfId("turf", "open", "racket", racketId, owner),
+  /** S17's Bid button: opens the bid modal (54 characters at most). */
+  bid: (racketId: string, owner: string) => cfId("turf", "bid", racketId, owner),
+  bidModal: (racketId: string, owner: string) => cfId("turf", "modal", "bid", racketId, owner),
   scout: (warId: string) => cfId("turf", "scout", warId),
   hit: (warId: string, block: WarBlockKey) => cfId("turf", "hit", warId, block),
   hitAnswer: (hitId: string, index: number) => cfId("turf", "hx", hitId, index),
