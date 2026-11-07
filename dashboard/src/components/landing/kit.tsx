@@ -70,8 +70,13 @@ export function SectionHead({ num, title, sub, tone = "default" }: { num: string
     <div ref={ref} className="mb-16 grid grid-cols-1 items-end gap-x-7 gap-y-3 border-b-[3px] pb-5 sm:grid-cols-[auto_1fr]" style={{ borderColor: ink }}>
       <span
         aria-hidden
-        className="font-display text-[clamp(70px,9vw,150px)] font-black leading-[.75] text-transparent sm:row-span-2"
+        className="font-display text-[clamp(70px,9vw,150px)] font-black leading-none text-transparent sm:row-span-2"
         style={{
+          // The fill paints the padding box, so give the glyphs room above and
+          // below (full line height plus padding) and pull the layout back with
+          // negative margins: the gold then covers whole digits, not a band.
+          padding: "0.14em 0",
+          margin: "-0.265em 0",
           WebkitTextStroke: `2px ${ink}`,
           backgroundImage: `linear-gradient(${fill}, ${fill})`,
           backgroundRepeat: "no-repeat",
@@ -132,10 +137,5 @@ export function CommandPill({ cmd, tone = "default" }: { cmd: string; tone?: "de
   );
 }
 
-/** Primary and secondary buttons in the Maximal Mono style. */
-export const btn = {
-  base: "inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-full border-[3px] px-6 font-body text-[15px] font-extrabold uppercase tracking-[.05em] transition-[transform,box-shadow,background-color,color,translate] duration-150 active:translate-y-0.5",
-  main: "border-gold bg-gold text-bg shadow-[4px_4px_0_var(--color-ink)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0_var(--color-ink)]",
-  ghost: "border-ink bg-transparent text-ink hover:bg-ink hover:text-bg",
-  lg: "min-h-14 px-8 text-[17px]",
-};
+// Button class strings live in ./styles (no "use client") so server components get real strings.
+export { btn } from "./styles";

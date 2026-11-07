@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { INVITE_URL, SUPPORT_URL, VOTE_URL } from "@/lib/links";
+import { FooterWordmark } from "./FooterWordmark";
 
 const COLUMNS: {
   title: string;
@@ -78,9 +79,12 @@ export function Footer() {
       </div>
       <div className="border-t border-line">
         <p className="mx-auto w-full max-w-[86rem] px-4 py-6 font-mono text-xs text-muted sm:px-6 lg:px-9">
-          © {new Date().getFullYear()} Fortuna. The Fortunes are fake. The
+          © <span suppressHydrationWarning>{new Date().getFullYear()}</span> Fortuna. The Fortunes are fake. The
           grudges are real.
         </p>
+      </div>
+      <div className="mx-auto w-full max-w-[86rem] overflow-hidden px-4 pt-12 sm:px-6 lg:px-9">
+        <FooterWordmark />
       </div>
     </footer>
   );

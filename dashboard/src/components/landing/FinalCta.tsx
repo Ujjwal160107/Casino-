@@ -1,7 +1,8 @@
 /* eslint-disable @next/next/no-img-element -- pixel-art mascot at a fixed size; next/image adds nothing here. */
 import { Plus } from "lucide-react";
 import { INVITE_URL, SUPPORT_URL } from "@/lib/links";
-import { btn, Container, Reveal } from "./kit";
+import { Container, Reveal } from "./kit";
+import { btn } from "./styles";
 import { cn } from "@/lib/utils";
 
 /** The closing call to action: a gold block with the two ways in and the Don beside them. Nothing here moves on its own: the block lifts in once with Reveal. */

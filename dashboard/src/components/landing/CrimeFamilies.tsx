@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- small pixel-art turf icons at fixed sizes; next/image adds nothing here. */
-import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { BotMessage, type ScreenKey } from "@/components/bot/BotMessage";
 import { Container, Reveal, Section, SectionHead, useReducedMotionPref } from "./kit";
 import { cn } from "@/lib/utils";
@@ -62,7 +62,10 @@ const LEAGUES = [
 
 /** A muted ink for inactive step titles: still 3:1+ on bone at display size. */
 const MUTED_INK = "color-mix(in srgb, var(--color-bg) 55%, var(--color-ink))";
-const SWAP_MS = 170;
+/** The stage's constant box: never taller than the viewport minus the nav and some air. */
+const STAGE_BOX = "min(640px, calc(100vh - 160px))";
+/** Room the frame's 12px gold offset shadow needs inside the box. */
+const SHADOW_ROOM = 12;
 
 /** Which step sits in the middle band of the viewport. Starts on the first step. */
 function useActiveStep(count: number) {
@@ -78,17 +81,6 @@ function useActiveStep(count: number) {
     return () => io.disconnect();
   }, [count]);
   return [refs, active] as const;
-}
-
-/** The step shown on the stage trails the active step by one short fade, instant under reduced motion. */
-function useStagedScreen(active: number, reduced: boolean) {
-  const [shown, setShown] = useState(active);
-  useEffect(() => {
-    if (shown === active) return;
-    const t = setTimeout(() => setShown(active), reduced ? 0 : SWAP_MS);
-    return () => clearTimeout(t);
-  }, [active, shown, reduced]);
-  return [shown, shown !== active] as const;
 }
 
 /** The dark Discord frame every story screen sits in. */
@@ -129,41 +121,72 @@ function StoryStep({ step, index, on, stepRef }: { step: Step; index: number; on
   );
 }
 
-/** The sticky stage (from 1000px): swaps to the active step's screen with a short fade. */
-function StoryStage({ shown, swapping, reduced, stageRef }: { shown: number; swapping: boolean; reduced: boolean; stageRef: RefObject<HTMLDivElement | null> }) {
-  const step = STEPS[shown];
-  return (
-    <div ref={stageRef} className="hidden min-w-0 min-[1000px]:sticky min-[1000px]:top-[110px] min-[1000px]:block">
-      <div
-        style={{
-          opacity: swapping ? 0 : 1,
-          transform: swapping ? "translateY(8px)" : "none",
-          transition: reduced ? undefined : `opacity ${SWAP_MS}ms ease, transform ${SWAP_MS}ms ease`,
-        }}
-      >
-        <StageFrame screen={step.screen} />
-      </div>
-      <p className="sr-only" aria-live="polite">{step.caption}</p>
-    </div>
-  );
+/**
+ * Scales each stacked card down (from its top centre) so it fits the stage
+ * box, re-fitting when the box or a card resizes. Writes the transform
+ * straight to the element, so no re-render.
+ */
+function useFitCards(count: number) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box || typeof ResizeObserver === "undefined") return;
+    const cards = cardRefs.current.slice(0, count);
+    const fit = () => {
+      const room = box.clientHeight - SHADOW_ROOM;
+      if (room <= 0) return; // hidden below 1000px
+      cards.forEach((c) => {
+        if (!c) return;
+        const h = c.offsetHeight; // layout height, unaffected by the transform
+        c.style.transform = h > room ? `scale(${room / h})` : "";
+      });
+    };
+    const ro = new ResizeObserver(fit);
+    ro.observe(box);
+    cards.forEach((c) => c && ro.observe(c));
+    return () => ro.disconnect();
+  }, [count]);
+  return [boxRef, cardRefs] as const;
 }
 
 /**
- * Publishes the stage's height as --stage-h on the story grid, so the steps
- * column can pad its bottom enough that the stuck stage stays fully in view
- * while the last step is active. Writes a CSS variable, so no re-render.
+ * The sticky stage (from 1000px): one constant box, centred in the viewport,
+ * holding all four cards stacked. Only the active card is visible; the swap
+ * is a crossfade with a small lift, instant under reduced motion. Nothing
+ * moves or changes height as the steps change.
  */
-function useStageHeightVar() {
-  const gridRef = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const grid = gridRef.current, stage = stageRef.current;
-    if (!grid || !stage || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => grid.style.setProperty("--stage-h", `${stage.offsetHeight}px`));
-    ro.observe(stage);
-    return () => ro.disconnect();
-  }, []);
-  return [gridRef, stageRef] as const;
+function StoryStage({ active, reduced }: { active: number; reduced: boolean }) {
+  const [boxRef, cardRefs] = useFitCards(STEPS.length);
+  return (
+    <div
+      ref={boxRef}
+      className="relative hidden min-w-0 min-[1000px]:sticky min-[1000px]:block"
+      style={{ height: "var(--stage-box)", top: "calc(50vh - var(--stage-box) / 2)" }}
+    >
+      {STEPS.map((s, i) => {
+        const on = i === active;
+        return (
+          <div
+            key={s.tag}
+            aria-hidden={!on}
+            className="pointer-events-none absolute inset-0 flex justify-center"
+            style={{
+              paddingRight: SHADOW_ROOM,
+              opacity: on ? 1 : 0,
+              transform: on ? "none" : "translateY(8px)",
+              transition: reduced ? "none" : "opacity 300ms var(--ease-out-expo), transform 300ms var(--ease-out-expo)",
+            }}
+          >
+            <div ref={(el) => { cardRefs.current[i] = el; }} className="h-max w-full origin-top">
+              <StageFrame screen={s.screen} />
+            </div>
+          </div>
+        );
+      })}
+      <p className="sr-only" aria-live="polite">{STEPS[active].caption}</p>
+    </div>
+  );
 }
 
 function FamilyFacts() {
@@ -202,8 +225,6 @@ function LeagueBadges() {
 export function CrimeFamilies() {
   const reduced = useReducedMotionPref();
   const [stepRefs, active] = useActiveStep(STEPS.length);
-  const [shown, swapping] = useStagedScreen(active, reduced);
-  const [gridRef, stageRef] = useStageHeightVar();
 
   return (
     <Section id="crime-families" ruled={false} className="border-y-[3px] border-ink bg-ink text-bg">
@@ -223,14 +244,18 @@ export function CrimeFamilies() {
           sub="New. Every crewmate holds intel someone else needs. Scroll through one job."
         />
 
-        <div ref={gridRef} className="grid gap-10 min-[1000px]:grid-cols-[minmax(0,1fr)_minmax(0,560px)] min-[1000px]:items-start">
-          {/* When the last step's bottom reaches the 45% line, the grid must still reach 110px + the stage height + room for its 12px shadow. */}
-          <ol className="m-0 list-none p-0 min-[1000px]:pb-[max(0px,calc(134px+var(--stage-h,0px)-45vh))]">
+        <div
+          className="grid gap-10 min-[1000px]:grid-cols-[minmax(0,1fr)_minmax(0,560px)] min-[1000px]:items-start"
+          style={{ "--stage-box": STAGE_BOX } as CSSProperties}
+        >
+          {/* The stage stays pinned while the grid reaches below it: when the last step's
+              bottom crosses the 45% line (it is still active), the grid must reach 50vh + half the box. */}
+          <ol className="m-0 list-none p-0 min-[1000px]:pb-[calc(var(--stage-box)/2+5vh)]">
             {STEPS.map((s, i) => (
               <StoryStep key={s.tag} step={s} index={i} on={i === active} stepRef={(el) => { stepRefs.current[i] = el; }} />
             ))}
           </ol>
-          <StoryStage shown={shown} swapping={swapping} reduced={reduced} stageRef={stageRef} />
+          <StoryStage active={active} reduced={reduced} />
         </div>
 
         <FamilyFacts />
