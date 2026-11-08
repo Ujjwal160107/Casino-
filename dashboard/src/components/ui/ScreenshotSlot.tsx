@@ -10,6 +10,7 @@ export function ScreenshotSlot({
   className,
   aspect = "aspect-video",
   maxWidth,
+  preload,
 }: {
   /** public path, e.g. "/art/stock-market.jpg" */
   src: string;
@@ -20,6 +21,8 @@ export function ScreenshotSlot({
   aspect?: string;
   /** tailwind max-width class for tall/portrait art, e.g. "max-w-xs" (centered) */
   maxWidth?: string;
+  /** set on the page's LCP image only */
+  preload?: boolean;
 }) {
   // Render nothing when the file isn't there — no placeholder boxes.
   const exists = fs.existsSync(path.join(process.cwd(), "public", src));
@@ -35,7 +38,7 @@ export function ScreenshotSlot({
         )}
       >
         {/* object-contain guarantees the whole image is visible — never cropped */}
-        <Image src={src} alt={alt} fill sizes="768px" className="object-contain" />
+        <Image src={src} alt={alt} fill sizes="768px" preload={preload} className="object-contain" />
       </div>
       {caption && (
         <figcaption className="mt-2 text-center text-sm text-muted">

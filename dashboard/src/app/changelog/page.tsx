@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { Footer } from "@/components/Footer";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { pageMetadata } from "@/lib/seo/metadata";
 import { Panel } from "@/components/ui/Panel";
 import { Tag } from "@/components/ui/Tag";
 import {
@@ -23,20 +25,22 @@ import {
   Megaphone,
 } from "lucide-react";
 
-export const metadata: Metadata = {
-  title: "Changelog",
+export const metadata: Metadata = pageMetadata({
+  title: "Changelog: Every Release, Newest First",
   description:
-    "Track the evolution of Fortuna. We ship updates regularly to improve your experience.",
-};
+    "Every Fortuna release, newest first: turf leagues and turf wars, Crime Families and crew heists, the V2 global account, and everything back to the 2026 launch.",
+  path: "/changelog",
+});
 
 export default async function ChangelogPage() {
   const session = await getServerSession(authOptions);
 
   return (
-    <main className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg">
+      <JsonLd />
       <LandingNavbar user={session?.user} />
 
-      <div className="mx-auto max-w-3xl px-6 pb-24 pt-16">
+      <main id="main" className="mx-auto max-w-3xl px-6 pb-24 pt-16">
         <p className="mb-2 font-mono text-sm font-medium uppercase tracking-widest text-gold">
           Latest Release
         </p>
@@ -652,10 +656,10 @@ export default async function ChangelogPage() {
             </Panel>
           </div>
         </div>
-      </div>
+      </main>
 
       <Footer />
-    </main>
+    </div>
   );
 }
 

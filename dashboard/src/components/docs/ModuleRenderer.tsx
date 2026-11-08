@@ -22,9 +22,10 @@ export function moduleToc(doc: ModuleDoc): TocItem[] {
   ];
 }
 
+/** The page's plain-language summary: the first prose after the title and art, and what answer engines quote. */
 function BeginnerBlock({ intro }: { intro: ModuleDoc["forBeginners"] }) {
   return (
-    <aside aria-label="New here?" className="mt-10 grid gap-4 rounded-2xl border-[3px] border-ink bg-panel p-6 sm:p-8">
+    <section aria-label="New here?" className="mt-10 grid gap-4 rounded-2xl border-[3px] border-ink bg-panel p-6 sm:p-8">
       <p className="font-mono text-xs font-bold uppercase tracking-[.14em] text-gold">New here?</p>
       <p className="max-w-[70ch] leading-[1.7] text-ink">
         {richText(intro.what)}
@@ -39,7 +40,7 @@ function BeginnerBlock({ intro }: { intro: ModuleDoc["forBeginners"] }) {
       <p className="max-w-[70ch] text-sm leading-relaxed text-muted">
         <b className="text-ink">Tip:</b> {richText(intro.tip)}
       </p>
-    </aside>
+    </section>
   );
 }
 
@@ -58,6 +59,7 @@ export function ModuleRenderer({ doc }: { doc: ModuleDoc }) {
           caption={doc.screenshot.caption}
           aspect={doc.screenshot.aspect}
           maxWidth={doc.screenshot.maxWidth}
+          preload
         />
       )}
 

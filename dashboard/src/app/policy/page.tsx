@@ -3,22 +3,26 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { Footer } from "@/components/Footer";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { pageMetadata } from "@/lib/seo/metadata";
 import { Panel } from "@/components/ui/Panel";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Privacy Policy",
   description:
-    "How Fortuna collects, uses, and protects your data — on Discord and on this website.",
-};
+    "How Fortuna collects, uses and protects your data on Discord and on this website: what we store, why, who sees it, how long we keep it and your rights.",
+  path: "/policy",
+});
 
 export default async function PolicyPage() {
   const session = await getServerSession(authOptions);
 
   return (
-    <main className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg">
+      <JsonLd />
       <LandingNavbar user={session?.user} />
 
-      <div className="mx-auto max-w-3xl px-6 pb-24 pt-16">
+      <main id="main" className="mx-auto max-w-3xl px-6 pb-24 pt-16">
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-ink">
           Privacy Policy
         </h1>
@@ -281,10 +285,10 @@ export default async function PolicyPage() {
             </a>
           </PolicySection>
         </div>
-      </div>
+      </main>
 
       <Footer />
-    </main>
+    </div>
   );
 }
 

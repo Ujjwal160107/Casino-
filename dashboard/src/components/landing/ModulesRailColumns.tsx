@@ -112,7 +112,7 @@ export function ModulesRailColumns({ modules }: { modules: RailModule[] }) {
                   {m.cmds.map((c) => <CommandPill key={c} cmd={c} tone="inverted" />)}
                 </div>
                 <Link href={`/docs/${m.slug}`} className="inline-flex min-h-11 items-center justify-self-start font-body text-sm font-extrabold uppercase tracking-[.06em]">
-                  <span className="border-b-[3px] border-gold pb-0.5">Read the guide →</span>
+                  <span className="border-b-[3px] border-gold pb-0.5">Read the guide<span className="sr-only">: {m.title}</span> <span aria-hidden>→</span></span>
                 </Link>
               </div>
             </div>

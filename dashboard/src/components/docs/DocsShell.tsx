@@ -45,9 +45,9 @@ export function DocsShell({
         <div className="hidden min-[760px]:block">
           <DocsSidebar current={current} />
         </div>
-        <div id="main" tabIndex={-1} className="min-w-0 focus:outline-none!">
+        <main id="main" tabIndex={-1} className="min-w-0 focus:outline-none!">
           {children}
-        </div>
+        </main>
         <div className="hidden min-[1000px]:block">
           <DocsToc items={toc} title={tocTitle} />
         </div>

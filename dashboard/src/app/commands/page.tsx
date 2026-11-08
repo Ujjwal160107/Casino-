@@ -9,12 +9,15 @@ import { CommandsExplorer } from "@/components/commands/CommandsExplorer";
 import { commandGroupId } from "@/components/docs/anchors";
 import { COMMANDS, MODULE_LABELS } from "@/content/commands";
 import type { ModuleId } from "@/content/types";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { pageMetadata } from "@/lib/seo/metadata";
+import { breadcrumbNode, commandTermSetNode } from "@/lib/seo/json-ld";
 
-export const metadata: Metadata = {
-  title: "Commands",
-  description:
-    "Every Fortuna command — usage, examples, cooldowns, payouts, and aliases. The whole deck, face up.",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "All Commands: Full Discord Bot Reference",
+  description: `All ${COMMANDS.length} Fortuna commands with usage, examples, cooldowns, payouts and aliases, grouped by module. The default prefix is ! and servers can change it.`,
+  path: "/commands",
+});
 
 const GROUPS = (Object.keys(MODULE_LABELS) as ModuleId[]).map((m) => ({
   id: commandGroupId(m),
@@ -25,7 +28,16 @@ export default async function CommandsPage() {
   const session = await getServerSession(authOptions);
 
   return (
-    <main className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg">
+      <JsonLd
+        nodes={[
+          breadcrumbNode([
+            { name: "Docs", path: "/docs" },
+            { name: "All commands", path: "/commands" },
+          ]),
+          commandTermSetNode(COMMANDS),
+        ]}
+      />
       <LandingNavbar user={session?.user} />
       <DocsShell current="commands" toc={GROUPS} tocTitle="Groups">
         <DocsPageHeader
@@ -40,6 +52,6 @@ export default async function CommandsPage() {
         <CommandsExplorer commands={COMMANDS} />
       </DocsShell>
       <Footer />
-    </main>
+    </div>
   );
 }

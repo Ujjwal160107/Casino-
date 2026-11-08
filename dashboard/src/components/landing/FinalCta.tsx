@@ -42,6 +42,8 @@ export function FinalCta() {
             alt=""
             width={230}
             height={230}
+            loading="lazy"
+            decoding="async"
             className="w-[min(230px,60vw)] justify-self-center [image-rendering:pixelated]"
           />
         </Reveal>

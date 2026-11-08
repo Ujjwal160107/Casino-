@@ -7,6 +7,10 @@ import { Footer } from "@/components/Footer";
 import { DocsShell } from "@/components/docs/DocsShell";
 import { ModuleRenderer, moduleToc } from "@/components/docs/ModuleRenderer";
 import { MODULE_DOCS, getModuleDoc } from "@/content/modules";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { pageMetadata } from "@/lib/seo/metadata";
+import { moduleDescription, moduleOgImage, modulePath, moduleTitle } from "@/lib/seo/docs";
+import { breadcrumbNode, techArticleNode } from "@/lib/seo/json-ld";
 
 export function generateStaticParams() {
   return MODULE_DOCS.map((m) => ({ module: m.slug }));
@@ -20,7 +24,14 @@ export async function generateMetadata({
   const { module } = await params;
   const doc = getModuleDoc(module);
   if (!doc) return {};
-  return { title: `${doc.title} — Docs`, description: doc.tagline };
+  return pageMetadata({
+    title: moduleTitle(doc),
+    description: moduleDescription(doc),
+    path: modulePath(doc),
+    image: moduleOgImage(doc),
+    imageAlt: `${doc.title}: the Fortuna docs`,
+    type: "article",
+  });
 }
 
 export default async function ModulePage({
@@ -35,12 +46,21 @@ export default async function ModulePage({
   const session = await getServerSession(authOptions);
 
   return (
-    <main className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg">
+      <JsonLd
+        nodes={[
+          breadcrumbNode([
+            { name: "Docs", path: "/docs" },
+            { name: doc.title, path: modulePath(doc) },
+          ]),
+          techArticleNode(doc),
+        ]}
+      />
       <LandingNavbar user={session?.user} />
       <DocsShell current={doc.slug} toc={moduleToc(doc)}>
         <ModuleRenderer doc={doc} />
       </DocsShell>
       <Footer />
-    </main>
+    </div>
   );
 }

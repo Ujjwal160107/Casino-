@@ -213,7 +213,7 @@ function LeagueBadges() {
             l.gold ? "border-gold bg-gold text-bg" : "border-bg text-bg",
           )}
         >
-          <img src={l.icon} alt="" width={72} height={72} className="h-[72px] w-[72px] [image-rendering:pixelated]" />
+          <img src={l.icon} alt="" width={72} height={72} loading="lazy" decoding="async" className="h-[72px] w-[72px] [image-rendering:pixelated]" />
           <b className="font-display text-[46px] font-black uppercase leading-none">{l.name}</b>
           <span className="font-mono text-xs font-bold uppercase tracking-[.12em] text-bg/80">{l.levels}</span>
         </li>

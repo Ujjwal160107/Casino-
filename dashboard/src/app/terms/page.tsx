@@ -3,21 +3,26 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { Footer } from "@/components/Footer";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { pageMetadata } from "@/lib/seo/metadata";
 import { Panel } from "@/components/ui/Panel";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Terms of Service",
-  description: "The user agreement for the Fortuna bot and website.",
-};
+  description:
+    "The user agreement for the Fortuna Discord bot and website: eligibility, your license, the virtual economy and simulated gambling, conduct rules and liability.",
+  path: "/terms",
+});
 
 export default async function TermsPage() {
   const session = await getServerSession(authOptions);
 
   return (
-    <main className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg">
+      <JsonLd />
       <LandingNavbar user={session?.user} />
 
-      <div className="mx-auto max-w-3xl px-6 pb-24 pt-16">
+      <main id="main" className="mx-auto max-w-3xl px-6 pb-24 pt-16">
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-ink">
           Terms of Service
         </h1>
@@ -56,7 +61,7 @@ export default async function TermsPage() {
               non-transferable license to access and use the Service solely
               for your personal, non-commercial entertainment purposes.
             </p>
-            <h4 className="font-bold text-ink">Restrictions:</h4>
+            <h3 className="font-bold text-ink">Restrictions:</h3>
             <p>You agree that you will not:</p>
             <ul className="list-disc space-y-2 pl-5">
               <li>
@@ -234,10 +239,10 @@ export default async function TermsPage() {
             </a>
           </TermSection>
         </div>
-      </div>
+      </main>
 
       <Footer />
-    </main>
+    </div>
   );
 }
 

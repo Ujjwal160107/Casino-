@@ -13,12 +13,14 @@ import { MODULE_DOCS } from "@/content/modules";
 import { COMMANDS } from "@/content/commands";
 import type { ModuleDoc } from "@/content/types";
 import { cn } from "@/lib/utils";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { pageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "Docs",
-  description:
-    "How Fortuna works — every system explained, from your first 1,000 Fortunes to your first missed credit card payment.",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Docs: How Every System Works, With Real Numbers",
+  description: `Every Fortuna system with its real numbers: the odds, prices, taxes and cooldowns. ${MODULE_DOCS.length} modules and ${COMMANDS.length} commands, all searchable.`,
+  path: "/docs",
+});
 
 const card =
   "group flex h-full flex-col gap-3 rounded-[18px] border-[3px] p-8 transition-[translate,box-shadow] duration-200 hover:-translate-x-0.5 hover:-translate-y-0.5";
@@ -61,11 +63,12 @@ export default async function DocsHub() {
   const others = rest.filter((m) => m !== featured);
 
   return (
-    <main className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg">
+      <JsonLd />
       <LandingNavbar user={session?.user} />
       <PaletteProvider items={buildSearchIndex()}>
         <Container className="pb-[var(--section-y)] pt-16">
-          <div id="main" tabIndex={-1} className="focus:outline-none!">
+          <main id="main" tabIndex={-1} className="focus:outline-none!">
             <header className="grid gap-8 border-b-[3px] border-ink pb-12">
               <p className="font-mono text-[13px] font-bold uppercase tracking-[.16em] text-muted">
                 {MODULE_DOCS.length} modules · {COMMANDS.length} commands
@@ -102,10 +105,10 @@ export default async function DocsHub() {
                 </Link>
               </li>
             </ul>
-          </div>
+          </main>
         </Container>
       </PaletteProvider>
       <Footer />
-    </main>
+    </div>
   );
 }

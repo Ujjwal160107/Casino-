@@ -46,7 +46,7 @@ export function ModulesRail() {
         <p className="mt-8 text-muted">
           Plus Crime &amp; Heat, Items &amp; Shop and Chickens.{" "}
           <Link href="/docs" className="border-b-2 border-gold text-ink">
-            All {MODULE_DOCS.length} modules in the docs →
+            All {MODULE_DOCS.length} modules in the docs <span aria-hidden>→</span>
           </Link>
         </p>
       </Container>

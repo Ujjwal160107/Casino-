@@ -3,6 +3,8 @@ import { Archivo, Big_Shoulders, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Toaster } from "sonner";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/site";
+import { TITLE_SUFFIX } from "@/lib/seo/metadata";
 
 const display = Big_Shoulders({
   subsets: ["latin"],
@@ -16,12 +18,17 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: {
-    default: "Fortuna — The Discord life simulator",
-    template: "%s · Fortuna",
-  },
-  description:
-    "Fortuna is a life simulator inside Discord — careers, degrees, credit cards, marriage, stocks, hunting, and a casino. One wallet across every server.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: SITE_TITLE, template: `%s${TITLE_SUFFIX}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  category: "games",
+  // Indexable by default (no robots meta, so 404s keep Next's lone noindex); let Google
+  // quote long passages and show large previews in results and AI answers.
+  robots: { googleBot: { "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
+  formatDetection: { telephone: false, email: false, address: false },
 };
 
 export const viewport: Viewport = {
