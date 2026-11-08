@@ -20,10 +20,9 @@ const crimeFamilies: ModuleDoc = {
     tip: "You don't need to found a family to play. Joining needs 1,000,000 net worth and 20 shifts; founding needs 15,000,000, 60 shifts, an Apartment or better, an active Gold card or better, and 10,000,000 to burn. Get invited, or apply to a recruiting family from !crew board.",
   },
   screenshot: {
-    // Not the crew heist banners: their art still reads "Fortuna's Capers".
-    src: "/art/cf-turf-map.png",
-    alt: "Fortuna's don planning a turf war over a city map",
-    caption: "Hold the block",
+    src: "/art/cf-caper-t4.png",
+    alt: "The Diamond Exchange Vault, the Tier 4 crew heist",
+    caption: "Diamond Exchange Vault",
     aspect: "aspect-[960/336]",
   },
   sections: [

@@ -148,13 +148,9 @@ function Part({ c, live }: { c: Node; live: Live }): ReactNode {
         </div>
       );
     }
-    case 12: return <div>{c.items?.map((it, i) => {
-      const src = art(it.media.url.replace("attachment://", ""));
-      // The heist banners still carry an old "Fortuna's Capers" plaque in the art: crop it off.
-      return /cf_caper_t\d/.test(src)
-        ? <div key={i} className="overflow-hidden rounded-lg" style={{ aspectRatio: "960 / 246" }}><img src={src} alt="" className="w-full [image-rendering:pixelated]" style={{ marginTop: "-9.4%" }} /></div>
-        : <img key={i} src={src} alt="" className="w-full rounded-lg [image-rendering:pixelated]" />;
-    })}</div>;
+    case 12: return <div>{c.items?.map((it, i) => (
+      <img key={i} src={art(it.media.url.replace("attachment://", ""))} alt="" className="w-full rounded-lg [image-rendering:pixelated]" />
+    ))}</div>;
     case 14: return <div className={`my-[3px] h-px ${c.divider === false ? "" : "bg-[#3a3d45]"}`} />;
     case 1: return <div className="flex flex-wrap gap-[7px]">{c.components?.map((x, i) => (x.type === 3 ? <Select key={i} s={x} live={live} /> : <Button key={i} b={x} live={live} />))}</div>;
     default: return null;
