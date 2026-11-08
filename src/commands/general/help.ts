@@ -291,7 +291,7 @@ export const CATEGORIES: CategoryData[] = [
         name: "crew", aliases: ["mob"], description: "Open your family dashboard, or the Create card when you have no family. Families hold up to 30 members.",
         usage: "{p}crew [subcommand]",
         subcommands: [
-          "create — found a family (10,000,000 from your wallet)",
+          "create — found a family (10,000,000 from your wallet; you need an Apartment or better and an active Gold card or better)",
           "invite <user> — invite a player (Capo and up)",
           "accept <TAG> — accept an invite from any server",
           "decline <TAG> — decline an invite",
