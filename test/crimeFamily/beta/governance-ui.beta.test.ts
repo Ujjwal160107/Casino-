@@ -759,7 +759,7 @@ describe("GOV commands: slash options, prefix aliases and help numbers", () => {
     const cat = CATEGORIES.find((c) => c.id === "crimefamilies")!;
     const all = JSON.stringify(cat);
     const n = (x: number) => x.toLocaleString("en-US");
-    expect(all).toContain(`create — found a family (${n(CRIME_FAMILY_CONFIG.createFee)} from your wallet)`);
+    expect(all).toContain(`create — found a family (${n(CRIME_FAMILY_CONFIG.createFee)} from your wallet; you need an Apartment or better and an active Gold card or better)`);
     expect(all).toContain(`rename — rename the family (${n(CRIME_FAMILY_CONFIG.renameFee)} from the vault, Boss)`);
     expect(all).toContain(`(Capo needs ${n(CRIME_FAMILY_CONFIG.capoMinNetWorth)} net worth)`);
     expect(all).toContain(`(${Math.round(CRIME_FAMILY_CONFIG.vaultTaxRate * 100)}% tax)`);
