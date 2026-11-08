@@ -3,12 +3,13 @@
 // here, so a gate is tightened in one table. Never calls Discord.
 import { SnowflakeUtil } from "discord.js";
 import prisma from "../../utils/prisma";
-import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
+import { CRIME_FAMILY_CONFIG, cardTierMeets, formatCardTierName } from "../../utils/economyConfig";
 import { caperRole, ELIGIBILITY_GATES, type CaperRoleKey, type GateKey } from "../../data/crimeFamilyCatalog";
 import { computeNetWorth } from "../netWorthService";
 import { isBanActive } from "../banService";
 import { checkJailStatus } from "../jailService";
 import { getOwnedPrepKeys } from "../crimeService";
+import { REGULAR_PROPERTY_CATALOG } from "../propertyService";
 import { ACTIVITY_RULES } from "./extensions";
 import { FamilyError } from "./tx";
 
@@ -55,7 +56,7 @@ export function eligibilityError(failures: EligibilityCheck[]): FamilyError {
 
 /**
  * Evaluates every row of the gate, in a fixed order: banned, jailed,
- * discord_age, fortuna_age, shifts, net_worth, not_member | tenure, heat,
+ * discord_age, fortuna_age, shifts, net_worth, property, credit_card, not_member | tenure, heat,
  * in_family, hop_cooldown, refound_cooldown, rejoin_cooldown, prep_item,
  * active.
  */
@@ -96,6 +97,23 @@ export async function checkMemberEligibility(uid: string, gateKey: GateKey, opts
   if (gate.netWorth !== null) {
     const { total } = await computeNetWorth(uid);
     add("net_worth", total >= gate.netWorth, `≥ ${num(gate.netWorth)} net worth`, num(total));
+  }
+
+  if (gate.minPropertyKey !== null) {
+    // Deeds rank by REGULAR_PROPERTY_CATALOG order (Shack 1, Apartment 2, ...); custom or zoo deeds don't count.
+    const rank = (key: string) => REGULAR_PROPERTY_CATALOG.findIndex((d) => d.key === key);
+    const needRank = rank(gate.minPropertyKey);
+    const owned = await prisma.ownedProperty.findMany({ where: { userId: uid }, select: { property: { select: { key: true } } } });
+    const best = owned.map((o) => rank(o.property.key)).reduce((m, r) => Math.max(m, r), -1);
+    const name = (r: number) => REGULAR_PROPERTY_CATALOG[r].name;
+    add("property", best >= needRank, `own a property tier ${needRank + 1}+ (${name(needRank)} or better)`, best >= 0 ? `a ${name(best)}` : "no property");
+  }
+
+  if (gate.minCardTier !== null) {
+    const card = await prisma.creditCard.findUnique({ where: { userId: uid }, select: { tier: true, status: true } });
+    const ok = !!card && card.status === "ACTIVE" && cardTierMeets(card.tier, gate.minCardTier);
+    const have = !card ? "no card" : card.status === "ACTIVE" ? `a ${formatCardTierName(card.tier)} card` : `a ${formatCardTierName(card.tier)} card (${card.status.toLowerCase()})`;
+    add("credit_card", ok, `an active ${formatCardTierName(gate.minCardTier)} card or better`, have);
   }
 
   if (gate.tenureSeconds !== null) {

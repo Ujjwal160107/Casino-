@@ -314,6 +314,10 @@ export interface GateDef {
   activeMember: boolean;
   hop: "join" | "found" | null;
   prepItem: boolean;
+  /** Own this deed or a pricier one (REGULAR_PROPERTY_CATALOG order); null skips the check. */
+  minPropertyKey: string | null;
+  /** Hold an ACTIVE credit card of this tier or higher (CARD_TIER_ORDER); null skips the check. */
+  minCardTier: "STARTER" | "GOLD" | "PLATINUM" | "BLACK" | null;
 }
 
 const MEMBER_TENURE_SECONDS = 259_200; // 72 h
@@ -324,7 +328,7 @@ function caperGate(tier: CaperTierDef): GateDef {
   return {
     discordAgeDays: 90, fortunaAgeDays: tier.seatGate.fortunaAgeDays, shifts: tier.seatGate.shifts, netWorth: tier.seatGate.netWorth,
     tenureSeconds: MEMBER_TENURE_SECONDS, heatBelow: tier.heatCeiling, notJailed: true, notInFamily: false, activeMember: false,
-    hop: null, prepItem: true,
+    hop: null, prepItem: true, minPropertyKey: null, minCardTier: null,
   };
 }
 
@@ -332,10 +336,12 @@ export const ELIGIBILITY_GATES: Readonly<Record<GateKey, GateDef>> = {
   found: {
     discordAgeDays: 180, fortunaAgeDays: 30, shifts: 60, netWorth: 15_000_000, tenureSeconds: null, heatBelow: 70,
     notJailed: true, notInFamily: true, activeMember: false, hop: "found", prepItem: false,
+    // Owner rule (2026-11-08): founders need a tier 2 deed (Apartment) and a tier 2 card (Gold), or better.
+    minPropertyKey: "apartment", minCardTier: "GOLD",
   },
   family_join: {
     discordAgeDays: 90, fortunaAgeDays: 14, shifts: 20, netWorth: 1_000_000, tenureSeconds: null, heatBelow: null,
-    notJailed: true, notInFamily: false, activeMember: false, hop: "join", prepItem: false,
+    notJailed: true, notInFamily: false, activeMember: false, hop: "join", prepItem: false, minPropertyKey: null, minCardTier: null,
   },
   caper_t1: caperGate(caperTier(1)),
   caper_t2: caperGate(caperTier(2)),
@@ -343,14 +349,14 @@ export const ELIGIBILITY_GATES: Readonly<Record<GateKey, GateDef>> = {
   caper_t4: caperGate(caperTier(4)),
   war: {
     discordAgeDays: 90, fortunaAgeDays: 14, shifts: 20, netWorth: null, tenureSeconds: MEMBER_TENURE_SECONDS, heatBelow: 100,
-    notJailed: true, notInFamily: false, activeMember: false, hop: null, prepItem: false,
+    notJailed: true, notInFamily: false, activeMember: false, hop: null, prepItem: false, minPropertyKey: null, minCardTier: null,
   },
   racket: {
     discordAgeDays: 90, fortunaAgeDays: null, shifts: 20, netWorth: null, tenureSeconds: MEMBER_TENURE_SECONDS, heatBelow: null,
-    notJailed: false, notInFamily: false, activeMember: true, hop: null, prepItem: false,
+    notJailed: false, notInFamily: false, activeMember: true, hop: null, prepItem: false, minPropertyKey: null, minCardTier: null,
   },
   payday: {
     discordAgeDays: 90, fortunaAgeDays: 14, shifts: 20, netWorth: null, tenureSeconds: PAYDAY_TENURE_SECONDS, heatBelow: null,
-    notJailed: false, notInFamily: false, activeMember: true, hop: null, prepItem: false,
+    notJailed: false, notInFamily: false, activeMember: true, hop: null, prepItem: false, minPropertyKey: null, minCardTier: null,
   },
 };

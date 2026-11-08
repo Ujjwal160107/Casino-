@@ -17,7 +17,7 @@ const crimeFamilies: ModuleDoc = {
   forBeginners: {
     what: "A crime family is a crew of 10 to 30 players. Members pay into a shared vault, the vault pays the family's dues and level fees, and once a week the earned part of the vault is split between the members who played. Deposits never come back out: the vault is for the family, not for parking cash.",
     firstCommands: ["!crew", "!heist", "!turf"],
-    tip: "You don't need to found a family to play. Joining needs 1,000,000 net worth and 20 shifts; founding needs 15,000,000, 60 shifts and 10,000,000 to burn. Get invited, or apply to a recruiting family from !crew board.",
+    tip: "You don't need to found a family to play. Joining needs 1,000,000 net worth and 20 shifts; founding needs 15,000,000, 60 shifts, an Apartment or better, an active Gold card or better, and 10,000,000 to burn. Get invited, or apply to a recruiting family from !crew board.",
   },
   screenshot: {
     // Not the crew heist banners: their art still reads "Fortuna's Capers".
@@ -46,6 +46,8 @@ const crimeFamilies: ModuleDoc = {
         rows: [
           ["Fee (from wallet, burned)", "10,000,000"],
           ["Net worth", "15,000,000 or more"],
+          ["Property", "own an Apartment or better (tier 2+: Apartment, House, Mansion, Private Island)"],
+          ["Credit card", "an active Gold card or better (tier 2+: Gold, Platinum, Black); a locked or delinquent card doesn't count"],
           ["Lifetime shifts", "60 or more"],
           ["Fortuna profile age", "30 days or more"],
           ["Discord account age", "180 days or more"],

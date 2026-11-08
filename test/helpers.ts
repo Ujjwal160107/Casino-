@@ -35,6 +35,7 @@ export async function resetUser(discordId: string): Promise<void> {
   await testPrisma.dailyQuest.deleteMany({ where: { userId: discordId } }).catch(() => {});
   await testPrisma.caughtAnimal.deleteMany({ where: { discordId } }).catch(() => {});
   await testPrisma.ownedProperty.deleteMany({ where: { userId: discordId } }).catch(() => {});
+  await testPrisma.creditCard.deleteMany({ where: { userId: discordId } }).catch(() => {});
   await testPrisma.inventory.deleteMany({ where: { userId: discordId } }).catch(() => {});
   const wallet = await testPrisma.wallet.findUnique({ where: { userId: discordId } }).catch(() => null);
   if (wallet) await testPrisma.transaction.deleteMany({ where: { walletId: wallet.id } }).catch(() => {});
@@ -106,6 +107,10 @@ export interface SeedEligibleOpts {
   prepKeys?: string[];
   jailedUntil?: Date;
   ban?: { expiresAt: Date | null };
+  /** Deed key owned (REGULAR_PROPERTY_CATALOG); default "apartment" (the founding minimum), null for none. */
+  property?: string | null;
+  /** Credit card held; default an ACTIVE Gold card (the founding minimum), null for none. */
+  card?: { tier: string; status?: string } | null;
 }
 
 /** A user who passes every family gate by default; returns the user id. */
@@ -119,6 +124,21 @@ export async function seedEligibleUser(opts: SeedEligibleOpts = {}): Promise<str
     ...(opts.jailedUntil ? { isJailed: true, jailReleaseTime: opts.jailedUntil } : {}),
     ...(opts.ban ? { isBanned: true, banExpiresAt: opts.ban.expiresAt } : {}),
   });
+  const deedKey = opts.property === undefined ? "apartment" : opts.property;
+  if (deedKey) {
+    const deed = await testPrisma.property.upsert({
+      where: { key: deedKey },
+      create: { key: deedKey, guildId: "global", name: deedKey, description: "test", basePrice: 0, price: 0, incomePerCycle: 0 }, // price 0: no effect on net worth
+      update: {},
+    });
+    await testPrisma.ownedProperty.create({ data: { userId: id, propertyId: deed.id, purchasedPrice: 0 } });
+  }
+  const card = opts.card === undefined ? { tier: "GOLD" } : opts.card;
+  if (card) {
+    await testPrisma.creditCard.create({
+      data: { userId: id, tier: card.tier, status: card.status ?? "ACTIVE", creditLimit: 1, weeklyInterestPct: 1, weeklySpendCap: 1, weeklyWithdrawCap: 1 },
+    });
+  }
   for (const catalogKey of opts.prepKeys ?? []) {
     const item = await testPrisma.shopItem.upsert({
       where: { catalogKey },

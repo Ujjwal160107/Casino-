@@ -59,12 +59,12 @@ describe("crime family catalog", () => {
   });
 
   it.each([
-    ["found", { discordAgeDays: 180, fortunaAgeDays: 30, shifts: 60, netWorth: 15_000_000, tenureSeconds: null, heatBelow: 70, notJailed: true, notInFamily: true, activeMember: false, hop: "found", prepItem: false }],
-    ["family_join", { discordAgeDays: 90, fortunaAgeDays: 14, shifts: 20, netWorth: 1_000_000, tenureSeconds: null, heatBelow: null, notJailed: true, notInFamily: false, activeMember: false, hop: "join", prepItem: false }],
-    ["caper_t4", { discordAgeDays: 90, fortunaAgeDays: 45, shifts: 300, netWorth: 40_000_000, tenureSeconds: 259_200, heatBelow: 40, notJailed: true, notInFamily: false, activeMember: false, hop: null, prepItem: true }],
-    ["war", { discordAgeDays: 90, fortunaAgeDays: 14, shifts: 20, netWorth: null, tenureSeconds: 259_200, heatBelow: 100, notJailed: true, notInFamily: false, activeMember: false, hop: null, prepItem: false }],
-    ["racket", { discordAgeDays: 90, fortunaAgeDays: null, shifts: 20, netWorth: null, tenureSeconds: 259_200, heatBelow: null, notJailed: false, notInFamily: false, activeMember: true, hop: null, prepItem: false }],
-    ["payday", { discordAgeDays: 90, fortunaAgeDays: 14, shifts: 20, netWorth: null, tenureSeconds: 604_800, heatBelow: null, notJailed: false, notInFamily: false, activeMember: true, hop: null, prepItem: false }],
+    ["found", { discordAgeDays: 180, fortunaAgeDays: 30, shifts: 60, netWorth: 15_000_000, tenureSeconds: null, heatBelow: 70, notJailed: true, notInFamily: true, activeMember: false, hop: "found", prepItem: false, minPropertyKey: "apartment", minCardTier: "GOLD" }],
+    ["family_join", { discordAgeDays: 90, fortunaAgeDays: 14, shifts: 20, netWorth: 1_000_000, tenureSeconds: null, heatBelow: null, notJailed: true, notInFamily: false, activeMember: false, hop: "join", prepItem: false, minPropertyKey: null, minCardTier: null }],
+    ["caper_t4", { discordAgeDays: 90, fortunaAgeDays: 45, shifts: 300, netWorth: 40_000_000, tenureSeconds: 259_200, heatBelow: 40, notJailed: true, notInFamily: false, activeMember: false, hop: null, prepItem: true, minPropertyKey: null, minCardTier: null }],
+    ["war", { discordAgeDays: 90, fortunaAgeDays: 14, shifts: 20, netWorth: null, tenureSeconds: 259_200, heatBelow: 100, notJailed: true, notInFamily: false, activeMember: false, hop: null, prepItem: false, minPropertyKey: null, minCardTier: null }],
+    ["racket", { discordAgeDays: 90, fortunaAgeDays: null, shifts: 20, netWorth: null, tenureSeconds: 259_200, heatBelow: null, notJailed: false, notInFamily: false, activeMember: true, hop: null, prepItem: false, minPropertyKey: null, minCardTier: null }],
+    ["payday", { discordAgeDays: 90, fortunaAgeDays: 14, shifts: 20, netWorth: null, tenureSeconds: 604_800, heatBelow: null, notJailed: false, notInFamily: false, activeMember: true, hop: null, prepItem: false, minPropertyKey: null, minCardTier: null }],
   ] as const)("gate %s matches 12.1", (gate, def) => {
     expect(C.ELIGIBILITY_GATES[gate]).toEqual(def);
   });
