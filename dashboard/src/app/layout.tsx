@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Inter, JetBrains_Mono } from "next/font/google";
+import { Archivo, Big_Shoulders, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Toaster } from "sonner";
 
-const display = Bricolage_Grotesque({
+const display = Big_Shoulders({
   subsets: ["latin"],
-  variable: "--font-bricolage",
+  weight: ["700", "800", "900"],
+  variable: "--font-shoulders",
 });
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const body = Archivo({ subsets: ["latin"], variable: "--font-archivo" });
 const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains",
@@ -24,7 +25,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0e0f13",
+  themeColor: "#0c0c0c",
   colorScheme: "dark",
 };
 
@@ -34,7 +35,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${display.variable} ${inter.variable} ${jetbrains.variable}`}
+      className={`${display.variable} ${body.variable} ${jetbrains.variable}`}
     >
       <body
         className="bg-bg font-body text-ink antialiased"

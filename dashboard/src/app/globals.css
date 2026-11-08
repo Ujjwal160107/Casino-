@@ -1,21 +1,41 @@
 @import "tailwindcss";
 
+/* Maximal Mono: loud layout, quiet palette. Three colours (ink, bone, gold);
+   every other shade is mixed from them. Token names are unchanged so every
+   page re-skins together. */
 @theme {
-  --color-bg: #0e0f13;
-  --color-panel: #15171c;
-  --color-panel-2: #1b1e24;
-  --color-line: #26282f;
-  --color-ink: #f2f3f5;
-  --color-muted: #9ba0aa;
-  --color-gold: #ffb627;
-  --color-gold-deep: #e09b00;
+  --color-bg: #0c0c0c;
+  --color-panel: #151514;
+  --color-panel-2: #1e1d1b;
+  --color-line: #2e2c29;
+  --color-line-2: #4a4741;
+  --color-ink: #f3efe6;
+  --color-ink-2: #d5d0c6;
+  --color-muted: #9a958b;
+  --color-gold: #ffb400;
+  --color-gold-deep: #d99800;
+  /* Semantic colours, kept for status only (wins, losses, warnings). */
   --color-felt: #2f9e6e;
   --color-chip: #e5484d;
   --color-card-blue: #4c8dff;
 
-  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
-  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-shoulders), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* One spacing rhythm for every section on the site. */
+:root {
+  --section-y: clamp(88px, 10vw, 152px);
+  --rule: 3px solid var(--color-ink);
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Keeps anchored and keyboard-focused content clear of the sticky nav. */
+  scroll-padding-top: 96px;
 }
 
 body {

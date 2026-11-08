@@ -4,17 +4,26 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { INVITE_URL } from "@/lib/links";
+import { cn } from "@/lib/utils";
+import { btn } from "./landing/kit";
 
 interface MobileSidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const LINKS = [
+/** The site's main links, shared by the desktop navbar and this sidebar. */
+export const NAV_LINKS: { href: string; label: string; isNew?: boolean }[] = [
   { href: "/commands", label: "Commands" },
+  { href: "/docs/crime-families", label: "Crime Families", isNew: true },
   { href: "/docs", label: "Docs" },
   { href: "/changelog", label: "Changelog" },
 ];
+
+/** Small gold NEW tag for a link. */
+export function NewPill() {
+  return <span className="rounded-full bg-gold px-1.5 py-0.5 font-mono text-[10px] font-bold leading-none tracking-[.08em] text-bg">NEW</span>;
+}
 
 export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -78,35 +87,37 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Mobile navigation"
-      className="fixed inset-0 z-[60] overscroll-contain bg-bg md:hidden"
+      className="fixed inset-0 z-[60] overflow-y-auto overscroll-contain bg-bg pt-[env(safe-area-inset-top,0px)] lg:hidden"
     >
-      <div className="flex h-16 items-center justify-between border-b border-line px-6">
-        <span className="font-display text-lg font-bold text-ink">FORTUNA</span>
+      <div className="flex min-h-[72px] items-center justify-between border-b-[3px] border-ink px-4 sm:px-6">
+        <span className="font-display text-[30px] font-black uppercase leading-none text-ink">Fortuna</span>
         <button
           ref={closeButtonRef}
+          type="button"
           onClick={onClose}
-          className="flex h-11 w-11 cursor-pointer items-center justify-center text-muted"
+          className="flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-ink text-ink transition-colors hover:bg-ink hover:text-bg"
           aria-label="Close menu"
         >
-          <X size={22} aria-hidden="true" />
+          <X size={20} aria-hidden="true" />
         </button>
       </div>
-      <div className="flex flex-col gap-1 p-6">
-        {LINKS.map((l) => (
+      <div className="flex flex-col px-4 py-6 sm:px-6">
+        {NAV_LINKS.map((l) => (
           <Link
             key={l.href}
             href={l.href}
             onClick={onClose}
-            className="rounded-lg px-3 py-3 text-lg font-medium text-ink hover:bg-panel"
+            className="flex min-h-14 items-center gap-3 border-b border-line font-display text-[34px] font-black uppercase leading-none text-ink transition-colors hover:text-gold"
           >
             {l.label}
+            {l.isNew && <NewPill />}
           </Link>
         ))}
         <a
           href={INVITE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-4 rounded-lg bg-gold px-4 py-3 text-center font-bold text-bg"
+          className={cn(btn.base, btn.main, btn.lg, "mt-8")}
         >
           Add to Discord
         </a>

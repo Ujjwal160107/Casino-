@@ -14,6 +14,13 @@ import {
   Swords,
   Dice5,
   Archive,
+  Users,
+  Landmark,
+  MapPin,
+  Gavel,
+  Crosshair,
+  Vote,
+  Megaphone,
 } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -42,6 +49,252 @@ export default async function ChangelogPage() {
         </p>
 
         <div className="mt-12 space-y-10">
+          {/* v2.2 — Turf */}
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-mono text-sm text-gold">v2.2</span>
+              <span className="font-mono text-sm text-muted">November 5, 2026</span>
+              <Tag color="gold">NEW SYSTEM</Tag>
+            </div>
+
+            <Panel className="mt-4 p-6">
+              <h2 className="font-display text-xl font-bold text-ink">
+                Turf: league cities of 10 rackets, weekly bidding and turf wars
+              </h2>
+              <p className="mt-2 leading-relaxed text-muted">
+                Crime families now fight over their league&apos;s city. Each
+                city&apos;s ten rackets pay protection money into the family
+                vault, and the only way to take one is to win its weekly turf
+                war. Rolling out to servers
+                in stages, after Crime Families.
+              </p>
+
+              <div className="mt-8 space-y-8">
+                <div>
+                  <div className="flex items-start gap-4">
+                    <MapPin className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        Rackets
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        <strong className="text-ink">!turf</strong> shows your
+                        league&apos;s city: four Corner, four District and two
+                        Crown rackets, all starting with the Street. An owned racket
+                        pays the family&apos;s earnings every 24 hours with no
+                        collecting, as long as at least 3 members are playing.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>Three leagues by family level: Bronze L1–3, Silver L4–6, Gold L7–10</FeatureItem>
+                    <FeatureItem>A new city opens for every 40 active families in a league</FeatureItem>
+                    <FeatureItem>100,000 to 1,300,000 a day per racket, by league and class</FeatureItem>
+                    <FeatureItem>Up to 3 rackets a family, 1 Crown</FeatureItem>
+                    <FeatureItem>3 neglected days hand a racket back to the Street</FeatureItem>
+                  </ul>
+                </div>
+
+                <div className="border-t border-line pt-8">
+                  <div className="flex items-start gap-4">
+                    <Gavel className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        Weekly bidding
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        Every racket has one war a week, and the Boss or
+                        Underboss bids from family earnings for the right to
+                        attack it. The top bid when bidding closes is burned
+                        when the war settles, win or lose.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>Opens 72 hours before the war, closes 1 hour before</FeatureItem>
+                    <FeatureItem>Floor of 7 days&apos; income: 700,000 to 9,100,000</FeatureItem>
+                    <FeatureItem>Each raise at least 10% over the top bid</FeatureItem>
+                    <FeatureItem>Outbid escrow goes straight back to earnings</FeatureItem>
+                  </ul>
+                </div>
+
+                <div className="border-t border-line pt-8">
+                  <div className="flex items-start gap-4">
+                    <Crosshair className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        Turf wars
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        A 60-minute fight over three blocks. Scout for each
+                        block&apos;s weak point, call it in your home channel,
+                        and land hits on the right approach. Win 2 of 3 blocks
+                        to take the racket; ties go to the defender.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>Free scouting every 5 minutes</FeatureItem>
+                    <FeatureItem>Hits cost 25,000, 6 per member per war</FeatureItem>
+                    <FeatureItem>+10 attacking, +12 defending per correct hit</FeatureItem>
+                    <FeatureItem>Scores go dark for the last 10 minutes</FeatureItem>
+                    <FeatureItem>Turf war actions (Scout and Hit) work from any server and from the war-soon DM.</FeatureItem>
+                  </ul>
+                </div>
+              </div>
+            </Panel>
+          </div>
+
+          {/* v2.1 — Crime Families and Crew Heists */}
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-mono text-sm text-gold">v2.1</span>
+              <span className="font-mono text-sm text-muted">November 5, 2026</span>
+              <Tag color="gold">NEW SYSTEM</Tag>
+            </div>
+
+            <Panel className="mt-4 p-6">
+              <h2 className="font-display text-xl font-bold text-ink">
+                Crime Families and Crew Heists
+              </h2>
+              <p className="mt-2 leading-relaxed text-muted">
+                Fortuna&apos;s first real group play. Found or join a crime
+                family of 10 to 30 players, fill a shared vault, and run crew
+                heists that only work when the whole crew talks to each other.
+                Big families get more crew heists a day and more Capo seats,
+                members can vote out a Boss who has lost the room, and a
+                recruitment board matches families with players. Rolling out to
+                servers in stages.
+              </p>
+
+              <div className="mt-8 space-y-8">
+                <div>
+                  <div className="flex items-start gap-4">
+                    <Users className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        Crime families
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        <strong className="text-ink">!crew</strong> opens your
+                        family: ranks from Associate to Boss, invites that work
+                        across servers, ten family levels and a family
+                        leaderboard.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>Founding costs 10,000,000, burned</FeatureItem>
+                    <FeatureItem>10 members at level 1, up to 30 at level 10</FeatureItem>
+                    <FeatureItem>1 to 6 Capo seats, one per 5 members</FeatureItem>
+                    <FeatureItem>Capo and Underboss need 10,000,000 net worth</FeatureItem>
+                    <FeatureItem>Daily dues of 40,000 × level</FeatureItem>
+                    <FeatureItem>Automatic handover after 14 days away</FeatureItem>
+                  </ul>
+                </div>
+
+                <div className="border-t border-line pt-8">
+                  <div className="flex items-start gap-4">
+                    <Landmark className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        The family vault and Payday
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        Deposits are locked in the treasury for good. Only what
+                        the family earns goes out, as a weekly Payday split
+                        equally between members who played.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>5% tax on deposits and on Payday</FeatureItem>
+                    <FeatureItem>Payday capped at 1,000,000 gross a member</FeatureItem>
+                    <FeatureItem>Each member&apos;s share is credited on its own</FeatureItem>
+                  </ul>
+                </div>
+
+                <div className="border-t border-line pt-8">
+                  <div className="flex items-start gap-4">
+                    <Swords className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        Crew Heists
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        <strong className="text-ink">!heist</strong> plans a
+                        family heist in four tiers, from the Pawnshop Back Room
+                        to the Diamond Exchange Vault. A 10-minute lobby fills
+                        the roles, then a 120-second GO where every member holds
+                        the answer to a crewmate&apos;s question. Clean, Messy or
+                        Bust depends on how well the crew trades intel.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>Six roles, each with its own prep items</FeatureItem>
+                    <FeatureItem>Stakes from 50,000 to 300,000 a seat</FeatureItem>
+                    <FeatureItem>Cuts up to 960,000 a seat on a Clean Tier 4</FeatureItem>
+                    <FeatureItem>10% of every pool goes to the family vault</FeatureItem>
+                    <FeatureItem>2 seats per player per rolling 24 hours</FeatureItem>
+                    <FeatureItem>4 to 10 crew heists a family a day, by size</FeatureItem>
+                    <FeatureItem>An AFK seat leaks its intel instead of sinking the job</FeatureItem>
+                    <FeatureItem>Crew heists work from any server and from the bot&apos;s DMs; the Share button passes intel to crewmates anywhere.</FeatureItem>
+                  </ul>
+                </div>
+
+                <div className="border-t border-line pt-8">
+                  <div className="flex items-start gap-4">
+                    <Vote className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        The no-confidence vote
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        <strong className="text-ink">!crew vote</strong> lets the
+                        Underboss or a Capo put the Boss to a vote. Every member
+                        with 72 hours in the family votes in secret for 48 hours;
+                        two thirds of them voting YES hands the chair to the
+                        Underboss, or the next heir. Kicks, rank changes, handover and disband are
+                        frozen while it runs.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>Secret ballots you can change until the close</FeatureItem>
+                    <FeatureItem>A new Boss gets 7 days before the first vote</FeatureItem>
+                    <FeatureItem>A failed vote blocks the next for 7 days</FeatureItem>
+                    <FeatureItem>A demoted Underboss or Capo can still start one for 7 days</FeatureItem>
+                  </ul>
+                </div>
+
+                <div className="border-t border-line pt-8">
+                  <div className="flex items-start gap-4">
+                    <Megaphone className="mt-1 h-5 w-5 shrink-0 text-gold" />
+                    <div>
+                      <h3 className="font-display text-lg font-bold text-ink">
+                        The recruitment board
+                      </h3>
+                      <p className="mt-1 leading-relaxed text-muted">
+                        <strong className="text-ink">!crew board</strong> lists
+                        every family that is recruiting, sorted by level, size or
+                        how many members actually play. Families set a pitch and
+                        requirements; players apply with a short message and
+                        officers accept or decline from an inbox.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <FeatureItem>An &quot;I qualify&quot; filter on your own numbers</FeatureItem>
+                    <FeatureItem>3 pending applications per player, 25 per family</FeatureItem>
+                    <FeatureItem>Applications expire after 72 hours</FeatureItem>
+                    <FeatureItem>A &quot;Family applications&quot; DM you can turn off</FeatureItem>
+                  </ul>
+                </div>
+              </div>
+            </Panel>
+          </div>
+
           {/* v2.0 — Fortuna Global */}
           <div>
             <div className="flex flex-wrap items-center gap-3">

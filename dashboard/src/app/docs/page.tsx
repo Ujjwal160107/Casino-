@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import * as icons from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { LandingNavbar } from "@/components/LandingNavbar";
 import { Footer } from "@/components/Footer";
-import { Panel } from "@/components/ui/Panel";
+import { Container } from "@/components/landing/kit";
+import { NEW_MODULE } from "@/components/docs/DocsSidebar";
+import { PaletteProvider } from "@/components/docs/palette/PaletteProvider";
+import { SearchButton } from "@/components/docs/palette/SearchButton";
+import { buildSearchIndex } from "@/components/docs/palette/search-index";
 import { MODULE_DOCS } from "@/content/modules";
+import { COMMANDS } from "@/content/commands";
+import type { ModuleDoc } from "@/content/types";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Docs",
@@ -14,57 +20,91 @@ export const metadata: Metadata = {
     "How Fortuna works — every system explained, from your first 1,000 Fortunes to your first missed credit card payment.",
 };
 
-function CardIcon({ name }: { name: string }) {
-  const Icon =
-    (icons as unknown as Record<string, icons.LucideIcon>)[name] ??
-    icons.BookOpen;
-  return <Icon className="h-6 w-6 text-gold" />;
+const card =
+  "group flex h-full flex-col gap-3 rounded-[18px] border-[3px] p-8 transition-[translate,box-shadow] duration-200 hover:-translate-x-0.5 hover:-translate-y-0.5";
+
+function ModuleCard({ doc, label }: { doc: ModuleDoc; label?: string }) {
+  const featured = doc.slug === NEW_MODULE;
+  return (
+    <Link
+      href={`/docs/${doc.slug}`}
+      className={cn(
+        card,
+        featured
+          ? "border-gold bg-gold text-bg shadow-[6px_6px_0_var(--color-ink)] hover:shadow-[8px_8px_0_var(--color-ink)]"
+          : "border-ink bg-panel hover:shadow-[6px_6px_0_var(--color-gold)]",
+      )}
+    >
+      {featured ? (
+        <span className="w-fit rounded-full bg-bg px-2.5 py-0.5 font-mono text-[11px] font-bold tracking-[.12em] text-gold">NEW</span>
+      ) : (
+        label && <span className="font-mono text-xs font-bold uppercase tracking-[.14em] text-gold">{label}</span>
+      )}
+      <h2 className={cn("font-display font-black uppercase leading-[.9]", featured ? "text-[clamp(44px,5vw,72px)]" : "text-4xl")}>
+        {doc.title}
+      </h2>
+      <p className={cn("max-w-[52ch]", featured ? "text-lg font-medium text-bg" : "text-ink-2")}>{doc.tagline}</p>
+      <p className={cn("mt-auto flex flex-wrap gap-x-3 gap-y-1 pt-2 font-mono text-[13px] font-bold", featured ? "text-bg" : "text-gold")}>
+        <span className="sr-only">First commands:</span>
+        {doc.forBeginners.firstCommands.map((c) => (
+          <span key={c}>{c}</span>
+        ))}
+      </p>
+    </Link>
+  );
 }
 
 export default async function DocsHub() {
   const session = await getServerSession(authOptions);
   const [starter, ...rest] = MODULE_DOCS;
+  const featured = rest.find((m) => m.slug === NEW_MODULE);
+  const others = rest.filter((m) => m !== featured);
 
   return (
     <main className="min-h-screen bg-bg">
       <LandingNavbar user={session?.user} />
-      <div className="mx-auto max-w-6xl px-6 pb-24 pt-16">
-        <h1 className="font-display text-4xl font-extrabold tracking-tight text-ink md:text-5xl">
-          Know the house. Beat the house.
-        </h1>
-        <p className="mt-3 max-w-2xl text-lg text-muted">
-          Every Fortuna system, documented — the odds, the prices, the taxes,
-          and the fine print the dealer reads fast.
-        </p>
+      <PaletteProvider items={buildSearchIndex()}>
+        <Container className="pb-[var(--section-y)] pt-16">
+          <div id="main" tabIndex={-1} className="focus:outline-none!">
+            <header className="grid gap-8 border-b-[3px] border-ink pb-12">
+              <p className="font-mono text-[13px] font-bold uppercase tracking-[.16em] text-muted">
+                {MODULE_DOCS.length} modules · {COMMANDS.length} commands
+              </p>
+              <h1 className="font-display text-[clamp(96px,16vw,220px)] font-black uppercase leading-[.8]">Docs</h1>
+              <p className="max-w-[56ch] text-lg text-ink-2">
+                Every Fortuna system with its real numbers: the odds, the prices, the taxes and the cooldowns. Search for a
+                command or a topic, or pick a module below.
+              </p>
+              <SearchButton variant="field" className="max-w-2xl" />
+            </header>
 
-        <Link href={`/docs/${starter.slug}`} className="mt-10 block">
-          <Panel className="border-gold/40 p-8 transition-colors hover:border-gold">
-            <p className="font-mono text-sm font-medium uppercase tracking-widest text-gold">
-              Start here
-            </p>
-            <h2 className="mt-2 font-display text-2xl font-bold text-ink">
-              {starter.title}
-            </h2>
-            <p className="mt-2 max-w-xl text-muted">{starter.tagline}</p>
-          </Panel>
-        </Link>
-
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {rest.map((m) => (
-            <Link key={m.slug} href={`/docs/${m.slug}`}>
-              <Panel className="h-full p-6 transition-colors hover:border-gold/40">
-                <CardIcon name={m.icon} />
-                <h2 className="mt-3 font-display text-lg font-bold text-ink">
-                  {m.title}
-                </h2>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted">
-                  {m.tagline}
-                </p>
-              </Panel>
-            </Link>
-          ))}
-        </div>
-      </div>
+            <ul className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {featured && (
+                <li className="sm:col-span-2">
+                  <ModuleCard doc={featured} />
+                </li>
+              )}
+              <li>
+                <ModuleCard doc={starter} label="Start here" />
+              </li>
+              {others.map((m) => (
+                <li key={m.slug}>
+                  <ModuleCard doc={m} />
+                </li>
+              ))}
+              <li>
+                <Link href="/commands" className={cn(card, "border-ink bg-panel hover:shadow-[6px_6px_0_var(--color-gold)]")}>
+                  <span className="font-mono text-xs font-bold uppercase tracking-[.14em] text-gold">Reference</span>
+                  <h2 className="font-display text-4xl font-black uppercase leading-[.9]">All commands</h2>
+                  <p className="text-ink-2">
+                    All {COMMANDS.length} commands with usage, cooldowns and key numbers, grouped by module.
+                  </p>
+                </Link>
+              </li>
+            </ul>
+          </div>
+        </Container>
+      </PaletteProvider>
       <Footer />
     </main>
   );
