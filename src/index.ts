@@ -70,7 +70,8 @@ client.on("error", (err) => {
 
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user?.tag}`);
-  client.user?.setActivity("V2 is finally out! Check what's new in changelog", { type: ActivityType.Playing });
+  // Custom shows the text as-is, without a "Playing" prefix.
+  client.user?.setActivity({ name: "Crime Families", type: ActivityType.Custom, state: "🆕 Crime Families are here! Type !crew to check it out" });
 
   try {
     await prisma.$connect();
