@@ -6,7 +6,8 @@ import { MongoMemoryReplSet } from "mongodb-memory-server";
 // Load MONGOMS_SYSTEM_BINARY (path to the installed mongod.exe) + TEST_REDIS_URL.
 config({ path: resolve(process.cwd(), ".env.test") });
 
-const URI_FILE = resolve(process.cwd(), "test/.mongo-uri");
+// TEST_MONGO_URI_FILE lets several test runs share the repo at once, each with its own DB.
+const URI_FILE = resolve(process.cwd(), process.env.TEST_MONGO_URI_FILE ?? "test/.mongo-uri");
 let replset: MongoMemoryReplSet | undefined;
 
 // One native single-node replica set for the whole test run. Why not Docker: Docker

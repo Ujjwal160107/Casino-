@@ -8,7 +8,8 @@ config({ path: resolve(process.cwd(), ".env.test") });
 // The Mongo test DB is a mongodb-memory-server replica set started once in
 // test/globalSetup.ts (Docker on Windows can't reach a Mongo RS from the host).
 // globalSetup writes its dynamic URI to test/.mongo-uri; pick it up per worker.
-const uriFile = resolve(process.cwd(), "test/.mongo-uri");
+// Must match globalSetup: TEST_MONGO_URI_FILE isolates parallel runs.
+const uriFile = resolve(process.cwd(), process.env.TEST_MONGO_URI_FILE ?? "test/.mongo-uri");
 if (existsSync(uriFile)) {
   process.env.TEST_DATABASE_URL = readFileSync(uriFile, "utf8").trim();
 }
