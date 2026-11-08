@@ -11,9 +11,18 @@ import { FamilyError } from "./tx";
 
 const LOBBY_CLOSED = "Lobby closed.";
 
-/** Returns a seat's stake as unearned income (D60: never afterEarnedCredit). */
-export function refundStakeInTx(tx: Prisma.TransactionClient, row: CaperCrew, reason: string): Promise<CreditResult> {
-  return creditWalletInTx(tx, row.userId, row.userId, row.stake, "caper_stake_refund", { caperId: row.caperId, role: row.role, reason }, false);
+/**
+ * Returns a seat's stake as unearned income (D60: never afterEarnedCredit). The
+ * stake's source is the wallet the clamp just filled, so a MAX_SAFE_BALANCE
+ * clamp cannot go back: it is burned into an audit row, as payShare burns a
+ * clamp it cannot return (F5).
+ */
+export async function refundStakeInTx(tx: Prisma.TransactionClient, row: CaperCrew, reason: string): Promise<CreditResult> {
+  const meta = { caperId: row.caperId, role: row.role, reason };
+  const credit = await creditWalletInTx(tx, row.userId, row.userId, row.stake, "caper_stake_refund", meta, false);
+  const burned = row.stake - credit.appliedAmount;
+  if (burned > 0) await tx.audit.create({ data: { userId: row.userId, type: "caper_stake_clamp_burn", meta: { ...meta, familyId: row.familyId, burned } } });
+  return credit;
 }
 
 /** Deletes one unstarted lobby seat and refunds it; bumps seatsVersion so it conflicts with join, start and cancel. */

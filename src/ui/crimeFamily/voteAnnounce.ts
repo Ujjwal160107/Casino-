@@ -9,6 +9,7 @@ import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import {
   familyNewBossNotice, familyVoteAgainstYouNotice, familyVoteOpenedNotice, familyVoteResultNotice, notifyMany, sendOptOutDm,
 } from "../../services/dmNoticeService";
+import { clearClaimMessage } from "../../services/crimeFamily/chairService";
 import {
   claimVoteAnnouncement, claimVoteRepost, getVoteView, setVoteMessage, unannouncedResultsOf, voteRecipients,
 } from "../../services/crimeFamily/voteService";
@@ -18,12 +19,16 @@ import { buildClaimResolved } from "./familyScreens";
 import { editChannelMessage, sendToChannel } from "./post";
 import { ballotRow, buildVoteCard, voteResultLine } from "./voteScreens";
 
-/** After a start commits (or the sweeper finds it silent): S34 in the home channel and the start DMs, once. */
+/**
+ * After a start commits (or the sweeper finds it silent): S34 in the home
+ * channel and the start DMs, once, and only while the vote is OPEN (a vote
+ * that closed first gets its result instead, never a late start).
+ */
 export async function announceVoteStart(client: Client, voteId: string): Promise<void> {
   return safely("announceVoteStart", async () => {
     if (!(await claimVoteAnnouncement(voteId, "start"))) return;
     const [view, to] = await Promise.all([getVoteView(voteId, null, new Date()), voteRecipients(voteId)]);
-    if (!view || !to) return;
+    if (!view || !to || view.status !== "OPEN") return;
     const posted = await sendToChannel(client, view.homeChannelId, buildVoteCard(view));
     await setVoteMessage(voteId, "", view.homeChannelId, posted ?? "");
     const opened = { familyLabel: view.familyLabel, bossId: view.bossId, starterId: view.starterId, closesAt: view.closesAt, need: view.need, eligible: view.eligible };
@@ -53,6 +58,7 @@ export async function announceVoteResult(client: Client, voteId: string): Promis
       const family = await prisma.family.findUnique({ where: { id: view.familyId }, select: { claimChannelId: true, claimMessageId: true } });
       if (family?.claimChannelId && family.claimMessageId) {
         await editChannelMessage(client, family.claimChannelId, family.claimMessageId, buildClaimResolved("Chair taken by vote"));
+        await clearClaimMessage(view.familyId, family.claimMessageId);
       }
     }
     const line = voteResultLine(view);

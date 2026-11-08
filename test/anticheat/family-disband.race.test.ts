@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { disbandFamily, previewDisband } from "../../src/services/crimeFamily/disbandService";
 import { createFamily } from "../../src/services/crimeFamily/familyService";
+import { acceptInvite, expireInvites } from "../../src/services/crimeFamily/membershipService";
 import { depositToVault, creditEarnings } from "../../src/services/crimeFamily/vaultService";
 import { FAMILY_HOOKS, ACTIVITY_RULES } from "../../src/services/crimeFamily/extensions";
 import { VaultBusy } from "../../src/services/crimeFamily/tx";
@@ -55,14 +56,16 @@ describe("disband (6.4)", () => {
     expect(await testPrisma.familyLedger.count({ where: { familyId: family.id, type: { in: ["payday", "payday_tax"] } } })).toBe(0);
   });
 
-  it("writes DISBANDED exits (wasBoss for the Boss), expires invites, deletes members and frees the name and tag", async () => {
+  it("writes DISBANDED exits (wasBoss for the Boss), closes invites, deletes members and frees the name and tag", async () => {
     const { family, bossId, s } = await disbandFam({ earnings: 0, treasury: 0, lastPaydayAt: daysAgo(1) });
-    const inv = await testPrisma.familyInvite.create({ data: { familyId: family.id, inviterId: bossId, inviteeId: "x", guildId: "g1", channelId: "c1", expiresAt: new Date(Date.now() + 864e5) } });
+    const x = await seedEligibleUser({ wallet: 2_000_000 });
+    const inv = await testPrisma.familyInvite.create({ data: { familyId: family.id, inviterId: bossId, inviteeId: x, guildId: "g1", channelId: "c1", expiresAt: new Date(Date.now() + 864e5) } });
     const r = await disbandFamily(bossId, "VLA");
     expect([...r.formerMembers].sort()).toEqual([bossId, s].sort());
     const exits = await testPrisma.familyExit.findMany({ where: { familyId: family.id } });
     expect(Object.fromEntries(exits.map((e) => [e.userId, [e.reason, e.wasBoss]]))).toEqual({ [bossId]: ["DISBANDED", true], [s]: ["DISBANDED", false] });
-    expect(await testPrisma.familyInvite.findUnique({ where: { id: inv.id } })).toMatchObject({ status: "EXPIRED", slot: inv.id });
+    await expect(acceptInvite(inv.id, x)).rejects.toThrow("Invite expired.");
+    expect((await expireInvites(new Date())).map((i) => i.id)).toEqual([inv.id]);   // the sweeper closes it, and its card, like any expiry
     expect(await testPrisma.familyMember.count({ where: { familyId: family.id } })).toBe(0);
     expect(await testPrisma.family.count()).toBe(0);
     expect(await testPrisma.audit.count({ where: { userId: bossId, type: "family_disband" } })).toBe(1);

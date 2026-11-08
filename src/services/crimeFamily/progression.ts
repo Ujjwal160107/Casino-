@@ -9,7 +9,7 @@ import { levelDef, type FamilyLevelDef, type FamilyRole } from "../../data/crime
 import { FAMILY_HOOKS } from "./extensions";
 import { writeLedger } from "./ledger";
 import { can } from "./permissions";
-import { FamilyError, runFamilyTx } from "./tx";
+import { FamilyError, runFamilyTx, VaultShort } from "./tx";
 import { spendFromVault } from "./vaultService";
 
 const ONLY_OFFICERS = "Only the Boss or Underboss can level up.";
@@ -67,6 +67,9 @@ export async function levelUpPreview(
     if (block) blockers.push(block);
     notes.push(...((await hook.levelUpNotes?.(family.id, { from: ctx.from, to: ctx.to, now })) ?? []));
   }
+  // Last, so it shows only when nothing else blocks: the Confirm's spend would refuse with the same line.
+  const vault = family.earnings + family.treasury;
+  if (blockers.length === 0 && vault < next.fee) blockers.push(new VaultShort(next.fee, vault).message);
   return { next, blockers, notes };
 }
 
@@ -80,6 +83,7 @@ export async function levelUpPreview(
 export async function levelUp(
   familyId: string, actorId: string, expectedLevel: number, now: Date = new Date(),
 ): Promise<LevelUpResult> {
+  if (!Number.isInteger(expectedLevel) || expectedLevel < 1) throw new FamilyError(LEVEL_CHANGED);
   await assertLevelUpActor(prisma, familyId, actorId, now);
   const current = await prisma.family.findUnique({ where: { id: familyId } });
   if (!current) throw new FamilyError("That family no longer exists.");

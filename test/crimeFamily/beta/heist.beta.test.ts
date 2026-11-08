@@ -636,7 +636,7 @@ describe("HEIST GO: briefs, the intel ring, Share, locks", () => {
   // BUG-HEIST-1: a seat can lock without ever opening its brief (cpr:act needs no
   // briefOpened), stay dark, and still be paid and counted as a pass; its partner
   // meanwhile reads the leaked answer. Spec 8.3/8.5/8.6 (D49): a dark seat is a miss with cut 0.
-  it.fails("BUG-HEIST-1: a seat that locks blind (never opens its brief) is dark at the leak yet counted as a pass and paid", async () => {
+  it("BUG-HEIST-1: a seat that locks blind (never opens its brief) is dark at the leak yet counted as a pass and paid", async () => {
     const startedAt = new Date(Date.now() - 10_000);
     const goEndsAt = new Date(startedAt.getTime() + 120_000);   // leakAt is 80 s away: the forged lock lands before it
     const { caper, ids, family } = await seedRunning({
@@ -944,7 +944,7 @@ describe("HEIST membership races and the router table", () => {
   // transaction never re-reads it, while leaving the family (whose hook refuses a
   // member with a live seat) does not touch the caper. A leave committing between
   // the two leaves a non-member holding a LIVE seat (and its stake) in the old family's lobby.
-  it.fails("BUG-HEIST-2: leaving the family while a Join is in flight leaves a non-member seated in the family's lobby", async () => {
+  it("BUG-HEIST-2: leaving the family while a Join is in flight leaves a non-member seated in the family's lobby", async () => {
     const f = await caperCrew({ tier: 1, roles: ["MASTERMIND", "LOOKOUT", "SAFECRACKER", "DRIVER"] });
     const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
     const { leaveFamily } = await import("../../../src/services/crimeFamily/membershipService");
@@ -975,7 +975,7 @@ describe("HEIST membership races and the router table", () => {
   // action named after an Object.prototype member resolves to that member, passes the
   // owner check (args end with the presser's id), is acknowledged, and then throws
   // "entry.run is not a function": logged as an error and answered "Something went wrong."
-  it.fails("BUG-HEIST-3: cpr:constructor / __proto__ / toString:<own id> resolve Object.prototype members as routes and crash the handler", async () => {
+  it("BUG-HEIST-3: cpr:constructor / __proto__ / toString:<own id> resolve Object.prototype members as routes and crash the handler", async () => {
     const uid = await seedEligibleUser({});
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     const out: string[] = [];

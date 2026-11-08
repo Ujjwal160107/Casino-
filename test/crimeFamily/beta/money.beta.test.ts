@@ -139,7 +139,7 @@ describe("deposits: amount parsing through the Deposit modal", () => {
     expect((await familyOf(f.id))!.treasury).toBe(9_500);
   });
 
-  it.fails("BUG-MONEY-1: '8.03m' deposits 8,030,000 (parseSmartAmount's float multiply takes 8,029,999)", async () => {
+  it("BUG-MONEY-1: '8.03m' deposits 8,030,000 (parseSmartAmount's float multiply takes 8,029,999)", async () => {
     const boss = await player({ wallet: 20_000_000 });
     await seedFamily({ bossId: boss });
     expect(await resolveDepositAmount(boss, "8.03m", new Date())).toBe(8_030_000);
@@ -425,7 +425,7 @@ describe("payday: the two-phase PaydayShare", () => {
     expect(await walletOf(alt)).toBe(5_000_000 + 950_000);
   });
 
-  it.fails("BUG-MONEY-2: a forged Confirm id with NaN or Infinity earnings is refused as stale, not a Prisma validation crash", async () => {
+  it("BUG-MONEY-2: a forged Confirm id with NaN or Infinity earnings is refused as stale, not a Prisma validation crash", async () => {
     const { family, bossId } = await payFamily(3_000_000, 2);
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
@@ -527,7 +527,7 @@ describe("level-ups", () => {
     expect(await ledgerRows(f.id)).toHaveLength(0);
   });
 
-  it.fails("BUG-MONEY-4: S6/S8 offer an enabled Level up and promise the fee 'from the treasury' when the vault cannot cover it", async () => {
+  it("BUG-MONEY-4: S6/S8 offer an enabled Level up and promise the fee 'from the treasury' when the vault cannot cover it", async () => {
     const boss = await player();
     await seedFamily({ bossId: boss, xp: 60_000, earnings: 0, treasury: 0 });
     const s8 = await press(CREW_IDS.vault("level", boss), boss);
@@ -576,7 +576,7 @@ describe("level-ups", () => {
     for (const u of all) expect(await walletOf(u)).toBe(paid ? 950_000 : 0);
   });
 
-  it.fails("BUG-MONEY-3: a forged level Confirm with a non-integer level is refused, not an 'Unknown family level' crash", async () => {
+  it("BUG-MONEY-3: a forged level Confirm with a non-integer level is refused, not an 'Unknown family level' crash", async () => {
     const boss = await player();
     const f = await seedFamily({ bossId: boss, xp: 60_000, earnings: 10_000_000 });
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -720,6 +720,7 @@ describe("crew heist money", () => {
         const answers = parseAnswers(live.answers)!;
         for (const role of T1) {
           const pick = run === 2 && role !== "MASTERMIND" ? (answers.seats[role]!.correct + 1) % 4 : answers.seats[role]!.correct;
+          await handleCrimeFamilyInteraction(fakeButton(CPR_IDS.openBrief(caper.id, ids[role]), { userId: ids[role], client: fake.client }) as any);
           await handleCrimeFamilyInteraction(fakeButton(CPR_IDS.act(caper.id, pick), { userId: ids[role], client: fake.client }) as any);
         }
         const done = await testPrisma.caper.findUniqueOrThrow({ where: { id: caper.id } });
@@ -784,7 +785,7 @@ describe("crew heist money", () => {
     expect((await testPrisma.creditCard.findUniqueOrThrow({ where: { userId: lobby.ids.LOOKOUT } })).currentBalance).toBe(5_000_000);
   });
 
-  it.fails("BUG-MONEY-5: a lobby stake refunded to a wallet near MAX_SAFE_BALANCE is not silently destroyed", async () => {
+  it("BUG-MONEY-5: a lobby stake refunded to a wallet near MAX_SAFE_BALANCE is not silently destroyed", async () => {
     const { family, ids } = await caperCrew({ tier: 1, roles: [...T1], wallet: 3_000_000 });
     track(...Object.values(ids));
     const caper = await planCaper({ uid: ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });

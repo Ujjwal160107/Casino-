@@ -37,10 +37,11 @@ export function voteResultLine(v: VoteView): string {
   return VOID_LINES[r.voidReason ?? "no_heir"];
 }
 
-/** S34: open (7 components) or closed (3). */
+/** S34: open (7 components) or closed (3); a closed view's closesAt is when it actually closed. */
 export function buildVoteCard(v: VoteView): CfPayload {
+  const when = v.status === "OPEN" ? "closes" : "closed";
   const container = new ContainerBuilder().addTextDisplayComponents(text(
-    `## No-confidence vote · [${v.tag}]\n<@${v.bossId}> · started by <@${v.starterId}> · closes ${rel(v.closesAt)}`,
+    `## No-confidence vote · [${v.tag}]\n<@${v.bossId}> · started by <@${v.starterId}> · ${when} ${rel(v.closesAt)}`,
   ));
   if (v.status !== "OPEN") return cfPayload(container.addTextDisplayComponents(text(voteResultLine(v))));
   container

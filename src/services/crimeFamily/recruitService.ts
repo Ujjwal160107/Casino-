@@ -9,7 +9,7 @@ import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { fmtFortunes } from "../../utils/format";
 import { levelDef, type FamilyRole } from "../../data/crimeFamilyCatalog";
 import { computeNetWorth } from "../netWorthService";
-import { parseBidAmount } from "./bidService";
+import { isObjectId, parseBidAmount } from "./bidService";
 import { checkMemberEligibility, eligibilityError } from "./eligibility";
 import { requireMembership } from "./familyQueries";
 import { joinFamilyInTx, withSeatRetry } from "./membershipService";
@@ -60,8 +60,12 @@ async function assertMayInTx(tx: Prisma.TransactionClient, familyId: string, act
   }
 }
 
-/** The listing modal (M2): every input is checked before anything is written; a blank pitch keeps the stored one (F10). */
-export async function editListing(actorId: string, input: ListingInput, now: Date = new Date()): Promise<Family> {
+/**
+ * The listing modal (M2): every input is checked before anything is written; a blank pitch keeps the stored one (F10).
+ * `shown` is what M2 pre-filled. Only the requirements the officer changed from `shown` are written, so a stale modal
+ * never reverts another officer's newer value; it is refused only when both changed the same requirement.
+ */
+export async function editListing(actorId: string, input: ListingInput, shown: Requirements, now: Date = new Date()): Promise<Family> {
   let pitch: string | null = null;
   if (input.pitch.trim() !== "") {
     const checked = checkPublicText(input.pitch, CRIME_FAMILY_CONFIG.pitchChars);
@@ -69,15 +73,21 @@ export async function editListing(actorId: string, input: ListingInput, now: Dat
     pitch = checked.text;
   }
   const data: Prisma.FamilyUpdateInput = {};
+  const edited: (typeof REQUIREMENTS)[number][] = [];
   for (const r of REQUIREMENTS) {
     const parsed = parseRequirement(input[INPUT_OF[r.key]], r.max);
     if (!parsed.ok) throw new FamilyError(`${r.label}: ${parsed.reason}`);
+    if (parsed.value === shown[r.key]) continue;
+    edited.push(r);
     Object.assign(data, { [r.field]: parsed.value });
   }
   const { family } = await requireMembership(actorId);
   return runFamilyTx(async (tx) => {
     await touchFamily(tx, family.id, now);
     await assertMayInTx(tx, family.id, actorId, "edit_listing", now);
+    const current = await tx.family.findUniqueOrThrow({ where: { id: family.id } });
+    const clash = edited.find((r) => current[r.field] !== shown[r.key]);
+    if (clash) throw new FamilyError(`Another officer just changed "${clash.label}". Reopen \`!crew recruit\` to see it.`);
     return tx.family.update({ where: { id: family.id }, data: { ...data, ...(pitch === null ? {} : { recruitPitch: pitch }), recruitEditedAt: now } });
   });
 }
@@ -173,14 +183,16 @@ export async function applyToFamily(i: {
   const now = i.now ?? new Date();
   const checked = checkPublicText(i.message, CRIME_FAMILY_CONFIG.applicationChars);
   if (!checked.ok) throw new FamilyError(checked.reason);
+  if (!isObjectId(i.familyId)) throw new FamilyError("That family no longer exists.");
   try {
     return await runFamilyTx(async (tx) => {
       if (!(await tx.family.findUnique({ where: { id: i.familyId }, select: { id: true } }))) throw new FamilyError("That family no longer exists.");
       await touchFamily(tx, i.familyId, now);
-      await touchUser(tx, i.applicantId, now);
       const family = await tx.family.findUniqueOrThrow({ where: { id: i.familyId } });
       const block = await applyBlock(tx, family, i.applicantId, now, () => readApplicantStats(tx, i.applicantId, now, computeNetWorth));
       if (block) throw new FamilyError(block);
+      // After the slow gate reads, so a held apply never blocks a concurrent join; a join that wrote the User meanwhile conflicts and retries this.
+      await touchUser(tx, i.applicantId, now);
       return tx.familyInvite.create({
         data: {
           familyId: i.familyId, kind: "APPLICATION", inviterId: "", inviteeId: i.applicantId, message: checked.text,
@@ -199,6 +211,7 @@ export async function applyToFamily(i: {
 
 /** S33 withdraw: CAS PENDING → WITHDRAWN (slot = id, so the pair may apply again after the wait). No DM. */
 export async function withdrawApplication(appId: string, applicantId: string, now: Date = new Date()): Promise<FamilyInvite> {
+  if (!isObjectId(appId)) throw new FamilyError(NOT_PENDING);
   const app = await prisma.familyInvite.findUnique({ where: { id: appId } });
   if (!app || app.inviteeId !== applicantId || app.kind !== "APPLICATION") throw new FamilyError(NOT_PENDING);
   return runFamilyTx(async (tx) => {
@@ -215,6 +228,7 @@ export async function withdrawApplication(appId: string, applicantId: string, no
 
 /** Reads an application for an officer's answer; anything else reads as no longer pending. */
 async function readApplication(appId: string): Promise<FamilyInvite> {
+  if (!isObjectId(appId)) throw new FamilyError(NOT_PENDING);
   const app = await prisma.familyInvite.findUnique({ where: { id: appId } });
   if (!app || app.kind !== "APPLICATION") throw new FamilyError(NOT_PENDING);
   return app;

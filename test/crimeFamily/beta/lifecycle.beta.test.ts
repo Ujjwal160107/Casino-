@@ -279,7 +279,7 @@ describe("LIFE invites", () => {
     await expect(invite(boss, await recruit())).rejects.toThrow("You can bring in 3 members per 7 days.");
   });
 
-  it.fails("BUG-LIFE-1: a declined invitee can be re-invited (and re-pinged) at once, without limit", async () => {
+  it("BUG-LIFE-1: a declined invitee can be re-invited (and re-pinged) at once, without limit", async () => {
     const boss = await seedEligibleUser();
     await seedFamily({ bossId: boss });
     const victim = await recruit();
@@ -660,7 +660,7 @@ describe("LIFE the chair", () => {
     await assertFamilyInvariants();
   });
 
-  it.fails("BUG-LIFE-2: after a claim, a later handover rewrites the old, resolved S23 claim card", async () => {
+  it("BUG-LIFE-2: after a claim, a later handover rewrites the old, resolved S23 claim card", async () => {
     await open(async () => {
       const now = new Date();
       const boss = await seedEligibleUser(); const ub = await seedEligibleUser(); const s = await seedEligibleUser();
@@ -683,7 +683,7 @@ describe("LIFE the chair", () => {
     });
   });
 
-  it.fails("BUG-LIFE-3: when a Boss gets the chair back after a claim, the hourly job rewrites the old resolved S23 to 'The Boss is back.'", async () => {
+  it("BUG-LIFE-3: when a Boss gets the chair back after a claim, the hourly job rewrites the old resolved S23 to 'The Boss is back.'", async () => {
     const now = new Date();
     const a = await seedEligibleUser(); const b = await seedEligibleUser();
     const f = await seedFamily({ bossId: a, members: [{ userId: b, role: "UNDERBOSS" }] });
@@ -704,12 +704,12 @@ describe("LIFE the chair", () => {
 // ── Rename ───────────────────────────────────────────────────────────────────
 
 describe("LIFE stale buttons and cards", () => {
-  it.fails("BUG-LIFE-4: a double-click on S5 Promote lifts a Soldier two ranks, to Underboss", async () => {
+  it("BUG-LIFE-4: a double-click on S5 Promote lifts a Soldier two ranks, to Underboss", async () => {
     await open(async () => {
       const boss = await seedEligibleUser(); const s = await seedEligibleUser({ wallet: 10_000_000 });
       await seedFamily({ bossId: boss, members: [{ userId: s, role: "SOLDIER", joinedAt: daysAgo(10) }] });
       const press = () => {
-        const i = fakeButton(CREW_IDS.manage("promote", s, boss), { userId: boss, ephemeralSource: true, client: fakeClient().client });
+        const i = fakeButton(CREW_IDS.rank("promote", s, "SOLDIER", boss), { userId: boss, ephemeralSource: true, client: fakeClient().client });
         return handleCrimeFamilyInteraction(i as any).then(() => i);
       };
       await Promise.all([press(), press()]);   // both presses were rendered for a Soldier
@@ -730,15 +730,15 @@ describe("LIFE stale buttons and cards", () => {
     });
   });
 
-  it.fails("BUG-LIFE-5: an S4 invite card stays live forever when its invite is closed by a disband or a kick of the inviter", async () => {
+  it("BUG-LIFE-5: an S4 invite card stays live forever when its invite is closed by a disband or a kick of the inviter", async () => {
     const now = new Date();
     const boss = await seedEligibleUser(); const capo = await seedEligibleUser();
     await seedFamily({ bossId: boss, tag: "SCD", members: [{ userId: capo, role: "CAPO", joinedAt: daysAgo(10) }] });
     const a = await recruit(); const b = await recruit();
     const byCapo = await invite(capo, a, now); await setInviteMessage(byCapo.id, "card-capo");
     const byBoss = await invite(boss, b, now); await setInviteMessage(byBoss.id, "card-boss");
-    await kickMember(boss, capo, now);          // the Capo's invite row is deleted
-    await disbandFamily(boss, "SCD", now);      // the Boss's invite is set EXPIRED directly
+    await kickMember(boss, capo, now);          // closes the Capo's invite
+    await disbandFamily(boss, "SCD", now);      // closes the Boss's invite; the family is gone
     const fc = fakeClient();
     await sweepInvites(fc.client as any, at(now, 2 * DAY));   // the minute job, long after both expiries
     const editedCards = fc.edits.map(([id]) => id);
@@ -809,7 +809,8 @@ describe("LIFE disband", () => {
     const boss = await seedEligibleUser(); const s = await seedEligibleUser();
     const f = await seedFamily({ bossId: boss, tag: "DSB", treasury: 4_000_000, earnings: 1_000_000, lastPaydayAt: daysAgo(1, now),
       members: [{ userId: s, role: "SOLDIER" }], data: { recruiting: true } });
-    const inv = await invite(boss, await recruit());
+    const invitee = await recruit();
+    const inv = await invite(boss, invitee);
     const applicant = await recruit();
     const app = await applyToFamily({ applicantId: applicant, familyId: f.id, message: "hello there", guildId: "g1", channelId: "c1" });
     await seedWar({ racketKey: "neon_strip", status: "BIDDING", topBid: 750_000, topBidderFamilyId: f.id });
@@ -819,7 +820,8 @@ describe("LIFE disband", () => {
     expect(out.burned).toBe(5_750_000);
     const after = await moneySnapshot();
     expect(before.total + 750_000 - out.burned).toBe(after.total);   // escrow re-entered the vault, then burned with it
-    expect((await testPrisma.familyInvite.findUnique({ where: { id: inv.id } }))!.status).toBe("EXPIRED");
+    await expect(acceptInvite(inv.id, invitee)).rejects.toThrow("Invite expired.");
+    expect((await expireInvites(now)).map((r) => r.id)).toEqual([inv.id]);   // the sweeper closes it, and its card, like any expiry
     expect((await testPrisma.familyInvite.findUnique({ where: { id: app.id } }))!.status).toBe("EXPIRED");
     expect(out.expiredApplications.map((a) => a.id)).toEqual([app.id]);
     expect(await testPrisma.war.findFirst({ where: { racketKey: "neon_strip" } })).toMatchObject({ topBid: 0, topBidderFamilyId: "" });
@@ -853,7 +855,8 @@ describe("LIFE disband", () => {
       const exits = await testPrisma.familyExit.findMany({ where: { familyId: f.id } });
       const joined = exits.some((e) => e.userId === u);
       expect(exits.length).toBe(joined ? 3 : 2);
-      expect((await testPrisma.familyInvite.findUnique({ where: { id: inv.id } }))!.status).toBe(joined ? "ACCEPTED" : "EXPIRED");
+      if (joined) expect((await testPrisma.familyInvite.findUnique({ where: { id: inv.id } }))!.status).toBe("ACCEPTED");
+      else await expect(acceptInvite(inv.id, u, now)).rejects.toThrow("Invite expired.");
       await assertFamilyInvariants();
     }
   });

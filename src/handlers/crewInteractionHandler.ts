@@ -21,7 +21,7 @@ import { readLedgerPage } from "../services/crimeFamily/ledger";
 import { acceptInvite, declineInvite, kickMember, leaveFamily, listPendingInvites } from "../services/crimeFamily/membershipService";
 import { checkFamilyName, checkFamilyTag } from "../services/crimeFamily/names";
 import { executePayday, previewPayday } from "../services/crimeFamily/paydayService";
-import { can } from "../services/crimeFamily/permissions";
+import { can, ROLE_RANK } from "../services/crimeFamily/permissions";
 import { levelUp } from "../services/crimeFamily/progression";
 import { FamilyError } from "../services/crimeFamily/tx";
 import { depositToVault, getVaultView, resolveDepositAmount } from "../services/crimeFamily/vaultService";
@@ -41,6 +41,7 @@ import { assertEnabled, assertServerOpen, auto, notice, owner, show, showThenAnn
 export { NOT_OPEN_HERE } from "./crewRouteKit";
 const ONLY_OFFICERS = "Only the Boss or Underboss can run payday.";
 const ONLY_BOSS_DISBAND = "Only the Boss can disband the family.";
+const NO_LONGER_ACTIVE = "This button is no longer active.";
 export const BAD_AMOUNT = "Enter a positive amount like 250k or 5m";
 
 const days = (seconds: number) => Math.round(seconds / 86_400);
@@ -174,7 +175,7 @@ const openRoute: CfRoute = async (i, args) => {
     case "leave": return show(i, confirmScreen(uid, "leave", null));
     case "kick":
     case "chair": return show(i, confirmScreen(uid, kind, args[1]));
-    default: throw new FamilyError("This button is no longer active.");
+    default: throw new FamilyError(NO_LONGER_ACTIVE);
   }
 };
 
@@ -183,15 +184,21 @@ const vaultRoute: CfRoute = async (i, [action, uid]) => {
   return show(i, action === "level" ? await levelScreen(uid) : await paydayScreen(uid));
 };
 
-/** `crew:mg:sel:<page>:<owner>` (select), `crew:mg:pg:<page>:<owner>` (pager) and `crew:mg:<action>:<target>:<owner>` (S5 buttons). */
+/**
+ * `crew:mg:sel:<page>:<owner>` (select), `crew:mg:pg:<page>:<owner>` (pager), `crew:mg:<kick|chair>:<target>:<owner>`
+ * and `crew:mg:<promote|demote>:<target>:<fromRole>:<owner>` (S5 buttons).
+ */
 const manageRoute: CfRoute = async (i, args) => {
   const uid = owner(args);
-  const [action, target] = args;
+  const [action, target, fromRole] = args;
   if (action === "sel") return show(i, await manageScreen(uid, i.isStringSelectMenu() ? i.values[0] ?? null : null, Number(args[1]) || 0));
   if (action === "pg") return show(i, await manageScreen(uid, null, Number(args[1]) || 0));
   if (action === "kick" || action === "chair") return show(i, confirmScreen(uid, action, target));
+  if (action !== "promote" && action !== "demote") throw new FamilyError(NO_LONGER_ACTIVE);
+  // A button posted before ids carried the rank has the owner where the rank goes.
+  if (!Object.prototype.hasOwnProperty.call(ROLE_RANK, fromRole)) throw new FamilyError(NO_LONGER_ACTIVE);
   const kind = action === "promote" ? "promoted" : "demoted";
-  const { family, newRole, fellBack } = await (action === "promote" ? promoteMember : demoteMember)(uid, target);
+  const { family, newRole, fellBack } = await (action === "promote" ? promoteMember : demoteMember)(uid, target, new Date(), fromRole as FamilyRole);
   await announceRoleChange(i.client, family, kind, target, newRole);
   return show(i, await manageScreen(uid, target, null, fellBack ? `<@${target}> is now a Soldier (no Capo seat was free).` : undefined));
 };
@@ -215,8 +222,10 @@ const confirmRoute: CfRoute = async (i, [kind, answer, target, uid]) => {
 
 /** `crew:pay:ok:<E>:<N>:<owner>` (S7 Confirm): a stale preview re-renders S7 with the reason. */
 const paydayRoute: CfRoute = async (i, [, earnings, count, uid]) => {
+  const expected = { earnings: Number(earnings), count: Number(count) };
+  if (!Number.isSafeInteger(expected.earnings) || !Number.isSafeInteger(expected.count)) throw new FamilyError(NO_LONGER_ACTIVE);
   const { family } = await requireMembership(uid);
-  const result = await executePayday(family.id, uid, { earnings: Number(earnings), count: Number(count) });
+  const result = await executePayday(family.id, uid, expected);
   if (result.status === "changed") return show(i, buildPaydayPreview(uid, result.preview, result.reason));
   return showThenAnnounce(i, vaultScreen(uid, `Paid ${result.paid.length} members.`), () => announcePayday(i.client, result));
 };
@@ -299,7 +308,7 @@ const modalRoute: CfRoute = async (i, [kind, uid]) => {
       return showThenAnnounce(i, notice(`**${familyLabel(result.family)}** has disbanded.`), () => announceDisband(i.client, result));
     }
     default:
-      throw new FamilyError("This button is no longer active.");
+      throw new FamilyError(NO_LONGER_ACTIVE);
   }
 };
 

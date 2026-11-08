@@ -34,7 +34,7 @@ beforeAll(async () => {
 beforeEach(async () => { await resetFamilies(); await seedTurf(); await flushTestKeys("cf:*"); });
 
 describe("BETA turf: forged and stale ids on the shared war buttons", () => {
-  it.fails("BUG-TURF-1: a forged non-ObjectId war or hit id on Scout / Hit / answer crashes into 'Something went wrong.' instead of a refusal", async () => {
+  it("BUG-TURF-1: a forged non-ObjectId war or hit id on Scout / Hit / answer crashes into 'Something went wrong.' instead of a refusal", async () => {
     await withCfConfig(ON, async () => {
       const a = await crew({ cityId: (await city("GOLD", 1)).id });
       const errors = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -592,7 +592,7 @@ describe("BETA turf: the league shrinks, the flag flips, every league pays its o
 });
 
 describe("BETA turf: races between the jobs and the players", () => {
-  it.fails("BUG-TURF-2: a soldier who presses Hit while leaving walks out of the family with an armed hit that still scores for it (edge 32 bypass)", async () => {
+  it("BUG-TURF-2: a soldier who presses Hit while leaving walks out of the family with an armed hit that still scores for it (edge 32 bypass)", async () => {
     await withCfConfig(ON, async () => {
       for (let n = 0; n < 4; n++) {
         await resetFamilies(); await seedTurf();

@@ -48,8 +48,9 @@ async function eachSafely<T>(job: string, items: T[], idOf: (item: T) => string,
 const allFamilyIds = async () => (await prisma.family.findMany({ select: { id: true } })).map((f) => f.id);
 
 /**
- * Minute: PENDING invites and applications past expiresAt → EXPIRED; each
- * invite's S4 card is edited once and each applicant gets the expiry DM. An
+ * Minute: PENDING invites and applications past expiresAt → EXPIRED (an
+ * invite closed by its inviter's exit or a disband included); each invite's
+ * S4 card is edited once and each applicant gets the expiry DM. An
  * application whose family is gone is skipped (the disband DMed it).
  */
 export async function sweepInvites(client: Client, now: Date): Promise<void> {

@@ -7,6 +7,7 @@ import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { WAR_BLOCKS, WAR_RULES } from "../../data/crimeFamilyCatalog";
 import { debitWalletInTx } from "../walletService";
+import { isObjectId } from "./bidService";
 import { checkMemberEligibility, eligibilityError } from "./eligibility";
 import { getMembership } from "./familyQueries";
 import { cryptoRng } from "./random";
@@ -53,8 +54,41 @@ async function liveWarIn(tx: Prisma.TransactionClient, warId: string, now: Date)
   return war;
 }
 
+/**
+ * The membership guard every press re-checks inside its transaction: warActor
+ * reads membership outside it, so a leave committing in between would let a
+ * non-member fight. The write (always later than the stored value, as in
+ * touchFamily, so Mongo never skips it) makes a concurrent leave conflict.
+ */
+async function stillMemberIn(tx: Prisma.TransactionClient, userId: string, familyId: string, now: Date): Promise<void> {
+  const member = await tx.familyMember.findFirst({ where: { userId, familyId }, select: { lastActiveAt: true } });
+  if (!member) throw new FamilyError(NOT_YOUR_WAR);
+  const lastActiveAt = new Date(Math.max(now.getTime(), member.lastActiveAt.getTime() + 1));
+  await tx.familyMember.updateMany({ where: { userId, familyId }, data: { lastActiveAt } });
+}
+
+/**
+ * Runs a press's transaction behind stillMemberIn. A press refused because the
+ * member left drops the contribution row warActor pre-created if nothing was
+ * ever written to it, so the leave hook never counts a non-member as a fighter.
+ */
+async function pressTx<T>(contribution: WarContribution, now: Date, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  try {
+    return await runFamilyTx(async (tx) => {
+      await stillMemberIn(tx, contribution.userId, contribution.familyId, now);
+      return fn(tx);
+    });
+  } catch (err) {
+    if (err instanceof FamilyError && err.message === NOT_YOUR_WAR) {
+      await prisma.warContribution.deleteMany({ where: { id: contribution.id, hits: 0, points: 0, lastScoutSlot: -1 } });
+    }
+    throw err;
+  }
+}
+
 /** Refuses a press on a war that is not live, from a family not in it, or from a member who may not fight; only then the contribution row (T14). */
 async function warActor(warId: string, userId: string, now: Date): Promise<{ war: War; side: WarSide; contribution: WarContribution }> {
+  if (!isObjectId(warId)) throw new FamilyError(OVER);
   const war = await prisma.war.findUnique({ where: { id: warId } });
   if (war?.status === "ARMED") throw new FamilyError(NOT_STARTED);
   if (!war || war.status !== "ACTIVE" || war.endsAt <= now) throw new FamilyError(OVER);
@@ -76,7 +110,7 @@ async function warActor(warId: string, userId: string, now: Date): Promise<{ war
 export async function scoutWar(input: { warId: string; userId: string; now?: Date }): Promise<ScoutReport> {
   const now = input.now ?? new Date();
   const { contribution } = await warActor(input.warId, input.userId, now);
-  return runFamilyTx(async (tx) => {
+  return pressTx(contribution, now, async (tx) => {
     const war = await liveWarIn(tx, input.warId, now);
     const slot = slotOf(war.startsAt, now);
     const ends = slotEndsAt(war.startsAt, slot);
@@ -96,7 +130,7 @@ export async function armHit(input: { warId: string; userId: string; block: WarB
   const { userId, block } = input;
   const { side, contribution } = await warActor(input.warId, userId, now);
   const c = CRIME_FAMILY_CONFIG;
-  const armed = await runFamilyTx(async (tx) => {
+  const armed = await pressTx(contribution, now, async (tx) => {
     const war = await liveWarIn(tx, input.warId, now);
     const { count } = await tx.warContribution.updateMany({
       where: { id: contribution.id, hits: { lt: c.hitsPerWar }, nextHitAt: { lte: now } },
@@ -126,6 +160,7 @@ export async function armHit(input: { warId: string; userId: string; block: WarB
 export async function answerHit(input: { hitId: string; userId: string; choice: number; now?: Date }): Promise<{ correct: boolean; points: number; block: WarBlockKey }> {
   const now = input.now ?? new Date();
   const { hitId, userId, choice } = input;
+  if (!isObjectId(hitId)) throw new FamilyError(NOT_YOUR_HIT);
   const hit = await prisma.warHit.findUnique({ where: { id: hitId } });
   if (!hit || hit.userId !== userId) throw new FamilyError(NOT_YOUR_HIT);
   const war = await prisma.war.findUniqueOrThrow({ where: { id: hit.warId } });

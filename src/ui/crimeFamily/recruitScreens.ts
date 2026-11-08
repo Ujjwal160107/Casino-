@@ -145,7 +145,7 @@ export function buildRecruitPanel(v: RecruitPanelView, note?: string): CfPayload
       text(`Applications: ${v.pending}/${CRIME_FAMILY_CONFIG.maxPendingApplicationsPerFamily} pending`),
     )
     .addActionRowComponents(buttonRow(
-      cfButton(CREW_IDS.recruit("toggle", owner), v.recruiting ? "Recruiting on" : "Recruiting off",
+      cfButton(CREW_IDS.recruit(v.recruiting ? "off" : "on", owner), v.recruiting ? "Recruiting on" : "Recruiting off",
         v.recruiting ? ButtonStyle.Success : ButtonStyle.Secondary, { disabled: !v.canEdit }),
       cfButton(CREW_IDS.recruitEdit(v.req, owner), "Edit listing…", ButtonStyle.Secondary, { disabled: !v.canEdit }),
       cfButton(CREW_IDS.recruit("inbox", owner), `Applications (${v.pending})`, ButtonStyle.Primary),
@@ -226,7 +226,7 @@ export function buildListingModal(r: Requirements, owner: string): ModalBuilder 
   const requirement = (id: string, label: string, value: number) =>
     inputRow(textInput(id, label, TextInputStyle.Short).setRequired(false).setMaxLength(20).setValue(String(value)));
   return new ModalBuilder()
-    .setCustomId(CREW_IDS.recruitModal(owner))
+    .setCustomId(CREW_IDS.recruitModal(r, owner))
     .setTitle("Recruitment listing")
     .addComponents(
       inputRow(textInput("pitch", "Pitch", TextInputStyle.Paragraph).setRequired(false)

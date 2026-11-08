@@ -73,12 +73,30 @@ export const parseSmartAmount = (input: string, maxBalance: number = Infinity): 
   return Math.floor(parseFloat(lower));
 };
 
+const SUFFIXED = /^(\d[\d,]*)(?:\.(\d+))?([kmb])$/i;
+const SUFFIX_PLACES: Record<string, number> = { k: 3, m: 6, b: 9 };
+
+/**
+ * A k/m/b amount ("8.03m", "1,500k") by integer maths on its digits: a float
+ * multiply floors 8.03 × 1e6 to 8,029,999. `exact` is false when a fraction of
+ * a fortune was floored away ("1.0001k" → 1,000). Null unless digits plus a suffix.
+ */
+export function parseSuffixedAmount(raw: string): { amount: number; exact: boolean } | null {
+  const m = SUFFIXED.exec(raw);
+  if (!m) return null;
+  const places = SUFFIX_PLACES[m[3].toLowerCase()];
+  const frac = (m[2] ?? "").replace(/0+$/, "");
+  return { amount: Number(m[1].replace(/,/g, "") + frac.slice(0, places).padEnd(places, "0")), exact: frac.length <= places };
+}
+
 /** Strict positive amount for typed inputs ("250k", "5m", "1,000,000", "all"): null unless a whole number > 0. */
 export function parsePositiveAmount(raw: string, maxBalance: number): number | null {
   const input = raw.trim();
   if (!/^\d[\d,]*(\.\d+)?[kmb]?$|^(all|max|allin)$/i.test(input)) return null;
   // "all" is the wallet balance, a Float that may be fractional: take the whole part.
-  const amount = /^(all|max|allin)$/i.test(input) ? Math.floor(maxBalance) : parseSmartAmount(input, maxBalance);
+  const amount = /^(all|max|allin)$/i.test(input)
+    ? Math.floor(maxBalance)
+    : parseSuffixedAmount(input)?.amount ?? parseSmartAmount(input, maxBalance);
   return Number.isInteger(amount) && amount > 0 ? amount : null;
 }
 

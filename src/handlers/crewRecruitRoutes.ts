@@ -8,7 +8,7 @@ import {
   getBoardView, getFamilyCardView, getInboxView, getMyApplicationsView, getRecruitPanelView, type BoardSort,
 } from "../services/crimeFamily/recruitQueries";
 import {
-  acceptApplication, applyToFamily, declineApplication, editListing, setRecruiting, withdrawApplication,
+  acceptApplication, applyToFamily, declineApplication, editListing, setRecruiting, withdrawApplication, type Requirements,
 } from "../services/crimeFamily/recruitService";
 import { FamilyError } from "../services/crimeFamily/tx";
 import { announceApplicationAnswer } from "../ui/crimeFamily/recruitAnnounce";
@@ -72,22 +72,25 @@ const withdrawRoute: CfRoute = async (i, args) => {
   return show(i, await myAppsScreen(uid, "Application withdrawn. You can apply there again in 24 hours."));
 };
 
-/** `crew:rc:toggle:<owner>` (S31). */
-const toggleRoute: CfRoute = async (i, args) => {
+/** `crew:rc:<on|off>:<owner>` (S31): sets the state the button showed it would set, never a toggle of the live one. */
+const recruitingRoute = (on: boolean): CfRoute => async (i, args) => {
   assertEnabled();
   const uid = owner(args);
-  const panel = await getRecruitPanelView(uid, new Date());
-  await setRecruiting(uid, !panel.recruiting);
+  await setRecruiting(uid, on);
   return show(i, await panelScreen(uid));
 };
 
-/** `crew:modal:recruit:<owner>` (M2). */
+/** The four requirements after the kind in `crew:rc:edit:…` and `crew:modal:recruit:…`. */
+const requirementsOf = (args: string[]): Requirements =>
+  ({ netWorth: Number(args[1]) || 0, shifts: Number(args[2]) || 0, ageDays: Number(args[3]) || 0, heists: Number(args[4]) || 0 });
+
+/** `crew:modal:recruit:<nw>:<sh>:<age>:<heists>:<owner>` (M2): the ids carry what M2 pre-filled, so only the edited requirements are written. */
 const listingRoute: CfRoute = async (i, args) => {
   assertEnabled();
   const uid = owner(args);
   await editListing(uid, {
     pitch: field(i, "pitch"), minNetWorth: field(i, "nw"), minShifts: field(i, "shifts"), minAgeDays: field(i, "age"), minHeists: field(i, "heists"),
-  });
+  }, requirementsOf(args));
   return show(i, await panelScreen(uid, "Listing saved."));
 };
 
@@ -119,10 +122,10 @@ export const RECRUIT_ROUTES: CfRouteTable = {
   "app:mine": auto(read((uid) => myAppsScreen(uid))),
   "app:wd": update(withdrawRoute),
   "rc:home": auto(read((uid) => panelScreen(uid))),
-  "rc:toggle": update(toggleRoute),
+  "rc:on": update(recruitingRoute(true)),
+  "rc:off": update(recruitingRoute(false)),
   /** F10: `crew:rc:edit:<nw>:<sh>:<age>:<heists>:<owner>` pre-fills M2. */
-  "rc:edit": modalOpener((args) => buildListingModal(
-    { netWorth: Number(args[1]) || 0, shifts: Number(args[2]) || 0, ageDays: Number(args[3]) || 0, heists: Number(args[4]) || 0 }, owner(args))),
+  "rc:edit": modalOpener((args) => buildListingModal(requirementsOf(args), owner(args))),
   "modal:recruit": ephemeral(listingRoute),
   "rc:inbox": auto(read((uid) => inboxScreen(uid, 0))),
   "ap:pg": update(read((uid, [, page]) => inboxScreen(uid, Number(page) || 0))),

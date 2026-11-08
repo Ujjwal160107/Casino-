@@ -3,7 +3,7 @@
 // the outbid family refunded, the top bid moved by compare-and-swap.
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
-import { fmtFortunes, parsePositiveAmount } from "../../utils/format";
+import { fmtFortunes, parsePositiveAmount, parseSuffixedAmount } from "../../utils/format";
 import { RACKETS, WAR_RULES, cityLabel, levelDef, type FamilyRole } from "../../data/crimeFamilyCatalog";
 import { checkJailStatus } from "../jailService";
 import { familyLabel, getMembership, isUnderInvestigation } from "./familyQueries";
@@ -39,9 +39,6 @@ export type BidResult = {
 const NOT_IN_FAMILY = "You are not in a crime family.";
 const ALL_WORDS = /^(all|max|allin)$/i;
 const BARE_FRACTION = /^[\d,]*\.\d*$/;   // "2.5": parsePositiveAmount floors it, a bid refuses it
-// "8.03m": parseSmartAmount's float multiply floors it to 8,029,999, so suffixed bids use string digits.
-const SUFFIXED = /^(\d[\d,]*)(?:\.(\d+))?([kmb])$/i;
-const SUFFIX_PLACES: Record<string, number> = { k: 3, m: 6, b: 9 };
 export const BAD_AMOUNT = "Enter an amount like 2.1m or 2,100,000.";
 const EARNINGS_SHORT = "Not enough earnings for this bid (bids never use the treasury). Check `!crew vault`.";
 const CROWN_KEYS = RACKETS.filter((r) => r.class === "CROWN").map((r) => r.key);
@@ -121,13 +118,10 @@ export async function pairRuleBlocks(db: Db, bidderFamilyId: string, ownerFamily
 export function parseBidAmount(raw: string | undefined): number | null {
   const s = (raw ?? "").trim();
   if (!s || ALL_WORDS.test(s) || BARE_FRACTION.test(s)) return null;
-  const m = SUFFIXED.exec(s);
-  if (!m) return parsePositiveAmount(s, Number.MAX_SAFE_INTEGER);
-  const places = SUFFIX_PLACES[m[3].toLowerCase()];
-  const frac = (m[2] ?? "").replace(/0+$/, "");
-  if (frac.length > places) return null;   // "1.0001k" is a fraction of a fortune
-  const n = Number(m[1].replace(/,/g, "") + frac.padEnd(places, "0"));
-  return Number.isSafeInteger(n) && n > 0 ? n : null;
+  const suffixed = parseSuffixedAmount(s);
+  if (!suffixed) return parsePositiveAmount(s, Number.MAX_SAFE_INTEGER);
+  const { amount, exact } = suffixed;   // inexact: "1.0001k" is a fraction of a fortune
+  return exact && Number.isSafeInteger(amount) && amount > 0 ? amount : null;
 }
 
 /**

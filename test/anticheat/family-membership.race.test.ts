@@ -268,13 +268,16 @@ describe("accept (6.4)", () => {
 });
 
 describe("leave and kick (6.4)", () => {
-  it("leave deletes the row, writes FamilyExit LEFT and deletes the leaver's pending invites", async () => {
+  it("leave deletes the row, writes FamilyExit LEFT and closes the leaver's pending invites", async () => {
     const { family, ids: [capo] } = await famWith([{ role: "CAPO" }]);
-    await invite(capo, await joiner());
+    const j = await joiner();
+    const inv = await invite(capo, j);
     await leaveFamily(capo);
     expect(await testPrisma.familyMember.findUnique({ where: { userId: capo } })).toBeNull();
     expect(await testPrisma.familyExit.findFirst({ where: { userId: capo } })).toMatchObject({ familyId: family.id, reason: "LEFT", wasBoss: false });
-    expect(await testPrisma.familyInvite.count({ where: { inviterId: capo } })).toBe(0);
+    await expect(acceptInvite(inv.id, j)).rejects.toThrow("Invite expired.");
+    await expect(declineInvite(inv.id, j)).rejects.toThrow("Invite expired.");
+    expect((await expireInvites(new Date())).map((r) => r.id)).toEqual([inv.id]);   // the sweeper closes it, and its card, like any expiry
   });
 
   it("a Boss with members cannot leave; a solo Boss is pointed to disband", async () => {

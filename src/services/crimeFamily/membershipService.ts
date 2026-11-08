@@ -10,7 +10,7 @@ import { FAMILY_HOOKS, type MemberExitKind } from "./extensions";
 import { assertNotJailed, getFamilyByTag, getMembership, readActorAndTarget, requireMembership } from "./familyQueries";
 import { can, NO_PERMISSION } from "./permissions";
 import { joinsPerFamilyFor } from "./sizeRules";
-import { FamilyError, invalidateUsers, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
+import { FamilyError, invalidateUsers, isUniqueViolation, runFamilyTx, touchFamily, touchUser } from "./tx";
 
 const WEEK_MS = 7 * 86_400_000;
 const SEAT_RACE_RUNS = 3;
@@ -63,7 +63,20 @@ export async function inviteMember(input: {
         where: { familyId: family.id, inviteeId: input.inviteeId, kind: "APPLICATION", status: "PENDING" }, select: { id: true },
       });
       if (applied) throw new FamilyError(`<@${input.inviteeId}> already applied: accept it in the inbox.`);
-      const pendingCount = await tx.familyInvite.count({ where: { familyId: family.id, kind: "INVITE", status: "PENDING" } });
+      const declined = await tx.familyInvite.findFirst({
+        where: { familyId: family.id, inviteeId: input.inviteeId, kind: "INVITE", status: "DECLINED", resolvedAt: { gt: new Date(now.getTime() - WEEK_MS) } },
+        orderBy: { resolvedAt: "desc" }, select: { resolvedAt: true },
+      });
+      if (declined) {
+        const again = Math.floor((declined.resolvedAt.getTime() + WEEK_MS) / 1000);
+        throw new FamilyError(`<@${input.inviteeId}> declined your family's invite: you can invite them again <t:${again}:R>.`);
+      }
+      // An invite closed by a leave, kick or disband (closeInvitesNow) stays PENDING until the minute sweep edits its card.
+      const closing = await tx.familyInvite.findFirst({
+        where: { familyId: family.id, inviteeId: input.inviteeId, kind: "INVITE", status: "PENDING", expiresAt: { lte: now } }, select: { id: true },
+      });
+      if (closing) throw new FamilyError(`<@${input.inviteeId}>'s last invite is closing: try again in a minute.`);
+      const pendingCount = await tx.familyInvite.count({ where: { familyId: family.id, kind: "INVITE", status: "PENDING", expiresAt: { gt: now } } });
       if (pendingCount >= CRIME_FAMILY_CONFIG.maxPendingInvites) {
         throw new FamilyError(`Too many pending invites (max ${CRIME_FAMILY_CONFIG.maxPendingInvites}).`);
       }
@@ -114,6 +127,7 @@ export async function joinFamilyInTx(
   const { familyId, uid, inviterId, now } = i;
   const gate = await checkMemberEligibility(uid, "family_join", { now, familyId });
   if (!gate.ok) throw eligibilityError(gate.failures);
+  await touchUser(tx, uid, now);   // conflicts with the joiner's concurrent apply or founding (A35)
   const family = await tx.family.findUnique({ where: { id: familyId } });
   if (!family) throw new FamilyError("That family no longer exists.");
   await assertJoinCaps(tx, familyId, family.level, inviterId, now, 1);
@@ -196,11 +210,11 @@ export async function acceptInviteByTag(
   return { ...(await acceptInvite(invite.id, uid, now)), inviteId: invite.id };
 }
 
-/** CAS PENDING → DECLINED with slot = id, so the pair can be invited again. */
+/** CAS PENDING → DECLINED with slot = id; the family may invite the player again after 7 days. */
 export async function declineInvite(inviteId: string, uid: string, now: Date = new Date()): Promise<FamilyInvite> {
   await readOwnInvite(inviteId, uid);
   const { count } = await prisma.familyInvite.updateMany({
-    where: { id: inviteId, kind: "INVITE", status: "PENDING" },
+    where: { id: inviteId, kind: "INVITE", status: "PENDING", expiresAt: { gt: now } },
     data: { status: "DECLINED", slot: inviteId, resolvedAt: now },
   });
   if (count !== 1) throw new FamilyError(INVITE_EXPIRED);
@@ -230,7 +244,7 @@ export async function listPendingInvites(uid: string, now: Date = new Date()): P
 
 /**
  * The shared exit: hook blocks (re-run on every retry), delete the member row,
- * record the FamilyExit, drop the leaver's PENDING invites, then hook side
+ * record the FamilyExit, close the leaver's PENDING invites (closeInvitesNow), then hook side
  * effects. Returns the users whose wallets a hook wrote (invalidate after commit).
  */
 async function removeMember(tx: Prisma.TransactionClient, familyId: string, userId: string, kind: MemberExitKind, now: Date): Promise<string[]> {
@@ -242,7 +256,7 @@ async function removeMember(tx: Prisma.TransactionClient, familyId: string, user
   if (count !== 1) throw new FamilyError(kind === "LEFT" ? "You are not in a crime family." : `<@${userId}> is not in your family.`);
   await tx.family.update({ where: { id: familyId }, data: { memberCount: { decrement: 1 } } });
   await tx.familyExit.create({ data: { userId, familyId, reason: kind, wasBoss: false, leftAt: now } });
-  await tx.familyInvite.deleteMany({ where: { inviterId: userId, status: "PENDING" } });
+  await closeInvitesNow(tx, { inviterId: userId });
   const wallets: string[] = [];
   for (const hook of FAMILY_HOOKS) wallets.push(...((await hook.onMemberExit?.(tx, { familyId, userId, kind, now })) ?? []));
   return wallets;
@@ -278,6 +292,18 @@ export async function kickMember(actorId: string, targetId: string, now: Date = 
   });
   await invalidateUsers(wallets);
   return { family, targetId };
+}
+
+/**
+ * Closes PENDING invites at once (an inviter's exit, a disband) by moving
+ * expiresAt to CLOSED_AT: every accept and decline CAS already refuses them,
+ * and the minute sweeper expires them and edits each S4 card like any other
+ * expiry. CLOSED_AT predates every caller's clock, so an accept that read its
+ * `now` before the close and retries after it is refused too.
+ */
+const CLOSED_AT = new Date(0);
+export async function closeInvitesNow(tx: Prisma.TransactionClient, where: Prisma.FamilyInviteWhereInput): Promise<void> {
+  await tx.familyInvite.updateMany({ where: { ...where, kind: "INVITE", status: "PENDING" }, data: { expiresAt: CLOSED_AT } });
 }
 
 /** The sweeper: past-due PENDING → EXPIRED with slot = id. Returns only the rows whose CAS this call won. */

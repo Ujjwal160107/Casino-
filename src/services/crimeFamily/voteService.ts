@@ -8,10 +8,11 @@ import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import type { FamilyRole } from "../../data/crimeFamilyCatalog";
 import { isBanActive } from "../banService";
+import { isObjectId } from "./bidService";
 import { moveChair, pickHeir } from "./chairService";
 import { assertNotJailed, familyLabel, requireMembership } from "./familyQueries";
 import { isAssociate, mayStartVote } from "./permissions";
-import { FamilyError, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
+import { CROWD_ATTEMPTS, FamilyError, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
 import { findOpenVote, hasOpenVote } from "./voteHooks";
 import { decideVote, voidReasonOf, voteCooldownUntil, votePassNeed, type VoteStatus } from "./voteRules";
 import type { VoteStartView, VoteView } from "./views";
@@ -21,6 +22,7 @@ const ALREADY_OPEN = "A vote is already open.";
 const BANNED = "Banned accounts can't take part in a vote.";
 const CLOSED = "Voting closed.";
 const NOT_ELIGIBLE = "You can't vote in this one.";
+const BALLOT_BUSY = "Too many ballots at once: press your vote again.";
 
 const rel = (d: Date) => `<t:${Math.floor(d.getTime() / 1000)}:R>`;
 const secondsAfter = (d: Date, seconds: number) => new Date(d.getTime() + seconds * 1000);
@@ -125,9 +127,11 @@ export async function getVoteStartView(actorId: string, now: Date): Promise<Vote
  * A secret, changeable ballot (4.3 step 2). The vote write (ballotsVersion)
  * makes a ballot and the close conflict, so a late ballot reads "Voting
  * closed."; a first-ballot double press that loses the unique (voteId, userId)
- * retries once into the update path (mapped outside the transaction).
+ * retries once into the update path (mapped outside the transaction). A storm
+ * that still exhausts CROWD_ATTEMPTS reads as a ballot refusal, not the vault's.
  */
 export async function castBallot(voteId: string, userId: string, choice: "YES" | "NO", now: Date = new Date()): Promise<FamilyVote> {
+  if (!isObjectId(voteId)) throw new FamilyError(CLOSED);
   const attempt = () => runFamilyTx(async (tx) => {
     const { count } = await tx.familyVote.updateMany({
       where: { id: voteId, status: "OPEN", closesAt: { gt: now } },
@@ -143,6 +147,9 @@ export async function castBallot(voteId: string, userId: string, choice: "YES" |
     if (prior) await tx.familyBallot.update({ where: { id: prior.id }, data: { choice, castAt: now } });
     else await tx.familyBallot.create({ data: { voteId, familyId: vote.familyId, userId, choice, castAt: now } });
     return vote;
+  }, CROWD_ATTEMPTS).catch((err) => {
+    // runFamilyTx's exhausted-retry refusal (tx.ts) names the vault; no vault is involved here.
+    throw err instanceof FamilyError && err.message === "Vault busy, try again." ? new FamilyError(BALLOT_BUSY) : err;
   });
   try {
     return await attempt();
@@ -245,8 +252,9 @@ export async function getVoteView(voteId: string, viewerId: string | null, now: 
     channelId: vote.channelId, messageId: vote.messageId, bossId: vote.bossId, starterId: vote.starterId, status, closesAt: vote.closesAt,
   };
   if (status !== "OPEN") {
+    // A closed vote shows when it actually closed: a void (chair moved) ends it before closesAt.
     return {
-      ...base, eligible: vote.eligibleAtClose, need: votePassNeed(vote.eligibleAtClose), voted: vote.yes + vote.no, heirId: null,
+      ...base, closesAt: vote.closedAt, eligible: vote.eligibleAtClose, need: votePassNeed(vote.eligibleAtClose), voted: vote.yes + vote.no, heirId: null,
       result: { yes: vote.yes, no: vote.no, newBossId: vote.newBossId, voidReason: voidReasonOf(vote) }, viewerCanVote: false,
     };
   }

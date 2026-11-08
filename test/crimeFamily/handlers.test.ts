@@ -156,7 +156,7 @@ describe("crime family interactions", () => {
       await handleCrimeFamilyInteraction(sel as any);
       const out = JSON.stringify(sel.editReply.mock.calls.at(-1)![0]);
       expect(out).toContain(CREW_IDS.manageSelect(1, boss));
-      expect(out).toContain(CREW_IDS.manage("promote", pick, boss));
+      expect(out).toContain(CREW_IDS.rank("promote", pick, "SOLDIER", boss));
     });
   });
 });
@@ -341,7 +341,7 @@ describe("recruitment routes (Task 15)", () => {
         expect(said(b)).toContain("Application no longer pending.");
       }
       await testPrisma.familyMember.update({ where: { userId: capo }, data: { role: "SOLDIER", roleSlot: capo } });
-      for (const id of [CREW_IDS.recruit("home", capo), CREW_IDS.recruit("inbox", capo), CREW_IDS.recruit("toggle", capo), CREW_IDS.inboxPage(0, capo)]) {
+      for (const id of [CREW_IDS.recruit("home", capo), CREW_IDS.recruit("inbox", capo), CREW_IDS.recruit("off", capo), CREW_IDS.inboxPage(0, capo)]) {
         const b = fakeButton(id, { userId: capo, ephemeralSource: true });
         await handleCrimeFamilyInteraction(b as any);
         expect(said(b)).toContain("You don't have permission to do that.");

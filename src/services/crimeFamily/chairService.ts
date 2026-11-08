@@ -70,9 +70,12 @@ async function assertPromotable(tx: Prisma.TransactionClient, familyId: string, 
 
 type RankChange = { family: Family; newRole: FamilyRole; fellBack: boolean };
 
-/** One rank step for target, up or down, by an actor the 6.3 table allows. No rule ever demotes for net worth or size. */
+/**
+ * One rank step for target, up or down, by an actor the 6.3 table allows. No rule ever demotes for net worth or size.
+ * `expectedRole` is the rank an S5 button was rendered for: a stale or double press refuses instead of stepping twice.
+ */
 async function changeRank(
-  action: Extract<FamilyAction, "promote" | "demote">, actorId: string, targetId: string, now: Date,
+  action: Extract<FamilyAction, "promote" | "demote">, actorId: string, targetId: string, now: Date, expectedRole?: FamilyRole,
 ): Promise<RankChange> {
   const { family } = await requireMembership(actorId);
   let newRole: FamilyRole | null = null;
@@ -83,6 +86,7 @@ async function changeRank(
       await assertNoHookBlock(tx, family.id, "rankChangeBlock");
       const { actor, target } = await readActorAndTarget(tx, family.id, actorId, targetId);
       const targetRole = target.role as FamilyRole;
+      if (expectedRole !== undefined && targetRole !== expectedRole) throw new FamilyError(`<@${targetId}>'s rank changed. Pick them again.`);
       if (!can(actorOf(actor), action, now, { role: targetRole })) throw new FamilyError(NO_PERMISSION);
       const stepped = (action === "promote" ? nextRoleUp(targetRole) : nextRoleDown(targetRole))!;
       if (action === "promote") await assertPromotable(tx, family.id, targetId, stepped);
@@ -101,12 +105,12 @@ async function changeRank(
   return { family, newRole: newRole!, fellBack };
 }
 
-export function promoteMember(actorId: string, targetId: string, now: Date = new Date()): Promise<RankChange> {
-  return changeRank("promote", actorId, targetId, now);
+export function promoteMember(actorId: string, targetId: string, now: Date = new Date(), expectedRole?: FamilyRole): Promise<RankChange> {
+  return changeRank("promote", actorId, targetId, now, expectedRole);
 }
 
-export function demoteMember(actorId: string, targetId: string, now: Date = new Date()): Promise<RankChange> {
-  return changeRank("demote", actorId, targetId, now);
+export function demoteMember(actorId: string, targetId: string, now: Date = new Date(), expectedRole?: FamilyRole): Promise<RankChange> {
+  return changeRank("demote", actorId, targetId, now, expectedRole);
 }
 
 /**
@@ -114,9 +118,12 @@ export function demoteMember(actorId: string, targetId: string, now: Date = new 
  * bossId, then the old Boss becomes a Soldier before the new Boss takes the
  * BOSS slot, so the roleSlot index never collides (6.7, P12). A first-time
  * Boss gets firstBossAt once (A40); then every onChairMove hook runs.
+ * The move ends any claim episode (claimNoticeFor), so a Boss who later gets
+ * the chair back never reads as "back"; the S23 pointer stays for the
+ * announcer that edits the card, which then drops it (clearClaimMessage).
  */
 export async function moveChair(tx: Prisma.TransactionClient, familyId: string, oldBossId: string, newBossId: string, now: Date): Promise<ChairMove> {
-  const { count } = await tx.family.updateMany({ where: { id: familyId, bossId: oldBossId }, data: { bossId: newBossId } });
+  const { count } = await tx.family.updateMany({ where: { id: familyId, bossId: oldBossId }, data: { bossId: newBossId, claimNoticeFor: "" } });
   if (count !== 1) throw new FamilyError("The chair already changed hands.");
   await tx.familyMember.updateMany({ where: { familyId, userId: oldBossId }, data: { role: "SOLDIER", roleSlot: oldBossId } });
   await tx.familyMember.updateMany({ where: { familyId, userId: newBossId }, data: { role: "BOSS", roleSlot: "BOSS" } });
@@ -205,4 +212,13 @@ export async function clearClaimNotice(familyId: string, bossId: string): Promis
 /** Remembers where S23 was posted so a claim or hand-over can edit it. */
 export async function setClaimMessage(familyId: string, channelId: string, messageId: string): Promise<void> {
   await prisma.family.updateMany({ where: { id: familyId }, data: { claimChannelId: channelId, claimMessageId: messageId } });
+}
+
+/**
+ * Drops the S23 pointer once its card shows the chair change, so no later
+ * chair move edits it again. CAS on the message id: a newer S23 posted
+ * meanwhile keeps its pointer.
+ */
+export async function clearClaimMessage(familyId: string, messageId: string): Promise<void> {
+  await prisma.family.updateMany({ where: { id: familyId, claimMessageId: messageId }, data: { claimChannelId: "", claimMessageId: "" } });
 }

@@ -171,9 +171,9 @@ describe("GOV vote: ballots, the freeze and the close", () => {
     const expectRefused = async (i: any, line: string) => expect(said(i)).toContain(line);
     await expectRefused(await press(CREW_IDS.confirm("kick", "ok", s1, boss), boss), "No kicks while a no-confidence vote is open.");
     await expectRefused(await press(CREW_IDS.confirm("kick", "ok", s1, capo), capo), "No kicks while a no-confidence vote is open.");
-    await expectRefused(await press(CREW_IDS.manage("promote", s1, boss), boss), "No promotions or demotions while a no-confidence vote is open.");
-    await expectRefused(await press(CREW_IDS.manage("demote", capo, boss), boss), "No promotions or demotions while a no-confidence vote is open.");
-    await expectRefused(await press(CREW_IDS.manage("demote", capo, ub), ub), "No promotions or demotions while a no-confidence vote is open.");
+    await expectRefused(await press(CREW_IDS.rank("promote", s1, "SOLDIER", boss), boss), "No promotions or demotions while a no-confidence vote is open.");
+    await expectRefused(await press(CREW_IDS.rank("demote", capo, "CAPO", boss), boss), "No promotions or demotions while a no-confidence vote is open.");
+    await expectRefused(await press(CREW_IDS.rank("demote", capo, "CAPO", ub), ub), "No promotions or demotions while a no-confidence vote is open.");
     await expectRefused(await press(CREW_IDS.confirm("chair", "ok", ub, boss), boss), "No handover while a no-confidence vote is open.");
     await expectRefused(await submit(CREW_IDS.modal("disband", boss), { tag: f.tag }, boss), "No disband while a no-confidence vote is open.");
     await expectRefused(await press(CREW_IDS.confirm("leave", "ok", "0", boss), boss), "Hand over the chair first");
@@ -289,7 +289,7 @@ describe("GOV vote: ballots, the freeze and the close", () => {
     await expectFamilyInvariants();
   });
 
-  it.fails("BUG-GOV-1: a ballot storm refuses ballots with the vault's 'Vault busy, try again.' (no vault is involved; the vote is lost unless the voter presses again)", async () => {
+  it("BUG-GOV-1: a ballot storm refuses ballots with the vault's 'Vault busy, try again.' (no vault is involved; the vote is lost unless the voter presses again)", async () => {
     const { ids } = await governanceFamily({ size: 30, roles: ["UNDERBOSS", "CAPO", "CAPO", "CAPO", "CAPO", "CAPO", "CAPO"] });
     const v = await startVote(ids[1]);
     const voters = ids.filter((id) => id !== ids[1]);
@@ -301,7 +301,7 @@ describe("GOV vote: ballots, the freeze and the close", () => {
     expect(refusals).toEqual([]);
   });
 
-  it.fails("BUG-GOV-2: a vote that reaches its close while its start is still unannounced gets a second S34 and 'vote opened' DMs with dead buttons after the result", async () => {
+  it("BUG-GOV-2: a vote that reaches its close while its start is still unannounced gets a second S34 and 'vote opened' DMs with dead buttons after the result", async () => {
     const { f, boss, ids } = await governanceFamily({ size: 6, roles: ["UNDERBOSS", "CAPO"] });
     const now = new Date();
     const v = await seedVote({ familyId: f.id, bossId: boss, starterId: ids[1], eligibleIds: ids, createdAt: at(now, -49 * H), closesAt: at(now, -H), announced: false });
@@ -314,7 +314,7 @@ describe("GOV vote: ballots, the freeze and the close", () => {
     expect(c.dm.get(ids[2])).toBe(1);                                    // the result DM only
   });
 
-  it.fails("BUG-GOV-3: S34 voided by a claim still reads 'closes in 47 hours' above 'Void: the chair changed hands.'", async () => {
+  it("BUG-GOV-3: S34 voided by a claim still reads 'closes in 47 hours' above 'Void: the chair changed hands.'", async () => {
     const { f, ids: [ub, capo] } = await governanceFamily({ size: 6, roles: ["UNDERBOSS", "CAPO"] });
     const v = await startVote(capo);
     await testPrisma.familyMember.update({ where: { userId: f.bossId }, data: { lastActiveAt: daysAgo(8) } });
@@ -332,19 +332,21 @@ describe("GOV vote: ballots, the freeze and the close", () => {
 
 const listing = (o: Partial<Record<"pitch" | "nw" | "shifts" | "age" | "heists", string>> = {}) =>
   ({ pitch: "", nw: "0", shifts: "0", age: "0", heists: "0", ...o });
+/** The requirements an unedited listing shows: what M2's customId carries for a fresh family. */
+const NO_REQ = { netWorth: 0, shifts: 0, ageDays: 0, heists: 0 };
 
 describe("GOV recruitment: the listing", () => {
   it("the Boss and the Underboss edit the listing through M2; a Capo (even forging the modal) cannot; shorthand amounts parse", async () => {
     const { f, boss, ids: [ub, capo] } = await governanceFamily({ size: 4, roles: ["UNDERBOSS", "CAPO"], level: 3 });
-    let i = await submit(CREW_IDS.recruitModal(boss), listing({ pitch: PITCH, nw: "1.5m", shifts: "5k", age: "30", heists: "1,000" }), boss);
+    let i = await submit(CREW_IDS.recruitModal(NO_REQ, boss), listing({ pitch: PITCH, nw: "1.5m", shifts: "5k", age: "30", heists: "1,000" }), boss);
     expect(said(i)).toContain("Listing saved.");
     expect(await family(f.id)).toMatchObject({ recruitPitch: PITCH, recruitMinNetWorth: 1_500_000, recruitMinShifts: 5_000, recruitMinAgeDays: 30, recruitMinHeists: 1_000 });
-    i = await submit(CREW_IDS.recruitModal(ub), listing({ nw: "10b" }), ub);
+    i = await submit(CREW_IDS.recruitModal({ netWorth: 1_500_000, shifts: 5_000, ageDays: 30, heists: 1_000 }, ub), listing({ nw: "10b" }), ub);
     expect(said(i)).toContain("Listing saved.");
     expect(await family(f.id)).toMatchObject({ recruitPitch: PITCH, recruitMinNetWorth: 10_000_000_000, recruitMinShifts: 0 });
-    i = await submit(CREW_IDS.recruitModal(capo), listing({ pitch: "Capo hijacks the pitch", nw: "0" }), capo);
+    i = await submit(CREW_IDS.recruitModal(NO_REQ, capo), listing({ pitch: "Capo hijacks the pitch", nw: "0" }), capo);
     expect(said(i)).toContain("You don't have permission to do that.");
-    i = await press(CREW_IDS.recruit("toggle", capo), capo);
+    i = await press(CREW_IDS.recruit("on", capo), capo);
     expect(said(i)).toContain("You don't have permission to do that.");
     expect((await family(f.id)).recruitPitch).toBe(PITCH);
   });
@@ -368,7 +370,7 @@ describe("GOV recruitment: the listing", () => {
   ])("a refused M2 field writes nothing: %s = %j", async (key, value, line) => {
     const { f, boss } = await governanceFamily({ size: 2 });
     const before = await family(f.id);
-    const i = await submit(CREW_IDS.recruitModal(boss), listing({ pitch: PITCH, [key]: value }), boss);
+    const i = await submit(CREW_IDS.recruitModal(NO_REQ, boss), listing({ pitch: PITCH, [key]: value }), boss);
     expect(said(i)).toContain(line);
     const after = await family(f.id);
     expect(after).toMatchObject({ recruitPitch: before.recruitPitch, recruitMinNetWorth: 0, recruitEditedAt: before.recruitEditedAt });
@@ -376,15 +378,15 @@ describe("GOV recruitment: the listing", () => {
 
   it("recruiting cannot turn on without a pitch; on puts the family on the board, off takes it off while pending applications stay answerable", async () => {
     const { f, boss } = await governanceFamily({ size: 2, wallet: 2_000_000 });
-    let i = await press(CREW_IDS.recruit("toggle", boss), boss);
+    let i = await press(CREW_IDS.recruit("on", boss), boss);
     expect(said(i)).toContain("Write a pitch first (Edit listing).");
-    await submit(CREW_IDS.recruitModal(boss), listing({ pitch: PITCH }), boss);
-    i = await press(CREW_IDS.recruit("toggle", boss), boss);
+    await submit(CREW_IDS.recruitModal(NO_REQ, boss), listing({ pitch: PITCH }), boss);
+    i = await press(CREW_IDS.recruit("on", boss), boss);
     expect((await family(f.id)).recruiting).toBe(true);
     const viewer = await seedEligibleUser({ wallet: 2_000_000 });
     expect(said(await press(CREW_IDS.board("lvl", false, 0, viewer), viewer))).toContain(`[${f.tag}]`);
     const app = await seedApplication({ familyId: f.id, applicantId: viewer });
-    await press(CREW_IDS.recruit("toggle", boss), boss);
+    await press(CREW_IDS.recruit("off", boss), boss);
     expect((await family(f.id)).recruiting).toBe(false);
     expect(said(await press(CREW_IDS.board("lvl", false, 0, viewer), viewer))).not.toContain(`[${f.tag}]`);
     const accept = await press(CREW_IDS.appAnswer("accept", app.id, boss), boss, { client: fakeClient().client });
@@ -392,22 +394,23 @@ describe("GOV recruitment: the listing", () => {
     await expectFamilyInvariants();
   });
 
-  it.fails("BUG-GOV-4: a stale S31 toggle does the opposite of its label (two officers, or a double click, turn recruiting back off)", async () => {
+  it("BUG-GOV-4: a stale S31 toggle does the opposite of its label (two officers, or a double click, turn recruiting back off)", async () => {
     const { f, boss, ids: [ub] } = await governanceFamily({ size: 3, roles: ["UNDERBOSS"], data: { recruitPitch: PITCH } });
     // Both officers have S31 open showing "Recruiting off"; each presses it to turn recruiting ON.
-    await press(CREW_IDS.recruit("toggle", boss), boss);
-    await press(CREW_IDS.recruit("toggle", ub), ub);
+    await press(CREW_IDS.recruit("on", boss), boss);
+    await press(CREW_IDS.recruit("on", ub), ub);
     expect((await family(f.id)).recruiting).toBe(true);
   });
 
-  it.fails("BUG-GOV-5: Edit listing on a stale S31 pre-fills old requirements and silently reverts another officer's newer ones", async () => {
+  it("BUG-GOV-5: Edit listing on a stale S31 pre-fills old requirements and silently reverts another officer's newer ones", async () => {
     const { f, boss, ids: [ub] } = await governanceFamily({ size: 3, roles: ["UNDERBOSS"], data: { recruitPitch: PITCH } });
     const staleReq = { netWorth: 0, shifts: 0, ageDays: 0, heists: 0 };   // what the Boss's S31 showed when it rendered
-    await submit(CREW_IDS.recruitModal(ub), listing({ nw: "50m", shifts: "300" }), ub);   // the Underboss raises the bar
+    await submit(CREW_IDS.recruitModal(staleReq, ub), listing({ nw: "50m", shifts: "300" }), ub);   // the Underboss raises the bar
     const opener = await press(CREW_IDS.recruitEdit(staleReq, boss), boss);               // the Boss presses Edit on the old panel
-    const inputs = opener.showModal.mock.calls[0][0].toJSON().components.map((row: any) => row.components[0]);
+    const modal = opener.showModal.mock.calls[0][0].toJSON();
+    const inputs = modal.components.map((row: any) => row.components[0]);
     const prefilled = Object.fromEntries(inputs.map((x: any) => [x.custom_id, x.value ?? ""]));
-    await submit(CREW_IDS.recruitModal(boss), { ...prefilled, pitch: "We run heists every single night." }, boss);   // only the pitch changed
+    await submit(modal.custom_id, { ...prefilled, pitch: "We run heists every single night." }, boss);   // only the pitch changed
     expect(await family(f.id)).toMatchObject({ recruitMinNetWorth: 50_000_000, recruitMinShifts: 300 });
   });
 });
@@ -541,7 +544,7 @@ describe("GOV recruitment: applying, caps and timings", () => {
     expect(said(garbage)).toContain("Sort: Level");
   });
 
-  it.fails("BUG-GOV-6: an apply racing an accept elsewhere leaves a PENDING application from a player who is already a member", async () => {
+  it("BUG-GOV-6: an apply racing an accept elsewhere leaves a PENDING application from a player who is already a member", async () => {
     const a = await governanceFamily({ size: 1, level: 3, data: { recruiting: true, recruitPitch: PITCH } });
     const c = await governanceFamily({ size: 1, level: 3, data: { recruiting: true, recruitPitch: PITCH } });
     const p = await seedEligibleUser({ wallet: 5_000_000 });
@@ -576,13 +579,13 @@ describe("GOV recruitment: the free-text rule and rendering", () => {
     }
   });
 
-  it.fails("BUG-GOV-7: homoglyph, accented and full-width slurs pass the filter (the fold strips every non-ASCII letter) and render as the slur", () => {
+  it("BUG-GOV-7: homoglyph, accented and full-width slurs pass the filter (the fold strips every non-ASCII letter) and render as the slur", () => {
     for (const bad of ["you are a nіgger lol", "you are a nïgger lol", "you are a ｎｉｇｇｅｒ lol"]) {
       expect(checkPublicText(bad, LIM).ok, JSON.stringify(bad)).toBe(false);
     }
   });
 
-  it.fails("BUG-GOV-8: leetspeak and split slurs pass the pitch filter and the family-name filter", () => {
+  it("BUG-GOV-8: leetspeak and split slurs pass the pitch filter and the family-name filter", () => {
     for (const bad of ["you are a n1gg3r lol", "you are a nig ger lol", "you are a n igger lol", "hey f4gg0t lol"]) {
       expect(checkPublicText(bad, LIM).ok, bad).toBe(false);
     }
@@ -675,7 +678,7 @@ describe("GOV routing: ownership, stale and forged customIds", () => {
     const buttons = [
       CREW_IDS.voteStart(owner), CREW_IDS.voteOk(owner), CREW_IDS.voteCancel(owner), CREW_IDS.open("vote", owner),
       CREW_IDS.board("lvl", false, 0, owner), CREW_IDS.myApps(owner), CREW_IDS.familyCard(f.id, owner), CREW_IDS.applyOpen(f.id, owner),
-      CREW_IDS.recruit("home", owner), CREW_IDS.recruit("toggle", owner), CREW_IDS.recruit("inbox", owner),
+      CREW_IDS.recruit("home", owner), CREW_IDS.recruit("on", owner), CREW_IDS.recruit("inbox", owner),
       CREW_IDS.recruitEdit({ netWorth: 0, shifts: 0, ageDays: 0, heists: 0 }, owner), CREW_IDS.appAnswer("accept", f.id, owner), CREW_IDS.inboxPage(1, owner),
     ];
     for (const id of buttons) {
@@ -684,7 +687,7 @@ describe("GOV routing: ownership, stale and forged customIds", () => {
       expect(i.showModal).not.toHaveBeenCalled();
     }
     for (const id of [CREW_IDS.boardSelect(owner), CREW_IDS.withdraw(owner)]) expect(said(await pick(id, [f.id], intruder)), id).toContain("This panel is not yours.");
-    for (const [id, fields] of [[CREW_IDS.recruitModal(owner), listing({ pitch: "Hijacked by the Boss" })], [CREW_IDS.applyModal(f.id, owner), { message: "x" }]] as const) {
+    for (const [id, fields] of [[CREW_IDS.recruitModal(NO_REQ, owner), listing({ pitch: "Hijacked by the Boss" })], [CREW_IDS.applyModal(f.id, owner), { message: "x" }]] as const) {
       expect(said(await submit(id, fields, intruder)), id).toContain("This panel is not yours.");
     }
     expect(await family(f.id)).toMatchObject({ recruiting: false, recruitPitch: PITCH });
@@ -703,7 +706,7 @@ describe("GOV routing: ownership, stale and forged customIds", () => {
     expect(await testPrisma.familyBallot.count({ where: { voteId: v.id } })).toBe(1);
   });
 
-  it.fails("BUG-GOV-9: a malformed id in a shared or select customId crashes into 'Something went wrong.' and an error log instead of a clean refusal", async () => {
+  it("BUG-GOV-9: a malformed id in a shared or select customId crashes into 'Something went wrong.' and an error log instead of a clean refusal", async () => {
     const uid = await seedEligibleUser();
     let replies: string[] = [];
     const errors = await countErrors(async () => {
@@ -768,7 +771,7 @@ describe("GOV commands: slash options, prefix aliases and help numbers", () => {
     expect(all).toContain("recruit — your family's listing and applications (Capo and up)");
   });
 
-  it.fails("BUG-GOV-10: `!crew constructor` gets no reply at all and `!crew __proto__` crashes ('Something went wrong.'): CREW_SUBACTIONS is indexed without an own-property check", async () => {
+  it("BUG-GOV-10: `!crew constructor` gets no reply at all and `!crew __proto__` crashes ('Something went wrong.'): CREW_SUBACTIONS is indexed without an own-property check", async () => {
     const outcomes: string[] = [];
     const errors = await countErrors(async () => {
       for (const sub of ["constructor", "__proto__"]) {

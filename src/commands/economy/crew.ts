@@ -218,7 +218,7 @@ export async function handleCrew(message: Message, args: string[], prefix: strin
   void touchActivity(uid);
   const guildId = message.guildId!;
   const sub = args[0]?.toLowerCase() ?? "dashboard";
-  const run = CREW_SUBACTIONS[sub];
+  const run = Object.prototype.hasOwnProperty.call(CREW_SUBACTIONS, sub) ? CREW_SUBACTIONS[sub] : undefined;
   if (!run) {
     return message.reply(v2Quiet(errorContainer(TITLE, `Usage: \`${prefix}crew [${Object.keys(CREW_SUBACTIONS).join(" | ")}]\``)));
   }

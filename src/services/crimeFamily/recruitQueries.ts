@@ -7,6 +7,7 @@ import prisma from "../../utils/prisma";
 import { CRIME_FAMILY_CONFIG } from "../../utils/economyConfig";
 import { FAMILY_LEVELS, levelDef, type FamilyRole } from "../../data/crimeFamilyCatalog";
 import { computeNetWorth, getNetWorth } from "../netWorthService";
+import { isObjectId } from "./bidService";
 import { checkMemberEligibility } from "./eligibility";
 import { familyLabel, requireMembership } from "./familyQueries";
 import { can, NO_PERMISSION } from "./permissions";
@@ -82,7 +83,7 @@ export async function getBoardView(viewerId: string, sort: BoardSort, qualifyOnl
 
 /** S30: the family's listing against the viewer's cached stats, and whether Apply is open. */
 export async function getFamilyCardView(familyId: string, viewerId: string, now: Date): Promise<FamilyCardView> {
-  const family = await prisma.family.findUnique({ where: { id: familyId } });
+  const family = isObjectId(familyId) ? await prisma.family.findUnique({ where: { id: familyId } }) : null;
   if (!family) throw new FamilyError("That family no longer exists.");
   const [stats, gate, pending, applied, reapply] = await Promise.all([
     applicantStats(viewerId, now, { cached: true }),

@@ -15,8 +15,27 @@ export function nameKeyOf(name: string): string {
   return name.toLowerCase().replace(/\s+/g, " ");
 }
 
-/** Case and every non-alphanumeric stripped: the form the denylist and slurs match against. */
-const fold = (raw: string) => raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+/**
+ * Letters that read as a Latin one but survive NFKD (Cyrillic and Greek
+ * homoglyphs, dotless i), plus leetspeak. Full-width forms and accents are
+ * handled by NFKD and the mark strip, so they need no entry here.
+ */
+const LOOKALIKES: Readonly<Record<string, string>> = {
+  а: "a", в: "b", е: "e", к: "k", м: "m", н: "h", о: "o", р: "p", с: "c", т: "t", у: "y", х: "x",
+  і: "i", ј: "j", ѕ: "s", ԁ: "d", һ: "h", ӏ: "l", ı: "i", ɡ: "g",
+  α: "a", ε: "e", η: "n", ι: "i", κ: "k", ν: "v", ο: "o", ρ: "p", τ: "t", υ: "u",
+  "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s",
+};
+
+/**
+ * The form the denylist and slurs match against: NFKD with marks stripped
+ * ("ï", "ｎ" → "i", "n"), lowercased, lookalikes mapped, then every
+ * non-alphanumeric dropped.
+ */
+const fold = (raw: string) =>
+  Array.from(raw.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase(), (c) => LOOKALIKES[c] ?? c)
+    .join("")
+    .replace(/[^a-z0-9]/g, "");
 
 /** Denylist and slurs match as substrings of the folded text. */
 function isDenied(raw: string): boolean {
@@ -29,10 +48,15 @@ const MENTION = /<@[!&]?\d+>|<#\d+>|@everyone|@here/i;
 const LINK = /(https?:\/\/|www\.|discord\.gg|discord(app)?\.com\/invite|dsc\.gg|\]\()/i;
 const PITCH_DENIED = new RegExp(`\\b(${PITCH_DENYLIST.join("|")})\\b`);
 
+/** A slur this long is also caught split across two words ("nig ger"); shorter ones would hit ordinary pairs ("go ok"). */
+const SPLIT_SLUR_MIN = 5;
+
 /**
  * Slurs per word (A37): each word folded on its own, plus one joined word per
- * run of two or more one-character words ("n i g g e r"). Folding the whole
- * sentence would join neighbours and invent matches ("go ok" → "gook").
+ * run of two or more one-character words ("n i g g e r"), plus each adjacent
+ * pair that joins into exactly a long slur or its plural ("nig ger", "n iggers").
+ * Folding the whole sentence would join neighbours and invent matches
+ * ("go ok" → "gook", "are tardy" → "retard", "chin king" → "chink").
  */
 function hasSlur(text: string): boolean {
   const words = text.split(" ").map(fold).filter((w) => w !== "");
@@ -43,7 +67,9 @@ function hasSlur(text: string): boolean {
     if (run.length >= 2) joined.push(run.join(""));
     run = [];
   }
-  return [...words, ...joined].some((w) => FAMILY_NAME_SLURS.some((slur) => w.includes(slur)));
+  if ([...words, ...joined].some((w) => FAMILY_NAME_SLURS.some((slur) => w.includes(slur)))) return true;
+  const pairs = words.slice(1).map((second, k) => words[k] + second);
+  return FAMILY_NAME_SLURS.some((slur) => slur.length >= SPLIT_SLUR_MIN && (pairs.includes(slur) || pairs.includes(`${slur}s`)));
 }
 
 /** A pitch or application message (amendment 8.6): zero-width stripped, whitespace collapsed, then each rule in order. */

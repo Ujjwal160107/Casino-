@@ -6,6 +6,7 @@ import type { Family, FamilyInvite } from "@prisma/client";
 import type { Client } from "discord.js";
 import prisma from "../../utils/prisma";
 import type { FamilyRole } from "../../data/crimeFamilyCatalog";
+import { clearClaimMessage } from "../../services/crimeFamily/chairService";
 import { familyLabel, getInviteCard, listMembers } from "../../services/crimeFamily/familyQueries";
 import type { CensusNotice } from "../../services/crimeFamily/census";
 import type { disbandFamily } from "../../services/crimeFamily/disbandService";
@@ -74,9 +75,9 @@ export async function announceResumedShares(client: Client, paid: PaidShare[]): 
 }
 
 /**
- * Edits the S23 claim notice when one was posted, then DMs: a claim tells the
- * old Boss, a hand-over tells every member. Last, the result of any vote the
- * move voided (F4).
+ * Edits the S23 claim notice when one was posted and drops its pointer, then
+ * DMs: a claim tells the old Boss, a hand-over tells every member. Last, the
+ * result of any vote the move voided (F4).
  */
 export async function announceChairChange(
   client: Client, family: Family, kind: "claimed" | "handed", oldBossId: string, newBossId: string,
@@ -85,6 +86,7 @@ export async function announceChairChange(
     if (family.claimChannelId && family.claimMessageId) {
       const status = kind === "claimed" ? `Chair claimed by <@${newBossId}>` : `Chair handed to <@${newBossId}>`;
       await editChannelMessage(client, family.claimChannelId, family.claimMessageId, buildClaimResolved(status));
+      await clearClaimMessage(family.id, family.claimMessageId);
     }
     const label = familyLabel(family);
     if (kind === "claimed") {
@@ -142,11 +144,13 @@ export async function announceInvite(client: Client, invite: FamilyInvite & { fa
   });
 }
 
-/** Edits the S4 invite card to its final status; skipped when it was never stored or the family is gone. */
+/** Edits the S4 invite card to its final status (a disbanded family's card reads as closed); skipped when it was never stored. */
 export async function resolveInviteCard(client: Client, inviteId: string, status: string): Promise<void> {
   return safely("resolveInviteCard", async () => {
     const card = await getInviteCard(inviteId);
-    if (card && card.messageId) await editChannelMessage(client, card.channelId, card.messageId, buildInviteResolved(card.view, status));
+    if (!card || !card.messageId) return;
+    const shown = card.view ? status : "Closed: the family disbanded.";
+    await editChannelMessage(client, card.channelId, card.messageId, buildInviteResolved(card.view, shown));
   });
 }
 

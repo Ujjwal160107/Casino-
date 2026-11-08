@@ -15,7 +15,7 @@ import { bootedSince } from "../processBootService";
 import { getCaper } from "./caperQueries";
 import { voidCaperInTx } from "./caperRefunds";
 import { resolveCaperOutcome, splitCaperPool, type CaperOutcome } from "./caperMath";
-import { parseAnswers } from "./intelRing";
+import { isDark, leakAtOf, parseAnswers } from "./intelRing";
 import { cryptoRng, rollUnit, type Rng } from "./random";
 import { invalidateUsers, runFamilyTx } from "./tx";
 import { creditEarnings } from "./vaultService";
@@ -83,14 +83,17 @@ async function drawCaper(caperId: string, rng: Rng): Promise<void> {
     if (!answers) throw new Error(`caper ${caperId}: answers unreadable in SETTLING`);
     const tier = caperTier(caper.tier);
     const rows = inRingOrder(await tx.caperCrew.findMany({ where: { caperId } }), answers.order);
-    const correct = (row: CaperCrew) => answers.seats[row.role as CaperRoleKey]?.correct;
-    const misses = rows.filter((r) => r.choice !== correct(r)).length;
+    // Spec 8.5/8.6 (D49): a dark seat is a miss with cut 0, whatever choice is stored.
+    const leakAt = leakAtOf(caper.goEndsAt);
+    const dark = rows.map((r) => isDark(r, leakAt));
+    const passed = rows.map((r, i) => !dark[i] && r.choice === answers.seats[r.role as CaperRoleKey]?.correct);
+    const misses = passed.filter((p) => !p).length;
 
     const roll = rollUnit(rng);
     const outcome = resolveCaperOutcome({ n: rows.length, misses, roll, base: tier.patrolBase, edge: caper.edge, hottestHeat: caper.heatSnapshot });
     const jail = outcome === "BUST" ? tier.jail : null;
     const jailed = rows.map(() => (jail ? rollUnit(rng) < jail.chance : false));
-    const split = splitCaperPool({ poolPerSeat: tier.poolPerSeat, n: rows.length, outcome, locked: rows.map((r) => r.choice !== -1) });
+    const split = splitCaperPool({ poolPerSeat: tier.poolPerSeat, n: rows.length, outcome, locked: rows.map((r, i) => r.choice !== -1 && !dark[i]) });
 
     const { count } = await tx.caper.updateMany({
       where: { id: caperId, status: "SETTLING", roll: -1 },
@@ -100,7 +103,7 @@ async function drawCaper(caperId: string, rng: Rng): Promise<void> {
     for (const [i, row] of rows.entries()) {
       await tx.caperCrew.update({
         where: { id: row.id },
-        data: { passed: row.choice === correct(row), cut: split.cuts[i], fine: outcome === "BUST" ? tier.bustFine : 0, jailed: jailed[i] },
+        data: { passed: passed[i], cut: split.cuts[i], fine: outcome === "BUST" ? tier.bustFine : 0, jailed: jailed[i] },
       });
     }
   });

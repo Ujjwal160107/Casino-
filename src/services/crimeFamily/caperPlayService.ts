@@ -13,6 +13,7 @@ import type { BriefView } from "./views";
 const TOO_LATE = "Too late.";
 const NOT_IN_CAPER = "You are not in this crew heist.";
 const WENT_DARK = "You went dark: this seat counts as a miss.";
+const OPEN_BRIEF_FIRST = "Open your brief first.";
 const OPTIONS = 4;
 
 /** The stored answers of a live GO; a corrupt row (edge 63) is played no further, resolve voids it. */
@@ -42,7 +43,7 @@ export async function openBrief(caperId: string, uid: string, now: Date = new Da
   return briefOf(caper, answers, await listCrew(caperId), uid, now);
 }
 
-/** Locks the presser's one choice before goEndsAt; a dark seat cannot lock, and a seat whose intel holder went dark locks as leaked. */
+/** Locks the presser's one choice before goEndsAt; an unopened brief or a dark seat cannot lock, and a seat whose intel holder went dark locks as leaked. */
 export async function lockChoice(caperId: string, uid: string, index: number, now: Date = new Date()): Promise<{ brief: BriefView; allLocked: boolean }> {
   if (!Number.isInteger(index) || index < 0 || index >= OPTIONS) throw new FamilyError("Pick one of the four options.");
   const { caper, answers } = await runFamilyTx(async (tx) => {
@@ -55,6 +56,7 @@ export async function lockChoice(caperId: string, uid: string, index: number, no
     const leakAt = leakAtOf(caper.goEndsAt);
     const leaking = now >= leakAt;
     if (leaking && isDark(row, leakAt)) throw new FamilyError(WENT_DARK);
+    if (!row.briefOpened) throw new FamilyError(OPEN_BRIEF_FIRST);
     const { next } = ringNeighbours(answers.order, row.role as CaperRoleKey);
     const holder = rows.find((r) => r.role === next);
     const { count } = await tx.caperCrew.updateMany({
@@ -86,7 +88,7 @@ export async function shareIntel(caperId: string, uid: string, now: Date = new D
     const leakAt = leakAtOf(caper.goEndsAt);
     const leaking = now >= leakAt;
     if (leaking && isDark(row, leakAt)) throw new FamilyError(WENT_DARK);
-    if (!row.briefOpened) throw new FamilyError("Open your brief first.");
+    if (!row.briefOpened) throw new FamilyError(OPEN_BRIEF_FIRST);
     const { count } = await tx.caperCrew.updateMany({ where: { caperId, userId: uid, sharedIntel: false }, data: { sharedIntel: true, sharedAt: now } });
     if (count !== 1) throw new FamilyError("Already shared.");
     const { prev } = ringNeighbours(answers.order, row.role as CaperRoleKey);

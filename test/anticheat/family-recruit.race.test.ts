@@ -10,6 +10,9 @@ import { acceptInvite, acceptInviteByTag, declineInviteByTag, inviteMember, list
 import { redisService } from "../../src/services/redisService";
 import { testPrisma, seedEligibleUser, seedFamily, seedApplication, resetFamilies, ensureUniqueIndexes, daysAgo } from "../helpers";
 
+/** What M2 pre-fills for a listing with no requirements set. */
+const NO_REQ = { netWorth: 0, shifts: 0, ageDays: 0, heists: 0 };
+
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "FamilyInvite", "User"]));
 beforeEach(resetFamilies);
 
@@ -104,12 +107,12 @@ describe("applications (amendment 8.4)", () => {
     await expect(apply(p, closed.f.id)).rejects.toThrow(`[${closed.tag}] is not recruiting.`);
     const before = (await testPrisma.family.findUniqueOrThrow({ where: { id: closed.f.id } })).recruitEditedAt;
     const input = { pitch: "", minNetWorth: "abc", minShifts: "", minAgeDays: "", minHeists: "" };
-    await expect(editListing(closed.boss, input)).rejects.toThrow(/net worth: Enter a whole number like 10m or 1,000\.$/i);
-    await expect(editListing(closed.boss, { ...input, minNetWorth: "", pitch: "visit discord.gg/abc now" })).rejects.toThrow("No links or invites.");
+    await expect(editListing(closed.boss, input, NO_REQ)).rejects.toThrow(/net worth: Enter a whole number like 10m or 1,000\.$/i);
+    await expect(editListing(closed.boss, { ...input, minNetWorth: "", pitch: "visit discord.gg/abc now" }, NO_REQ)).rejects.toThrow("No links or invites.");
     expect(+(await testPrisma.family.findUniqueOrThrow({ where: { id: closed.f.id } })).recruitEditedAt).toBe(+before);
     const capo = await seedEligibleUser();
     await seedFamily({ bossId: await seedEligibleUser(), members: [{ userId: capo, role: "CAPO", joinedAt: daysAgo(10) }] });
-    await expect(editListing(capo, { ...input, minNetWorth: "", pitch: PITCH })).rejects.toThrow("You don't have permission to do that.");
+    await expect(editListing(capo, { ...input, minNetWorth: "", pitch: PITCH }, NO_REQ)).rejects.toThrow("You don't have permission to do that.");
   });
 
   it("Review Focus 1: an application never passes through the invite paths", async () => {

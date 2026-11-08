@@ -55,11 +55,16 @@ async function acknowledge(i: CfInteraction, ack: CfRouteEntry["ack"]): Promise<
   return safeDeferReply(i, ephemeral);
 }
 
+/** The table's own entry for a key; never an Object.prototype member ("constructor", "__proto__") from a forged customId. */
+function routeOf(table: CfRouteTable, key: string): CfRouteEntry | undefined {
+  return Object.prototype.hasOwnProperty.call(table, key) ? table[key] : undefined;
+}
+
 export async function handleCrimeFamilyInteraction(i: CfInteraction): Promise<void> {
   const parsed = parseCfId(i.customId);
   if (!parsed) return;
   const table = TABLES[parsed.prefix];
-  const entry = table[`${parsed.action}:${parsed.args[0]}`] ?? table[parsed.action];
+  const entry = routeOf(table, `${parsed.action}:${parsed.args[0]}`) ?? routeOf(table, parsed.action);
   if (!entry) return rejectPress(i, NO_ROUTE);
   if (entry.scope !== "shared" && parsed.args[parsed.args.length - 1] !== i.user.id) return rejectPress(i, "This panel is not yours.");
 

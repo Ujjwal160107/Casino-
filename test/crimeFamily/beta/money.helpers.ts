@@ -53,7 +53,7 @@ export async function sheet(): Promise<Sheet> {
   const ledger = await testPrisma.familyLedger.findMany({});
   const walletIds = wallets.map((w) => w.id);
   const txs = await testPrisma.transaction.findMany({ where: { walletId: { in: walletIds }, type: { in: ["caper_cut", "turf_hit"] } } });
-  const clampBurns = await testPrisma.audit.findMany({ where: { userId: { in: users }, type: "family_payday_clamp_burn" } });
+  const clampBurns = await testPrisma.audit.findMany({ where: { userId: { in: users }, type: { in: ["family_payday_clamp_burn", "caper_stake_clamp_burn"] } } });
 
   const stakeEscrow = sum(crew.filter((c) => !c.started && !c.refunded).map((c) => c.stake));
   const burnedStakes = sum(crew.filter((c) => c.started && !c.refunded).map((c) => c.stake));

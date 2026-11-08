@@ -3,7 +3,7 @@
 // and 3 add their builders to CPR_IDS and TURF_IDS.
 import type { BoardSort, Requirements } from "../../services/crimeFamily/recruitService";
 import type { WarBlockKey } from "../../services/crimeFamily/warMath";
-import type { LeagueKey } from "../../data/crimeFamilyCatalog";
+import type { FamilyRole, LeagueKey } from "../../data/crimeFamilyCatalog";
 
 export type CfPrefix = "crew" | "cpr" | "turf";
 
@@ -35,7 +35,7 @@ export function decodeName(encoded: string): string {
 export type CrewScreen = "home" | "vault" | "manage" | "log" | "top" | "invites";
 export type CrewOpenKind = "vault" | "payday" | "level" | "log" | "disband" | "rename" | "leave" | "vote";
 export type CrewConfirmKind = "leave" | "kick" | "chair";
-export type CrewManageAction = "promote" | "demote" | "kick" | "chair";
+export type CrewManageAction = "kick" | "chair";
 export type CrewModalKind = "create" | "deposit" | "rename" | "disband";
 
 export const CREW_IDS = {
@@ -46,6 +46,8 @@ export const CREW_IDS = {
   manageSelect: (page: number, owner: string) => cfId("crew", "mg", "sel", page, owner),
   managePage: (page: number, owner: string) => cfId("crew", "mg", "pg", page, owner),
   manage: (action: CrewManageAction, target: string, owner: string) => cfId("crew", "mg", action, target, owner),
+  /** S5 Promote and Demote carry the rank the target had when S5 rendered, so a double press moves one rank, not two. */
+  rank: (action: "promote" | "demote", target: string, fromRole: FamilyRole, owner: string) => cfId("crew", "mg", action, target, fromRole, owner),
   confirm: (kind: CrewConfirmKind, answer: "ok" | "no", target: string, owner: string) => cfId("crew", "cf", kind, answer, target, owner),
   open: (kind: CrewOpenKind, owner: string) => cfId("crew", "open", kind, owner),
   openTarget: (kind: "kick" | "chair", target: string, owner: string) => cfId("crew", "open", kind, target, owner),
@@ -75,10 +77,12 @@ export const CREW_IDS = {
   familyCard: (familyId: string, owner: string) => cfId("crew", "fc", familyId, owner),
   applyOpen: (familyId: string, owner: string) => cfId("crew", "app", "open", familyId, owner),
   applyModal: (familyId: string, owner: string) => cfId("crew", "modal", "apply", familyId, owner),
-  recruit: (kind: "home" | "toggle" | "inbox", owner: string) => cfId("crew", "rc", kind, owner),
+  /** S31's recruiting button carries the state it sets ("on" or "off"), so a stale or double press cannot flip it back. */
+  recruit: (kind: "home" | "on" | "off" | "inbox", owner: string) => cfId("crew", "rc", kind, owner),
   /** The listing modal opener carries the current requirements so M2 can pre-fill them without I/O (F10). */
   recruitEdit: (r: Requirements, owner: string) => cfId("crew", "rc", "edit", r.netWorth, r.shifts, r.ageDays, r.heists, owner),
-  recruitModal: (owner: string) => cfId("crew", "modal", "recruit", owner),
+  /** M2 carries the requirements it pre-filled: the save refuses when the listing has changed since (a stale panel). */
+  recruitModal: (r: Requirements, owner: string) => cfId("crew", "modal", "recruit", r.netWorth, r.shifts, r.ageDays, r.heists, owner),
   appAnswer: (answer: "accept" | "decline", appId: string, owner: string) => cfId("crew", "ap", answer, appId, owner),
   inboxPage: (page: number, owner: string) => cfId("crew", "ap", "pg", page, owner),
 } as const;

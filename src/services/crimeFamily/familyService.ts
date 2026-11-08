@@ -10,7 +10,7 @@ import { writeLedger } from "./ledger";
 import { withdrawPendingApplications } from "./membershipService";
 import { checkFamilyName, checkFamilyTag } from "./names";
 import { can, NO_PERMISSION } from "./permissions";
-import { FamilyError, invalidateUsers, isUniqueViolation, runFamilyTx } from "./tx";
+import { FamilyError, invalidateUsers, isUniqueViolation, runFamilyTx, touchUser } from "./tx";
 import { spendFromVault, utcDayKey } from "./vaultService";
 import type { FamilyRole } from "../../data/crimeFamilyCatalog";
 
@@ -35,6 +35,7 @@ export async function createFamily(input: {
   let family: Family;
   try {
     family = await runFamilyTx(async (tx) => {
+      await touchUser(tx, input.uid, now);   // conflicts with the founder's concurrent apply or join (A35)
       await debitWalletInTx(tx, input.uid, fee, "family_create", { tag: tag.tag });
       const family = await tx.family.create({
         data: {

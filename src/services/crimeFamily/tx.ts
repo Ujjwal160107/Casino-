@@ -33,6 +33,9 @@ export class VaultBusy extends Error {
 /** A write conflict worth retrying; a FamilyError never is, whatever its message (a family named "Deadlock"). */
 const isTransient = (err: unknown) => !(err instanceof FamilyError) && isTransientWriteConflict(err);
 
+/** Retries for a press a whole family makes at once on one document (ballots, heist joins): the default 3 runs out. */
+export const CROWD_ATTEMPTS = 10;
+
 /**
  * Runs fn in one Mongo transaction, retrying transient conflicts (including
  * VaultBusy and P2034). An exhausted retry becomes "Vault busy, try again.".

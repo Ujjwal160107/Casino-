@@ -183,9 +183,10 @@ export function buildInviteCard(v: InviteView): CfPayload {
  * The S4 card after an answer or expiry: no buttons, no ping. A plain header
  * that drops the posted crest file, so the edit never names an attachment the
  * message lacks (the family may have moved to another crest tier since).
+ * A null view (the family is gone) leaves only the status line.
  */
-export function buildInviteResolved(v: InviteView, status: string): CfPayload {
-  const container = new ContainerBuilder().addTextDisplayComponents(text(inviteHeaderText(v)), text(`**${status}**`));
+export function buildInviteResolved(v: InviteView | null, status: string): CfPayload {
+  const container = new ContainerBuilder().addTextDisplayComponents(...(v ? [text(inviteHeaderText(v))] : []), text(`**${status}**`));
   return cfPayload(container, { freshAttachments: true });
 }
 
@@ -218,14 +219,15 @@ export function buildManagePanel(ownerId: string, view: FamilyDashboardView, sel
       return option;
     }));
   const t = target ?? "0";
+  const tRole = view.roster.find((m) => m.userId === target)?.role ?? "SOLDIER";
   const container = new ContainerBuilder()
     .addTextDisplayComponents(text(`${withNote(`## Manage [${view.tag}]`, note)}\n${roster.map((m, i) => `\`#${start + i + 1}\` ${rosterLine(m)}`).join("\n")}`))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(text(manageLegend(view)))
     .addActionRowComponents(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select))
     .addActionRowComponents(buttonRow(
-      cfButton(CREW_IDS.manage("promote", t, ownerId), "Promote", ButtonStyle.Secondary, { disabled: !target }),
-      cfButton(CREW_IDS.manage("demote", t, ownerId), "Demote", ButtonStyle.Secondary, { disabled: !target }),
+      cfButton(CREW_IDS.rank("promote", t, tRole, ownerId), "Promote", ButtonStyle.Secondary, { disabled: !target }),
+      cfButton(CREW_IDS.rank("demote", t, tRole, ownerId), "Demote", ButtonStyle.Secondary, { disabled: !target }),
       cfButton(CREW_IDS.manage("kick", t, ownerId), "Kick", ButtonStyle.Danger, { disabled: !target }),
       cfButton(CREW_IDS.manage("chair", t, ownerId), "Hand over", ButtonStyle.Danger, { disabled: !target || view.viewer.role !== "BOSS" }),
       cfButton(CREW_IDS.view("home", ownerId), "Back"),
@@ -343,8 +345,12 @@ export function buildPaydayPreview(ownerId: string, p: PaydayPreview, note?: str
 export function buildLevelUpConfirm(ownerId: string, v: VaultView): CfPayload {
   const next = v.levelUp.next;
   const fromEarnings = next ? Math.min(v.earnings, next.fee) : 0;
+  // The burn split is a promise, so it shows only when nothing blocks the Confirm (a short vault is a blocker).
+  const burn = next && v.levelUp.blockers.length === 0
+    ? `, burned: ${fmtFortunes(fromEarnings)} from earnings, ${fmtFortunes(next.fee - fromEarnings)} from the treasury`
+    : "";
   const body = next
-    ? `**Fee:** ${fmtFortunes(next.fee)}, burned: ${fmtFortunes(fromEarnings)} from earnings, ${fmtFortunes(next.fee - fromEarnings)} from the treasury.\n` +
+    ? `**Fee:** ${fmtFortunes(next.fee)}${burn}.\n` +
       `**Level ${next.level}:** up to ${next.memberCap} members${next.tierUnlocked ? `, tier ${next.tierUnlocked} crew heists` : ""}.` +
       (v.levelUp.notes.length ? `\n${v.levelUp.notes.join("\n")}` : "") +
       (v.levelUp.blockers.length ? `\n${v.levelUp.blockers.join("\n")}` : "")

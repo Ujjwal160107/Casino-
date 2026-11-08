@@ -90,7 +90,7 @@ describe("Capos scale with size (amendment 3)", () => {
   it("S5 says the demoted Underboss fell back to Soldier", async () => {
     const { boss, ids } = await family(30, { UNDERBOSS: 1, CAPO: 6 });
     await withCfConfig({ enabled: true }, async () => {
-      const i = fakeButton(CREW_IDS.manage("demote", ids[0], boss), { userId: boss, ephemeralSource: true, client: fakeClient().client });
+      const i = fakeButton(CREW_IDS.rank("demote", ids[0], "UNDERBOSS", boss), { userId: boss, ephemeralSource: true, client: fakeClient().client });
       await handleCrimeFamilyInteraction(i as any);
       expect(said(i)).toContain(`<@${ids[0]}> is now a Soldier (no Capo seat was free).`);
     });

@@ -99,7 +99,7 @@ export function expectedSettlement(caper: Caper, crew: CaperCrew[]): Expected {
     const paid = r.choice !== -1 && !isDarkRow(r, caper.goEndsAt);
     perSeat.set(r.userId, {
       cut: paid ? cutPerSeat : 0, fine: outcome === "BUST" ? tier.bustFine : 0, heat,
-      passed: r.choice !== -1 && r.choice === answers.seats[r.role as CaperRoleKey]!.correct,
+      passed: !missed(r),   // a dark seat is a miss (spec 8.5), whatever choice it stored
     });
   }
   return { outcome, misses, pool, crewShare, vaultCut, perSeat, xp: tier.xp[outcome.toLowerCase() as "clean" | "messy" | "bust"] };

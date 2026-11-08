@@ -19,7 +19,7 @@ import { buildAnswers, ringOrder } from "./intelRing";
 import { cryptoRng, type Rng } from "./random";
 import { can } from "./permissions";
 import { heistCapFor } from "./sizeRules";
-import { FamilyError, invalidateUsers, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
+import { CROWD_ATTEMPTS, FamilyError, invalidateUsers, isUniqueViolation, runFamilyTx, touchFamily } from "./tx";
 
 const LIVE_CAPER = "Your family already has a live crew heist.";
 const HOLDS_SEAT = "You already hold a seat in a live crew heist.";
@@ -149,12 +149,16 @@ export async function joinCaper(input: {
         data: { seatsVersion: { increment: 1 } },
       });
       if (count === 0) throw new FamilyError(LOBBY_CLOSED);
+      // Re-read membership and write the family so a leave or kick racing this join conflicts (BUG-HEIST-2).
+      const member = await tx.familyMember.findUnique({ where: { userId: uid } });
+      if (!member || member.familyId !== snapshot.familyId) throw new FamilyError(NOT_IN_FAMILY);
+      await touchFamily(tx, snapshot.familyId, now);
       await debitWalletInTx(tx, uid, tier.stake, "caper_stake", { caperId, role });
       const seat = await tx.caperCrew.create({ data: { caperId, familyId: snapshot.familyId, userId: uid, role, stake: tier.stake } });
       const caper = await tx.caper.findUniqueOrThrow({ where: { id: caperId } });
       const full = (await tx.caperCrew.count({ where: { caperId } })) === tier.crewMax;
       return { caper, seat, full };
-    });
+    }, CROWD_ATTEMPTS);   // every seat CASes seatsVersion, and a crew presses Join together
   } catch (err) {
     if (isUniqueViolation(err, "CaperCrew_caperId_role_key")) throw new FamilyError("Role just taken.");
     if (isUniqueViolation(err, "CaperCrew_caperId_userId_key") || isUniqueViolation(err, "CaperCrew_userId_liveSlot_key")) {

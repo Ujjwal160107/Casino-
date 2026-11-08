@@ -1,12 +1,14 @@
 // Disband (spec 6.4, 6.8): the Boss types the tag; one transaction re-checks
 // the hook blocks, runs the hooks' side effects, reserves a capped final
-// payday when one is due (no minimum, D61), burns everything left, expires invites and applications,
+// payday when one is due (no minimum, D61), burns everything left, closes invites (the sweeper
+// expires them and closes their cards) and expires applications,
 // records the exits and hard-deletes the family, freeing its name and tag.
 import type { Family, FamilyInvite } from "@prisma/client";
 import prisma from "../../utils/prisma";
 import { FAMILY_HOOKS } from "./extensions";
 import { requireMembership } from "./familyQueries";
 import { writeLedger } from "./ledger";
+import { closeInvitesNow } from "./membershipService";
 import {
   evaluatePaydayMembers, isPaydayDue, payPaydayShares, previewPayday, reservePaydayInTx, splitPayday, type PaidShare, type Split,
 } from "./paydayService";
@@ -73,11 +75,11 @@ export async function disbandFamily(bossId: string, typedTag: string, now: Date 
     await tx.audit.create({
       data: { guildId: final.homeGuildId, userId: bossId, type: "family_disband", meta: { familyId: family.id, name: final.name, tag: final.tag, burned } },
     });
-    const pending = await tx.familyInvite.findMany({ where: { familyId: family.id, status: "PENDING" }, select: { id: true } });
+    await closeInvitesNow(tx, { familyId: family.id });
+    const pending = await tx.familyInvite.findMany({ where: { familyId: family.id, kind: "APPLICATION", status: "PENDING" }, select: { id: true } });
     const expiredApplications: FamilyInvite[] = [];
     for (const { id } of pending) {
-      const row = await tx.familyInvite.update({ where: { id }, data: { status: "EXPIRED", slot: id, resolvedAt: now } });
-      if (row.kind === "APPLICATION") expiredApplications.push(row);
+      expiredApplications.push(await tx.familyInvite.update({ where: { id }, data: { status: "EXPIRED", slot: id, resolvedAt: now } }));
     }
     await tx.familyExit.createMany({
       data: members.map((m) => ({ userId: m.userId, familyId: family.id, reason: "DISBANDED", wasBoss: m.userId === final.bossId, leftAt: now })),
