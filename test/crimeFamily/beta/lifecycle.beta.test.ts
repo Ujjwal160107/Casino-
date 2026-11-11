@@ -873,8 +873,10 @@ describe("LIFE chaos", () => {
       data: { recruiting: true } });
     const fB = await seedFamily({ bossId: bB, level: 10, tag: "CHB" });
     const invitees = await Promise.all(Array.from({ length: 6 }, () => recruit()));
-    const invsA = await Promise.all(invitees.slice(0, 3).map((u) => invite(bA, u, now)));
-    const invsB = await Promise.all(invitees.slice(1).map((u) => invite(bB, u, now)));   // five invitees also hold an invite from B (pending cap 5)
+    // Setup runs one invite at a time: parallel invites race on the family row and
+    // can exhaust their retries on a loaded CI box. The chaos is in `ops` below.
+    const invsA = []; for (const u of invitees.slice(0, 3)) invsA.push(await invite(bA, u, now));
+    const invsB = []; for (const u of invitees.slice(1)) invsB.push(await invite(bB, u, now));   // five invitees also hold an invite from B (pending cap 5)
     const applicant = await recruit();
     const app = await applyToFamily({ applicantId: applicant, familyId: fA.id, message: "count me in", guildId: "g1", channelId: "c1", now });
     const ops: Promise<unknown>[] = [
