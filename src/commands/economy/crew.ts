@@ -206,7 +206,8 @@ export async function replyOrRefuse(message: Message, run: () => Promise<unknown
     if (err instanceof FamilyError || err instanceof InsufficientFundsError) {
       return message.reply(v2Quiet(errorContainer(title, err.message)));
     }
-    console.error(`[crimeFamily] ${message.content} failed:`, err);
+    // The title, not message.content: we never log what players type.
+    console.error(`[crimeFamily] ${title} failed:`, err);
     return message.reply(v2Quiet(errorContainer(title, "Something went wrong.")));
   }
 }
