@@ -80,6 +80,9 @@ export async function withCfConfig<T>(overrides: CfConfigOverrides, fn: () => Pr
   }
 }
 
+/** Both switches off: tests of the closed feature set this, so they don't depend on the shipped default. */
+export const CF_OFF = { enabled: false, turfEnabled: false } as const;
+
 // ── Crime Families ───────────────────────────────────────────────────────────
 
 const DAY_MS = 86_400_000;

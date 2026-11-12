@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { routeMessage } from "../../src/commandRouter";
 import { fakeMessage, replyText } from "./fakeMessage";
-import { seedEligibleUser, seedFamily, resetFamilies, withCfConfig, testPrisma } from "../helpers";
+import { seedEligibleUser, seedFamily, resetFamilies, withCfConfig, CF_OFF, testPrisma } from "../helpers";
 import { seedRunning, seedLobby } from "../crimeFamily/caperFixtures";
 import { TURF_IDS } from "../../src/ui/crimeFamily/ids";
 import { seedTurf } from "../../src/services/crimeFamily/turfCities";
@@ -35,7 +35,7 @@ describe("!crew routing", () => {
     expect(t).toContain("Not Married");
     expect(t).toContain("Crime families are `!crew`.");
   });
-  it("refuses while disabled or in a guild outside allowGuildIds", async () => {
+  it("refuses while disabled or in a guild outside allowGuildIds", () => withCfConfig(CF_OFF, async () => {
     const u = await seedEligibleUser();
     const off = fakeMessage("!crew", { authorId: u, guildId: "g1" });
     await routeMessage({} as any, off.message, "!");
@@ -45,7 +45,7 @@ describe("!crew routing", () => {
       await routeMessage({} as any, other.message, "!");
       expect(replyText(other.reply.mock.calls[0][0])).toContain("Crime Families are not open in this server yet.");
     });
-  });
+  }));
   it("a jailed member can open the crew heist brief but cannot join (13.1)", async () => {
     await withCfConfig({ enabled: true }, async () => {
       const run = await seedRunning({ tier: 1, roles: ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] });

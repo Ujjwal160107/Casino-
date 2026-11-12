@@ -5,7 +5,7 @@ import { fakeMessage, replyText } from "../router/fakeMessage";
 import { fakeClient } from "./fakeClient";
 import { TURF_IDS } from "../../src/ui/crimeFamily/ids";
 import { seedTurf } from "../../src/services/crimeFamily/turfCities";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, seedRacket, seedWar, withCfConfig, racketByKey, turfCity } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, seedRacket, seedWar, withCfConfig, CF_OFF, racketByKey, turfCity } from "../helpers";
 
 const ON = { enabled: true, turfEnabled: true };
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "TurfCity", "Racket", "War"]));
@@ -22,11 +22,11 @@ async function run(text: string, authorId: string, guildId = "g1") {
 }
 
 describe("!turf (13.1)", () => {
-  it("is refused while turf is closed", async () => {
+  it("is refused while turf is closed", () => withCfConfig(CF_OFF, async () => {
     expect(await run("!turf", await seedEligibleUser())).toContain("Turf wars are not open in this server yet.");
-  });
+  }));
 
-  it("every turf refusal is titled Turf, closed or not (one title for the command)", async () => {
+  it("every turf refusal is titled Turf, closed or not (one title for the command)", () => withCfConfig(CF_OFF, async () => {
     const u = await seedEligibleUser();
     expect(await run("!turf", u)).toContain("## Turf\\n");
     await withCfConfig(ON, async () => {
@@ -34,7 +34,7 @@ describe("!turf (13.1)", () => {
       expect(bad).toContain("## Turf\\n");
       expect(bad).not.toContain("Crime Families");
     });
-  });
+  }));
 
   it("racket <key|n> posts an opener; an unknown key lists keys (Review Focus 2)", async () => {
     await withCfConfig(ON, async () => {

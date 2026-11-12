@@ -89,7 +89,7 @@ describe("war math (9.1, 9.4, 15)", () => {
 
   it("isTurfOpen needs enabled, turfEnabled and an allowed guild", async () => {
     expect(CRIME_FAMILY_CONFIG).toMatchObject({ bidOpensBeforeSeconds: 259_200, bidClosesBeforeSeconds: 3_600, bidRaisePct: 10, bidMinRaise: 100_000, warSoonSeconds: 900, racketEligibleMin: 3, neglectStrikesToRelease: 3, activeCorrectHits: 3 });
-    await withCfConfig({ enabled: true }, async () => expect(isTurfOpen("g1")).toBe(false));
+    await withCfConfig({ enabled: true, turfEnabled: false }, async () => expect(isTurfOpen("g1")).toBe(false));
     await withCfConfig({ enabled: true, turfEnabled: true, allowGuildIds: ["g1"] }, async () => {
       expect(isTurfOpen("g1")).toBe(true);
       expect(isTurfOpen("g2")).toBe(false);
@@ -97,7 +97,7 @@ describe("war math (9.1, 9.4, 15)", () => {
   });
 
   it("A20: isTurfOpen(null) needs enabled and turfEnabled", async () => {
-    await withCfConfig({ enabled: true }, async () => expect(isTurfOpen(null)).toBe(false));
+    await withCfConfig({ enabled: true, turfEnabled: false }, async () => expect(isTurfOpen(null)).toBe(false));
     await withCfConfig({ enabled: true, turfEnabled: true, allowGuildIds: ["g1"] }, async () => expect(isTurfOpen(null)).toBe(true));
   });
 });

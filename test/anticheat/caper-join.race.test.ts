@@ -152,6 +152,8 @@ describe("join (8.4 steps 2-3)", () => {
   it("enforces the rolling 2-seat cap across UTC midnight (23 h 59 m in, 24 h 1 m out)", async () => {
     const now = new Date("2026-11-05T00:01:00Z");
     const { family, ids } = await caperCrew({ tier: 1, roles: [...T1] });
+    // caperCrew dates tenure from the real clock; this test pins its own clock, so tenure must too.
+    await testPrisma.familyMember.updateMany({ where: { familyId: family.id }, data: { joinedAt: new Date(+now - 10 * 86_400_000) } });
     const seat = (startedAt: Date, k: number) => testPrisma.caperCrew.create({ data: { caperId: `65f00000000000000000000${k}`, familyId: family.id, userId: ids.LOOKOUT, role: "LOOKOUT", liveSlot: `65f00000000000000000000${k}`, stake: 50_000, started: true, startedAt } });
     await seat(new Date("2026-11-04T00:02:00Z"), 1); await seat(new Date("2026-11-04T23:00:00Z"), 2);
     await testPrisma.family.update({ where: { id: family.id }, data: { nextCaperAt: new Date(+now - 1) } });

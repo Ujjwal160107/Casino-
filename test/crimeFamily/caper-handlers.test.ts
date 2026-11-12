@@ -5,7 +5,7 @@ import { planCaper, joinCaper } from "../../src/services/crimeFamily/caperLobbyS
 import { CPR_IDS } from "../../src/ui/crimeFamily/ids";
 import { caperTier } from "../../src/data/crimeFamilyCatalog";
 import { fakeButton, fakeSelect, said } from "./fakeInteraction";
-import { testPrisma, resetFamilies, ensureUniqueIndexes, withCfConfig, flushTestKeys } from "../helpers";
+import { testPrisma, resetFamilies, ensureUniqueIndexes, withCfConfig, CF_OFF, flushTestKeys } from "../helpers";
 import { caperCrew, seedRunning, fakeCaperClient, G, CH } from "./caperFixtures";
 
 const R3 = ["MASTERMIND", "LOOKOUT", "SAFECRACKER"] as const;
@@ -37,12 +37,12 @@ describe("cpr: planner routes", () => {
     expect(await testPrisma.caper.count()).toBe(0);
   }));
 
-  it("plan while closed", async () => {
+  it("plan while closed", () => withCfConfig(CF_OFF, async () => {
     const { bossId } = await caperCrew({ tier: 1, roles: [...R3] });
     const i = await press(fakeSelect(CPR_IDS.plan(bossId), ["1"], { userId: bossId, guildId: G, channelId: CH, client: fakeCaperClient().client }));
     expect(said(i)).toContain("Crime Families are not open in this server yet.");
     expect(await testPrisma.caper.count()).toBe(0);
-  });
+  }));
 
   it("plan in a channel missing Attach Files outside the home guild", () => open(async () => {
     const { family, bossId } = await caperCrew({ tier: 1, roles: [...R3] });
@@ -79,7 +79,7 @@ describe("cpr: lobby and GO routes", () => {
     expect((await testPrisma.caperCrew.findMany({ where: { caperId: c.id } })).map((r) => r.role).sort()).toEqual(["LOOKOUT", "MASTERMIND", "SAFECRACKER"]);
   }));
 
-  it("a DM join while switched off says 'not open yet' and seats nobody (Review Focus 5)", async () => {
+  it("a DM join while switched off says 'not open yet' and seats nobody (Review Focus 5)", () => withCfConfig(CF_OFF, async () => {
     const f = await caperCrew({ tier: 1, roles: [...T1] });
     const c = await planCaper({ uid: f.ids.MASTERMIND, tier: 1, guildId: G, channelId: CH });
     const before = (await testPrisma.wallet.findUnique({ where: { userId: f.ids.LOOKOUT } }))!.balance;
@@ -92,7 +92,7 @@ describe("cpr: lobby and GO routes", () => {
     });
     expect(await testPrisma.caperCrew.count({ where: { caperId: c.id, userId: f.ids.LOOKOUT } })).toBe(1);
     expect((await testPrisma.wallet.findUnique({ where: { userId: f.ids.LOOKOUT } }))!.balance).toBe(before - caperTier(1).stake); // one stake (50,000), once
-  });
+  }));
 
   it("plan from a DM is refused (the lobby needs a server channel)", () => open(async () => {
     const { bossId } = await caperCrew({ tier: 1, roles: [...R3] });

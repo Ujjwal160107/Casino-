@@ -7,7 +7,7 @@ import { TURF_IDS } from "../../src/ui/crimeFamily/ids";
 import { weakPoint, slotOf } from "../../src/services/crimeFamily/warMath";
 import { racketDef } from "../../src/data/crimeFamilyCatalog";
 import { fakeButton, fakeModal, said } from "./fakeInteraction";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedTurfCity, withCfConfig, turfCity } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedTurfCity, withCfConfig, CF_OFF, turfCity } from "../helpers";
 
 const ON = { enabled: true, turfEnabled: true };
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "TurfCity", "Racket", "War", "WarContribution"]));
@@ -33,11 +33,11 @@ describe("turf routes (13.2)", () => {
     Object.assign(prisma.familyMember, { findUnique });   // mockRestore writes undefined back on Prisma's model proxy
   });
 
-  it("the map is refused while turf is closed", async () => {
+  it("the map is refused while turf is closed", () => withCfConfig(CF_OFF, async () => {
     const i = fakeButton(TURF_IDS.viewMap("u1"), { userId: "u1", guildId: "g1" });
     await handleCrimeFamilyInteraction(i as any);
     expect(said(i)).toContain("Turf wars are not open in this server yet.");
-  });
+  }));
 
   it("Hit → S19 → the right approach scores +10 on the board's war", async () => {
     const { w, s } = await liveWar();

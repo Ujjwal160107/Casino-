@@ -3,7 +3,7 @@ import { CRIME_FAMILY_CONFIG, isCrimeFamilyOpen } from "../../src/utils/economyC
 import * as C from "../../src/data/crimeFamilyCatalog";
 import { CRIME_PREP_WHITELIST } from "../../src/data/crimePrepWhitelist";
 import { SHOP_CATALOG } from "../../src/utils/shopCatalog";
-import { withCfConfig } from "../helpers";
+import { CF_OFF, withCfConfig } from "../helpers";
 
 describe("crime family catalog", () => {
   it("partitions the 25 prep items across the six roles exactly once (8.2)", () => {
@@ -70,11 +70,11 @@ describe("crime family catalog", () => {
   });
 
   it("pins the config numbers the families layer uses", () => {
-    expect(CRIME_FAMILY_CONFIG).toMatchObject({ enabled: false, turfEnabled: false, allowGuildIds: null, createFee: 10_000_000, renameFee: 2_000_000, duesPerLevel: 40_000, depositMin: 10_000, depositDailyCap: 25_000_000, vaultTaxRate: 0.05, paydayMinEarnings: 500_000, paydayGrossCap: 1_000_000 });
+    expect(CRIME_FAMILY_CONFIG).toMatchObject({ enabled: true, turfEnabled: true, allowGuildIds: null, createFee: 10_000_000, renameFee: 2_000_000, duesPerLevel: 40_000, depositMin: 10_000, depositDailyCap: 25_000_000, vaultTaxRate: 0.05, paydayMinEarnings: 500_000, paydayGrossCap: 1_000_000 });
   });
 
   it("opens only when enabled and the guild is allowed", async () => {
-    expect(isCrimeFamilyOpen("g1")).toBe(false);
+    await withCfConfig(CF_OFF, async () => expect(isCrimeFamilyOpen("g1")).toBe(false));
     await withCfConfig({ enabled: true }, async () => {
       expect(isCrimeFamilyOpen("g1")).toBe(true);
     });
@@ -85,7 +85,7 @@ describe("crime family catalog", () => {
   });
 
   it("A20: a DM press follows enabled; allowGuildIds limits only servers", async () => {
-    expect(isCrimeFamilyOpen(null)).toBe(false); // enabled false by default in tests
+    await withCfConfig(CF_OFF, async () => expect(isCrimeFamilyOpen(null)).toBe(false));
     await withCfConfig({ enabled: true, allowGuildIds: ["g1"] }, async () => {
       expect(isCrimeFamilyOpen(null)).toBe(true);
       expect(isCrimeFamilyOpen(undefined)).toBe(true);

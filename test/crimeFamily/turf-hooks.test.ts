@@ -4,7 +4,7 @@ import { leaveFamily, kickMember } from "../../src/services/crimeFamily/membersh
 import { disbandFamily, previewDisband } from "../../src/services/crimeFamily/disbandService";
 import { getLeaderboard } from "../../src/services/crimeFamily/leaderboard";
 import { buildDashboardView } from "../../src/services/crimeFamily/familyQueries";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedContribution, seedWarHits, withCfConfig, racketByKey } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWar, seedContribution, seedWarHits, withCfConfig, CF_OFF, racketByKey } from "../helpers";
 
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "FamilyInvite", "TurfCity", "Racket", "War", "WarContribution"]));
 beforeEach(resetFamilies);
@@ -84,7 +84,7 @@ describe("turf entries in plan 1's registries", () => {
     });
   });
 
-  it("with turf off no racket count shows and the Rackets tab is gone; an rk key falls back to XP (P23)", async () => {
+  it("with turf off no racket count shows and the Rackets tab is gone; an rk key falls back to XP (P23)", () => withCfConfig(CF_OFF, async () => {
     const a = await seedFamily({ bossId: await seedEligibleUser(), xp: 5 });
     await seedRacket("pawn_row", { ownerFamilyId: a.id });
     const v = await getLeaderboard("rk", a.id);
@@ -92,7 +92,7 @@ describe("turf entries in plan 1's registries", () => {
     expect(v.sorts.map((s) => s.key)).toEqual(["xp", "war"]);
     expect(v.rows.map((r) => [r.familyId, r.value, r.rackets])).toEqual([[a.id, 5, null]]);
     expect((await buildDashboardView(a.id, a.bossId, new Date())).racketsHeld).toBeNull();
-  });
+  }));
 
   it("the registry import cycle resolves from either entry point (T12)", async () => {
     vi.resetModules();

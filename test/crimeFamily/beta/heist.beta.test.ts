@@ -15,7 +15,7 @@ import { announceLobby, resolveAndAnnounce, runStart } from "../../../src/ui/cri
 import { buildCaperCard, buildBrief, buildPersonalCaperCard } from "../../../src/ui/crimeFamily/caperScreens";
 import { CPR_IDS } from "../../../src/ui/crimeFamily/ids";
 import { handleCaper } from "../../../src/commands/economy/caper";
-import { testPrisma, resetFamilies, ensureUniqueIndexes, flushTestKeys, seedEligibleUser, daysAgo, withCfConfig } from "../../helpers";
+import { testPrisma, resetFamilies, ensureUniqueIndexes, flushTestKeys, seedEligibleUser, daysAgo, withCfConfig, CF_OFF } from "../../helpers";
 import { caperCrew, seedRunning, seedLobby, fakeCaperClient, scriptedRng, G, CH } from "../caperFixtures";
 import {
   open, ui, said, money, liquid, ledgerSum, caperRow, crewOf, answersOf, assertSettledPerSpec, assertInvariants,
@@ -276,7 +276,7 @@ describe("HEIST plan: who, which tier, how often (cpr:plan through the router)",
     expect(await testPrisma.caper.count()).toBe(0);
   }));
 
-  it("the kill switch refuses planning and joining but a live heist still plays to the end", async () => {
+  it("the kill switch refuses planning and joining but a live heist still plays to the end", () => withCfConfig(CF_OFF, async () => {
     const f = await caperCrew({ tier: 1, roles: ["MASTERMIND", "LOOKOUT", "SAFECRACKER", "DRIVER"] });
     const fc = fakeCaperClient();
     expect(said(await ui.plan(fc.client, f.ids.MASTERMIND, "1"))).toContain("not open");
@@ -292,7 +292,7 @@ describe("HEIST plan: who, which tier, how often (cpr:plan through the router)",
       await ui.act(fc.client, c.id, f.ids[r], answers.seats[r]!.correct);
     }
     expect((await caperRow(c.id)).status).toBe("RESOLVED");
-  });
+  }));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

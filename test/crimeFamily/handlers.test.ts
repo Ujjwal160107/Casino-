@@ -13,7 +13,7 @@ import {
 import { leaveFamily } from "../../src/services/crimeFamily/membershipService";
 import { fakeClient } from "./fakeClient";
 import { applyToFamily } from "../../src/services/crimeFamily/recruitService";
-import { testPrisma, seedEligibleUser, seedFamily, seedVote, seedApplication, resetFamilies, ensureUniqueIndexes, daysAgo, withCfConfig } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, seedVote, seedApplication, resetFamilies, ensureUniqueIndexes, daysAgo, withCfConfig, CF_OFF } from "../helpers";
 
 beforeAll(() => ensureUniqueIndexes(["Family", "FamilyMember", "FamilyInvite", "FamilyVote", "FamilyBallot"]));
 beforeEach(resetFamilies);
@@ -110,7 +110,7 @@ describe("crime family interactions", () => {
     await handleCrimeFamilyInteraction(gone as any);
     expect(said(gone)).toContain("This button is no longer active.");
   });
-  it("create and invite answers are refused while the feature is closed", async () => {
+  it("create and invite answers are refused while the feature is closed", () => withCfConfig(CF_OFF, async () => {
     const founder = await seedEligibleUser({ wallet: 15_000_000 });
     const press = () => fakeButton(CREW_IDS.createOk("VLA", "Velvet Ante", founder), { userId: founder, guildId: "g1", ephemeralSource: true });
     const off = press();
@@ -130,7 +130,7 @@ describe("crime family interactions", () => {
     await handleCrimeFamilyInteraction(acc as any);
     expect(said(acc)).toContain("Crime Families are not open yet.");
     expect(await testPrisma.familyMember.findUnique({ where: { userId: invitee } })).toBeNull();
-  });
+  }));
   it("create from a DM is refused under enabled (it needs a server; A20)", async () => {
     const founder = await seedEligibleUser({ wallet: 15_000_000 });
     await withCfConfig({ enabled: true }, async () => {

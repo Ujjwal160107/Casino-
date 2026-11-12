@@ -8,7 +8,7 @@ import { seedTurf } from "../../src/services/crimeFamily/turfCities";
 import { nextWarStart } from "../../src/services/crimeFamily/warMath";
 import { racketDef } from "../../src/data/crimeFamilyCatalog";
 import { fakeClient } from "./fakeClient";
-import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWarHits, seedWar, withCfConfig, flushTestKeys, racketByKey, turfCity } from "../helpers";
+import { testPrisma, seedEligibleUser, seedFamily, resetFamilies, ensureUniqueIndexes, daysAgo, seedRacket, seedWarHits, seedWar, withCfConfig, CF_OFF, flushTestKeys, racketByKey, turfCity } from "../helpers";
 
 const H = 3600_000;
 const ON = { enabled: true, turfEnabled: true };
@@ -81,7 +81,7 @@ describe("turf jobs (15)", () => {
     });
   });
 
-  it("with turf off: no new wars, and a bid war closing is cancelled and refunded (T1)", async () => {
+  it("with turf off: no new wars, and a bid war closing is cancelled and refunded (T1)", () => withCfConfig(CF_OFF, async () => {
     const a = await fam("ch-a", 3_000_000);
     const c = fakeClient();
     await withCfConfig(ON, async () => {
@@ -93,9 +93,9 @@ describe("turf jobs (15)", () => {
     expect(await testPrisma.war.findFirst({ where: { racketKey: "valet_racket", ...(await inGold()) } })).toMatchObject({ status: "CANCELLED" });
     expect((await testPrisma.family.findUnique({ where: { id: a.f.id } }))!.earnings).toBe(3_000_000);
     expect(await testPrisma.war.count({ where: { status: "BIDDING" } })).toBe(0);
-  });
+  }));
 
-  it("tickRackets mints for 3 eligible members, strikes and DMs otherwise, and does nothing while turf is off", async () => {
+  it("tickRackets mints for 3 eligible members, strikes and DMs otherwise, and does nothing while turf is off", () => withCfConfig(CF_OFF, async () => {
     const rich = await fam("ch-a"); const lazy = await fam("ch-b");
     for (const id of rich.ids) await seedWarHits(id, rich.f.id, 3);
     await seedWarHits(lazy.ids[2], lazy.f.id, 3);
@@ -109,5 +109,5 @@ describe("turf jobs (15)", () => {
     expect((await testPrisma.family.findUnique({ where: { id: rich.f.id } }))!.earnings).toBe(300_000);
     expect((await racketByKey("docks_numbers")).neglectStrikes).toBe(1);
     expect([...c.dm.keys()].sort()).toEqual([lazy.ids[0], lazy.ids[1]].sort()); // officers; the active Soldier is eligible
-  });
+  }));
 });

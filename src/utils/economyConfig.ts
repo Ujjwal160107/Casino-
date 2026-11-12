@@ -198,8 +198,8 @@ export const TAX_CONFIG = {
 // transferTaxRate. Tiers, roles, rackets, levels and gates live in
 // src/data/crimeFamilyCatalog.ts.
 export const CRIME_FAMILY_CONFIG = {
-  enabled: false,
-  turfEnabled: false,
+  enabled: true,
+  turfEnabled: true,
   allowGuildIds: null as string[] | null, // null = every guild
   createFee: 10_000_000,
   renameFee: 2_000_000,
