@@ -255,7 +255,7 @@ export const COMMANDS: Command[] = [
       { name: "invite <user> / accept <TAG> / decline <TAG>", desc: "Invite a player (Capo and up); answer an invite from any server." },
       { name: "leave / kick <user>", desc: "Leave, or remove a member below your rank." },
       { name: "promote / demote / handover <user>", desc: "Move a member one rank (Capo and Underboss need 10,000,000 net worth), or hand the Boss chair over." },
-      { name: "deposit <amount|all>", desc: "Wallet to vault treasury, 5% tax, 25,000,000 per UTC day." },
+      { name: "deposit <amount|all>", desc: "Wallet to vault treasury, no tax, 25,000,000 per UTC day." },
       { name: "vault / payday / levelup / log", desc: "Vault balances, the weekly payout, the level fee and the ledger." },
       { name: "top / info <TAG>", desc: "The family leaderboard, or any family's public dashboard." },
       { name: "home / rename / disband / claim", desc: "Boss tools; claim lets the Underboss take the chair from a Boss gone 7 days." },
@@ -266,7 +266,7 @@ export const COMMANDS: Command[] = [
     examples: ["!crew", "!crew invite @Bob", "!crew deposit 5m", "!crew accept VLA", "!crew board"],
     keyNumbers: [
       { label: "Create fee", value: "10,000,000" },
-      { label: "Deposit tax", value: "5%" },
+      { label: "Payday tax", value: "5% (deposits untaxed)" },
       { label: "Payday cap", value: "1,000,000 gross a week" },
       { label: "Dues", value: "40,000 × level a day" },
       { label: "Members", value: "10–30 by level" },

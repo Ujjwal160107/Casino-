@@ -297,7 +297,7 @@ const modalRoute: CfRoute = async (i, [kind, uid]) => {
       const amount = await resolveDepositAmount(uid, field("amount"), new Date());
       if (amount === null) throw new FamilyError(BAD_AMOUNT);
       const d = await depositToVault(uid, amount);
-      return show(i, await vaultScreen(uid, `Deposited ${fmtFortunes(d.net)} (${fmtFortunes(d.tax)} tax burned).`));
+      return show(i, await vaultScreen(uid, `Deposited ${fmtFortunes(d.amount)}.`));
     }
     case "rename": {
       const family = await renameFamily(uid, field("name"));

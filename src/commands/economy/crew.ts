@@ -98,7 +98,7 @@ async function deposit(ctx: CrewCtx) {
   const amount = await resolveDepositAmount(ctx.uid, ctx.args[0] ?? "", now);
   if (amount === null) throw new FamilyError(BAD_AMOUNT);
   const d = await depositToVault(ctx.uid, amount, now);
-  return notice(ctx, `Deposited ${fmtFortunes(d.net)} to the vault (${fmtFortunes(d.tax)} tax burned).`);
+  return notice(ctx, `Deposited ${fmtFortunes(d.amount)} to the vault.`);
 }
 
 async function home(ctx: CrewCtx) {

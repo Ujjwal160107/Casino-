@@ -297,7 +297,7 @@ const crimeFamilies: ModuleDoc = {
         title: "Treasury and earnings",
         columns: ["Bucket", "Filled by", "Spent on", "Reaches a wallet?"],
         rows: [
-          ["Treasury", "Member deposits, after the 5% tax", "Dues, level fees, rename, only after earnings is empty", "Never. Burned on disband."],
+          ["Treasury", "Member deposits, untaxed", "Dues, level fees, rename, only after earnings is empty", "Never. Burned on disband."],
           ["Earnings", "10% of every crew heist pool, racket income and refunded bids", "Dues, level fees, rename (first); racket bids (only from earnings); Payday", "Only through Payday"],
         ],
       },

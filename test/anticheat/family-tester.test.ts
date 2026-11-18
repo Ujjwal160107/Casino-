@@ -29,14 +29,14 @@ describe("testers get no family bypass (D34)", () => {
     expect(await wallet(BOT_DEVELOPER_ID)).toBe(30_000_000);
   });
 
-  it("depositToVault charges 5% and holds the daily cap", async () => {
+  it("depositToVault is untaxed and holds the daily cap", async () => {
     await seedEligibleUser({ id: BOT_DEVELOPER_ID, wallet: 40_000_000 });
     const f = await seedFamily({ bossId: BOT_DEVELOPER_ID });
     const day = new Date("2026-11-04T10:00:00Z");
-    expect(await depositToVault(BOT_DEVELOPER_ID, 20_000_000, day)).toMatchObject({ tax: 1_000_000, net: 19_000_000 });
+    expect(await depositToVault(BOT_DEVELOPER_ID, 20_000_000, day)).toMatchObject({ amount: 20_000_000 });
     await expect(depositToVault(BOT_DEVELOPER_ID, 5_000_001, day)).rejects.toThrow(/cap/i);
     expect(await wallet(BOT_DEVELOPER_ID)).toBe(20_000_000);
-    expect(await testPrisma.family.findUnique({ where: { id: f.id } })).toMatchObject({ treasury: 19_000_000 });
+    expect(await testPrisma.family.findUnique({ where: { id: f.id } })).toMatchObject({ treasury: 20_000_000 });
   });
 
   it("executePayday refuses before 7 days", async () => {

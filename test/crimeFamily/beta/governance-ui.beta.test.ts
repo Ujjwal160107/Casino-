@@ -762,7 +762,7 @@ describe("GOV commands: slash options, prefix aliases and help numbers", () => {
     expect(all).toContain(`create — found a family (${n(CRIME_FAMILY_CONFIG.createFee)} from your wallet; you need an Apartment or better and an active Gold card or better)`);
     expect(all).toContain(`rename — rename the family (${n(CRIME_FAMILY_CONFIG.renameFee)} from the vault, Boss)`);
     expect(all).toContain(`(Capo needs ${n(CRIME_FAMILY_CONFIG.capoMinNetWorth)} net worth)`);
-    expect(all).toContain(`(${Math.round(CRIME_FAMILY_CONFIG.vaultTaxRate * 100)}% tax)`);
+    expect(all).toContain("add wallet money to the vault (no tax)");
     expect(all).toContain(`inactive ${CRIME_FAMILY_CONFIG.claimChairAfterSeconds / 86_400} days`);
     expect(all).toContain(`a ${CRIME_FAMILY_CONFIG.lobbySeconds / 60}-minute lobby and a ${CRIME_FAMILY_CONFIG.goSeconds}-second GO`);
     expect(all).toContain("up to 30 members");

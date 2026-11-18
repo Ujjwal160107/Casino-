@@ -206,7 +206,7 @@ export const CRIME_FAMILY_CONFIG = {
   duesPerLevel: 40_000,
   depositMin: 10_000,
   depositDailyCap: 25_000_000,
-  vaultTaxRate: TAX_CONFIG.transferTaxRate, // 0.05, applied inline on deposit and payday
+  vaultTaxRate: TAX_CONFIG.transferTaxRate, // 0.05, applied inline on payday (deposits are untaxed)
   paydayMinEarnings: 500_000,
   paydayGrossCap: 1_000_000,
   paydayIntervalSeconds: 604_800,

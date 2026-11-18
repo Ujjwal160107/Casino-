@@ -123,10 +123,9 @@ describe("deposits: amount parsing through the Deposit modal", () => {
       expect(await ledgerRows(f.id)).toHaveLength(0);
       expect((await testPrisma.familyMember.findUniqueOrThrow({ where: { userId: boss } })).depositedToday).toBe(0);
     } else {
-      const tax = Math.floor(expected * 0.05);
-      expect(said(i)).toContain(`(${tax.toLocaleString("en-US")} tax burned)`);
+      expect(said(i)).toContain(`Deposited ${expected.toLocaleString("en-US")}.`);
       expect(await walletOf(boss)).toBe(30_000_000 - expected);
-      expect(fam.treasury).toBe(expected - tax);
+      expect(fam.treasury).toBe(expected);
       await expectLedgerChain(f.id, { treasury: 0, earnings: 0 });
     }
   });
@@ -136,7 +135,7 @@ describe("deposits: amount parsing through the Deposit modal", () => {
     const f = await seedFamily({ bossId: boss });
     await submit("deposit", boss, { amount: "10000.99" });
     expect(await walletOf(boss)).toBe(0);
-    expect((await familyOf(f.id))!.treasury).toBe(9_500);
+    expect((await familyOf(f.id))!.treasury).toBe(10_000);
   });
 
   it("BUG-MONEY-1: '8.03m' deposits 8,030,000 (parseSmartAmount's float multiply takes 8,029,999)", async () => {
@@ -145,7 +144,7 @@ describe("deposits: amount parsing through the Deposit modal", () => {
     expect(await resolveDepositAmount(boss, "8.03m", new Date())).toBe(8_030_000);
     expect(await resolveDepositAmount(boss, "2.01m", new Date())).toBe(2_010_000);
     const i = await submit("deposit", boss, { amount: "8.03m" });
-    expect(said(i)).toContain("Deposited 7,628,500");
+    expect(said(i)).toContain("Deposited 8,030,000");
     expect(await walletOf(boss)).toBe(20_000_000 - 8_030_000);
   });
 
@@ -158,7 +157,7 @@ describe("deposits: amount parsing through the Deposit modal", () => {
     expect(await testPrisma.familyMember.findUniqueOrThrow({ where: { userId: boss } })).toMatchObject({ depositedToday: 0, deposited: 0, depositDayKey: "" });
     await conserved(() => submit("deposit", boss, { amount: "1m" }));
     expect(await walletOf(boss)).toBe(0);
-    expect((await familyOf(f.id))!.treasury).toBe(950_000);
+    expect((await familyOf(f.id))!.treasury).toBe(1_000_000);
     expect(await testPrisma.familyMember.findUniqueOrThrow({ where: { userId: boss } })).toMatchObject({ depositedToday: 1_000_000, deposited: 1_000_000 });
   });
 
@@ -168,21 +167,20 @@ describe("deposits: amount parsing through the Deposit modal", () => {
     await testPrisma.wallet.update({ where: { userId: boss }, data: { balance: 30_000_000.75 } });
     await submit("deposit", boss, { amount: "all" });
     expect(await walletOf(boss)).toBeCloseTo(5_000_000.75, 5);
-    expect((await familyOf(f.id))!.treasury).toBe(23_750_000);
+    expect((await familyOf(f.id))!.treasury).toBe(25_000_000);
     const again = await submit("deposit", boss, { amount: "max" });
     expect(said(again)).toContain("Daily deposit cap reached (0 left today).");
   });
 
-  it("odd amounts burn floor(5%) and every ledger row matches the vault", async () => {
+  it("odd amounts land whole, nothing is burned, and every ledger row matches the vault", async () => {
     const boss = await player({ wallet: 5_000_000 });
     const f = await seedFamily({ bossId: boss });
     await conserved(async () => {
       for (const amt of [10_019, 10_001, 333_333, 19_999]) await depositToVault(boss, amt);
     });
-    const taxes = [500, 500, 16_666, 999];
-    const rows = await ledgerRows(f.id, "deposit_tax");
-    expect(rows.map((r) => (r.meta as any).burned)).toEqual(taxes);
-    expect((await familyOf(f.id))!.treasury).toBe(10_019 + 10_001 + 333_333 + 19_999 - taxes.reduce((a, b) => a + b, 0));
+    expect(await ledgerRows(f.id, "deposit_tax")).toHaveLength(0);
+    expect((await ledgerRows(f.id, "deposit")).map((r) => r.amount)).toEqual([10_019, 10_001, 333_333, 19_999]);
+    expect((await familyOf(f.id))!.treasury).toBe(10_019 + 10_001 + 333_333 + 19_999);
     await expectLedgerChain(f.id, { treasury: 0, earnings: 0 });
   });
 
@@ -192,9 +190,9 @@ describe("deposits: amount parsing through the Deposit modal", () => {
     const before = await sheet();
     const [a, b] = await Promise.all([submit("deposit", boss, { amount: "2m" }), submit("deposit", boss, { amount: "2m" })]);
     expectConserved(before, await sheet());
-    expect([said(a), said(b)].filter((s) => s.includes("Deposited 1,900,000"))).toHaveLength(1);
+    expect([said(a), said(b)].filter((s) => s.includes("Deposited 2,000,000"))).toHaveLength(1);
     expect(await walletOf(boss)).toBe(1_000_000);
-    expect((await familyOf(f.id))!.treasury).toBe(1_900_000);
+    expect((await familyOf(f.id))!.treasury).toBe(2_000_000);
     expect(await ledgerRows(f.id, "deposit")).toHaveLength(1);
   });
 
@@ -214,7 +212,7 @@ describe("deposits: amount parsing through the Deposit modal", () => {
     const fam = (await familyOf(f.id))!;
     const deposits = await ledgerRows(f.id, "deposit");
     const dues = await ledgerRows(f.id, "dues");
-    expect(fam.treasury + fam.earnings).toBe(50_000 + deposits.length * 950_000 + (await ledgerRows(f.id, "racket_income")).length * 77_777 - dues.length * 120_000);
+    expect(fam.treasury + fam.earnings).toBe(50_000 + deposits.length * 1_000_000 + (await ledgerRows(f.id, "racket_income")).length * 77_777 - dues.length * 120_000);
   });
 
   it("a deposit racing the depositor's leave: either the deposit lands (and stays) or nothing is charged", async () => {
@@ -227,7 +225,7 @@ describe("deposits: amount parsing through the Deposit modal", () => {
       const [dep, left] = await Promise.allSettled([depositToVault(m, 500_000), leaveFamily(m)]);
       expectConserved(before, await sheet());
       const fam = (await familyOf(f.id))!;
-      if (dep.status === "fulfilled") expect(fam.treasury).toBe(475_000);
+      if (dep.status === "fulfilled") expect(fam.treasury).toBe(500_000);
       else expect(await walletOf(m)).toBe(1_000_000);
       expect(left.status).toBe("fulfilled");
       expect(await testPrisma.familyMember.count({ where: { familyId: f.id } })).toBe(1);
@@ -240,7 +238,7 @@ describe("deposits: amount parsing through the Deposit modal", () => {
     const f = await seedFamily({ bossId: boss, members: [{ userId: m, role: "SOLDIER", joinedAt: daysAgo(10) }] });
     await conserved(async () => { await depositToVault(m, 1_000_000); await leaveFamily(m); });
     expect(await walletOf(m)).toBe(0);
-    expect((await familyOf(f.id))!.treasury).toBe(950_000);
+    expect((await familyOf(f.id))!.treasury).toBe(1_000_000);
   });
 
   it("a jailed member's Deposit modal is refused and charges nothing", async () => {
@@ -295,8 +293,8 @@ describe("payday: the two-phase PaydayShare", () => {
     ]);
     expectConserved(before, await sheet());
     expect(pay.status).toBe("paid");
-    expect(dep.net).toBe(1_900_000);
-    expect(await familyOf(family.id)).toMatchObject({ treasury: 1_900_000, earnings: 0 });
+    expect(dep.amount).toBe(2_000_000);
+    expect(await familyOf(family.id)).toMatchObject({ treasury: 2_000_000, earnings: 0 });
     expect(await walletOf(soldiers[0])).toBe(5_000_000 - 2_000_000 + 950_000);
     await expectLedgerChain(family.id, { treasury: 0, earnings: 3_000_000 });
   });
@@ -461,11 +459,11 @@ describe("dues and arrears", () => {
     const f = await seedFamily({ bossId: boss, level: 3, duesArrears: 4 });
     expect(arrearsOwed({ duesArrears: 4, level: 3 })).toBe(480_000);
     await conserved(async () => {
-      await depositToVault(boss, 500_000);                     // net 475,000 < 480,000
-      expect(await familyOf(f.id)).toMatchObject({ treasury: 475_000, duesArrears: 4 });
-      await depositToVault(boss, 10_000);                      // net 9,500 → 484,500 ≥ 480,000
+      await depositToVault(boss, 470_000);                     // 470,000 < 480,000
+      expect(await familyOf(f.id)).toMatchObject({ treasury: 470_000, duesArrears: 4 });
+      await depositToVault(boss, 20_000);                      // 490,000 ≥ 480,000
     });
-    expect(await familyOf(f.id)).toMatchObject({ treasury: 4_500, duesArrears: 0 });
+    expect(await familyOf(f.id)).toMatchObject({ treasury: 10_000, duesArrears: 0 });
     expect(await ledgerRows(f.id, "dues")).toHaveLength(1);
     await expectLedgerChain(f.id, { treasury: 0, earnings: 0 });
   });
@@ -475,7 +473,7 @@ describe("dues and arrears", () => {
     const b = await player({ wallet: 1_000_000 });
     const f = await seedFamily({ bossId: a, level: 1, duesArrears: 5, members: [{ userId: b, role: "SOLDIER", joinedAt: daysAgo(10) }] });
     await conserved(() => Promise.all([depositToVault(a, 500_000), depositToVault(b, 500_000)]));
-    expect(await familyOf(f.id)).toMatchObject({ treasury: 950_000 - 200_000, duesArrears: 0 });
+    expect(await familyOf(f.id)).toMatchObject({ treasury: 1_000_000 - 200_000, duesArrears: 0 });
     expect(await ledgerRows(f.id, "dues")).toHaveLength(1);
   });
 

@@ -300,7 +300,7 @@ export const CATEGORIES: CategoryData[] = [
           "promote <user> — move a member up one rank (Capo needs 10,000,000 net worth)",
           "demote <user> — move a member down one rank",
           "handover <user> — hand the Boss chair to a member",
-          "deposit <amount|all> — add wallet money to the vault (5% tax)",
+          "deposit <amount|all> — add wallet money to the vault (no tax)",
           "vault — vault balances, dues and recent entries",
           "payday — pay vault earnings out to active members (Boss, Underboss)",
           "levelup — spend the level fee to level up (Boss, Underboss)",

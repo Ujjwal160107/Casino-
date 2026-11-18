@@ -119,13 +119,13 @@ export async function resolveDepositAmount(uid: string, raw: string, now: Date):
 }
 
 /**
- * Spec 7.2: wallet → treasury, 5% burned inline (never applyTransferTax, so
- * Tax Shield never applies), capped per member per UTC day by a CAS on the
- * member row. A refusal anywhere rolls the wallet debit back.
+ * Spec 7.2: wallet → treasury, untaxed (owner rule 2026-11-18: vault money is
+ * off the books, so only payday is taxed), capped per member per UTC day by a
+ * CAS on the member row. A refusal anywhere rolls the wallet debit back.
  */
 export async function depositToVault(
   uid: string, amount: number, now: Date = new Date(),
-): Promise<{ amount: number; tax: number; net: number; leftToday: number }> {
+): Promise<{ amount: number; leftToday: number }> {
   const { family, member } = await requireMembership(uid);
   await assertNotJailed(uid);
   if (!Number.isInteger(amount)) throw new FamilyError("Deposit a whole number of fortunes.");
@@ -133,13 +133,11 @@ export async function depositToVault(
   if (leftNow === 0 || amount > leftNow) throw capReached(leftNow);
   if (amount < CRIME_FAMILY_CONFIG.depositMin) throw new FamilyError(`Minimum deposit is ${fmtFortunes(CRIME_FAMILY_CONFIG.depositMin)}.`);
 
-  const tax = Math.floor(amount * CRIME_FAMILY_CONFIG.vaultTaxRate);
-  const net = amount - tax;
   const today = utcDayKey(now);
   const cap = CRIME_FAMILY_CONFIG.depositDailyCap;
 
   const leftToday = await runFamilyTx(async (tx) => {
-    await debitWalletInTx(tx, uid, amount, "family_vault_deposit", { familyId: family.id, tax });
+    await debitWalletInTx(tx, uid, amount, "family_vault_deposit", { familyId: family.id });
     const row = await tx.familyMember.findUnique({ where: { userId: uid } });
     if (!row || row.familyId !== family.id) throw new FamilyError(NOT_IN_FAMILY);
     const sameDay = row.depositDayKey === today;
@@ -156,19 +154,15 @@ export async function depositToVault(
       if (!fresh || fresh.familyId !== family.id) throw new FamilyError(NOT_IN_FAMILY);
       throw capReached(depositLeftToday(fresh, now));
     }
-    const updated = await tx.family.update({ where: { id: family.id }, data: { treasury: { increment: net } } });
+    const updated = await tx.family.update({ where: { id: family.id }, data: { treasury: { increment: amount } } });
     await writeLedger(tx, {
-      familyId: family.id, actorId: uid, type: "deposit", amount: net, treasuryAfter: updated.treasury, earningsAfter: updated.earnings,
-    });
-    await writeLedger(tx, {
-      familyId: family.id, actorId: uid, type: "deposit_tax", amount: 0, treasuryAfter: updated.treasury, earningsAfter: updated.earnings,
-      meta: { burned: tax },
+      familyId: family.id, actorId: uid, type: "deposit", amount, treasuryAfter: updated.treasury, earningsAfter: updated.earnings,
     });
     await retryArrears(tx, family.id, uid);
     return (sameDay ? cap - row.depositedToday : cap) - amount;
   });
   await invalidateUsers([uid]);
-  return { amount, tax, net, leftToday };
+  return { amount, leftToday };
 }
 
 /**

@@ -41,14 +41,14 @@ describe("creditEarnings and arrears (7.4)", () => {
 });
 
 describe("deposits (7.2)", () => {
-  it("taxes 5% inline even under Tax Shield and locks the rest in treasury", async () => {
+  it("is untaxed: the whole amount locks in treasury and no deposit_tax row is written", async () => {
     const boss = await seedEligibleUser({ wallet: 2_000_000 });
     const f = await seedFamily({ bossId: boss });
-    await testRedis().set(`tax_shield:${boss}`, JSON.stringify({ active: true }), "EX", 600);
-    expect(await depositToVault(boss, 1_000_000)).toMatchObject({ tax: 50_000, net: 950_000 });
+    expect(await depositToVault(boss, 1_000_000)).toMatchObject({ amount: 1_000_000 });
     expect(await wallet(boss)).toBe(1_000_000);
-    expect(await fam(f.id)).toMatchObject({ treasury: 950_000, earnings: 0 });
-    expect(await testPrisma.familyLedger.findFirst({ where: { familyId: f.id, type: "deposit_tax" } })).toMatchObject({ amount: 0, meta: { burned: 50_000 } });
+    expect(await fam(f.id)).toMatchObject({ treasury: 1_000_000, earnings: 0 });
+    expect(await testPrisma.familyLedger.findFirst({ where: { familyId: f.id, type: "deposit" } })).toMatchObject({ amount: 1_000_000 });
+    expect(await testPrisma.familyLedger.count({ where: { familyId: f.id, type: "deposit_tax" } })).toBe(0);
   });
   it("refuses under the minimum, a non-integer, a jailed member and a non-member", async () => {
     const boss = await seedEligibleUser({ wallet: 1_000_000 });

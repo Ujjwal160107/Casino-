@@ -96,7 +96,7 @@ describe("!crew", () => {
     for (const bad of ["-5m", "abc"]) expect((await crew(boss, `deposit ${bad}`)).said()).toContain("Enter a positive amount like 250k or 5m");
     await crew(boss, "deposit all");
     expect((await testPrisma.wallet.findUnique({ where: { userId: boss } }))!.balance).toBe(15_000_000);
-    expect((await testPrisma.family.findUnique({ where: { id: f.id } }))!.treasury).toBe(23_750_000);
+    expect((await testPrisma.family.findUnique({ where: { id: f.id } }))!.treasury).toBe(25_000_000);
     expect((await crew(boss, "deposit all")).said()).toContain("Daily deposit cap reached (0 left today).");
   });
 

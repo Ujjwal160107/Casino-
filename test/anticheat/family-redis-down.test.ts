@@ -74,9 +74,9 @@ describe("with Redis down", () => {
     const inv = await inviteMember({ inviterId: boss, inviteeId: joinerId, guildId: "g1", channelId: "c1" });
     expect((await acceptInvite(inv.id, joinerId)).member).toMatchObject({ familyId: family.id, role: "SOLDIER" });
 
-    expect(await depositToVault(joinerId, 1_000_000)).toMatchObject({ tax: 50_000, net: 950_000 });
+    expect(await depositToVault(joinerId, 1_000_000)).toMatchObject({ amount: 1_000_000 });
     expect(await wallet(joinerId)).toBe(1_000_000);
-    expect(await testPrisma.family.findUnique({ where: { id: family.id } })).toMatchObject({ treasury: 950_000 });
+    expect(await testPrisma.family.findUnique({ where: { id: family.id } })).toMatchObject({ treasury: 1_000_000 });
   });
 
   it("executePayday pays every eligible member", async () => {
