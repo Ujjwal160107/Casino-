@@ -340,15 +340,17 @@ function familyNotice(iconKey: string, title: string, body: string, row?: Status
   return noticeContainer(cfNoticeEmote(iconKey), title, body, FAMILY_HINT, row);
 }
 
-export function familyInviteNotice(v: {
-  familyLabel: string; inviterId: string; tag: string; expiresAt: Date; jumpUrl: string | null;
-}): ContainerBuilder {
+/** `row` is the invite's Accept / Decline buttons, the same ones as on the S4 card. */
+export function familyInviteNotice(
+  v: { familyLabel: string; inviterId: string; expiresAt: Date; jumpUrl: string | null },
+  row: ActionRowBuilder<ButtonBuilder>,
+): ContainerBuilder {
   const expires = Math.floor(v.expiresAt.getTime() / 1000);
   let body =
     `<@${v.inviterId}> invited you to join **${v.familyLabel}**.\n` +
-    `Accept with \`!crew accept ${v.tag}\` or decline with \`!crew decline ${v.tag}\`. The invite expires <t:${expires}:R>.`;
+    `Accept or decline with the buttons below. The invite expires <t:${expires}:R>.`;
   if (v.jumpUrl) body += `\n[See the invite](${v.jumpUrl})`;
-  return familyNotice("crest_1", "You're invited to a crime family", body);
+  return familyNotice("crest_1", "You're invited to a crime family", body).addActionRowComponents(row);
 }
 
 export type FamilyRoleNoticeKind = "kicked" | "promoted" | "demoted" | "chair_claimed" | "chair_handed";

@@ -78,9 +78,10 @@ describe("!crew", () => {
     const boss = await seedEligibleUser(); const invitee = await seedEligibleUser();
     await seedFamily({ bossId: boss });
     const m = await crew(boss, `invite ${invitee}`, { firstReplyFails: true });
-    expect(await testPrisma.familyInvite.findFirst({ where: { inviteeId: invitee } })).toMatchObject({ status: "PENDING", messageId: "" });
+    const inv = await testPrisma.familyInvite.findFirst({ where: { inviteeId: invitee } });
+    expect(inv).toMatchObject({ status: "PENDING", messageId: "" });
     expect([...m.dm.keys()]).toEqual([invitee]);
-    expect(JSON.stringify(m.dmLast.get(invitee))).toContain("crew accept");
+    expect(JSON.stringify(m.dmLast.get(invitee))).toContain(CREW_IDS.invite("accept", inv!.id));
     expect(JSON.stringify(m.dmLast.get(invitee))).not.toContain("discord.com/channels");
   });
 

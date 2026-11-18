@@ -23,7 +23,7 @@ import {
   sendOptOutDm,
 } from "../../services/dmNoticeService";
 import { fmtFortunes } from "../../utils/format";
-import { buildClaimResolved, buildInviteResolved } from "./familyScreens";
+import { buildClaimResolved, buildInviteResolved, inviteButtons } from "./familyScreens";
 import { buildNotice } from "./kit";
 import { editChannelMessage, jumpLink, sendToChannel } from "./post";
 import { announceExpiredApplications } from "./recruitAnnounce";
@@ -137,10 +137,9 @@ export async function announceInvite(client: Client, invite: FamilyInvite & { fa
     await sendOptOutDm(client, invite.inviteeId, "family", familyInviteNotice({
       familyLabel: familyLabel(invite.family),
       inviterId: invite.inviterId,
-      tag: invite.family.tag,
       expiresAt: invite.expiresAt,
       jumpUrl: messageId ? jumpLink(invite.guildId, invite.channelId, messageId) : null,
-    }));
+    }, inviteButtons(invite.id)));
   });
 }
 

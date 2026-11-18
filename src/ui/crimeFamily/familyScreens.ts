@@ -11,6 +11,7 @@ import {
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   type AttachmentBuilder,
+  type ButtonBuilder,
 } from "discord.js";
 import { Mascot } from "../../config/branding";
 import { FAMILY_ROLES, leagueOf, type FamilyRole } from "../../data/crimeFamilyCatalog";
@@ -172,11 +173,16 @@ export function buildInviteCard(v: InviteView): CfPayload {
       `Members ${v.memberCount}/${v.memberCap} · expires ${rel(v.expiresAt)}\n` +
       `-# Joining needs the family join gates. Leaving later means ${hop} days before you can join another family.`,
     ))
-    .addActionRowComponents(buttonRow(
-      cfButton(CREW_IDS.invite("accept", v.inviteId), "Accept", ButtonStyle.Success),
-      cfButton(CREW_IDS.invite("decline", v.inviteId), "Decline"),
-    ));
+    .addActionRowComponents(inviteButtons(v.inviteId));
   return cfPayload(container, { files: file ? [file] : undefined, mentionUsers: [v.inviteeId] });
+}
+
+/** Accept / Decline for one invite: on the S4 card and on the invitee's DM (the press works from either). */
+export function inviteButtons(inviteId: string): ActionRowBuilder<ButtonBuilder> {
+  return buttonRow(
+    cfButton(CREW_IDS.invite("accept", inviteId), "Accept", ButtonStyle.Success),
+    cfButton(CREW_IDS.invite("decline", inviteId), "Decline"),
+  );
 }
 
 /**

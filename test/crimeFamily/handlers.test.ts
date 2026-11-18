@@ -131,6 +131,15 @@ describe("crime family interactions", () => {
     expect(said(acc)).toContain("Crime Families are not open yet.");
     expect(await testPrisma.familyMember.findUnique({ where: { userId: invitee } })).toBeNull();
   }));
+  it("Accept pressed on the invite DM (no guild) joins the family", async () => {
+    const boss = await seedEligibleUser(); const invitee = await seedEligibleUser({ wallet: 2_000_000 });
+    const f = await seedFamily({ bossId: boss });
+    const inv = await inviteMember({ inviterId: boss, inviteeId: invitee, guildId: "g1", channelId: "c1" });
+    const dm = fakeButton(CREW_IDS.invite("accept", inv.id), { userId: invitee, guildId: null });
+    await handleCrimeFamilyInteraction(dm as any);
+    expect(said(dm)).toContain("You joined");
+    expect(await testPrisma.familyMember.findUnique({ where: { userId: invitee } })).toMatchObject({ familyId: f.id, role: "SOLDIER" });
+  });
   it("create from a DM is refused under enabled (it needs a server; A20)", async () => {
     const founder = await seedEligibleUser({ wallet: 15_000_000 });
     await withCfConfig({ enabled: true }, async () => {

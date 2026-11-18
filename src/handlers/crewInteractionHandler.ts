@@ -254,7 +254,7 @@ const inviteRoute: CfRoute = async (i, [answer, inviteId]) => {
   if (answer === "accept") {
     const { family } = await acceptInvite(inviteId, uid);
     await resolveInviteCard(i.client, inviteId, `Accepted by <@${uid}>`);
-    return show(i, notice(`You joined **${familyLabel(family)}**. Open it with \`!crew\`.`));
+    return show(i, notice(`You joined **${familyLabel(family)}**. Open it with \`/crew\`.`));
   }
   await declineInvite(inviteId, uid);
   await resolveInviteCard(i.client, inviteId, "Declined");

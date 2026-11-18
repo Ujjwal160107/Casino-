@@ -3,6 +3,8 @@ import { DM_NOTICE_TYPES, isCooldownReminderType } from "../../src/services/dmPr
 import { caperGoNotice, caperLobbyNotice, familyArrearsNotice, familyInviteNotice, notifyMany, turfWarSoonNotice } from "../../src/services/dmNoticeService";
 import { briefRow, joinSelectRow } from "../../src/ui/crimeFamily/caperScreens";
 import { warActionRow } from "../../src/ui/crimeFamily/turfScreens";
+import { inviteButtons } from "../../src/ui/crimeFamily/familyScreens";
+import { CREW_IDS } from "../../src/ui/crimeFamily/ids";
 import { cfPayload } from "../../src/ui/crimeFamily/kit";
 import { countComponents } from "../crimeFamily/layoutHelpers";
 import { visibleText } from "../crimeFamily/visibleText";
@@ -15,33 +17,39 @@ import { fakeClient } from "../crimeFamily/fakeClient";
 const count = (n: any): number => 1 + (n.components ?? []).reduce((s: number, c: any) => s + count(c), 0) + (n.accessory ? 1 : 0);
 import { setEmojiRecord } from "../../src/utils/emojiRegistry";
 
+const INV = "65f0000000000000000000ab";
+
 describe("family DM notices (13.4)", () => {
   it("family is an account notice with no command", () => {
     expect(DM_NOTICE_TYPES.family).toEqual({ label: "Crime family", group: "account" });
     expect(isCooldownReminderType("family")).toBe(false);
   });
-  it("the invite notice tells the player how to accept and links the card", () => {
-    const c = familyInviteNotice({ familyLabel: "[VLA] Velvet Ante", inviterId: "1", tag: "VLA", expiresAt: new Date(Date.now() + 864e5), jumpUrl: "https://discord.com/channels/1/2/3" });
-    expect(containerText(c)).toContain("!crew accept VLA");
+  it("the invite notice carries the card's Accept / Decline buttons and links the card", () => {
+    const c = familyInviteNotice({ familyLabel: "[VLA] Velvet Ante", inviterId: "1", expiresAt: new Date(Date.now() + 864e5), jumpUrl: "https://discord.com/channels/1/2/3" }, inviteButtons(INV));
+    expect(containerText(c)).toContain("Accept or decline with the buttons below.");
+    expect(containerText(c)).not.toContain("!crew");
     expect(containerText(c)).toContain("https://discord.com/channels/1/2/3");
+    const ids = JSON.stringify(c.toJSON());
+    expect(ids).toContain(CREW_IDS.invite("accept", INV));
+    expect(ids).toContain(CREW_IDS.invite("decline", INV));
   });
   it("the arrears notice prints days as a plain count, singular or plural", () => {
     expect(containerText(familyArrearsNotice({ familyLabel: "x", days: 1, owed: 5_000 }))).toContain("**In arrears:** 1 day\n");
     expect(containerText(familyArrearsNotice({ familyLabel: "x", days: 3, owed: 5_000 }))).toContain("**In arrears:** 3 days\n");
   });
   it("uses the Gun emote as the thumbnail while no cf emoji is loaded", () => {
-    expect(containerThumb(familyInviteNotice({ familyLabel: "x", inviterId: "1", tag: "VLA", expiresAt: new Date(), jumpUrl: null }))).toContain("1456729243399753752");
+    expect(containerThumb(familyInviteNotice({ familyLabel: "x", inviterId: "1", expiresAt: new Date(), jumpUrl: null }, inviteButtons(INV)))).toContain("1456729243399753752");
   });
   it("respects the family toggle", async () => {
     await seedUser("fam-dm-off", { disabledReminders: ["family"] } as any);
     await seedUser("fam-dm-on");
     const dm = fakeDmClient();
-    await notifyMany(dm.client, "family", ["fam-dm-off", "fam-dm-on"], () => familyInviteNotice({ familyLabel: "x", inviterId: "1", tag: "VLA", expiresAt: new Date(), jumpUrl: null }));
+    await notifyMany(dm.client, "family", ["fam-dm-off", "fam-dm-on"], () => familyInviteNotice({ familyLabel: "x", inviterId: "1", expiresAt: new Date(), jumpUrl: null }, inviteButtons(INV)));
     expect([...dm.sent.keys()]).toEqual(["fam-dm-on"]);
   });
   it("uses the cf_crest_1 emoji as the thumbnail once it is loaded", () => {
     setEmojiRecord("cf_crest_1", { id: "1234567890123456789", name: "cf_crest_1" });
-    expect(containerThumb(familyInviteNotice({ familyLabel: "x", inviterId: "1", tag: "VLA", expiresAt: new Date(), jumpUrl: null }))).toContain("1234567890123456789");
+    expect(containerThumb(familyInviteNotice({ familyLabel: "x", inviterId: "1", expiresAt: new Date(), jumpUrl: null }, inviteButtons(INV)))).toContain("1234567890123456789");
   });
 });
 
