@@ -199,27 +199,6 @@ const JS_PAGE_ITEMS: Record<number, string[]> = {
   ],
 };
 
-// The Job Store art was drawn against a pre-overhaul price sheet and still
-// shows the old, cheaper numbers — a player reading "120,000" off the picture
-// gets charged 800,000. Until the art is redrawn, print the real prices under
-// the image, read off JOB_SHOP_CATALOG so the shelf tracks whatever `!shop
-// buy` actually charges. Numbering matches the info buttons and the picture's
-// reading order (left to right, top to bottom).
-function buildJobPriceShelfText(page: number): string {
-  const lines = (JS_PAGE_ITEMS[page] ?? [])
-    .map((key, idx) => {
-      const entry = JOB_SHOP_CATALOG.find((i) => i.key === key);
-      return entry ? `**${idx + 1}. ${entry.name}** — ${fmtCurrency(entry.price)}` : null;
-    })
-    .filter((l): l is string => l !== null);
-
-  return [
-    "### Prices",
-    "-# The picture is out of date — these are what `!shop buy` charges.",
-    ...lines,
-  ].join("\n");
-}
-
 // Uni Store: 9 items on 1 image page
 const US_PAGE_ITEMS: string[] = [
   "study_laptop", "textbook_bundle", "lab_kit", "calculator_pro",
@@ -579,7 +558,7 @@ export function buildJobStoreMessage(page: number, ownerId: string, disabled = f
       new SectionBuilder()
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
-            `## ${CATEGORY_EMOJI_STRINGS["JOB"] ?? ""} Job Store\n-# Page ${safePage}/${JS_TOTAL_PAGES} — press a number for item details; prices are listed below the picture`,
+            `## ${CATEGORY_EMOJI_STRINGS["JOB"] ?? ""} Job Store\n-# Page ${safePage}/${JS_TOTAL_PAGES} — press a number for item details`,
           ),
         )
         .setThumbnailAccessory(
@@ -594,11 +573,7 @@ export function buildJobStoreMessage(page: number, ownerId: string, disabled = f
           .setURL(`attachment://${attachmentName}`)
           .setDescription(`Job Store page ${safePage}`),
       ),
-    )
-    .addSeparatorComponents(
-      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true),
-    )
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(buildJobPriceShelfText(safePage)));
+    );
 
   // Numbered info buttons for this page's items
   const pageItems = JS_PAGE_ITEMS[safePage] ?? [];
